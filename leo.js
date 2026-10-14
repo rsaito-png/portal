@@ -459,27 +459,39 @@ const PLAN_DEMO_ROWS = [
   { 児童名: '児童C', 現在の期: '3期', 現在の計画期間: '2026年4月〜2026年9月', 次期開始月: '2026年10月', フォーム送付目安日: '至急', フォーム回答日: '2026/09/20', 計画書作成: '済', 原案署名: '済', 本案署名: '未', 備考: '（見本）会議日の調整中' },
   { 児童名: '児童D', 現在の期: '1期', 現在の計画期間: '2026年10月〜2027年3月', 次期開始月: '2027年4月', フォーム送付目安日: '2027/03/15', フォーム回答日: '2026/09/18', 計画書作成: '済', 原案署名: '済', 本案署名: '済', 備考: '' },
 ];
+// 段階ごとに開く資料（leo_plan_links.kind）。児童ごとの個別リンクはDB（ログインした職員だけ読める）。公開リポには置かない
+const STEP_KINDS = [[], ['monitoring'], ['answer'], ['plan'], ['plan', 'tracker'], ['consent_genan'], ['plan'], ['consent_honan'], ['plan']];
+const STEP_COMMON = [[], ['アンケート'], ['管理表'], ['計画フォルダ'], ['管理表'], ['同意リンク一覧'], [], ['同意リンク一覧'], []];
+const PLAN_DEMO_LINKS = ['児童A', '児童B', '児童C', '児童D'].flatMap(c => [['plan', '（見本）今の計画書'], ['tracker', '（見本）管理表の行'], ['answer', '（見本）アンケート回答'],
+  ['consent_genan', '（見本）原案の同意リンク'], ['consent_honan', '（見本）本案の同意リンク'], ['monitoring', '（見本）モニタリング記録フォルダ']].map(([kind, label], i) => ({ child: c, sort: i, kind, label, url: '#leo/plan' })));
 LEO_VIEWS.plan = async function () {
-  const rows = DEMO ? PLAN_DEMO_ROWS : await sheetRows('keikaku'), t = new Date(today() + 'T00:00:00+09:00');
-  const L = k => `<a href="${PLAN_LINKS[k]}" target="_blank">${k} ↗</a>`;
-  const cards = rows.filter(r => r['児童名']).map(r => {
+  const [rows0, links] = await Promise.all([DEMO ? PLAN_DEMO_ROWS : sheetRows('keikaku'), DEMO ? PLAN_DEMO_LINKS : sb('leo_plan_links?order=child,sort').catch(() => [])]);
+  const rows = rows0.filter(r => r['児童名'] && !String(r['児童名']).startsWith('※')), t = new Date(today() + 'T00:00:00+09:00');
+  const LK = {}; links.forEach(l => (LK[l.child.replace(/\s/g, '')] ||= []).push(l));
+  const btn = (href, label, main) => `<a href="${esc(href)}" target="${href.startsWith('#') ? '_self' : '_blank'}" rel="noopener" style="display:block;margin:6px 0;padding:12px;border-radius:8px;text-decoration:none;font-size:16px;${main ? 'background:#e8833a;color:#fff' : 'background:#f3f3f3;color:#222'}">${esc(label)} ↗</a>`;
+  const L = k => btn(PLAN_LINKS[k], k);
+  const cards = rows.map(r => {
     const m = String(r['次期開始月'] || '').match(/(\d{4})年(\d{1,2})月/), st = planStage(r), d = m ? planDates(+m[1], +m[2]) : null;
-    const over = d && st < 8 && d.start < t, soon = d && st < 8 && !over && (d.start - t) / 864e5 <= 45;
-    const step = PLAN_FLOW[st];
-    return { r, st, d, over, soon, html: `<div class="card rec" style="border-left:6px solid ${st >= 8 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'}">
-      <b>${esc(r['児童名'])}</b>　次は ${esc(r['次期開始月'] || '？')} から（${esc(r['現在の期'] || '')}の次）${over ? ' <span class="badge">開始月を過ぎています</span>' : ''}
-      <div style="display:flex;gap:2px;margin:6px 0">${PLAN_FLOW.map((_, i) => `<span title="${PLAN_FLOW[i][0]}" style="flex:1;height:8px;border-radius:3px;background:${i < st ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div>
-      ${st >= 8 ? '<small>本案の同意まで済み。計画期間中です。毎日の業務日誌（Q列）が次の材料になります。</small>'
-        : `<b>いま：${step[0]}</b>（${step[1]}）<br><small>${step[2]}</small>${step[3] ? '<br><small>' + step[3].map(L).join('　') + '</small>' : ''}`}
-      ${d && st < 8 ? `<br><small>次の計画期間：${d.start.getFullYear()}/${md(d.start)}〜${d.end.getFullYear()}/${md(d.end)}<br>書類に入れる日付（作成者 齊藤連）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small>` : ''}
-      <br><small style="color:#666">回答日 ${esc(r['フォーム回答日'] || 'まだ')}／計画書作成 ${esc(r['計画書作成'] || '未')}／原案署名 ${esc(r['原案署名'] || '未')}／本案署名 ${esc(r['本案署名'] || '未')}${r['備考'] ? '／' + esc(r['備考']) : ''}</small></div>` };
+    const over = d && st < 8 && d.start < t, soon = d && st < 8 && !over && (d.start - t) / 864e5 <= 45, my = LK[String(r['児童名']).replace(/\s/g, '')] || [];
+    const of = kinds => my.filter(l => kinds.includes(l.kind));
+    const stepLinks = i => [...of(STEP_KINDS[i]).map(l => btn(l.url, l.label, i === st)), ...STEP_COMMON[i].map(k => btn(PLAN_LINKS[k], k + '（全員共通）'))].join('');
+    return { r, st, d, over, html: `<details class="card" style="border-left:6px solid ${st >= 8 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:0">
+      <summary style="padding:14px;cursor:pointer;font-size:17px;list-style:none"><b>${esc(r['児童名'])}</b> <span style="float:right">▼</span><br>
+        <small>${st >= 8 ? '本案まで済み（計画期間中）' : 'いま：' + PLAN_FLOW[st][0]}${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</small>
+        <div style="display:flex;gap:2px;margin-top:6px">${PLAN_FLOW.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${i < st ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div></summary>
+      <div style="padding:0 14px 14px">
+        ${d ? `<p><small>次の計画期間：${d.start.getFullYear()}/${md(d.start)}〜${d.end.getFullYear()}/${md(d.end)}<br>書類に入れる日付（作成者 齊藤連）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : ''}
+        <p><small style="color:#666">${esc(r['現在の期'] || '')}／回答日 ${esc(r['フォーム回答日'] || 'まだ')}／計画書作成 ${esc(r['計画書作成'] || '未')}／原案署名 ${esc(r['原案署名'] || '未')}／本案署名 ${esc(r['本案署名'] || '未')}</small></p>
+        <h4 style="margin:8px 0 2px">この子の資料</h4>${my.length ? my.map(l => btn(l.url, l.label)).join('') : '<p class="note">リンクがまだ登録されていません。</p>'}
+        <h4 style="margin:12px 0 2px">段階ごと（タップで開く）</h4>
+        ${PLAN_FLOW.map(([a, w, x], i) => `<details style="margin:4px 0;border-radius:8px;background:${i === st ? '#fff6d6' : i < st ? '#eef8ee' : '#fafafa'}"><summary style="padding:12px;font-size:15px;cursor:pointer">${i < st ? '✅' : i === st ? '👉' : '⬜'} ${a}（${w}）</summary>
+          <div style="padding:0 12px 10px"><small>${x}</small>${stepLinks(i) || '<p class="note">開く資料はありません。</p>'}</div></details>`).join('')}
+      </div></details>` };
   }).sort((a, b) => (a.st >= 8) - (b.st >= 8) || b.over - a.over || (a.d?.start || 0) - (b.d?.start || 0));
   return `<h3>個別支援計画（いまどこ？）</h3>${demoNote()}
-    <p class="note">「レオ 個別支援計画 管理表」から作っています（見るだけ）。済の入力は管理表と同意フォームで行います。保護者へはLINE 1対1で送ります（ポータルからは送りません）。</p>
-    <p class="note">${['管理表', 'アンケート', '同意リンク一覧', '計画フォルダ', '記録フォルダ'].map(L).join('　')}</p>
-    ${cards.map(c => c.html).join('') || '<p>管理表の行がありません。</p>'}
-    <details class="card"><summary>流れ（6か月ごとにくり返し）</summary><ol style="padding-left:1.2em">${PLAN_FLOW.map(([a, w, x]) => `<li><b>${a.slice(2)}</b>（${w}）<br><small>${x}</small></li>`).join('')}</ol>
-    <small>計画期間は全員、開始月の1日〜6か月目の月末。書類に入れる日付は、作業が遅れても計画開始日から平日をさかのぼった日（本案＝1日、土日祝なら直前の平日／会議・原案・アセスメントはその前の平日に1日ずつ）。同意は原案で1回・本案で1回、別のリンクで。</small></details>`;
+    <p class="note">名前をタップすると、その子の資料と段階ごとのリンクが開きます。正は「レオ 個別支援計画 管理表」（ここは見るだけ）。保護者へはLINE 1対1で送ります（ポータルからは送りません）。</p>
+    ${cards.map((c, i) => DEMO && i === 0 && /open=1/.test(location.search) ? c.html.replace('<details class="card"', '<details open class="card"').replace('<details style="margin:4px 0;border-radius:8px;background:#fff6d6"', '<details open style="margin:4px 0;border-radius:8px;background:#fff6d6"') : c.html).join('') || '<p>管理表の行がありません。</p>'}
+    <details class="card"><summary style="padding:12px;font-size:16px">全員共通のリンク</summary>${['管理表', 'アンケート', '同意リンク一覧', '計画フォルダ', '記録フォルダ'].map(L).join('')}</details>`;
 };
 // ===== 配置表・型表・管理表の入力（児発管・管理者・事務）＋ 送迎の配慮 =====
 const MASTER_LABEL = { kata: '送迎 型表', keikaku: '個別支援計画 管理表', haichi: '職員配置表', care: '送迎の配慮（児童ごと）' };
