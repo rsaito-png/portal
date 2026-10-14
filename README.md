@@ -1,0 +1,18 @@
+# 職員ポータル（MVP）
+
+職員みんなの入口になる1枚のページです。スマホ対応・日本語・メール＋パスワードでログイン。
+
+## 構成
+- `index.html` … 画面と処理（ビルド不要、GitHub Pagesでそのまま公開）
+- `config.js` … **法人ごとの設定（名前・色・事業所・タイル）。他法人に使うときはここだけ変更**
+- ログイン … Supabase Auth（東京リージョン）
+
+## 他の事業所で使う手順
+1. このリポジトリをコピー
+2. Supabaseで東京リージョンのプロジェクトを作り、URLと公開キー（publishable）を `config.js` へ
+3. Supabase の Authentication > Users > Add user で職員を登録（Auto Confirm にチェック）
+4. GitHub Pages を有効化
+
+## 注意
+- 公開キーはブラウザに出してよい種類。秘密キー（service_role / secret）は絶対に書かない
+- 個人データは国内リージョンのみに保存

@@ -1,39 +1,66 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>星心会 職員ポータル</title>
 <style>
+:root{--main:#2e6b4f}
 body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222}
-header{background:#2e6b4f;color:#fff;padding:14px 16px;font-size:18px;display:flex;justify-content:space-between;align-items:center}
+header{background:var(--main);color:#fff;padding:14px 16px;font-size:18px;display:flex;justify-content:space-between;align-items:center}
 main{max-width:640px;margin:auto;padding:16px}
 .card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 3px #0002}
 input,button{font-size:17px;width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #bbb}
-button{background:#2e6b4f;color:#fff;border:0}
+button{background:var(--main);color:#fff;border:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .tile{background:#fff;border-radius:12px;padding:22px 10px;text-align:center;text-decoration:none;color:#222;box-shadow:0 1px 3px #0002;font-size:18px}
 .tile span{display:block;font-size:34px}.tile small{display:block;color:#888;font-size:12px;margin-top:4px}
 #out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:14px}
 #msg{color:#c00;min-height:1em}
 </style></head><body>
-<header>星心会 職員ポータル<button id="out" hidden onclick="logout()">ログアウト</button></header>
+<header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
 <div id="login" class="card"><p>メールアドレスとパスワードでログインしてください。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
 <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
 <button onclick="login()">ログイン</button><div id="msg"></div></div>
 <div id="home" hidden><p id="hi"></p><div class="grid" id="tiles"></div>
-<p style="color:#888;font-size:13px">わからないことは Google Chat の受付でボットに話しかけてください。</p></div>
+<p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
+<script src="config.js"></script>
 <script>
-const URL_='https://zvrardoyxocmqhvyddnf.supabase.co',KEY='sb_publishable_C3S0K18If_cNj6gpgIct9w_3NFMdnCT';
-const TILES=[['📓','日誌','#','準備中'],['🚐','送迎','#','準備中'],['✅','実績','#','準備中'],['📁','書類','#','準備中'],['📅','カレンダー','https://calendar.google.com/','Googleカレンダー'],['⏰','出退勤','https://rsaito-png.github.io/kintai/','テスト版']];
-const $=i=>document.getElementById(i);
-async function login(){$('msg').textContent='';
- const r=await fetch(URL_+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('em').value.trim(),password:$('pw').value})});
- const j=await r.json(); if(!r.ok){$('msg').textContent='ログインできませんでした。メールとパスワードを確認してください。';return}
- localStorage.setItem('sess',JSON.stringify({t:j.access_token,e:j.user.email,x:Date.now()+j.expires_in*1000}));show()}
-function logout(){localStorage.removeItem('sess');location.reload()}
-function show(){const s=JSON.parse(localStorage.getItem('sess')||'null');
- if(!s||s.x<Date.now()){localStorage.removeItem('sess');return}
- $('login').hidden=true;$('home').hidden=false;$('out').hidden=false;$('hi').textContent=s.e+' でログイン中';
- $('tiles').innerHTML=TILES.map(([i,n,u,s])=>`<a class="tile" href="${u}" ${u=='#'?'onclick="alert(\'準備中です\');return false"':'target="_blank"'}><span>${i}</span>${n}<small>${s}</small></a>`).join('')}
-$('pw').addEventListener('keydown',e=>{if(e.key=='Enter')login()});show();
+const C = window.PORTAL_CONFIG;
+const $ = id => document.getElementById(id);
+document.title = C.title;
+$('ttl').textContent = C.title;
+$('help').textContent = C.helpText;
+document.documentElement.style.setProperty('--main', C.themeColor);
+
+// Supabase Auth（メール＋パスワード）でログイン
+async function login() {
+  $('msg').textContent = '';
+  const r = await fetch(C.supabaseUrl + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: $('em').value.trim(), password: $('pw').value }),
+  });
+  const j = await r.json();
+  if (!r.ok) { $('msg').textContent = 'ログインできませんでした。メールとパスワードを確認してください。'; return; }
+  localStorage.setItem('sess', JSON.stringify({ email: j.user.email, exp: Date.now() + j.expires_in * 1000 }));
+  show();
+}
+
+function logout() { localStorage.removeItem('sess'); location.reload(); }
+
+function tileHtml([icon, name, url, note]) {
+  const link = url ? `href="${url}" target="_blank"` : `href="#" onclick="alert('準備中です');return false"`;
+  return `<a class="tile" ${link}><span>${icon}</span>${name}<small>${note}</small></a>`;
+}
+
+function show() {
+  const s = JSON.parse(localStorage.getItem('sess') || 'null');
+  if (!s || s.exp < Date.now()) { localStorage.removeItem('sess'); return; }
+  $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
+  $('hi').textContent = s.email + ' でログイン中';
+  $('tiles').innerHTML = C.tiles.map(tileHtml).join('');
+}
+
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+show();
 </script></body></html>
