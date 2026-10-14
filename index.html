@@ -44,6 +44,7 @@ h3{font-size:15px;color:#555;margin:20px 0 8px}
 </main>
 <script src="config.js"></script>
 <script src="leo.js"></script>
+<script src="uketsuke.js"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -81,6 +82,7 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 function render() {
   const [id, sub] = decodeURIComponent(location.hash.slice(1)).split('/');
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
+  if (id === 'uketsuke') return renderUketsuke();
   const o = C.offices.find(x => x.id === id);
   if (o) {
     $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>

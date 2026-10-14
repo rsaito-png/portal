@@ -61,6 +61,7 @@ window.PORTAL_CONFIG = {
   ],
   // 法人共通（ホームの下に表示）
   shared: { name: '法人共通', tiles: [
+    ['📨', 'Chat受付', '#uketsuke', 'Google Chatの受付窓口に来た依頼・報告'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
     ['🎓', '法定研修', 'https://drive.google.com/open?id=1TlSFx02IxdE-bUeoHRJC-n55MLNFIWgxc6s3IJRP8L4', 'GAS Webアプリ・要確認'],
     ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],

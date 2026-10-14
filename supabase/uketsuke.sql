@@ -1,5 +1,7 @@
+-- uketsuke_debug は動作確認用に一時作成→削除済み
 -- Google Chat 受付窓口：Botが受けた依頼・報告を貯める（書き込みは Edge Function の service_role だけ）
 alter table public.staff_profiles add column if not exists chat_email text unique; -- Google Chat のアカウント（@psr-seishinkai.org）
+alter table public.staff_profiles add column if not exists chat_user text unique;  -- Chat のユーザーID（users/数字）。メールが取れない時もこれで引ける
 create table if not exists public.uketsuke (
   id bigint generated always as identity primary key,
   created_at timestamptz not null default now(),

@@ -4,7 +4,7 @@ import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const AUD = Deno.env.get("CHAT_AUDIENCE")!; // Chat API 設定に入れた HTTP エンドポイント URL と完全一致
-const PORTAL = "https://rsaito-png.github.io/portal/";
+const PORTAL = "https://rsaito-png.github.io/portal/#uketsuke";
 const JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -35,12 +35,8 @@ async function verified(req: Request) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("ok");
-  const ok = await verified(req);
-  const raw = await req.text();
-  const dbg = (n: string) => db.from("uketsuke_debug").insert({ note: n.slice(0, 500) });
-  if (!ok) { await dbg("401 " + lastErr); return new Response("unauthorized", { status: 401 }); }
-  const ev = JSON.parse(raw);
-  await dbg("ok keys=" + Object.keys(ev.chat ?? ev).join(",") + " type=" + (ev.type ?? ""));
+  if (!(await verified(req))) { console.error("401", lastErr); return new Response("unauthorized", { status: 401 }); }
+  const ev = await req.json();
   // 旧形式(Chat API)と Workspace アドオン形式の両方に対応
   const chat = ev.chat ?? null;
   const type = ev.type ?? (chat?.messagePayload ? "MESSAGE" : chat?.addedToSpacePayload ? "ADDED_TO_SPACE" : "");
@@ -59,7 +55,9 @@ Deno.serve(async (req) => {
   const body = (msg.argumentText ?? msg.text ?? "").trim();
   if (!body) return reply("内容を書いて送ってください。");
   const email = (user?.email ?? "").toLowerCase();
-  const { data: sp } = await db.from("staff_profiles").select("office").eq("chat_email", email).maybeSingle();
+  // まず Chat のユーザーID、無ければメールで職員を引く
+  let { data: sp } = await db.from("staff_profiles").select("office").eq("chat_user", user?.name ?? "-").maybeSingle();
+  if (!sp && email) ({ data: sp } = await db.from("staff_profiles").select("office").eq("chat_email", email).maybeSingle());
   const category = classify(body);
   const { data, error } = await db.from("uketsuke").upsert({
     sender_name: user?.displayName, sender_email: email || null, chat_user: user?.name,
