@@ -3,7 +3,7 @@
 const DEMO_DATA = {
   me: '職員X',
   nikki: [
-    { row_no: 9,  kind: '利用', child: '児童A', service: '放デイ', pick_driver: '職員X', pick_place: '〇〇小学校', pick_time: '14:30', pick_car: '1号車', start_time: '14:45', end_time: '17:00', drop_driver: '職員Y', drop_place: '自宅', drop_time: '17:15', drop_car: '2号車', meal: '', snack: 'あり' },
+    { row_no: 9,  kind: '利用', child: '児童A', service: '放デイ', pick_driver: '職員X', pick_place: '〇〇小学校', pick_time: '14:30', pick_car: '1号車', start_time: '14:45', end_time: '17:00', drop_driver: '職員Y', drop_place: '自宅', drop_time: '17:15', drop_car: '2号車', meal: '', snack: 'あり', activity: '（見本）公園で鬼ごっこ。友だちに順番をゆずれた。おやつは完食。' },
     { row_no: 10, kind: '利用', child: '児童B', service: '放デイ', pick_driver: '職員Y', pick_place: '△△小学校', pick_time: '14:40', pick_car: '2号車', start_time: '15:00', end_time: '17:30', drop_driver: '職員X', drop_place: '〇〇園', drop_time: '17:40', drop_car: '1号車', meal: '', snack: 'あり' },
     { row_no: 11, kind: '利用', child: '児童C', service: '児発', pick_driver: '送迎なし', pick_place: '', pick_time: '', pick_car: '', start_time: '10:00', end_time: '13:00', drop_driver: '送迎なし', drop_place: '', drop_time: '', drop_car: '', meal: 'あり', snack: '' },
     { row_no: 20, kind: '欠席', child: '児童D' },
@@ -34,8 +34,8 @@ const DEMO_DATA = {
   ],
 };
 // 日誌で「直せる」項目。直すと1分ほどで Google の日誌に反映（box の apply_edits.py）
-// 食事・おやつは料金に関わるのでポータルでは直さない（日誌で直接）
-const NIKKI_FIELDS = [['pick_place','迎え場所'],['pick_time','迎え時刻'],['pick_driver','迎え運転手'],['start_time','開始'],['end_time','終了'],
+// activity＝日誌Q列（活動記録・LINEからスパークが書く児童の様子）。食事・おやつ・加算は料金に関わるので直さない（日誌で直接）
+const NIKKI_FIELDS = [['activity','活動記録（児童の様子）'],['pick_place','迎え場所'],['pick_time','迎え時刻'],['pick_driver','迎え運転手'],['start_time','開始'],['end_time','終了'],
   ['drop_time','送り時刻'],['drop_driver','送り運転手'],['drop_place','送り場所']];
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
@@ -158,7 +158,9 @@ const LEO_VIEWS = {
     const rows = (await loadNikki()).filter(r => r.kind === '利用');
     return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直したらすぐ日誌に反映されます（1分ほど）。日誌のほうが先に変わっていたときは反映せず「衝突」になります。食事・おやつは日誌で直接直してください。</p>` +
       rows.map(r => `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）
-        ${NIKKI_FIELDS.map(([f, l]) => `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(r[f])}" value="${esc(r[f])}"></label>`).join('')}</div>`).join('') +
+        ${NIKKI_FIELDS.map(([f, l]) => f === 'activity'
+          ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(r[f])}">${esc(r[f])}</textarea></label>`
+          : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(r[f])}" value="${esc(r[f])}"></label>`).join('')}</div>`).join('') +
       `<button onclick="saveNikki()">直した所を送る</button><div id="saved"></div>`;
   },
   async jisseki() {
@@ -171,12 +173,12 @@ const LEO_VIEWS = {
 };
 
 async function saveNikki() {
-  const ch = [...document.querySelectorAll('.rec input')].filter(i => i.value !== i.dataset.old)
+  const ch = [...document.querySelectorAll('.rec input, .rec textarea')].filter(i => i.value !== i.dataset.old)
     .map(i => ({ target: 'nikki', day: today(), row_key: i.dataset.row, field: i.dataset.f, old_value: i.dataset.old, new_value: i.value }));
   if (!ch.length) { $('saved').textContent = '変更はありません。'; return; }
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${ch.length}件の修正）。`; return; }
   try { await sb('leo_edits', { method: 'POST', body: JSON.stringify(ch), headers: { Prefer: 'return=minimal' } });
-    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; document.querySelectorAll(".rec input").forEach(i => { i.dataset.old = i.value; }); }
+    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; document.querySelectorAll(".rec input, .rec textarea").forEach(i => { i.dataset.old = i.value; }); }
   catch (e) { $('saved').textContent = e.message; }
 }
 
