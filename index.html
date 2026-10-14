@@ -10,6 +10,10 @@ input,button{font-size:17px;width:100%;box-sizing:border-box;padding:12px;margin
 button{background:var(--main);color:#fff;border:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .tile{background:#fff;border-radius:12px;padding:22px 10px;text-align:center;text-decoration:none;color:#222;box-shadow:0 1px 3px #0002;font-size:18px}
+.office{border-left:6px solid var(--c);text-align:left;padding:18px 14px}
+.office small{display:inline;margin-left:6px}
+.back{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:8px 14px}
+h3{font-size:15px;color:#555;margin:20px 0 8px}
 .tile span{display:block;font-size:34px}.tile small{display:block;color:#888;font-size:12px;margin-top:4px}
 #out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:14px}
 #msg{color:#c00;min-height:1em}
@@ -21,7 +25,7 @@ button{background:var(--main);color:#fff;border:0}
 <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
 <button onclick="login()">ログイン</button>
 <button onclick="location.search='?demo=1'" style="background:#fff;color:var(--main);border:1px solid var(--main)">見本を見る</button><div id="msg"></div></div>
-<div id="home" hidden><p id="hi"></p><div class="grid" id="tiles"></div>
+<div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
 <script src="config.js"></script>
@@ -49,13 +53,28 @@ async function login() {
 
 function logout() { localStorage.removeItem('sess'); location.reload(); }
 
-function tileHtml([icon, name, url, note]) {
+function tileHtml([icon, name, url, note], color) {
   const link = url ? `href="${url}" target="_blank"` : `href="#" onclick="alert('準備中です');return false"`;
-  return `<a class="tile" ${link}><span>${icon}</span>${name}<small>${note}</small></a>`;
+  const accent = color ? `style="border-top:4px solid ${color}"` : '';
+  return `<a class="tile" ${link} ${accent}><span>${icon}</span>${name}<small>${note}</small></a>`;
 }
 
-// 見本モード（?demo=1）: ログイン不要・見本データのみ
-const DEMO = new URLSearchParams(location.search).get('demo') === '1';
+// 画面切替は URL の #事業所id で行う（戻るボタン・ブラウザの戻るが両方効く）
+function render() {
+  const id = location.hash.slice(1);
+  const o = C.offices.find(x => x.id === id);
+  if (o) {
+    $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
+      <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
+      <div class="grid">${o.tiles.map(t => tileHtml(t, o.color)).join('')}</div>`;
+    return;
+  }
+  $('view').innerHTML = `<h3>事業所をえらんでください</h3>
+    <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.name}<small>${x.kind}</small></a>`).join('')}</div>
+    <h3>${C.shared.name}</h3>
+    <div class="grid">${C.shared.tiles.map(t => tileHtml(t)).join('')}</div>`;
+}
+window.addEventListener('hashchange', render);
 
 function show() {
   const s = DEMO ? { email: '見本（デモ）', exp: Infinity } : JSON.parse(localStorage.getItem('sess') || 'null');
@@ -63,7 +82,7 @@ function show() {
   $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
   $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
   if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
-  $('tiles').innerHTML = C.tiles.map(tileHtml).join('');
+  render();
 }
 
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
