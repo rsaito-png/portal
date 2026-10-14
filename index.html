@@ -29,6 +29,9 @@ h3{font-size:15px;color:#555;margin:20px 0 8px}
 <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
 <button onclick="login()">ログイン</button>
 <button onclick="location.search='?demo=1'" style="background:#fff;color:var(--main);border:1px solid var(--main)">見本を見る</button><div id="msg"></div></div>
+<div id="setpw" class="card" hidden><p>新しいパスワードを決めてください（8文字以上）。</p>
+<input id="npw" type="password" placeholder="新しいパスワード" autocomplete="new-password">
+<button onclick="setPassword()">パスワードを決める</button><div id="pmsg"></div></div>
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
@@ -106,6 +109,20 @@ function show() {
   }
   render();
 }
+
+// パスワード設定リンク（#access_token=...&type=recovery|invite）から来たとき
+const AUTH_HASH = new URLSearchParams(location.hash.slice(1));
+async function setPassword() {
+  const pw = $('npw').value;
+  if (pw.length < 8) { $('pmsg').textContent = '8文字以上にしてください。'; return; }
+  const r = await fetch(C.supabaseUrl + '/auth/v1/user', { method: 'PUT',
+    headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + AUTH_HASH.get('access_token'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw }) });
+  if (!r.ok) { $('pmsg').textContent = 'リンクの期限が切れているかもしれません。管理者に新しいリンクをもらってください。'; return; }
+  history.replaceState(null, '', location.pathname);
+  $('setpw').hidden = true; $('login').hidden = false; $('msg').textContent = 'パスワードを決めました。ログインしてください。';
+}
+if (AUTH_HASH.get('access_token') && ['recovery', 'invite'].includes(AUTH_HASH.get('type'))) { $('login').hidden = true; $('setpw').hidden = false; }
 
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 show();
