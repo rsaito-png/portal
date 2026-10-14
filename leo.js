@@ -381,8 +381,8 @@ LEO_VIEWS.seikyu = async function () {
     <div style="overflow-x:auto"><table class="tbl"><tr>${KID_F.map(([, l]) => `<th>${l}</th>`).join('')}</tr>${kids.map(row).join('')}${(missing.length ? missing.map(n => ({ name: n })) : [{}]).map(row).join('')}</table></div>
     <button onclick="saveKids()">マスタを保存</button> <span id="kd_msg"></span>
     <h4>2. ファイルを作る</h4><label>事業所番号（10桁）<input id="office_no" value="${esc(localStorage.getItem('leo_office_no') || (DEMO ? '9999999999' : ''))}" size="12"></label>
-    <p class="note">事業所全体にかかる減算（かかっている月だけ印を付けます。基本報酬のサービスコードが減算用のコードに変わります）：
-      ${OFFICE_GENSAN.map(([k, l]) => `<label><input type="checkbox" class="og" value="${k}" ${JSON.parse(localStorage.getItem('leo_office_gensan') || '[]').includes(k) ? 'checked' : ''}>${l}</label>`).join(' ')}</p>
+    <p class="note">事業所全体にかかる減算（今はなし。かかった月だけ印を付けます。基本報酬のサービスコードが減算用のコードに変わります）：
+      ${OFFICE_GENSAN.map(([k, l]) => `<label><input type="checkbox" class="og" value="${k}">${l}</label>`).join(' ')}</p>
     <button onclick="makeCsv()">請求CSVを作る（K112/K122・K611）</button><div id="csv_out"></div>`;
 };
 async function saveKids() {
@@ -405,7 +405,7 @@ async function makeCsv() {
     const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children'), { nikki, flags } = await billData(), F = {}, K = {};
     flags.forEach(f => F[f.day + f.child] = f);
     kids.forEach(k => K[k.name] = { ...k, contract_start: (k.contract_start || '').replace(/-/g, ''), first_date: (k.first_date || '').replace(/-/g, '') });
-    const og = [...document.querySelectorAll('input.og:checked')].map(i => i.value); localStorage.setItem('leo_office_gensan', JSON.stringify(og));
+    const og = [...document.querySelectorAll('input.og:checked')].map(i => i.value);
     const recs = nikki.map(n => { const f = F[n.day + n.child] || {}; return { day: n.day, child: n.child, status: n.kind === '欠席' ? '欠席' : '出席', start: n.start_time, end: n.end_time,
       pick: isTrip(n.pick_driver), drop: isTrip(n.drop_driver), holiday: f.holiday, absent_support: f.absent_support, kosodate: f.kosodate }; });
     const ym = BILL_MONTH.replace('-', ''), r = LeoBilling.build(ym, office, K, recs, og), chk = await billChecks(nikki, flags);
