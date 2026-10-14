@@ -176,7 +176,7 @@ async function saveNikki() {
   if (!ch.length) { $('saved').textContent = '変更はありません。'; return; }
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${ch.length}件の修正）。`; return; }
   try { await sb('leo_edits', { method: 'POST', body: JSON.stringify(ch), headers: { Prefer: 'return=minimal' } });
-    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; ch.forEach(() => {}); }
+    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; document.querySelectorAll(".rec input").forEach(i => { i.dataset.old = i.value; }); }
   catch (e) { $('saved').textContent = e.message; }
 }
 
