@@ -26,11 +26,12 @@ window.PORTAL_CONFIG = {
   offices: [
     { id: 'leo', name: 'レオ', kind: '児発・放デイ', color: '#e8833a', tiles: [
       ['💬', '公式LINE', 'https://manager.line.biz/', '報告はこちらから（仮リンク）', 'main'],
-      // 下の2つは表示専用（入力なし）。データ元は既存の自動化でカレンダーに反映済みの送迎・利用予定。あとで接続する
-      ['🚐', '今日の送迎（自分の担当）', 'https://calendar.google.com/', '表示のみ（いまはカレンダーへ）', 'main', ['迎え 9:30 児童A（自宅）', '送り 16:30 児童B（〇〇園）']],
-      ['🧒', '今日の利用児童', 'https://calendar.google.com/', '表示のみ（いまはカレンダーへ）', 'main', ['児童A', '児童B', '児童C', '児童D']],
-      ['📓', '日誌（見る・直す）', 'https://drive.google.com/open?id=1DAC9ncJfUa1lvI88su-tJnUvV4thu2xC8gPXpbyYDWs', '業務日誌2026.10・カレンダーから自動記入（v4）'],
-      ['✅', '実績記録（見る・直す）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から毎晩自動転記'],
+      // 下の2つは表示専用（入力なし）。データ元はカレンダー→毎朝GASで作られた日誌を box が Supabase に同期したもの
+      ['🚐', '今日の送迎（自分の担当）', '#leo/sougei', '日誌（カレンダーから自動）より表示', 'main', ['迎え 9:30 児童A（自宅）', '送り 16:30 児童B（〇〇園）']],
+      ['🧒', '今日の利用児童', '#leo/kids', '日誌より表示', 'main', ['児童A', '児童B', '児童C', '児童D']],
+      ['📓', '日誌（見る・直す）', '#leo/nikki', 'カレンダー＋LINE(スパーク)から自動・ポータルで直せる'],
+      ['📄', '日誌の元シート', 'https://drive.google.com/open?id=1DAC9ncJfUa1lvI88su-tJnUvV4thu2xC8gPXpbyYDWs', '業務日誌2026.10（Google）'],
+      ['✅', '実績記録（見る・直す）', '#leo/jisseki', '日誌から毎晩自動転記'],
       ['🗓️', '送迎 型表', 'https://drive.google.com/open?id=1kzP5UO-ptUw9_jnYGh2ysOXawJbAytI0Dj0AmAgILfM', 'フォームから自動作成・要確認'],
       ['📝', '個別支援計画 管理表', 'https://drive.google.com/open?id=1xJDYdWF1BvZKndQ6FA3OLrMTYPDaQPcYQGrBakcaT7o', 'GAS＋Bot下書き'],
       ['🔍', 'アセスメント（フォーム）', 'https://drive.google.com/open?id=1kspL8oAWVxTwzaqeQZQe684eiUAj9PpcvdpbrqF-gEc', '手入力'],
