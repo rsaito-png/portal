@@ -165,7 +165,7 @@ const LEO_VIEWS = {
   },
   async jisseki() {
     const rows = DEMO ? DEMO_DATA.jisseki : await sb('leo_jisseki?order=day.desc,child&limit=200');
-    return `<h3>実績記録（見る・直す）</h3>${demoNote()}<p class="note">利用料・加算などの請求の項目はここには出しません。</p>
+    return `<h3>実績記録（見るだけ）</h3>${demoNote()}<p class="note">利用料・加算などの請求の項目はここには出しません。</p>
       <table><tr><th>日付</th><th>児童</th><th>状況</th><th>時間</th></tr>${rows.map(r =>
       `<tr><td>${esc(r.day)}</td><td>${esc(r.child)}</td><td>${esc(r.status)}</td><td>${esc(r.start_time)}〜${esc(r.end_time)}</td></tr>`).join('')}</table>
       <p class="note">直したいときは日誌側で直すと、夜の転記で実績にも入ります。</p>`;
