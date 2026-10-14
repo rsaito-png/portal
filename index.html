@@ -16,6 +16,8 @@ button{background:var(--main);color:#fff;border:0}
 .sample{text-align:left;font-size:15px;margin:8px 0 0;padding-left:22px}
 table{width:100%;border-collapse:collapse;background:#fff;font-size:14px}td,th{border-bottom:1px solid #eee;padding:6px 4px;text-align:left}
 .note{color:#888;font-size:13px}.rec{margin:10px 0}.rec label{display:block;font-size:13px;color:#555}.rec input{margin:2px 0 6px;padding:8px}
+.ptabs button{width:auto;margin-right:6px;padding:8px 16px;background:#fff;color:#333;border:1px solid #bbb}.ptabs .on{background:var(--main);color:#fff}
+h4{margin:14px 0 6px;font-size:15px}.kk.over{border-left:6px solid #d33}.kk.soon{border-left:6px solid #e6b800}.kk.ok{opacity:.6}.badge{background:#d33;color:#fff;border-radius:6px;padding:1px 6px;font-size:12px}.kk.soon .badge{background:#e6b800}.kk.ok .badge{background:#888}
 .back{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:8px 14px}
 h3{font-size:15px;color:#555;margin:20px 0 8px}
 .tile span{display:block;font-size:34px}.tile small{display:block;color:#888;font-size:12px;margin-top:4px}
@@ -65,7 +67,7 @@ function logout() { localStorage.removeItem('sess'); location.reload(); }
 
 function tileHtml([icon, name, url, note, size, sample], color) {
   const list = DEMO && sample ? `<ul class="sample">${sample.map(x => `<li>${x}</li>`).join('')}</ul><small>（見本データ）</small>` : `<small>${note}</small>`;
-  const link = url.startsWith('#') ? `href="${url}"` : url ? `href="${url}" target="_blank"` : `href="#" onclick="alert('準備中です');return false"`;
+  const link = url.startsWith('#') || url.endsWith('.html') ? `href="${url}"` : url ? `href="${url}" target="_blank"` : `href="#" onclick="alert('準備中です');return false"`;
   const accent = color ? `style="border-top:4px solid ${color}"` : '';
   return `<a class="tile${size === 'main' ? ' main' : ''}" ${link} ${accent}><span>${icon}</span>${name}${list}</a>`;
 }
@@ -78,7 +80,7 @@ function render() {
   if (o) {
     $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
       <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
-      <div class="grid">${o.tiles.map(t => tileHtml(t, o.color)).join('')}</div>`;
+      <div class="grid">${o.tiles.filter(t => !t[6] || t[6] === ROLE).map(t => tileHtml(t, o.color)).join('')}</div>`;
     return;
   }
   $('view').innerHTML = `<h3>事業所をえらんでください</h3>

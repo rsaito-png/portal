@@ -20,7 +20,7 @@ window.PORTAL_CONFIG = {
     ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'] ] },
 
   // 事業所ごとのタイル（2026-10-14 稼働システム一覧から作成。リンク先は既存のGoogleファイル）
-  // tiles は [アイコン, 名前, リンク(空なら準備中), 補足, 'main'なら横幅いっぱい, 見本モードで出す見本行]
+  // tiles は [アイコン, 名前, リンク(空なら準備中), 補足, 'main'なら横幅いっぱい, 見本モードで出す見本行, 見せる役割（例 '事務'）]
   // 補足の書き方: 「自動」＝仕組みで入る／「手入力」＝人が入れる／「要確認」＝動いているか未確認
   // ※個人データは書かない（このリポジトリは公開）。リンクだけ置く
   offices: [
@@ -32,10 +32,11 @@ window.PORTAL_CONFIG = {
       ['📓', '日誌（見る・直す）', '#leo/nikki', 'カレンダー＋LINE(スパーク)から自動・ポータルで直せる'],
       ['📄', '日誌の元シート', 'https://drive.google.com/open?id=1DAC9ncJfUa1lvI88su-tJnUvV4thu2xC8gPXpbyYDWs', '業務日誌2026.10（Google）'],
       ['✅', '実績記録（見る・直す）', '#leo/jisseki', '日誌から毎晩自動転記'],
-      ['🗓️', '送迎 型表', 'https://drive.google.com/open?id=1kzP5UO-ptUw9_jnYGh2ysOXawJbAytI0Dj0AmAgILfM', 'フォームから自動作成・要確認'],
-      ['📝', '個別支援計画 管理表', 'https://drive.google.com/open?id=1xJDYdWF1BvZKndQ6FA3OLrMTYPDaQPcYQGrBakcaT7o', 'GAS＋Bot下書き'],
+      ['🗓️', '送迎 型表', '#leo/kata', '曜日ごとの迎え・送り（見るだけ）'],
+      ['📝', '個別支援計画 管理表', '#leo/keikaku', '期限が近い順（見るだけ）'],
       ['🔍', 'アセスメント（フォーム）', 'https://drive.google.com/open?id=1kspL8oAWVxTwzaqeQZQe684eiUAj9PpcvdpbrqF-gEc', '手入力'],
-      ['👥', '職員配置表', 'https://drive.google.com/open?id=1n1WLuqYjsChMW7nC47Yadt8yVeESN3oc2H5e8MA9tMc', 'GAS＋手動'],
+      ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ）'],
+      ['🔧', '直した所（事務）', '#leo/edits', '未反映の修正の確認', '', null, '事務'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f', tiles: [
       ['📓', '日誌 Registro Diário', 'https://drive.google.com/open?id=1-v3KYrjbyMuRqIoF8xUG4mEskMUHSMKjDIQkJxBdgw0', 'フォーム回答（手入力）'],
@@ -62,5 +63,6 @@ window.PORTAL_CONFIG = {
   shared: { name: '法人共通', tiles: [
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
     ['🎓', '法定研修', 'https://drive.google.com/open?id=1TlSFx02IxdE-bUeoHRJC-n55MLNFIWgxc6s3IJRP8L4', 'GAS Webアプリ・要確認'],
+    ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
     ['⏰', '出退勤（新・テスト）', 'https://rsaito-png.github.io/kintai/', 'テスト版'] ] },
 };
