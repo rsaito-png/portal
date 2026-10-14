@@ -23,6 +23,7 @@ h3{font-size:15px;color:#555;margin:20px 0 8px}
 .tile span{display:block;font-size:34px}.tile small{display:block;color:#888;font-size:12px;margin-top:4px}
 #out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:14px}
 #msg{color:#c00;min-height:1em}
+.tile .badge{display:inline-block;font-size:13px;margin-bottom:4px}
 </style></head><body>
 <header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
@@ -79,7 +80,8 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 }
 
 // 画面切替は URL の #事業所id で行う（戻るボタン・ブラウザの戻るが両方効く）
-function render() {
+async function render() {
+  if (typeof loadDuty === 'function') await loadDuty();
   const [id, sub] = decodeURIComponent(location.hash.slice(1)).split('/');
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   if (id === 'uketsuke') return renderUketsuke();
@@ -87,7 +89,8 @@ function render() {
   if (o) {
     $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
       <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
-      <div class="grid">${o.tiles.filter(t => !t[6] || t[6] === ROLE).map(t => tileHtml(t, o.color)).join('')}</div>`;
+      <div class="grid">${o.tiles.filter(t => !t[6] || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage())).map(t => tileHtml(t, o.color)).join('')}</div>`;
+    if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
     return;
   }
   $('view').innerHTML = `<h3>事業所をえらんでください</h3>
