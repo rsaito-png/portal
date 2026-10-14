@@ -29,14 +29,14 @@ window.PORTAL_CONFIG = {
       // 下の2つは表示専用（入力なし）。データ元はカレンダー→毎朝GASで作られた日誌を box が Supabase に同期したもの
       ['🚐', '今日の送迎（自分の担当）', '#leo/sougei', '日誌（カレンダーから自動）より表示', 'main', ['迎え 9:30 児童A（自宅）', '送り 16:30 児童B（〇〇園）']],
       ['🧒', '今日の利用児童', '#leo/kids', '日誌より表示', 'main', ['児童A', '児童B', '児童C', '児童D']],
-      ['📓', '日誌（見る・直す）', '#leo/nikki', 'カレンダー＋LINE(スパーク)から自動・ポータルで直せる'],
+      ['📓', '日誌（見る・直す）', '#leo/nikki', '直したらすぐ日誌に反映'],
       ['📄', '日誌の元シート', 'https://drive.google.com/open?id=1DAC9ncJfUa1lvI88su-tJnUvV4thu2xC8gPXpbyYDWs', '業務日誌2026.10（Google）'],
       ['✅', '実績記録（見る・直す）', '#leo/jisseki', '日誌から毎晩自動転記'],
       ['🗓️', '送迎 型表', '#leo/kata', '曜日ごとの迎え・送り（見るだけ）'],
       ['📝', '個別支援計画 管理表', '#leo/keikaku', '期限が近い順（見るだけ）'],
       ['🔍', 'アセスメント（フォーム）', 'https://drive.google.com/open?id=1kspL8oAWVxTwzaqeQZQe684eiUAj9PpcvdpbrqF-gEc', '手入力'],
       ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ）'],
-      ['🔧', '直した所（事務）', '#leo/edits', '未反映の修正の確認', '', null, '事務'],
+      ['🔧', '直した所（事務）', '#leo/edits', '修正の反映状況・衝突の確認', '', null, '事務'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f', tiles: [
       ['📓', '日誌 Registro Diário', 'https://drive.google.com/open?id=1-v3KYrjbyMuRqIoF8xUG4mEskMUHSMKjDIQkJxBdgw0', 'フォーム回答（手入力）'],

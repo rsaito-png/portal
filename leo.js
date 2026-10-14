@@ -29,12 +29,14 @@ const DEMO_DATA = {
   ],
   edits: [
     { day: '(今日)', row_key: '9', field: 'pick_time', old_value: '14:30', new_value: '14:40', who: '職員X', edited_at: '(今日 15:02)', status: '未反映' },
-    { day: '(今日)', row_key: '10', field: 'drop_place', old_value: '自宅', new_value: '〇〇園', who: '職員Y', edited_at: '(今日 16:20)', status: '未反映' },
+    { day: '(今日)', row_key: '10', field: 'drop_place', old_value: '自宅', new_value: '〇〇園', who: '職員Y', edited_at: '(今日 16:20)', status: '衝突', apply_note: 'シートの値が変わっていました（今の値: △△）' },
+    { day: '(昨日)', row_key: '11', field: 'end_time', old_value: '13:00', new_value: '13:30', who: '職員X', edited_at: '(昨日 13:40)', status: '反映済' },
   ],
 };
-// 日誌で「直せる」項目（ポータルでは修正依頼として保存→確認後にGoogleの日誌へ反映）
+// 日誌で「直せる」項目。直すと1分ほどで Google の日誌に反映（box の apply_edits.py）
+// 食事・おやつは料金に関わるのでポータルでは直さない（日誌で直接）
 const NIKKI_FIELDS = [['pick_place','迎え場所'],['pick_time','迎え時刻'],['pick_driver','迎え運転手'],['start_time','開始'],['end_time','終了'],
-  ['drop_time','送り時刻'],['drop_driver','送り運転手'],['drop_place','送り場所'],['meal','食事'],['snack','おやつ']];
+  ['drop_time','送り時刻'],['drop_driver','送り運転手'],['drop_place','送り場所']];
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -140,29 +142,16 @@ const LEO_VIEWS = {
     let rows;
     if (DEMO) rows = DEMO_DATA.edits;
     else {
-      const [e, p] = await Promise.all([sb('leo_edits?status=eq.未反映&order=edited_at.desc&limit=200'), sb('staff_profiles?select=user_id,nikki_name')]);
+      const [e, p] = await Promise.all([sb('leo_edits?order=edited_at.desc&limit=100'), sb('staff_profiles?select=user_id,nikki_name')]);
       const nm = Object.fromEntries(p.map(x => [x.user_id, x.nikki_name]));
       rows = e.map(x => ({ ...x, who: nm[x.edited_by] || '（不明）', edited_at: new Date(x.edited_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) }));
     }
-    const label = Object.fromEntries(NIKKI_FIELDS);
-    return `<h3>直した所（未反映 ${rows.length}件）</h3>${demoNote()}<p class="note">職員がポータルで直した内容です。Googleの日誌にはまだ反映していません（反映は齊藤さんの判断で行います）。</p>` +
-      (rows.length ? `<table><tr><th>日付・行</th><th>項目</th><th>前 → 後</th><th>直した人</th></tr>${rows.map(r =>
-        `<tr><td>${esc(r.day)}<br><small>${esc(r.row_key)}行</small></td><td>${esc(label[r.field] || r.field)}</td><td><s>${esc(r.old_value)}</s> → <b>${esc(r.new_value)}</b></td><td>${esc(r.who)}<br><small>${esc(r.edited_at)}</small></td></tr>`).join('')}</table>` : '<p>未反映の修正はありません。</p>');
-  },
-  async nikki() {
-    PERIOD = 'today';
-    const rows = (await loadNikki()).filter(r => r.kind === '利用');
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直した内容は「修正依頼」として保存され、確認後に日誌へ反映されます。</p>` +
-      rows.map(r => `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）
-        ${NIKKI_FIELDS.map(([f, l]) => `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(r[f])}" value="${esc(r[f])}"></label>`).join('')}</div>`).join('') +
-      `<button onclick="saveNikki()">直した所を送る</button><div id="saved"></div>`;
-  },
-  async jisseki() {
-    const rows = DEMO ? DEMO_DATA.jisseki : await sb('leo_jisseki?order=day.desc,child&limit=200');
-    return `<h3>実績記録（見る・直す）</h3>${demoNote()}<p class="note">利用料・加算などの請求の項目はここには出しません。</p>
-      <table><tr><th>日付</th><th>児童</th><th>状況</th><th>時間</th></tr>${rows.map(r =>
-      `<tr><td>${esc(r.day)}</td><td>${esc(r.child)}</td><td>${esc(r.status)}</td><td>${esc(r.start_time)}〜${esc(r.end_time)}</td></tr>`).join('')}</table>
-      <p class="note">直したいときは日誌側で直すと、夜の転記で実績にも入ります。</p>`;
+    const label = Object.fromEntries([...NIKKI_FIELDS, ['meal', '食事'], ['snack', 'おやつ']]);
+    const cnt = st => rows.filter(r => r.status === st).length;
+    return `<h3>直した所</h3>${demoNote()}<p class="note">職員がポータルで直した内容（最新100件）。直すと1分ほどで日誌に反映されます。<b>衝突</b>は日誌が先に変わっていたため反映していないもの。日誌を見て必要ならもう一度直してください。</p>
+      <p>衝突 <b style="color:#d33">${cnt('衝突')}</b>件・反映待ち ${cnt('未反映')}件・反映済 ${cnt('反映済')}件</p>` +
+      (rows.length ? `<table><tr><th>日付・行</th><th>項目</th><th>前 → 後</th><th>状態</th></tr>${rows.map(r =>
+        `<tr${r.status === '衝突' ? ' style="background:#fdecec"' : ''}><td>${esc(r.day)}<br><small>${esc(r.row_key)}行</small></td><td>${esc(label[r.field] || r.field)}<br><small>${esc(r.who)} ${esc(r.edited_at)}</small></td><td><s>${esc(r.old_value)}</s> → <b>${esc(r.new_value)}</b></td><td>${esc(r.status)}${r.apply_note && r.status !== '反映済' ? `<br><small>${esc(r.apply_note)}</small>` : ''}</td></tr>`).join('')}</table>` : '<p>まだ修正はありません。</p>');
   },
 };
 
@@ -172,7 +161,7 @@ async function saveNikki() {
   if (!ch.length) { $('saved').textContent = '変更はありません。'; return; }
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${ch.length}件の修正）。`; return; }
   try { await sb('leo_edits', { method: 'POST', body: JSON.stringify(ch), headers: { Prefer: 'return=minimal' } });
-    $('saved').textContent = `${ch.length}件の修正依頼を送りました。`; ch.forEach(() => {}); }
+    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; ch.forEach(() => {}); }
   catch (e) { $('saved').textContent = e.message; }
 }
 
