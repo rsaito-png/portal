@@ -16,3 +16,10 @@
 ## 注意
 - 公開キーはブラウザに出してよい種類。秘密キー（service_role / secret）は絶対に書かない
 - 個人データは国内リージョンのみに保存
+
+## 役割（職員／事務）
+- `config.js` の `roles` と `clerk` 区画で設定。事務区画（請求CSV・実績集計）は事務の人にだけ表示
+- 事務にする人は Supabase の SQL Editor で:
+  `update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role":"事務"}' where email = '対象のメール';`
+- 画面で隠しているだけなので、請求データを置くときは Supabase の RLS でも事務だけに制限すること
+- 見本モード: `?demo=1`（職員の見え方）、`?demo=1&role=事務`（事務の見え方）。画面のラジオボタンでも切替可

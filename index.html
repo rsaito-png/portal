@@ -47,7 +47,7 @@ async function login() {
   });
   const j = await r.json();
   if (!r.ok) { $('msg').textContent = 'ログインできませんでした。メールとパスワードを確認してください。'; return; }
-  localStorage.setItem('sess', JSON.stringify({ email: j.user.email, exp: Date.now() + j.expires_in * 1000 }));
+  localStorage.setItem('sess', JSON.stringify({ email: j.user.email, role: (j.user.app_metadata || {}).role || C.defaultRole, exp: Date.now() + j.expires_in * 1000 }));
   show();
 }
 
@@ -72,16 +72,29 @@ function render() {
   $('view').innerHTML = `<h3>事業所をえらんでください</h3>
     <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.name}<small>${x.kind}</small></a>`).join('')}</div>
     <h3>${C.shared.name}</h3>
-    <div class="grid">${C.shared.tiles.map(t => tileHtml(t)).join('')}</div>`;
+    <div class="grid">${C.shared.tiles.map(t => tileHtml(t)).join('')}</div>
+    ${ROLE === C.clerk.role ? `<h3>${C.clerk.name}（事務の方のみ表示）</h3>
+    <div class="grid">${C.clerk.tiles.map(t => tileHtml(t, '#555')).join('')}</div>` : ''}`;
 }
 window.addEventListener('hashchange', render);
+let ROLE = C.defaultRole;
+
+// 見本モードだけ: 職員／事務 の見え方を切り替え
+function roleToggle() {
+  return '<p>見え方：' + C.roles.map(r => `<label><input type="radio" name="role" value="${r}" ${r === ROLE ? 'checked' : ''} style="width:auto"> ${r}</label>`).join(' ') + '</p>';
+}
 
 function show() {
-  const s = DEMO ? { email: '見本（デモ）', exp: Infinity } : JSON.parse(localStorage.getItem('sess') || 'null');
+  const s = DEMO ? { email: '見本（デモ）', exp: Infinity, role: new URLSearchParams(location.search).get('role') || C.defaultRole } : JSON.parse(localStorage.getItem('sess') || 'null');
   if (!s || s.exp < Date.now()) { localStorage.removeItem('sess'); return; }
   $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
   $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
   if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
+  ROLE = s.role || C.defaultRole;
+  if (DEMO) {
+    $('hi').insertAdjacentHTML('afterend', roleToggle());
+    document.querySelectorAll('input[name=role]').forEach(r => r.onchange = () => { ROLE = r.value; render(); });
+  }
   render();
 }
 

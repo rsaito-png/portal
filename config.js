@@ -6,11 +6,20 @@ window.PORTAL_CONFIG = {
   supabaseUrl: 'https://zvrardoyxocmqhvyddnf.supabase.co',
   supabaseKey: 'sb_publishable_C3S0K18If_cNj6gpgIct9w_3NFMdnCT', // 公開用キー（ブラウザに出してよい種類）
   helpText: 'わからないことは Google Chat の受付でボットに話しかけてください。',
+  // 役割。ログインユーザーの役割は Supabase の app_metadata.role（未設定なら defaultRole）
+  roles: ['職員', '事務'],
+  defaultRole: '職員',
+  // 事務だけに見せる区画（画面で隠すだけ。データ側の保護は Supabase のRLSで別途行う）
+  clerk: { name: '事務', role: '事務', tiles: [
+    ['💴', '請求CSV', '', '準備中'],
+    ['📊', '実績集計', '', '準備中'] ] },
+  // ※タイルの中身は仮置き。事業所ごとの正式な内容が決まったらここを書き換える
   // 事業所ごとのタイル。tiles は [アイコン, 名前, リンク(空なら準備中), 補足]
   offices: [
     { id: 'leo', name: 'レオ', kind: '児童', color: '#e8833a', tiles: [
       ['📓', '業務日誌', '', '準備中'], ['🚐', '送迎', '', '準備中'], ['✅', '実績', '', '準備中'],
-      ['📝', '個別支援計画', '', '準備中'], ['📁', '書類', '', '準備中'] ] },
+      ['📝', '個別支援計画', '', '準備中'], ['📁', '書類', '', '準備中'],
+      ['💬', '公式LINE', 'https://manager.line.biz/', 'LINE管理画面'] ] },
     { id: 'chamu', name: '茶夢', kind: '', color: '#8a6a4f', tiles: [
       ['📓', '日誌', '', '準備中'], ['✅', '実績', '', '準備中'],
       ['📝', '個別支援計画', '', '準備中'], ['📁', '書類', '', '準備中'] ] },
