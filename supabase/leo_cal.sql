@@ -63,3 +63,18 @@ begin
 end $$;
 revoke all on function public.leo_frame_put from public;
 grant execute on function public.leo_frame_put to anon;
+
+-- box：枠を作るための材料（その日の予定・名簿・型表・GASが作った日誌）
+create or replace function public.leo_frame_input(p_token text, p_day date)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if encode(digest(p_token, 'sha256'), 'hex') is distinct from (select token_sha256 from sync_secret where name = 'leo') then raise exception 'bad token'; end if;
+  return jsonb_build_object(
+    'events', (select coalesce(jsonb_agg(to_jsonb(e) - 'updated_by'), '[]') from leo_events e where day = p_day),
+    'roster', (select coalesce(jsonb_agg(distinct n), '[]') from (select child n from leo_nikki where child <> '' and day > p_day - 120
+                 union select name from leo_children) x where n is not null),
+    'kata', (select coalesce(jsonb_agg(data), '[]') from leo_sheet where kind = 'kata'),
+    'nikki', (select coalesce(jsonb_agg(to_jsonb(n)), '[]') from leo_nikki n where day = p_day));
+end $$;
+revoke all on function public.leo_frame_input from public;
+grant execute on function public.leo_frame_input to anon;
