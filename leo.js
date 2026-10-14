@@ -476,7 +476,7 @@ const markupHtml = t => esc(t || '').split('\n').map(l => l.startsWith('#T ') ? 
 const plainText = t => String(t || '').replace(/^#[TR] /gm, '');
 const PLAN_DEMO_DB = { plans: [{ id: 1, child: '児童B', term_no: 2, start_on: '2026-11-01', end_on: '2027-04-30', assess_on: '2026-10-27', genan_on: '2026-10-28', kaigi_on: '2026-10-29', honan_on: '2026-10-30',
     assessment: null, genan: null, kaigi: null, honan: null, plan_made: false, genan_consent_at: null, honan_consent_at: null, verified: true },
-  { id: 2, child: '児童A', term_no: 2, start_on: '2026-05-01', end_on: '2026-10-31', imported_from: '（見本）既存の計画書ドキュメント', verified: false, honan: '（見本）取り込んだ今期の本案の本文', plan_made: true, genan_consent_at: '2026-04-28', honan_consent_at: '2026-04-30' }],
+  { id: 2, child: '児童A', term_no: 2, start_on: '2026-05-01', end_on: '2026-10-31', imported_from: '（見本）既存の計画書ドキュメント', verified: true, note: '実際の期間：令和8年5月8日〜令和8年11月7日。元：Googleドキュメント（4書類に分けて取り込み）', honan: '（見本）取り込んだ今期の本案の本文', plan_made: true, genan_consent_at: '2026-04-28', honan_consent_at: '2026-04-30' }],
   mon: [{ child: '児童B', term: '第2期', answers: { grade: '小1', adl: 3, body: 4, emo: 2, env: 3, comm: 3, social: 2, wish: '（見本）友だちとの関わりを増やしたい' }, submitted_at: '2026-10-12' }],
   staff: [{ child: '児童B', term: '第2期', text: '（見本）5/1〜10/14 の活動記録から：公園で鬼ごっこ…', source: '自動（簡易）' }] };
 let PLAN_OPEN = '';
@@ -505,7 +505,7 @@ LEO_VIEWS.plan = async function () {
         <div style="display:flex;gap:2px;margin-top:6px">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div></summary>
       <div style="padding:0 14px 14px">
         ${d ? `<p><small>書類に入れる日付（作成者 齊藤連）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : '<p class="note">管理表の「次期開始月」がありません。</p>'}
-        <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '' : '　<span class="badge">未確認</span>'}</small></p>${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
+        <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '　✅ 確認済' : '　<span class="badge">未確認</span>'}</small></p>${now.note ? `<p><small>${esc(now.note)}</small></p>` : ''}${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
         <h4>1. 保護者アンケート</h4>${mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
         ${mg ? btn('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`) : ''}
         <h4>2. 職員モニタリング</h4>${sm ? `<details><summary>${esc(sm.source)}（タップで読む）</summary><p style="white-space:pre-wrap"><small>${esc(sm.text)}</small></p></details>` : '<p class="note">まだありません。</p>'}

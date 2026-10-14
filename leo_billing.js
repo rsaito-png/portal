@@ -1,59 +1,72 @@
-// レオ 請求CSV（児発61・放デイ63）— billing/leo_billing.py と同じ計算（テストで一致を確認）。提出はしない：ファイルを作るだけ
+// レオ 請求CSV（児発61・放デイ63）— billing/leo_billing.py と同じ計算・同じ出力（billing/test_js_same.js で一致を確認）。提出はしない：ファイルを作るだけ
+// 障害児の様式：K112/K122（請求書・明細書、データ種別K11）＋ K611（実績記録票、K61）。根拠は billing/leo_billing.py の冒頭
 (function (G) {
-const SVC = { '61区分1': ['1511', 901], '61区分2': ['JH16', 928], '61区分3': ['JH34', 980],
-  '63区分1': ['H574', 574], '63区分2': ['H592', 609], '63区分3': ['H610', 666] };
-const ADDON = { 欠席: ['5495', 94], 送迎: ['6240', 54], 子育て: ['5701', 80] };
-const KIND = { 児発: '61', 放デイ: '63' }, UNIT_PRICE = 10.36;
+const CODES = {"addon":{"61子育て":["5701",80],"61欠席":["5495",94],"61送迎":["6240",54],"63子育て":["5701",80],"63欠席":["5495",94],"63送迎":["6240",54]},"base":{"61区分1":["1511",901],"61区分1・支減":["KR66",766],"61区分1・支減・未計画":["KR72",536],"61区分1・支減・未計画2":["KR78",383],"61区分1・支減・未計画2・評価減":["KR79",326],"61区分1・支減・未計画2・評価減・開所減1":["KR81",229],"61区分1・支減・未計画2・評価減・開所減2":["KR83",277],"61区分1・支減・未計画2・開所減1":["KR80",269],"61区分1・支減・未計画2・開所減2":["KR82",326],"61区分1・支減・未計画・評価減":["KR73",456],"61区分1・支減・未計画・評価減・開所減1":["KR75",320],"61区分1・支減・未計画・評価減・開所減2":["KR77",388],"61区分1・支減・未計画・開所減1":["KR74",376],"61区分1・支減・未計画・開所減2":["KR76",456],"61区分1・支減・評価減":["KR67",651],"61区分1・支減・評価減・開所減1":["KR69",456],"61区分1・支減・評価減・開所減2":["KR71",553],"61区分1・支減・開所減1":["KR68",536],"61区分1・支減・開所減2":["KR70",651],"61区分1・未計画":["1513",631],"61区分1・未計画2":["2328",451],"61区分1・未計画2・評価減":["2330",383],"61区分1・未計画2・評価減・開所減1":["2334",269],"61区分1・未計画2・評価減・開所減2":["2338",326],"61区分1・未計画2・開所減1":["2332",316],"61区分1・未計画2・開所減2":["2336",383],"61区分1・未計画・評価減":["2320",536],"61区分1・未計画・評価減・開所減1":["2323",376],"61区分1・未計画・評価減・開所減2":["2326",456],"61区分1・未計画・開所減1":["1514",442],"61区分1・未計画・開所減2":["1786",536],"61区分1・評価減":["2311",766],"61区分1・評価減・開所減1":["2314",536],"61区分1・評価減・開所減2":["2317",651],"61区分1・開所減1":["1512",631],"61区分1・開所減2":["1785",766],"61区分2":["JH16",928],"61区分2・支減":["KR84",789],"61区分2・支減・未計画":["KR90",553],"61区分2・支減・未計画2":["KR96",394],"61区分2・支減・未計画2・評価減":["KR97",335],"61区分2・支減・未計画2・評価減・開所減1":["KR99",235],"61区分2・支減・未計画2・評価減・開所減2":["KS01",285],"61区分2・支減・未計画2・開所減1":["KR98",276],"61区分2・支減・未計画2・開所減2":["KS00",335],"61区分2・支減・未計画・評価減":["KR91",470],"61区分2・支減・未計画・評価減・開所減1":["KR93",329],"61区分2・支減・未計画・評価減・開所減2":["KR95",400],"61区分2・支減・未計画・開所減1":["KR92",387],"61区分2・支減・未計画・開所減2":["KR94",470],"61区分2・支減・評価減":["KR85",671],"61区分2・支減・評価減・開所減1":["KR87",470],"61区分2・支減・評価減・開所減2":["KR89",570],"61区分2・支減・開所減1":["KR86",553],"61区分2・支減・開所減2":["KR88",671],"61区分2・未計画":["JH22",650],"61区分2・未計画2":["JH28",464],"61区分2・未計画2・評価減":["JH29",394],"61区分2・未計画2・評価減・開所減1":["JH31",276],"61区分2・未計画2・評価減・開所減2":["JH33",335],"61区分2・未計画2・開所減1":["JH30",325],"61区分2・未計画2・開所減2":["JH32",394],"61区分2・未計画・評価減":["JH23",553],"61区分2・未計画・評価減・開所減1":["JH25",387],"61区分2・未計画・評価減・開所減2":["JH27",470],"61区分2・未計画・開所減1":["JH24",455],"61区分2・未計画・開所減2":["JH26",553],"61区分2・評価減":["JH17",789],"61区分2・評価減・開所減1":["JH19",553],"61区分2・評価減・開所減2":["JH21",671],"61区分2・開所減1":["JH18",650],"61区分2・開所減2":["JH20",789],"61区分3":["JH34",980],"61区分3・支減":["KS02",833],"61区分3・支減・未計画":["KS08",583],"61区分3・支減・未計画2":["KS14",417],"61区分3・支減・未計画2・評価減":["KS15",354],"61区分3・支減・未計画2・評価減・開所減1":["KS17",248],"61区分3・支減・未計画2・評価減・開所減2":["KS19",301],"61区分3・支減・未計画2・開所減1":["KS16",292],"61区分3・支減・未計画2・開所減2":["KS18",354],"61区分3・支減・未計画・評価減":["KS09",496],"61区分3・支減・未計画・評価減・開所減1":["KS11",347],"61区分3・支減・未計画・評価減・開所減2":["KS13",422],"61区分3・支減・未計画・開所減1":["KS10",408],"61区分3・支減・未計画・開所減2":["KS12",496],"61区分3・支減・評価減":["KS03",708],"61区分3・支減・評価減・開所減1":["KS05",496],"61区分3・支減・評価減・開所減2":["KS07",602],"61区分3・支減・開所減1":["KS04",583],"61区分3・支減・開所減2":["KS06",708],"61区分3・未計画":["JH40",686],"61区分3・未計画2":["JH46",490],"61区分3・未計画2・評価減":["JH47",417],"61区分3・未計画2・評価減・開所減1":["JH49",292],"61区分3・未計画2・評価減・開所減2":["JH51",354],"61区分3・未計画2・開所減1":["JH48",343],"61区分3・未計画2・開所減2":["JH50",417],"61区分3・未計画・評価減":["JH41",583],"61区分3・未計画・評価減・開所減1":["JH43",408],"61区分3・未計画・評価減・開所減2":["JH45",496],"61区分3・未計画・開所減1":["JH42",480],"61区分3・未計画・開所減2":["JH44",583],"61区分3・評価減":["JH35",833],"61区分3・評価減・開所減1":["JH37",583],"61区分3・評価減・開所減2":["JH39",708],"61区分3・開所減1":["JH36",686],"61区分3・開所減2":["JH38",833],"63区分1":["H574",574],"63区分1・支減":["H628",488],"63区分1・支減・未計画":["H634",342],"63区分1・支減・未計画2":["H640",244],"63区分1・支減・未計画2・評価減":["H641",207],"63区分1・支減・未計画2・評価減・開所減1":["H643",145],"63区分1・支減・未計画2・評価減・開所減2":["H645",176],"63区分1・支減・未計画2・開所減1":["H642",171],"63区分1・支減・未計画2・開所減2":["H644",207],"63区分1・支減・未計画・評価減":["H635",291],"63区分1・支減・未計画・評価減・開所減1":["H637",203],"63区分1・支減・未計画・評価減・開所減2":["H639",247],"63区分1・支減・未計画・開所減1":["H636",239],"63区分1・支減・未計画・開所減2":["H638",291],"63区分1・支減・評価減":["H629",415],"63区分1・支減・評価減・開所減1":["H631",291],"63区分1・支減・評価減・開所減2":["H633",353],"63区分1・支減・開所減1":["H630",342],"63区分1・支減・開所減2":["H632",415],"63区分1・未計画":["H580",402],"63区分1・未計画2":["H586",287],"63区分1・未計画2・評価減":["H587",244],"63区分1・未計画2・評価減・開所減1":["H589",171],"63区分1・未計画2・評価減・開所減2":["H591",207],"63区分1・未計画2・開所減1":["H588",201],"63区分1・未計画2・開所減2":["H590",244],"63区分1・未計画・評価減":["H581",342],"63区分1・未計画・評価減・開所減1":["H583",239],"63区分1・未計画・評価減・開所減2":["H585",291],"63区分1・未計画・開所減1":["H582",281],"63区分1・未計画・開所減2":["H584",342],"63区分1・評価減":["H575",488],"63区分1・評価減・開所減1":["H577",342],"63区分1・評価減・開所減2":["H579",415],"63区分1・開所減1":["H576",402],"63区分1・開所減2":["H578",488],"63区分2":["H592",609],"63区分2・支減":["H646",518],"63区分2・支減・未計画":["H652",362],"63区分2・支減・未計画2":["H658",259],"63区分2・支減・未計画2・評価減":["H659",220],"63区分2・支減・未計画2・評価減・開所減1":["H661",155],"63区分2・支減・未計画2・評価減・開所減2":["H663",187],"63区分2・支減・未計画2・開所減1":["H660",182],"63区分2・支減・未計画2・開所減2":["H662",220],"63区分2・支減・未計画・評価減":["H653",308],"63区分2・支減・未計画・評価減・開所減1":["H655",215],"63区分2・支減・未計画・評価減・開所減2":["H657",262],"63区分2・支減・未計画・開所減1":["H654",253],"63区分2・支減・未計画・開所減2":["H656",308],"63区分2・支減・評価減":["H647",440],"63区分2・支減・評価減・開所減1":["H649",308],"63区分2・支減・評価減・開所減2":["H651",374],"63区分2・支減・開所減1":["H648",362],"63区分2・支減・開所減2":["H650",440],"63区分2・未計画":["H598",426],"63区分2・未計画2":["H604",305],"63区分2・未計画2・評価減":["H605",259],"63区分2・未計画2・評価減・開所減1":["H607",182],"63区分2・未計画2・評価減・開所減2":["H609",220],"63区分2・未計画2・開所減1":["H606",214],"63区分2・未計画2・開所減2":["H608",259],"63区分2・未計画・評価減":["H599",362],"63区分2・未計画・評価減・開所減1":["H601",253],"63区分2・未計画・評価減・開所減2":["H603",308],"63区分2・未計画・開所減1":["H600",298],"63区分2・未計画・開所減2":["H602",362],"63区分2・評価減":["H593",518],"63区分2・評価減・開所減1":["H595",362],"63区分2・評価減・開所減2":["H597",440],"63区分2・開所減1":["H594",426],"63区分2・開所減2":["H596",518],"63区分3":["H610",666],"63区分3・支減":["H664",566],"63区分3・支減・未計画":["H670",396],"63区分3・支減・未計画2":["H676",283],"63区分3・支減・未計画2・評価減":["H677",241],"63区分3・支減・未計画2・評価減・開所減1":["H679",168],"63区分3・支減・未計画2・評価減・開所減2":["H681",205],"63区分3・支減・未計画2・開所減1":["H678",198],"63区分3・支減・未計画2・開所減2":["H680",241],"63区分3・支減・未計画・評価減":["H671",337],"63区分3・支減・未計画・評価減・開所減1":["H673",235],"63区分3・支減・未計画・評価減・開所減2":["H675",286],"63区分3・支減・未計画・開所減1":["H672",277],"63区分3・支減・未計画・開所減2":["H674",337],"63区分3・支減・評価減":["H665",481],"63区分3・支減・評価減・開所減1":["H667",337],"63区分3・支減・評価減・開所減2":["H669",409],"63区分3・支減・開所減1":["H666",396],"63区分3・支減・開所減2":["H668",481],"63区分3・未計画":["H616",466],"63区分3・未計画2":["H622",333],"63区分3・未計画2・評価減":["H623",283],"63区分3・未計画2・評価減・開所減1":["H625",198],"63区分3・未計画2・評価減・開所減2":["H627",241],"63区分3・未計画2・開所減1":["H624",233],"63区分3・未計画2・開所減2":["H626",283],"63区分3・未計画・評価減":["H617",396],"63区分3・未計画・評価減・開所減1":["H619",277],"63区分3・未計画・評価減・開所減2":["H621",337],"63区分3・未計画・開所減1":["H618",326],"63区分3・未計画・開所減2":["H620",396],"63区分3・評価減":["H611",566],"63区分3・評価減・開所減1":["H613",396],"63区分3・評価減・開所減2":["H615",481],"63区分3・開所減1":["H612",466],"63区分3・開所減2":["H614",566]}}; // billing/gen_codes.py が service_codes_3.xlsx から作る leo_codes.json と同じ
+const KIND = { 児発: '61', 放デイ: '63' }, YOSHIKI = { 61: '0301', 63: '0501' }, DECIDE = { 61: '611000', 63: '631000' };
+const GENSAN_ORDER = ['支減', '未計画', '未計画2', '評価減', '開所減1', '開所減2'], UNIT_PRICE = 10.36, AREA = '06';
 const q = v => v === '' || v == null ? '' : '"' + String(v).replace(/"/g, '""') + '"';
 const toCsv = rows => rows.map(r => r.map(q).join(',')).join('\r\n') + '\r\n';
 const rec = (n, o) => { const r = Array(n).fill(''); for (const k in o) r[k - 1] = o[k] == null ? '' : String(o[k]); return r; };
 const nextYm = ym => { let y = +ym.slice(0, 4), m = +ym.slice(4) + 1; if (m > 12) { y++; m = 1; } return y + String(m).padStart(2, '0'); };
 const wrap = (d, kind, office, ymn) => [['1', '1', '0', String(d.length), kind, '0', office, '0', '1', ymn, ''], ...d.map((p, i) => ['2', String(i + 2), ...p]), ['3', String(d.length + 2)]];
-const mins = t => { if (!t) return null; const [h, m] = String(t).split(':'); return +h * 60 + +m; };
-function band(k, s, e, hol) { const a = mins(s), b = mins(e); if (a == null || b == null || b <= a) return null; const d = b - a;
-  if (d < 30) return null; if (d <= 90) return '区分1'; if (d <= 180) return '区分2'; if (k === '63' && !hol) return '区分2'; return '区分3'; }
-const pad = (n, w) => String(n).padStart(w, '0'), fl = Math.floor;
-// children: {名前:{jukyusha_no, city_no, kind, cap_monthly, mushouka, kana, contract_days, contract_start(YYYYMMDD)}}
+const Z = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンァィゥェォャュョッー・', H = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝｧｨｩｪｫｬｭｮｯｰ･';
+const HAN = {}; [...Z].forEach((z, i) => HAN[z] = H[i]);
+[...'ガギグゲゴザジズゼゾダヂヅデドバビブベボヴ'].forEach((z, i) => HAN[z] = 'ｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾊﾋﾌﾍﾎｳ'[i] + 'ﾞ'); [...'パピプペポ'].forEach((z, i) => HAN[z] = 'ﾊﾋﾌﾍﾎ'[i] + 'ﾟ');
+const hankaku = s => [...String(s || '').normalize('NFKC')].map(ch => ch === '\u3000' ? ' ' : (HAN[ch] ?? ch)).join('');
+// 時刻は表示されている文字列（'15:00' / '15:00:00'）で受ける
+const hm = t => { if (!t) return null; const p = String(t).trim().split(':'); if (p.length < 2 || !/^\d+$/.test(p[0]) || !/^\d{2}/.test(p[1])) throw new Error('時刻の形が不正: ' + t); return +p[0] * 60 + +p[1].slice(0, 2); };
+function band(k, s, e, hol) { const a = hm(s), b = hm(e); if (a == null || b == null || b <= a) return [null, 0]; const d = b - a;
+  if (d < 30) return [null, d]; if (d <= 90) return ['区分1', d]; if (d <= 180) return ['区分2', d]; if (k === '63' && !hol) return ['区分2', d]; return ['区分3', d]; }
+const baseCode = (k, b, gs) => { const key = k + b + GENSAN_ORDER.filter(g => gs.has(g)).map(g => '・' + g).join(''); const c = CODES.base[key]; if (!c) throw new Error('減算の組み合わせがコード表にない: ' + key); return c; };
+const pad = (n, w) => String(n).padStart(w, '0'), fl = Math.floor, r2 = x => Math.round(x);
+// children: {名前:{jukyusha_no, city_no, kind, cap_monthly, mushouka, kana, guardian_kana, contract_days, contract_start(YYYYMMDD), first_date(YYYYMMDD), kinyu_no, gensan:[]}}
 // records: [{day:'YYYY-MM-DD', child, status:'出席'|'欠席', start, end, pick:bool, drop:bool, holiday, absent_support, kosodate}]
-function build(ym, office, children, records) {
+// officeGensan: 事業所全体の減算 ['支減','評価減','開所減1','開所減2'] から
+function build(ym, office, children, records, officeGensan = []) {
   const by = {}; for (const r of records) if (r.day.replace(/-/g, '').slice(0, 6) === ym && children[r.child]) (by[r.child] ||= []).push(r);
   const bills = [], warn = [];
   for (const name of Object.keys(by).sort()) {
-    const c = children[name], k = KIND[c.kind], det = {}; let use = 0, absn = 0, kos = 0; const days = [];
-    const add = (code, u) => { (det[code] ||= [u, 0])[1]++; };
+    const c = children[name], k = KIND[c.kind], gs = new Set([...officeGensan, ...(c.gensan || [])]), det = {}; let use = 0, absn = 0, kos = 0; const days = [];
+    const add = ([code, u]) => { (det[code] ||= [u, 0])[1]++; };
     for (const r of by[name].sort((a, b) => a.day < b.day ? -1 : 1)) {
-      if (r.status === '出席') { const b = band(k, r.start, r.end, r.holiday);
+      if (r.status === '出席') { const [b, m] = band(k, r.start, r.end, r.holiday);
         if (!b) { warn.push(`${name} ${r.day}：時間が無いか30分未満なので算定していません`); continue; }
-        add(...SVC[k + b]); use++; if (r.kosodate) { if (kos < 4) { kos++; add(...ADDON.子育て); } else warn.push(`${name} ${r.day}：子育てサポート加算は月4回までなので算定外`); } days.push([r, b]); }
-      else if (r.status === '欠席' && r.absent_support) { if (absn < 4) { absn++; add(...ADDON.欠席); days.push([r, '欠席']); } else warn.push(`${name} ${r.day}：欠席時対応は月4回までなので算定外`); }
+        add(baseCode(k, b, gs)); use++; let ko = false;
+        if (r.kosodate) { if (kos < 4) { kos++; ko = true; add(CODES.addon[k + '子育て']); } else warn.push(`${name} ${r.day}：子育てサポート加算は月4回までなので算定外`); }
+        days.push([r, b, m, ko]); }
+      else if (r.status === '欠席' && r.absent_support) { if (absn < 4) { absn++; add(CODES.addon[k + '欠席']); days.push([r, '欠席', 0, false]); } else warn.push(`${name} ${r.day}：欠席時対応は月4回までなので算定外`); }
     }
     const trips = days.filter(([, x]) => x !== '欠席').reduce((s, [r]) => s + !!r.pick + !!r.drop, 0);
-    if (trips) { det[ADDON.送迎[0]] = [ADDON.送迎[1], trips]; }
-    const units = Object.values(det).reduce((s, [u, t]) => s + u * t, 0), cost = fl(units * UNIT_PRICE);
-    const burden = c.mushouka ? 0 : Math.min(fl(cost * 0.1), +c.cap_monthly);
-    bills.push({ name, units, cost, burden, benefit: cost - burden, use, k, det, days, c, trips });
+    if (trips) { const [cd, uu] = CODES.addon[k + '送迎']; det[cd] = [uu, trips]; }
+    const units = Object.values(det).reduce((s, [u, t]) => s + u * t, 0), cost = fl(units * UNIT_PRICE), ichiwari = fl(cost * 0.1);
+    const futan2 = c.mushouka ? 0 : ichiwari, burden = Math.min(futan2, +c.cap_monthly);
+    bills.push({ name, units, cost, ichiwari, futan2, burden, benefit: cost - burden, use, absn, kos, k, det, days, c, trips });
   }
   const claims = [], jis = [], cities = {};
   for (const b of bills) (cities[b.c.city_no] ||= []).push(b);
-  const S = (a, f) => a.reduce((s, x) => s + x[f], 0);
-  for (const city of Object.keys(cities).sort()) { const bs = cities[city];
-    claims.push(rec(23, { 1: 'J111', 2: '01', 3: ym, 4: city, 5: office, 6: S(bs, 'benefit'), 7: bs.length, 8: S(bs, 'units'), 9: S(bs, 'cost'), 10: S(bs, 'benefit'), 12: S(bs, 'burden'),
+  const S = (a, f) => a.reduce((s, x) => s + x[f], 0), keys = o => Object.keys(o).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  for (const city of keys(cities)) { const bs = cities[city];
+    claims.push(rec(23, { 1: 'K112', 2: '01', 3: ym, 4: city, 5: office, 6: S(bs, 'benefit'), 7: bs.length, 8: S(bs, 'units'), 9: S(bs, 'cost'), 10: S(bs, 'benefit'), 12: S(bs, 'burden'),
       17: bs.length, 18: S(bs, 'units'), 19: S(bs, 'cost'), 20: S(bs, 'benefit'), 22: S(bs, 'burden') }));
     for (const k of [...new Set(bs.map(b => b.k))].sort()) { const kb = bs.filter(b => b.k === k);
-      claims.push(rec(14, { 1: 'J111', 2: '02', 3: ym, 4: city, 5: office, 6: '1', 7: k, 8: kb.length, 9: S(kb, 'units'), 10: S(kb, 'cost'), 11: S(kb, 'benefit'), 13: S(kb, 'burden') })); }
-    for (const b of bs) { const c = b.c, h = pad(c.jukyusha_no, 10), first = b.days.length ? Math.min(...b.days.map(([r]) => +r.day.slice(8))) : 1;
-      claims.push(rec(35, { 1: 'J121', 2: '01', 3: ym, 4: city, 5: office, 6: h, 8: c.kana || '', 10: '', 11: '1', 12: c.cap_monthly, 13: '1', 20: b.units, 21: b.cost, 22: b.burden, 25: b.burden, 27: b.burden, 28: b.benefit }));
-      claims.push(rec(12, { 1: 'J121', 2: '02', 3: ym, 4: city, 5: office, 6: h, 7: b.k, 8: c.contract_start || ym + pad(first, 2), 10: b.use }));
-      for (const code of Object.keys(b.det).sort()) { const [u, t] = b.det[code];
-        claims.push(rec(11, { 1: 'J121', 2: '03', 3: ym, 4: city, 5: office, 6: h, 7: b.k + code, 8: u, 9: t, 10: u * t })); }
-      claims.push(rec(33, { 1: 'J121', 2: '04', 3: ym, 4: city, 5: office, 6: h, 7: b.k, 8: '1', 9: b.use, 10: b.units, 11: Math.round(UNIT_PRICE * 1000), 12: '0', 13: b.cost,
-        14: fl(b.cost * 0.1), 15: fl(b.cost * 0.1), 16: b.burden, 21: b.burden, 22: b.benefit }));
-      claims.push(rec(11, { 1: 'J121', 2: '05', 3: ym, 4: city, 5: office, 6: h, 7: b.k + '0000', 8: pad((+c.contract_days || 23) * 100, 5), 9: c.contract_start || '', 11: '1' }));
-      jis.push(rec(172, { 1: 'J611', 2: '01', 3: ym, 4: city, 5: office, 6: h, 7: '0' + b.k + '1', 34: b.trips || '' }));
-      for (const [r, x] of b.days) { const hm = t => t ? t.replace(':', '').padStart(4, '0') : '', ab = x === '欠席';
-        jis.push(rec(113, { 1: 'J611', 2: '02', 3: ym, 4: city, 5: office, 6: h, 7: '0' + b.k + '1', 9: r.day.slice(8), 10: ab ? '2' : '', 14: ab ? '' : hm(r.start), 15: ab ? '' : hm(r.end),
-          21: !ab && r.pick ? '1' : '', 22: !ab && r.drop ? '1' : '' })); } } }
-  return { claim: wrap(claims, 'J11', office, nextYm(ym)), jisseki: wrap(jis, 'J61', office, nextYm(ym)), bills, warn };
+      claims.push(rec(14, { 1: 'K112', 2: '02', 3: ym, 4: city, 5: office, 6: '1', 7: k, 8: kb.length, 9: S(kb, 'units'), 10: S(kb, 'cost'), 11: S(kb, 'benefit'), 13: S(kb, 'burden') })); }
+    for (const b of bs) { const c = b.c, h = pad(c.jukyusha_no, 10), k = b.k;
+      claims.push(rec(35, { 1: 'K122', 2: '01', 3: ym, 4: city, 5: office, 6: h, 8: hankaku(c.guardian_kana), 9: hankaku(c.kana), 10: AREA, 12: c.cap_monthly,
+        20: b.units, 21: b.cost, 22: b.burden, 27: b.burden, 28: b.benefit }));
+      let first = c.first_date;
+      if (!first) { first = b.days.length ? ym + pad(Math.min(...b.days.map(([r]) => +r.day.slice(8))), 2) : ym + '01'; warn.push(`${b.name}：初回提供日（一連の契約で最初に来た日）が未登録なので、今月最初の日 ${first} を入れています`); }
+      claims.push(rec(12, { 1: 'K122', 2: '02', 3: ym, 4: city, 5: office, 6: h, 7: k, 8: first, 10: b.use }));
+      for (const code of keys(b.det)) { const [u, t] = b.det[code]; claims.push(rec(11, { 1: 'K122', 2: '03', 3: ym, 4: city, 5: office, 6: h, 7: k + code, 8: u, 9: t, 10: u * t })); }
+      claims.push(rec(33, { 1: 'K122', 2: '04', 3: ym, 4: city, 5: office, 6: h, 7: k, 8: '1', 9: b.use + b.absn, 10: b.units, 11: pad(r2(UNIT_PRICE * 1000), 5), 12: '0', 13: b.cost,
+        14: b.ichiwari, 15: b.futan2, 16: b.burden, 21: b.burden, 22: b.benefit }));
+      claims.push(rec(11, { 1: 'K122', 2: '05', 3: ym, 4: city, 5: office, 6: h, 7: c.decide_code || DECIDE[k], 8: pad(r2((c.contract_days == null || c.contract_days === '' ? 23 : +c.contract_days) * 100), 5),
+        9: c.contract_start || '', 11: c.kinyu_no || 1 }));
+      const ys = YOSHIKI[k], tot = b.days.filter(([, x]) => x !== '欠席').reduce((s, [, , m]) => s + m, 0);
+      jis.push(rec(172, { 1: 'K611', 2: '01', 3: ym, 4: city, 5: office, 6: h, 7: ys, 19: pad(r2(tot / 60 * 100), 5), 34: b.trips || '', 163: b.kos || '' }));
+      for (const [r, x, m, ko] of b.days) { const ab = x === '欠席', t = v => pad(fl(hm(v) / 60), 2) + pad(hm(v) % 60, 2);
+        jis.push(rec(113, { 1: 'K611', 2: '02', 3: ym, 4: city, 5: office, 6: h, 7: ys, 9: r.day.slice(8), 14: ab ? '' : t(r.start), 15: ab ? '' : t(r.end), 16: ab ? '' : pad(r2(m / 60 * 100), 4),
+          21: !ab && r.pick ? '1' : '', 22: !ab && r.drop ? '1' : '', 34: k === '63' && !ab ? (r.holiday ? '2' : '1') : '', 36: ab ? '8' : '', 103: ko ? '1' : '' })); } } }
+  return { claim: wrap(claims, 'K11', office, nextYm(ym)), jisseki: wrap(jis, 'K61', office, nextYm(ym)), bills, warn };
 }
-G.LeoBilling = { build, toCsv, UNIT_PRICE };
+G.LeoBilling = { build, toCsv, UNIT_PRICE, GENSAN_ORDER };
 })(typeof window !== 'undefined' ? window : globalThis);
