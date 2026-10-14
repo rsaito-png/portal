@@ -55,14 +55,14 @@ def build(ym, children, records):
         if r['day'].strftime('%Y%m') == ym and r['child'] in children: by[r['child']].append(r)
     claims, jis, bills = [], [], []
     for name, days in sorted(by.items()):
-        c = children[name]; k = SVC_KIND[c['種別']]; det = defaultdict(lambda: [0, 0]); use = go = back = absn = 0; day_rows = []
+        c = children[name]; k = SVC_KIND[c['種別']]; det = defaultdict(lambda: [0, 0]); use = go = back = absn = kos = 0; day_rows = []
         for r in sorted(days, key=lambda x: x['day']):
             if r['status'] == '出席':
                 b = band(k, r['start'], r['end'], r.get('holiday'))
                 if not b: continue
                 code, u = SVC[(k, b)]; det[code][0] = u; det[code][1] += 1; use += 1
                 go += r.get('pick') == '◯'; back += r.get('drop') == '◯'
-                if r.get('kosodate'): cd, uu = ADDON[(k, '子育て')]; det[cd][0] = uu; det[cd][1] += 1
+                if r.get('kosodate') and kos < 4: kos += 1; cd, uu = ADDON[(k, '子育て')]; det[cd][0] = uu; det[cd][1] += 1
                 day_rows.append((r, b))
             elif r['status'] == '欠席' and r.get('absent_support') and absn < 4:
                 absn += 1; cd, uu = ADDON[(k, '欠席')]; det[cd][0] = uu; det[cd][1] += 1; day_rows.append((r, '欠席'))

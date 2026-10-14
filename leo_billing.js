@@ -19,12 +19,12 @@ function build(ym, office, children, records) {
   const by = {}; for (const r of records) if (r.day.replace(/-/g, '').slice(0, 6) === ym && children[r.child]) (by[r.child] ||= []).push(r);
   const bills = [], warn = [];
   for (const name of Object.keys(by).sort()) {
-    const c = children[name], k = KIND[c.kind], det = {}; let use = 0, absn = 0; const days = [];
+    const c = children[name], k = KIND[c.kind], det = {}; let use = 0, absn = 0, kos = 0; const days = [];
     const add = (code, u) => { (det[code] ||= [u, 0])[1]++; };
     for (const r of by[name].sort((a, b) => a.day < b.day ? -1 : 1)) {
       if (r.status === '出席') { const b = band(k, r.start, r.end, r.holiday);
         if (!b) { warn.push(`${name} ${r.day}：時間が無いか30分未満なので算定していません`); continue; }
-        add(...SVC[k + b]); use++; if (r.kosodate) add(...ADDON.子育て); days.push([r, b]); }
+        add(...SVC[k + b]); use++; if (r.kosodate) { if (kos < 4) { kos++; add(...ADDON.子育て); } else warn.push(`${name} ${r.day}：子育てサポート加算は月4回までなので算定外`); } days.push([r, b]); }
       else if (r.status === '欠席' && r.absent_support) { if (absn < 4) { absn++; add(...ADDON.欠席); days.push([r, '欠席']); } else warn.push(`${name} ${r.day}：欠席時対応は月4回までなので算定外`); }
     }
     const trips = days.filter(([, x]) => x !== '欠席').reduce((s, [r]) => s + !!r.pick + !!r.drop, 0);

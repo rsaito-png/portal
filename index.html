@@ -82,7 +82,7 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 // 画面切替は URL の #事業所id で行う（戻るボタン・ブラウザの戻るが両方効く）
 async function render() {
   if (typeof loadDuty === 'function') await loadDuty();
-  const [id, sub] = decodeURIComponent(location.hash.slice(1)).split('/');
+  const [id, sub] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   if (id === 'uketsuke') return renderUketsuke();
   const o = C.offices.find(x => x.id === id);

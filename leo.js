@@ -68,7 +68,10 @@ async function loadNikki() {
 }
 const byDay = rows => { const m = {}; rows.forEach(r => (m[r.day] = m[r.day] || []).push(r)); return Object.entries(m); };
 const noTab = () => '<p>この期間の日誌タブがまだありません（日誌は毎朝作られ、夜22時に取り込みます）。</p>';
-const sheetRows = async kind => DEMO ? DEMO_DATA[kind] : (await sb(`leo_sheet?kind=eq.${kind}&order=row_no`)).map(r => r.data);
+// 配置表・型表・管理表：ポータルで入力したもの（leo_master）があればそれを使い、なければGoogleからの写し（leo_sheet）
+const sheetRows = async kind => { if (DEMO) return (MASTER_DEMO[kind] || DEMO_DATA[kind]);
+  const m = await sb(`leo_master?kind=eq.${kind}&order=row_no`); return m.length ? m.map(r => r.data) : (await sb(`leo_sheet?kind=eq.${kind}&order=row_no`)).map(r => r.data); };
+const MASTER_DEMO = {};
 async function myName() {
   if (DEMO) return DEMO_DATA.me;
   const p = await sb('staff_profiles?select=nikki_name');
@@ -79,7 +82,8 @@ const demoNote = () => DEMO ? '<p class="note">見本データです（架空）
 
 const LEO_VIEWS = {
   async sougei() {
-    const [rows, me] = await Promise.all([loadNikki(), myName()]);
+    const [rows, me, cc] = await Promise.all([loadNikki(), myName(), DEMO ? [{ child: '児童A', note: '（見本）助手席の後ろ。降車時は母へ直接引き渡し。' }] : sb('leo_child_care').catch(() => [])]);
+    const CARE = Object.fromEntries(cc.filter(x => x.note).map(x => [x.child, x.note]));
     const days = byDay(rows.filter(r => r.kind === '利用'));
     return `<h3>${PLABEL[PERIOD]}の送迎（${esc(me) || '名前未登録'} さんの担当）</h3>${periodTabs('sougei')}${demoNote()}` + (days.length ? days.map(([d, rs]) => {
       const jobs = [];
@@ -89,7 +93,7 @@ const LEO_VIEWS = {
       });
       jobs.sort((a, b) => (a.t || '').localeCompare(b.t || ''));
       return `<h4>${fmtDay(d)}</h4>` + (jobs.length ? `<table><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>車</th></tr>${jobs.map(j =>
-        `<tr><td>${esc(j.t)}</td><td>${j.k}</td><td>${esc(j.c)}</td><td>${esc(j.p)}</td><td>${esc(j.car)}</td></tr>`).join('')}</table>` : '<p>担当はありません。</p>');
+        `<tr><td>${esc(j.t)}</td><td>${j.k}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}</td><td>${esc(j.p)}</td><td>${esc(j.car)}</td></tr>`).join('')}</table>` : '<p>担当はありません。</p>');
     }).join('') : noTab());
   },
   async kids() {
@@ -240,7 +244,7 @@ LEO_VIEWS.hiyari = async function () {
   const notRead = r => staff.filter(p => !(readers[r.id] || new Set()).has(p.user_id)).map(p => p.nikki_name);
   const dt = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   return `<h3>ヒヤリハット</h3>${demoNote()}<p class="note">ヒヤッとしたこと・ハッとしたことは、小さなことでも書いてください。全員で読んで、同じことを起こさないための記録です（責める記録ではありません）。</p>
-    <details class="card"><summary><b>＋ 報告する</b></summary>
+    <details class="card" ${/new=1|from=line/.test(location.hash + location.search) ? "open" : ""}><summary><b>＋ 報告する</b></summary>
       <div class="rec"><label>いつ<input type="datetime-local" id="hy_at"></label>
       <label>どこで<input id="hy_place" placeholder="例：送迎車、公園、室内"></label>
       <label>種類<select id="hy_kind">${HY_KINDS.map(k => `<option>${k}</option>`).join('')}</select></label>
@@ -253,7 +257,7 @@ LEO_VIEWS.hiyari = async function () {
       ${isNew(r) ? '<span class="badge">新着</span> ' : ''}<b>${esc(r.kind)}</b>　${dt(r.occurred_at)}　${esc(r.place || '')}${r.child_label ? '　' + esc(r.child_label) : ''}
       <p style="white-space:pre-wrap">${esc(r.what)}</p>${r.response ? `<p class="note">その場の対応：${esc(r.response)}</p>` : ''}
       ${r.prevention ? `<p><b>再発防止：</b>${esc(r.prevention)}</p>` : ''}${r.manager_comment ? `<p class="note">確認者より：${esc(r.manager_comment)}</p>` : ''}
-      <p class="note">${r.status}${staff.length > 1 ? (notRead(r).length ? '　まだ読んでいない人：' + notRead(r).map(esc).join('、') : '　全員読みました') : ''}</p>
+      <p class="note">${r.source === 'LINE' ? 'LINEから・' : ''}${r.status}${staff.length > 1 ? (notRead(r).length ? '　まだ読んでいない人：' + notRead(r).map(esc).join('、') : '　全員読みました') : ''}</p>
       ${canManage() && r.status === '未確認' ? `<label>再発防止の改善策<textarea id="hp_${r.id}" rows="2">${esc(r.prevention || '')}</textarea></label>
         <label>ひとこと（全員に見えます）<input id="hc_${r.id}"></label><button onclick="hyCheck(${r.id})">確認した</button>` : ''}</div>`).join('') || '<p>まだ報告はありません。</p>'}`;
 };
@@ -261,7 +265,7 @@ async function hySave() {
   const v = id => document.getElementById(id).value.trim(), m = document.getElementById('hy_msg');
   if (!v('hy_at') || !v('hy_what')) { m.textContent = '「いつ」と「何があったか」は必ず書いてください。'; return; }
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
-  try { await sb('hiyari', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ occurred_at: new Date(v('hy_at')).toISOString(), place: v('hy_place'), kind: v('hy_kind'), child_label: v('hy_child'), what: v('hy_what'), response: v('hy_resp'), prevention: v('hy_prev'), service: '' }) });
+  try { await sb('hiyari', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ occurred_at: new Date(v('hy_at')).toISOString(), place: v('hy_place'), kind: v('hy_kind'), child_label: v('hy_child'), what: v('hy_what'), response: v('hy_resp'), prevention: v('hy_prev'), service: '', source: /from=line/.test(location.hash + location.search) ? 'LINE' : 'ポータル' }) });
     renderLeoView('hiyari'); } catch (e) { m.textContent = e.message; }
 }
 async function hyCheck(id) {
@@ -295,7 +299,7 @@ LEO_VIEWS.home = async function () {
   return `<h3>今日やること（児発管）</h3>${demoNote()}<p class="note">上から順に片づければ大丈夫です。終わったものは自動で消えます。</p>` +
     (todo.length ? todo.map(([p, i, t, href, sub]) => `<a class="card rec" href="${href}" style="display:block;text-decoration:none;color:#222;${p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800'}"><span style="font-size:22px">${i}</span> <b>${t}</b><br><small>${sub}</small></a>`).join('')
       : '<p>今日やることはありません。</p>') +
-    `<h4>まだ画面がないもの（準備中）</h4><p class="note">モニタリング・担当者会議の予定／加算の要件チェック／送迎表の配慮事項／アセスメント記入。できしだいここに出ます。</p>`;
+    `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、表の入力・送迎の配慮は <a href="#leo/master">入力画面</a> から。</p>`;
 };
 
 async function saveNikki() {
@@ -397,14 +401,97 @@ async function makeCsv() {
     kids.forEach(k => K[k.name] = { ...k, contract_start: (k.contract_start || '').replace(/-/g, '') });
     const recs = nikki.map(n => { const f = F[n.day + n.child] || {}; return { day: n.day, child: n.child, status: n.kind === '欠席' ? '欠席' : '出席', start: n.start_time, end: n.end_time,
       pick: isTrip(n.pick_driver), drop: isTrip(n.drop_driver), holiday: f.holiday, absent_support: f.absent_support, kosodate: f.kosodate }; });
-    const ym = BILL_MONTH.replace('-', ''), r = LeoBilling.build(ym, office, K, recs);
+    const ym = BILL_MONTH.replace('-', ''), r = LeoBilling.build(ym, office, K, recs), chk = await billChecks(nikki, flags);
     const nm = [...new Set(nikki.map(n => n.child))].filter(n => !K[n]);
     const file = (rows, name) => { const b = new Blob([new Uint8Array(Encoding.convert(Encoding.stringToCode(LeoBilling.toCsv(rows)), { to: 'SJIS', from: 'UNICODE' }))], { type: 'text/csv' });
       return `<a class="card" style="display:inline-block" href="${URL.createObjectURL(b)}" download="${name}">⬇ ${name}</a>`; };
     const yen = n => n.toLocaleString('ja-JP');
     out.innerHTML = `${file(r.claim, `J111${ym.slice(2)}.CSV`)} ${file(r.jisseki, `J611${ym.slice(2)}.CSV`)}
       <table class="tbl"><tr><th>児童</th><th>利用日数</th><th>送迎(片道)</th><th>単位</th><th>費用</th><th>利用者負担</th><th>給付費</th></tr>${r.bills.map(b => `<tr><td>${esc(b.name)}</td><td>${b.use}</td><td>${b.trips}</td><td>${yen(b.units)}</td><td>${yen(b.cost)}</td><td>${yen(b.burden)}</td><td>${yen(b.benefit)}</td></tr>`).join('')}</table>
-      ${[...nm.map(n => `${n}：マスタがないので入れていません`), ...r.warn].map(w => `<p class="note" style="color:#c00">⚠ ${esc(w)}</p>`).join('')}
+      <h4>要件チェック</h4>${chk.length ? '' : '<p>気になる点はありません。</p>'}${[...nm.map(n => `${n}：マスタがないので入れていません`), ...r.warn, ...chk].map(w => `<p class="note" style="color:#c00">⚠ ${esc(w)}</p>`).join('')}
       <p class="note">作ったファイルは、取込送信ソフトで読み込んで、エラーと金額を確かめてください（送信はまだしないでください）。</p>`; }
   catch (e) { out.textContent = e.message; }
+}
+
+// ===== 個別支援計画まわり：アセスメント → 原案 → 担当者会議 → 原案の説明・同意 → 本案の交付・同意 → モニタリング（保護者・職員） =====
+const PLAN_STEPS = ['アセスメント', '計画書原案', '担当者会議', '原案の説明・同意', '計画書本案', '本案の交付・同意', '保護者モニタリング', '職員モニタリング'];
+const PLAN_DEMO = [{ child: '児童A', term: '2026年11月〜2027年4月', step: 'アセスメント', done_on: '2026-10-10', content: '（見本）保護者面談。集団での順番待ちが課題。' },
+  { child: '児童A', term: '2026年11月〜2027年4月', step: '職員モニタリング', done_on: '2026-10-12', content: '（見本）順番をゆずれる場面が増えた。' }];
+let PLAN_CHILD = '';
+LEO_VIEWS.plan = async function () {
+  const kk = await sheetRows('keikaku'), steps = DEMO ? PLAN_DEMO : await sb('leo_plan_steps?order=updated_at.desc&limit=500');
+  const kids = kk.map(r => r['児童名']).filter(Boolean); if (!PLAN_CHILD || !kids.includes(PLAN_CHILD)) PLAN_CHILD = kids[0] || '';
+  const r = kk.find(x => x['児童名'] === PLAN_CHILD) || {}, m = String(r['次期開始月'] || '').match(/(\d{4})年(\d{1,2})月/);
+  const term = m ? `${m[1]}年${+m[2]}月〜${+m[2] + 5 > 12 ? +m[1] + 1 : m[1]}年${(+m[2] + 4) % 12 + 1}月` : (r['現在の計画期間'] || '');
+  const mine = steps.filter(x => x.child === PLAN_CHILD && x.term === term), mg = canManage();
+  return `<h3>個別支援計画（${esc(PLAN_CHILD)}さん）</h3>${demoNote()}
+    <p><select onchange="PLAN_CHILD=this.value;renderLeoView('plan')">${kids.map(k => `<option ${k === PLAN_CHILD ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>　次の計画：<b>${esc(term)}</b></p>
+    <p class="note">上から順に進めます。済んだら記録してください。${mg ? '' : '現場の職員は「職員モニタリング」だけ書けます。'}</p>
+    ${PLAN_STEPS.map(st => { const d = mine.filter(x => x.step === st);
+      return `<div class="card rec" style="border-left:6px solid ${d.length ? '#3a3' : '#ccc'}"><b>${d.length ? '✅' : '⬜'} ${st}</b>${d.map(x => `<br><small>${esc(x.done_on || '')} ${esc(x.content || '')}${x.attendees ? '／出席：' + esc(x.attendees) : ''}${x.consent_by ? '／同意：' + esc(x.consent_by) + ' ' + esc(x.consent_on || '') : ''}${x.file_url ? ` ／<a href="${esc(x.file_url)}" target="_blank">書類</a>` : ''}</small>`).join('')}</div>`; }).join('')}
+    <details class="card"><summary><b>＋ 記録する</b></summary><div class="rec">
+      <label>何を<select id="pl_step">${PLAN_STEPS.filter(st => mg || st === '職員モニタリング').map(s => `<option>${s}</option>`).join('')}</select></label>
+      <label>日付<input type="date" id="pl_on" value="${today()}"></label><label>内容（様子・話したこと・決めたこと）<textarea id="pl_c" rows="4"></textarea></label>
+      ${mg ? `<label>出席者（担当者会議）<input id="pl_att"></label><label>同意した保護者の名前（同意のとき）<input id="pl_cb"></label>
+      <label>計画書の保管場所（Googleドライブ等のURL）<input id="pl_url" placeholder="https://"></label>` : ''}
+      <button onclick="savePlan('${esc(term)}')">保存</button><div id="pl_msg"></div></div></details>`;
+};
+async function savePlan(term) {
+  const v = id => ($(id)?.value || '').trim(), m = $('pl_msg'), step = v('pl_step');
+  if (!v('pl_c')) { m.textContent = '内容を書いてください。'; return; }
+  if (/同意/.test(step) && !v('pl_cb')) { m.textContent = '同意のときは、保護者の名前を書いてください。'; return; }
+  if (v('pl_url') && !/^https:\/\//.test(v('pl_url'))) { m.textContent = 'URLは https:// から'; return; }
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try { await sb('leo_plan_steps?on_conflict=child,term,step,author', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child: PLAN_CHILD, term, step, done_on: v('pl_on'), content: v('pl_c'),
+      attendees: v('pl_att') || null, consent_by: v('pl_cb') || null, consent_on: /同意/.test(step) ? v('pl_on') : null, file_url: v('pl_url') || null }) }); renderLeoView('plan'); }
+  catch (e) { m.textContent = e.message; }
+}
+
+// ===== 配置表・型表・管理表の入力（児発管・管理者・事務）＋ 送迎の配慮 =====
+const MASTER_LABEL = { kata: '送迎 型表', keikaku: '個別支援計画 管理表', haichi: '職員配置表', care: '送迎の配慮（児童ごと）' };
+let MASTER_KIND = 'kata';
+LEO_VIEWS.master = async function () {
+  if (!canManage()) return '<p>この画面は児発管・管理者・事務だけです。</p>';
+  const tabs = '<p class="ptabs">' + Object.entries(MASTER_LABEL).map(([k, l]) => `<button class="${k === MASTER_KIND ? 'on' : ''}" onclick="MASTER_KIND='${k}';renderLeoView('master')">${l}</button>`).join('') + '</p>';
+  if (MASTER_KIND === 'care') {
+    const kids = [...new Set((await sheetRows('kata')).map(r => r['児童名']).filter(Boolean))], cc = DEMO ? [{ child: '児童A', note: '（見本）助手席の後ろ。降車時は母へ直接引き渡し。' }] : await sb('leo_child_care');
+    const C2 = Object.fromEntries(cc.map(x => [x.child, x.note]));
+    return `<h3>送迎の配慮</h3>${demoNote()}${tabs}<p class="note">座席・チャイルドシート・引き渡す相手・酔いやすさ・アレルギーなど。送迎画面で運転手に出ます。</p>
+      ${kids.map(k => `<label>${esc(k)}<input class="care" data-c="${esc(k)}" value="${esc(C2[k] || '')}"></label>`).join('')}<button onclick="saveCare()">保存</button><div id="ms_msg"></div>`;
+  }
+  const own = DEMO ? [] : await sb(`leo_master?kind=eq.${MASTER_KIND}&order=row_no`), g = DEMO ? DEMO_DATA[MASTER_KIND] : (await sb(`leo_sheet?kind=eq.${MASTER_KIND}&order=row_no`)).map(r => r.data);
+  const rows = own.length ? own.map(r => r.data) : g, cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
+  return `<h3>${MASTER_LABEL[MASTER_KIND]}の入力</h3>${demoNote()}${tabs}
+    <p class="note">${own.length ? 'ポータルで入力した内容です（ポータルの画面はこちらを使います）。' : 'まだポータルで入力していません。下はGoogleの表の写しです。「保存」するとポータルの表になります（Googleの表は変わりません）。'}11/1まではGoogleの表も今まで通り使ってください。</p>
+    <div style="overflow-x:auto"><table class="tbl"><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" size="8"></td>`).join('')}</tr>`).join('')}</table></div>
+    <button onclick="renderLeoView('master').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
+};
+function addMasterRow() { const t = document.querySelector('tr.mrow:last-child'); t.parentNode.appendChild(t.cloneNode(true)).querySelectorAll('input').forEach(i => i.value = ''); }
+async function saveMaster() {
+  const rows = [...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length);
+  const m = $('ms_msg'); if (DEMO) { m.textContent = `見本モードなので保存しません（${rows.length}行）。`; return; }
+  try { await sb(`leo_master?kind=eq.${MASTER_KIND}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    if (rows.length) await sb('leo_master', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows.map((d, i) => ({ kind: MASTER_KIND, row_no: i + 1, data: d }))) });
+    m.textContent = `${rows.length}行を保存しました。`; } catch (e) { m.textContent = e.message; }
+}
+async function saveCare() {
+  const rows = [...document.querySelectorAll('input.care')].map(i => ({ child: i.dataset.c, note: i.value.trim() || null })), m = $('ms_msg');
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try { await sb('leo_child_care?on_conflict=child', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }); m.textContent = '保存しました。'; } catch (e) { m.textContent = e.message; }
+}
+
+// ===== 加算・人員の要件チェック（請求CSVの前に） =====
+async function billChecks(nikki, flags) {
+  const out = [], by = {}; nikki.filter(n => n.kind === '利用').forEach(n => (by[n.day] ||= new Set()).add(n.child));
+  let hai = []; try { hai = await sheetRows('haichi'); } catch (e) { }
+  const staffOn = d => new Set(hai.filter(r => String(r['日付'] || '').replace(/\//g, '-').slice(0, 10) === d).map(r => r['職員名'])).size;
+  for (const [d, s] of Object.entries(by)) {
+    if (s.size > 10) out.push(`${fmtDay(d)}：利用${s.size}人（定員10）。定員超過になっていないか確認`);
+    const n = staffOn(d); if (hai.length && n < 2) out.push(`${fmtDay(d)}：配置表の職員が${n}人。児童指導員・保育士等2人以上が必要（人員欠如減算に注意）`);
+  }
+  flags.filter(f => f.absent_support && !(f.absent_note || '').trim()).forEach(f => out.push(`${fmtDay(f.day)} ${f.child}：欠席時対応の記録内容が空です`));
+  const ab = new Set(nikki.filter(n => n.kind === '欠席').map(n => n.day + n.child));
+  flags.filter(f => f.absent_support && !ab.has(f.day + f.child)).forEach(f => out.push(`${fmtDay(f.day)} ${f.child}：欠席時対応の印があるが、日誌では欠席になっていません`));
+  const nt = nikki.filter(n => n.kind === '利用' && (!n.start_time || !n.end_time)); nt.forEach(n => out.push(`${fmtDay(n.day)} ${n.child}：開始・終了時間がありません（算定できません）`));
+  return out;
 }
