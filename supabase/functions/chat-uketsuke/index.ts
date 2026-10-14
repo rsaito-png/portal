@@ -47,6 +47,13 @@ Deno.serve(async (req) => {
     ? { hostAppDataAction: { chatDataAction: { createMessageAction: { message: { text } } } } }
     : { text });
 
+  // 受付窓口とのDMなら、その人のDMを職員表に登録（ポータルからのお知らせの送り先になる）
+  if (space?.name && (space.type === "DM" || space.spaceType === "DIRECT_MESSAGE" || space.singleUserBotDm) && user?.name) {
+    const em = (user.email ?? "").toLowerCase();
+    let { data: hit } = await db.from("staff_profiles").update({ chat_dm_space: space.name }).eq("chat_user", user.name).select("user_id");
+    if (!hit?.length && em) ({ data: hit } = await db.from("staff_profiles").update({ chat_dm_space: space.name, chat_user: user.name }).eq("chat_email", em).select("user_id"));
+    if (!hit?.length) await db.from("chat_dm_unknown").upsert({ chat_user: user.name, email: em || null, display_name: user.displayName, space: space.name, seen_at: new Date().toISOString() });
+  }
   // 最初のメッセージで追加された時は ADDED_TO_SPACE にメッセージが付いてくるので、それも受付する
   if (type === "ADDED_TO_SPACE" && !msg)
     return reply("受付窓口です。日誌の直し・送迎の変更・請求・計画などの依頼や報告を、ここに書いてください。\n一覧はポータル: " + PORTAL);
