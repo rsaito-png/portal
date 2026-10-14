@@ -13,6 +13,7 @@ button{background:var(--main);color:#fff;border:0}
 .office{border-left:6px solid var(--c);text-align:left;padding:18px 14px}
 .office small{display:inline;margin-left:6px}
 .tile.main{grid-column:1/-1;padding:30px 10px;font-size:22px}
+.sample{text-align:left;font-size:15px;margin:8px 0 0;padding-left:22px}
 .back{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:8px 14px}
 h3{font-size:15px;color:#555;margin:20px 0 8px}
 .tile span{display:block;font-size:34px}.tile small{display:block;color:#888;font-size:12px;margin-top:4px}
@@ -54,10 +55,11 @@ async function login() {
 
 function logout() { localStorage.removeItem('sess'); location.reload(); }
 
-function tileHtml([icon, name, url, note, size], color) {
+function tileHtml([icon, name, url, note, size, sample], color) {
+  const list = DEMO && sample ? `<ul class="sample">${sample.map(x => `<li>${x}</li>`).join('')}</ul><small>（見本データ）</small>` : `<small>${note}</small>`;
   const link = url ? `href="${url}" target="_blank"` : `href="#" onclick="alert('準備中です');return false"`;
   const accent = color ? `style="border-top:4px solid ${color}"` : '';
-  return `<a class="tile${size === 'main' ? ' main' : ''}" ${link} ${accent}><span>${icon}</span>${name}<small>${note}</small></a>`;
+  return `<a class="tile${size === 'main' ? ' main' : ''}" ${link} ${accent}><span>${icon}</span>${name}${list}</a>`;
 }
 
 // 画面切替は URL の #事業所id で行う（戻るボタン・ブラウザの戻るが両方効く）
