@@ -28,7 +28,7 @@ create or replace function public.trg_notify_hiyari() returns trigger language p
 begin
   perform notify_enqueue('all', 'ヒヤリハット',
     '⚠️ ヒヤリハットの新しい報告があります（' || to_char(coalesce(new.occurred_at, now()) at time zone 'Asia/Tokyo', 'MM/DD') ||
-    coalesce('・' || nullif(new.place, ''), '') || '）。読んだら「読んだ」を押してください。',
+    coalesce('・' || nullif(new.place, ''), '') || '）。ポータルで読んでください。',
     'https://rsaito-png.github.io/portal/#leo/hiyari', coalesce(new.office, 'レオ'));
   return new;
 end $$;
