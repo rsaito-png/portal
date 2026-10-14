@@ -40,6 +40,7 @@ window.PORTAL_CONFIG = {
       ['🔍', 'アセスメント（フォーム）', 'https://drive.google.com/open?id=1kspL8oAWVxTwzaqeQZQe684eiUAj9PpcvdpbrqF-gEc', '手入力'],
       ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ）'],
       ['🖊️', '保護者の実績確認', '#leo/kakunin', '児童ごとのリンク作成・確認済みの一覧', '', null, '児発管'],
+      ['💬', 'LINE報告を書く', '#leo/line', '保護者への報告文→LINE・日誌の活動記録に', 'main'],
       ['🧩', '個別支援計画（いまどこ？）', '#leo/plan', '管理表から・次にやること'],
       ['🗂️', '配置表・型表・管理表・送迎の配慮の入力', '#leo/master', 'ポータルの表を直す', '', null, '児発管'],
       ['✍️', '請求の印（欠席時対応・子育てサポート）', '#leo/shirushi', 'その日のうちに付ける'],
