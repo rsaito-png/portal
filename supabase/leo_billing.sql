@@ -29,3 +29,8 @@ drop policy if exists ldf_ins on public.leo_day_flags;
 create policy ldf_ins on public.leo_day_flags for insert to authenticated with check (public.my_office() = 'レオ' or public.can_bill());
 drop policy if exists ldf_upd on public.leo_day_flags;
 create policy ldf_upd on public.leo_day_flags for update to authenticated using (public.my_office() = 'レオ' or public.can_bill()) with check (public.my_office() = 'レオ' or public.can_bill());
+-- 2026-10-15 障害児様式（K122）対応：保護者カナ・一連の契約での初回提供日（明細書 日数情報の開始年月日）・事業者記入欄番号・児童ごとの減算（未計画など）
+alter table public.leo_children add column if not exists guardian_kana text;
+alter table public.leo_children add column if not exists first_date date;
+alter table public.leo_children add column if not exists kinyu_no int check (kinyu_no between 1 and 99);
+alter table public.leo_children add column if not exists gensan text[] not null default '{}' check (gensan <@ array['未計画','未計画2']);

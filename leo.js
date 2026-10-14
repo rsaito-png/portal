@@ -329,7 +329,7 @@ const DEMO_BILL = {
   nikki: [['01', '児童A', '利用', '14:45', '17:00', '職員X', '職員Y'], ['02', '児童A', '欠席'], ['03', '児童C', '利用', '10:00', '13:00', '送迎なし', '送迎なし'], ['05', '児童A', '利用', '10:00', '15:30', '職員X', '']]
     .map(([d, c, k, s, e, p, q]) => ({ day: BILL_MONTH + '-' + d, child: c, kind: k, start_time: s, end_time: e, pick_driver: p, drop_driver: q })),
   flags: [{ day: BILL_MONTH + '-02', child: '児童A', absent_support: true, absent_note: '（見本）母より発熱の連絡。様子を聞き、次回の予定を確認', kosodate: false, holiday: false }],
-  kids: [{ name: '児童A', kana: 'ｼﾞﾄﾞｳA', jukyusha_no: '9900000001', city_no: '999999', kind: '放デイ', cap_monthly: 4600, mushouka: false, contract_days: 23, contract_start: '2026-04-01' },
+  kids: [{ name: '児童A', kana: 'ｼﾞﾄﾞｳA', guardian_kana: 'ﾎｺﾞｼｬA', first_date: '2026-04-03', jukyusha_no: '9900000001', city_no: '999999', kind: '放デイ', cap_monthly: 4600, mushouka: false, contract_days: 23, contract_start: '2026-04-01' },
     { name: '児童C', kana: 'ｼﾞﾄﾞｳC', jukyusha_no: '9900000003', city_no: '999999', kind: '児発', cap_monthly: 4600, mushouka: true, contract_days: 10, contract_start: '2026-04-01' }],
 };
 async function billData() {
@@ -362,15 +362,18 @@ async function saveShirushi() {
 }
 
 // ===== 請求（事務・管理者だけ）：児童マスタ（受給者証）→ CSVを作る。国保連への提出はここではしない =====
-const KID_F = [['name', '児童名（日誌と同じ）'], ['kana', 'フリガナ（半角ｶﾅ）'], ['jukyusha_no', '受給者証番号（10桁）'], ['city_no', '市町村番号（6桁）'], ['kind', '種別'], ['cap_monthly', '負担上限月額'],
-  ['mushouka', '無償化'], ['contract_days', '契約支給量（日）'], ['contract_start', '契約開始日']];
+const KID_F = [['name', '児童名（日誌と同じ）'], ['kana', '児童フリガナ'], ['guardian_kana', '保護者フリガナ'], ['jukyusha_no', '受給者証番号（10桁）'], ['city_no', '市町村番号（6桁）'], ['kind', '種別'], ['cap_monthly', '負担上限月額'],
+  ['mushouka', '無償化'], ['contract_days', '契約支給量（日）'], ['contract_start', '契約開始日'], ['first_date', '初回利用日（この契約で最初に来た日）'], ['kinyu_no', '事業者記入欄番号'], ['gensan', '計画未作成の減算']];
+const OFFICE_GENSAN = [['支減', '支援プログラム未公表'], ['評価減', '自己評価結果等未公表'], ['開所減1', '開所時間減算（4時間未満）'], ['開所減2', '開所時間減算（4〜6時間）']];
 LEO_VIEWS.seikyu = async function () {
   if (!canBill()) return '<p>この画面は事務・管理者だけです。</p>';
   const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children?order=name'), { nikki } = await billData();
   const names = [...new Set(nikki.map(n => n.child))], known = new Set(kids.map(k => k.name)), missing = names.filter(n => !known.has(n));
   const inp = (k, f, v) => f === 'kind' ? `<select data-f="kind">${['放デイ', '児発'].map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
     : f === 'cap_monthly' ? `<select data-f="cap_monthly">${[0, 4600, 37200].map(o => `<option ${o == v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
-    : f === 'mushouka' ? `<input type="checkbox" data-f="mushouka" ${v ? 'checked' : ''}>` : `<input data-f="${f}" value="${esc(v ?? '')}" ${f === 'contract_start' ? 'type="date"' : ''} size="${f === 'name' ? 10 : 12}">`;
+    : f === 'mushouka' ? `<input type="checkbox" data-f="mushouka" ${v ? 'checked' : ''}>`
+    : f === 'gensan' ? `<select data-f="gensan">${[['', 'なし'], ['未計画', '未作成（1〜2月目）'], ['未計画2', '未作成（3月目以降）']].map(([o, l]) => `<option value="${o}" ${(v || [])[0] === o || (!o && !(v || []).length) ? 'selected' : ''}>${l}</option>`).join('')}</select>`
+    : `<input data-f="${f}" value="${esc(v ?? '')}" ${/contract_start|first_date/.test(f) ? 'type="date"' : ''} size="${f === 'name' || f === 'kinyu_no' ? (f === 'kinyu_no' ? 3 : 10) : 12}">`;
   const row = k => `<tr class="kid">${KID_F.map(([f]) => `<td>${inp(k, f, k[f])}</td>`).join('')}</tr>`;
   return `<h3>請求CSVを作る（事務）</h3>${demoNote()}${monthTabs('seikyu')}
     <p class="note">ここで作るのはファイルだけです。国保連への送信は今まで通り「取込送信ソフト」で、中身を確かめてから行ってください。単価は6級地 10.36円（児発・放デイ／センター以外）。</p>
@@ -378,13 +381,16 @@ LEO_VIEWS.seikyu = async function () {
     <div style="overflow-x:auto"><table class="tbl"><tr>${KID_F.map(([, l]) => `<th>${l}</th>`).join('')}</tr>${kids.map(row).join('')}${(missing.length ? missing.map(n => ({ name: n })) : [{}]).map(row).join('')}</table></div>
     <button onclick="saveKids()">マスタを保存</button> <span id="kd_msg"></span>
     <h4>2. ファイルを作る</h4><label>事業所番号（10桁）<input id="office_no" value="${esc(localStorage.getItem('leo_office_no') || (DEMO ? '9999999999' : ''))}" size="12"></label>
-    <button onclick="makeCsv()">請求CSVを作る（J111・J611）</button><div id="csv_out"></div>`;
+    <p class="note">事業所全体にかかる減算（かかっている月だけ印を付けます。基本報酬のサービスコードが減算用のコードに変わります）：
+      ${OFFICE_GENSAN.map(([k, l]) => `<label><input type="checkbox" class="og" value="${k}" ${JSON.parse(localStorage.getItem('leo_office_gensan') || '[]').includes(k) ? 'checked' : ''}>${l}</label>`).join(' ')}</p>
+    <button onclick="makeCsv()">請求CSVを作る（K112/K122・K611）</button><div id="csv_out"></div>`;
 };
 async function saveKids() {
   const rows = [...document.querySelectorAll('tr.kid')].map(tr => { const o = {}; tr.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = i.type === 'checkbox' ? i.checked : i.value.trim()); return o; }).filter(o => o.name);
   const m = $('kd_msg'), bad = rows.find(r => !/^\d{10}$/.test(r.jukyusha_no) || !/^\d{6}$/.test(r.city_no));
   if (bad) { m.textContent = `${bad.name}：受給者証番号は10桁・市町村番号は6桁の数字で入れてください。`; return; }
-  rows.forEach(r => { r.cap_monthly = +r.cap_monthly; r.contract_days = r.contract_days ? +r.contract_days : null; r.contract_start = r.contract_start || null; });
+  rows.forEach(r => { r.cap_monthly = +r.cap_monthly; r.contract_days = r.contract_days ? +r.contract_days : null; r.contract_start = r.contract_start || null;
+    r.first_date = r.first_date || null; r.kinyu_no = r.kinyu_no ? +r.kinyu_no : null; r.gensan = r.gensan ? [r.gensan] : []; r.guardian_kana = r.guardian_kana || null; });
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try { await sb('leo_children?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }); m.textContent = '保存しました。'; }
   catch (e) { m.textContent = e.message; }
@@ -398,15 +404,16 @@ async function makeCsv() {
   try { await loadSjis(); if (!window.LeoBilling) await new Promise((ok, ng) => { const s = document.createElement('script'); s.src = 'leo_billing.js'; s.onload = ok; s.onerror = ng; document.head.appendChild(s); });
     const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children'), { nikki, flags } = await billData(), F = {}, K = {};
     flags.forEach(f => F[f.day + f.child] = f);
-    kids.forEach(k => K[k.name] = { ...k, contract_start: (k.contract_start || '').replace(/-/g, '') });
+    kids.forEach(k => K[k.name] = { ...k, contract_start: (k.contract_start || '').replace(/-/g, ''), first_date: (k.first_date || '').replace(/-/g, '') });
+    const og = [...document.querySelectorAll('input.og:checked')].map(i => i.value); localStorage.setItem('leo_office_gensan', JSON.stringify(og));
     const recs = nikki.map(n => { const f = F[n.day + n.child] || {}; return { day: n.day, child: n.child, status: n.kind === '欠席' ? '欠席' : '出席', start: n.start_time, end: n.end_time,
       pick: isTrip(n.pick_driver), drop: isTrip(n.drop_driver), holiday: f.holiday, absent_support: f.absent_support, kosodate: f.kosodate }; });
-    const ym = BILL_MONTH.replace('-', ''), r = LeoBilling.build(ym, office, K, recs), chk = await billChecks(nikki, flags);
+    const ym = BILL_MONTH.replace('-', ''), r = LeoBilling.build(ym, office, K, recs, og), chk = await billChecks(nikki, flags);
     const nm = [...new Set(nikki.map(n => n.child))].filter(n => !K[n]);
     const file = (rows, name) => { const b = new Blob([new Uint8Array(Encoding.convert(Encoding.stringToCode(LeoBilling.toCsv(rows)), { to: 'SJIS', from: 'UNICODE' }))], { type: 'text/csv' });
       return `<a class="card" style="display:inline-block" href="${URL.createObjectURL(b)}" download="${name}">⬇ ${name}</a>`; };
     const yen = n => n.toLocaleString('ja-JP');
-    out.innerHTML = `${file(r.claim, `J111${ym.slice(2)}.CSV`)} ${file(r.jisseki, `J611${ym.slice(2)}.CSV`)}
+    out.innerHTML = `${file(r.claim, `K112${ym.slice(2)}.CSV`)} ${file(r.jisseki, `K611${ym.slice(2)}.CSV`)}
       <table class="tbl"><tr><th>児童</th><th>利用日数</th><th>送迎(片道)</th><th>単位</th><th>費用</th><th>利用者負担</th><th>給付費</th></tr>${r.bills.map(b => `<tr><td>${esc(b.name)}</td><td>${b.use}</td><td>${b.trips}</td><td>${yen(b.units)}</td><td>${yen(b.cost)}</td><td>${yen(b.burden)}</td><td>${yen(b.benefit)}</td></tr>`).join('')}</table>
       <h4>要件チェック</h4>${chk.length ? '' : '<p>気になる点はありません。</p>'}${[...nm.map(n => `${n}：マスタがないので入れていません`), ...r.warn, ...chk].map(w => `<p class="note" style="color:#c00">⚠ ${esc(w)}</p>`).join('')}
       <p class="note">作ったファイルは、取込送信ソフトで読み込んで、エラーと金額を確かめてください（送信はまだしないでください）。</p>`; }

@@ -18,6 +18,7 @@ UNIT_PRICE = 10.36   # 6級地 児発・放デイ
 AREA = '06'          # 共通編 1.4 地域区分コード 06:六級地（16 は十六級地＝EA02）
 OFFICE_NO = '9999999999'  # 架空
 
+def r2(x): return int(math.floor(x + 0.5))   # JS の Math.round と同じ丸め
 def q(v): return '' if v is None or v == '' else '"' + str(v).replace('"', '""') + '"'
 def to_csv(rows): return ('\r\n'.join(','.join(q(c) for c in r) for r in rows) + '\r\n').encode('cp932')
 def rec(n, items):
@@ -126,18 +127,18 @@ def build(ym, children, records, office=OFFICE_NO, office_gensan=()):
             for code, (u, t) in sorted(b['det'].items()):
                 claims.append(rec(11, {1: 'K122', 2: '03', 3: ym, 4: city, 5: office, 6: h, 7: k + code, 8: u, 9: t, 10: u * t}))
             claims.append(rec(33, {1: 'K122', 2: '04', 3: ym, 4: city, 5: office, 6: h, 7: k, 8: '1', 9: b['use'] + b['absn'], 10: b['units'],
-                                   11: f'{round(UNIT_PRICE * 1000):05d}', 12: '0', 13: b['cost'], 14: b['ichiwari'], 15: b['futan2'], 16: b['burden'],
+                                   11: f'{r2(UNIT_PRICE * 1000):05d}', 12: '0', 13: b['cost'], 14: b['ichiwari'], 15: b['futan2'], 16: b['burden'],
                                    21: b['burden'], 22: b['benefit']}))
             claims.append(rec(11, {1: 'K122', 2: '05', 3: ym, 4: city, 5: office, 6: h, 7: c.get('決定サービスコード') or DECIDE[k],
-                                   8: f"{round(float(c.get('契約日数', 23)) * 100):05d}", 9: c.get('契約開始日', ''), 11: c.get('記入欄番号', 1)}))
+                                   8: f"{r2(float(c.get('契約日数', 23)) * 100):05d}", 9: c.get('契約開始日', ''), 11: c.get('記入欄番号', 1)}))
             # 2.1.3.6 実績記録票 基本（172項目）・明細（113項目）
             ys = YOSHIKI[k]; tot = sum(m for _, x, m, _ in b['days'] if x != '欠席')
-            jis.append(rec(172, {1: 'K611', 2: '01', 3: ym, 4: city, 5: office, 6: h, 7: ys, 19: f'{round(tot / 60 * 100):05d}',
+            jis.append(rec(172, {1: 'K611', 2: '01', 3: ym, 4: city, 5: office, 6: h, 7: ys, 19: f'{r2(tot / 60 * 100):05d}',
                                  34: b['trips'] or '', 163: b['kos'] or ''}))
             for r, x, m, ko in b['days']:
                 ab = x == '欠席'; t = lambda v: f'{hm(v) // 60:02d}{hm(v) % 60:02d}'
                 jis.append(rec(113, {1: 'K611', 2: '02', 3: ym, 4: city, 5: office, 6: h, 7: ys, 9: f"{r['day'].day:02d}",
-                                     14: '' if ab else t(r['start']), 15: '' if ab else t(r['end']), 16: '' if ab else f'{round(m / 60 * 100):04d}',
+                                     14: '' if ab else t(r['start']), 15: '' if ab else t(r['end']), 16: '' if ab else f'{r2(m / 60 * 100):04d}',
                                      21: '1' if not ab and r.get('pick') == '◯' else '', 22: '1' if not ab and r.get('drop') == '◯' else '',
                                      34: ('2' if r.get('holiday') else '1') if k == '63' and not ab else '', 36: '8' if ab else '',
                                      103: '1' if ko else ''}))

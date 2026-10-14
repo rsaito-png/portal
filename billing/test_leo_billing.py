@@ -1,5 +1,6 @@
 # 架空データだけで検証（本物の児童・受給者証は使わない）
-import subprocess, sys
+import subprocess, sys, os
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from datetime import date
 import leo_billing as L
 kids = {
