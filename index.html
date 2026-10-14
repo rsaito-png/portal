@@ -33,6 +33,8 @@ h3{font-size:15px;color:#555;margin:20px 0 8px}
 <script src="config.js"></script>
 <script>
 const C = window.PORTAL_CONFIG;
+// 見本モード（?demo=1）: ログイン不要・見本データのみ
+const DEMO = new URLSearchParams(location.search).get('demo') === '1';
 const $ = id => document.getElementById(id);
 document.title = C.title;
 $('ttl').textContent = C.title;
