@@ -30,7 +30,12 @@ h3{font-size:15px;color:#555;margin:20px 0 8px}
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
 <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
 <button onclick="login()">ログイン</button>
+<button onclick="$('login').hidden=true;$('forgot').hidden=false" style="background:#fff;color:var(--main);border:1px solid var(--main)">はじめての方／パスワードを忘れた方</button>
 <button onclick="location.search='?demo=1'" style="background:#fff;color:var(--main);border:1px solid var(--main)">見本を見る</button><div id="msg"></div></div>
+<div id="forgot" class="card" hidden><p>登録されているメールアドレスを入れてください。パスワードを決めるためのメールが届きます。</p>
+<input id="fem" type="email" placeholder="メールアドレス" autocomplete="username">
+<button onclick="sendReset()">メールを送る</button>
+<button onclick="$('forgot').hidden=true;$('login').hidden=false" style="background:#fff;color:#333;border:1px solid #bbb">もどる</button><div id="fmsg"></div></div>
 <div id="setpw" class="card" hidden><p>新しいパスワードを決めてください（8文字以上）。</p>
 <input id="npw" type="password" placeholder="新しいパスワード" autocomplete="new-password">
 <button onclick="setPassword()">パスワードを決める</button><div id="pmsg"></div></div>
@@ -110,6 +115,18 @@ function show() {
     document.querySelectorAll('input[name=role]').forEach(r => r.onchange = () => { ROLE = r.value; render(); });
   }
   render();
+}
+
+// はじめての方／パスワードを忘れた方：Supabase がパスワード設定メールを送る
+// 登録のないアドレスでも同じ表示にする（アカウントの有無を知られないため）
+async function sendReset() {
+  const email = $('fem').value.trim();
+  if (!email.includes('@')) { $('fmsg').textContent = 'メールアドレスを入れてください。'; return; }
+  const r = await fetch(C.supabaseUrl + '/auth/v1/recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname), {
+    method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+  $('fmsg').textContent = r.status === 429
+    ? 'いま混み合っています。しばらくしてからもう一度お試しください。'
+    : '登録されているアドレスなら、パスワード設定のメールを送りました。メールのボタンを押してパスワードを決めてください（24時間有効）。届かないときは管理者に連絡してください。';
 }
 
 // パスワード設定リンク（#access_token=...&type=recovery|invite）から来たとき
