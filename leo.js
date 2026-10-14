@@ -460,15 +460,15 @@ const PLAN_DEMO_ROWS = [
   { 児童名: '児童D', 現在の期: '1期', 現在の計画期間: '2026年10月〜2027年3月', 次期開始月: '2027年4月', フォーム送付目安日: '2027/03/15', フォーム回答日: '2026/09/18', 計画書作成: '済', 原案署名: '済', 本案署名: '済', 備考: '' },
 ];
 // 段階ごとに開く資料（leo_plan_links.kind）。児童ごとの個別リンクはDB（ログインした職員だけ読める）。公開リポには置かない
-const STEP_KINDS = [[], ['monitoring'], ['answer'], ['plan'], ['plan', 'tracker'], ['consent_genan'], ['plan'], ['consent_honan'], ['plan']];
+const STEP_KINDS = [[], ['monitoring'], ['answer'], ['plan', 'plan_next'], ['plan_next', 'tracker'], ['consent_genan', 'plan_next'], ['plan_next'], ['consent_honan'], ['plan_next']];
 const STEP_COMMON = [[], ['アンケート'], ['管理表'], ['計画フォルダ'], ['管理表'], ['同意リンク一覧'], [], ['同意リンク一覧'], []];
-const PLAN_DEMO_LINKS = ['児童A', '児童B', '児童C', '児童D'].flatMap(c => [['plan', '（見本）今の計画書'], ['tracker', '（見本）管理表の行'], ['answer', '（見本）アンケート回答'],
-  ['consent_genan', '（見本）原案の同意リンク'], ['consent_honan', '（見本）本案の同意リンク'], ['monitoring', '（見本）モニタリング記録フォルダ']].map(([kind, label], i) => ({ child: c, sort: i, kind, label, url: '#leo/plan' })));
+const PLAN_DEMO_LINKS = ['児童A', '児童B', '児童C', '児童D'].flatMap(c => [['plan', '（見本）今の計画書'], ['plan_next', '（見本）次の計画の下書き：未作成'], ['tracker', '（見本）管理表の行'], ['answer', '（見本）アンケート回答'],
+  ['consent_genan', '（見本）原案の同意リンク'], ['consent_honan', '（見本）本案の同意リンク'], ['monitoring', '（見本）モニタリング記録フォルダ']].map(([kind, label], i) => ({ child: c, sort: i, kind, label, url: /未作成/.test(label) ? '' : '#leo/plan' })));
 LEO_VIEWS.plan = async function () {
   const [rows0, links] = await Promise.all([DEMO ? PLAN_DEMO_ROWS : sheetRows('keikaku'), DEMO ? PLAN_DEMO_LINKS : sb('leo_plan_links?order=child,sort').catch(() => [])]);
   const rows = rows0.filter(r => r['児童名'] && !String(r['児童名']).startsWith('※')), t = new Date(today() + 'T00:00:00+09:00');
   const LK = {}; links.forEach(l => (LK[l.child.replace(/\s/g, '')] ||= []).push(l));
-  const btn = (href, label, main) => `<a href="${esc(href)}" target="${href.startsWith('#') ? '_self' : '_blank'}" rel="noopener" style="display:block;margin:6px 0;padding:12px;border-radius:8px;text-decoration:none;font-size:16px;${main ? 'background:#e8833a;color:#fff' : 'background:#f3f3f3;color:#222'}">${esc(label)} ↗</a>`;
+  const btn = (href, label, main) => !href ? `<div style="margin:6px 0;padding:12px;border-radius:8px;background:#fff;border:1px dashed #bbb;color:#888;font-size:15px">${esc(label)}</div>` : `<a href="${esc(href)}" target="${href.startsWith('#') ? '_self' : '_blank'}" rel="noopener" style="display:block;margin:6px 0;padding:12px;border-radius:8px;text-decoration:none;font-size:16px;${main ? 'background:#e8833a;color:#fff' : 'background:#f3f3f3;color:#222'}">${esc(label)} ↗</a>`;
   const L = k => btn(PLAN_LINKS[k], k);
   const cards = rows.map(r => {
     const m = String(r['次期開始月'] || '').match(/(\d{4})年(\d{1,2})月/), st = planStage(r), d = m ? planDates(+m[1], +m[2]) : null;
