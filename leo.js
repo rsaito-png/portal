@@ -172,6 +172,43 @@ const LEO_VIEWS = {
   },
 };
 
+// 保護者の実績確認（事務のみ）：児童ごとのリンクを作ってコピー → 公式LINEで送る。確認済みかを一覧で見る
+let KK_MONTH = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
+const KK_URL = t => location.origin + location.pathname.replace(/[^/]*$/, '') + 'kakunin.html?t=' + t;
+LEO_VIEWS.kakunin = async function () {
+  if (ROLE !== '事務') return '<p>この画面は事務の方だけが使えます。</p>';
+  let links, conf;
+  if (DEMO) {
+    links = [{ token: 'demo1', child: '児童A', month: KK_MONTH }, { token: 'demo2', child: '児童B', month: KK_MONTH }, { token: 'demo3', child: '児童C', month: KK_MONTH }];
+    conf = [{ token: 'demo1', confirm: '内容に相違ありません', parent_name: '保護者A', comment: null, signature: 'x', submitted_at: new Date().toISOString() },
+            { token: 'demo2', confirm: '相違があります', parent_name: '保護者B', comment: '（見本）6日は利用していません', signature: null, submitted_at: new Date().toISOString() }];
+  } else {
+    links = await sb(`leo_confirm_links?month=eq.${KK_MONTH}&order=child`);
+    conf = links.length ? await sb(`leo_confirmations?select=token,confirm,parent_name,comment,signature,submitted_at&token=in.(${links.map(l => l.token).join(',')})&order=id.desc`) : [];
+  }
+  const last = {}; conf.forEach(c => { if (!last[c.token]) last[c.token] = c; });
+  const done = links.filter(l => last[l.token]).length;
+  return `<h3>保護者の実績確認（事務のみ）</h3>${demoNote()}
+    <p class="note">児童ごとの専用リンクです（推測できない番号つき・その児童のその月の実績だけが見えます）。「コピー」して公式LINEで保護者に送ってください。</p>
+    <p>対象月 <input type="month" value="${KK_MONTH}" style="width:auto" onchange="KK_MONTH=this.value;renderLeoView('kakunin')">
+    <button style="width:auto" onclick="kkMake()">この月のリンクを作る</button></p>
+    <p>確認済み <b>${done}</b> ／ ${links.length}人</p>` +
+    (links.length ? `<table><tr><th>児童</th><th>確認</th><th>リンク</th></tr>${links.map(l => { const c = last[l.token];
+      return `<tr${c && c.confirm === '相違があります' ? ' style="background:#fdecec"' : ''}><td>${esc(l.child)}</td>
+      <td>${c ? `${esc(c.confirm)}<br><small>${esc(c.parent_name)}・${new Date(c.submitted_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}${c.signature ? '・署名あり' : ''}</small>${c.comment ? `<br><small>${esc(c.comment)}</small>` : ''}` : '<span style="color:#d33">未確認</span>'}</td>
+      <td><button style="width:auto;padding:6px 10px" onclick="kkCopy('${l.token}', this)">コピー</button></td></tr>`; }).join('')}</table>`
+      : '<p>この月のリンクはまだありません。「この月のリンクを作る」を押してください（実績・日誌に出てくる児童の分ができます）。</p>');
+};
+async function kkMake() {
+  if (DEMO) { alert('見本モードなので作りません'); return; }
+  try { const n = await sb('rpc/leo_confirm_make_links', { method: 'POST', body: JSON.stringify({ p_month: KK_MONTH }) }); alert(n + '人分のリンクを作りました'); renderLeoView('kakunin'); }
+  catch (e) { alert(e.message); }
+}
+function kkCopy(t, b) {
+  const u = DEMO ? KK_URL('').replace('t=', 'demo=1') : KK_URL(t);
+  navigator.clipboard.writeText(u).then(() => { b.textContent = 'コピーしました'; }, () => prompt('このリンクをコピーしてください', u));
+}
+
 async function saveNikki() {
   const ch = [...document.querySelectorAll('.rec input, .rec textarea')].filter(i => i.value !== i.dataset.old)
     .map(i => ({ target: 'nikki', day: today(), row_key: i.dataset.row, field: i.dataset.f, old_value: i.dataset.old, new_value: i.value }));

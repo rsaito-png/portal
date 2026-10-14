@@ -36,6 +36,7 @@ window.PORTAL_CONFIG = {
       ['📝', '個別支援計画 管理表', '#leo/keikaku', '期限が近い順（見るだけ）'],
       ['🔍', 'アセスメント（フォーム）', 'https://drive.google.com/open?id=1kspL8oAWVxTwzaqeQZQe684eiUAj9PpcvdpbrqF-gEc', '手入力'],
       ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ）'],
+      ['🖊️', '保護者の実績確認（事務）', '#leo/kakunin', '児童ごとのリンク作成・確認済みの一覧', '', null, '事務'],
       ['🔧', '直した所（事務）', '#leo/edits', '修正の反映状況・衝突の確認', '', null, '事務'],
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
