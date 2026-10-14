@@ -222,12 +222,22 @@ const HY_KINDS = ['転倒・転落・つまづき', '誤嚥・誤飲', '誤与�
 const HY_DEMO = [
   { id: 2, occurred_at: new Date().toISOString(), place: '送迎車', kind: '交通事故', child_label: '児童A', what: '（見本）発進時に児童がシートベルトを外していた', response: '停車して付け直した', prevention: '', status: '未確認', manager_comment: '' },
   { id: 1, occurred_at: new Date(Date.now() - 864e5).toISOString(), place: '公園', kind: '転倒・転落・つまづき', child_label: '児童B', what: '（見本）走っていて段差でつまづいた。けがなし', response: '様子を見た', prevention: '公園では段差の場所を先に伝える', status: '確認済', manager_comment: '全員に共有済み' } ];
+const myUid = () => { try { return JSON.parse(atob(JSON.parse(localStorage.getItem('sess') || '{}').token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { return null; } };
 const hySeenKey = () => 'hiyari_seen_' + (JSON.parse(localStorage.getItem('sess') || '{}').email || 'demo');
 async function hyRows() { return DEMO ? HY_DEMO : sb('hiyari?order=id.desc&limit=100'); }
-async function hiyariUnread() { try { const r = await hyRows(); const seen = +localStorage.getItem(hySeenKey()) || 0; return r.filter(x => x.id > seen).length; } catch (e) { return 0; } }
+async function myReads() { return DEMO ? [] : (await sb('hiyari_reads?select=hiyari_id,user_id')); }
+async function hiyariUnread() { try { const [r, rd] = await Promise.all([hyRows(), myReads()]); if (DEMO) { const seen = +localStorage.getItem(hySeenKey()) || 0; return r.filter(x => x.id > seen).length; }
+  const me = myUid(); const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); return r.filter(x => !mine.has(x.id)).length; } catch (e) { return 0; } }
 LEO_VIEWS.hiyari = async function () {
-  const rows = await hyRows(); const seen = +localStorage.getItem(hySeenKey()) || 0;
-  if (rows.length) localStorage.setItem(hySeenKey(), Math.max(...rows.map(r => r.id)));
+  const rows = await hyRows(); let seen = +localStorage.getItem(hySeenKey()) || 0, unread = null, readers = {}, staff = [];
+  if (DEMO) { if (rows.length) localStorage.setItem(hySeenKey(), Math.max(...rows.map(r => r.id))); }
+  else { const me = myUid(), rd = await myReads();
+    const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); unread = new Set(rows.filter(r => !mine.has(r.id)).map(r => r.id));
+    rd.forEach(x => (readers[x.hiyari_id] ||= new Set()).add(x.user_id));
+    if (unread.size) sb('hiyari_reads?on_conflict=hiyari_id,user_id', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify([...unread].map(id => ({ hiyari_id: id }))) }).catch(() => {});
+    if (canManage()) try { staff = await sb('staff_profiles?office=eq.レオ&select=user_id,nikki_name'); } catch (e) { } }
+  const isNew = r => unread ? unread.has(r.id) : r.id > seen;
+  const notRead = r => staff.filter(p => !(readers[r.id] || new Set()).has(p.user_id)).map(p => p.nikki_name);
   const dt = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   return `<h3>ヒヤリハット</h3>${demoNote()}<p class="note">ヒヤッとしたこと・ハッとしたことは、小さなことでも書いてください。全員で読んで、同じことを起こさないための記録です（責める記録ではありません）。</p>
     <details class="card"><summary><b>＋ 報告する</b></summary>
@@ -240,10 +250,10 @@ LEO_VIEWS.hiyari = async function () {
       <label>次に起こさないための工夫（思いつけば）<textarea id="hy_prev" rows="2"></textarea></label>
       <button onclick="hySave()">送る</button><div id="hy_msg"></div></div></details>
     ${rows.map(r => `<div class="card rec" style="${r.status === '未確認' ? 'border-left:6px solid #d33' : ''}">
-      ${r.id > seen ? '<span class="badge">新着</span> ' : ''}<b>${esc(r.kind)}</b>　${dt(r.occurred_at)}　${esc(r.place || '')}${r.child_label ? '　' + esc(r.child_label) : ''}
+      ${isNew(r) ? '<span class="badge">新着</span> ' : ''}<b>${esc(r.kind)}</b>　${dt(r.occurred_at)}　${esc(r.place || '')}${r.child_label ? '　' + esc(r.child_label) : ''}
       <p style="white-space:pre-wrap">${esc(r.what)}</p>${r.response ? `<p class="note">その場の対応：${esc(r.response)}</p>` : ''}
       ${r.prevention ? `<p><b>再発防止：</b>${esc(r.prevention)}</p>` : ''}${r.manager_comment ? `<p class="note">確認者より：${esc(r.manager_comment)}</p>` : ''}
-      <p class="note">${r.status}</p>
+      <p class="note">${r.status}${staff.length ? (notRead(r).length ? '　まだ読んでいない人：' + notRead(r).map(esc).join('、') : '　全員読みました') : ''}</p>
       ${canManage() && r.status === '未確認' ? `<label>再発防止の改善策<textarea id="hp_${r.id}" rows="2">${esc(r.prevention || '')}</textarea></label>
         <label>ひとこと（全員に見えます）<input id="hc_${r.id}"></label><button onclick="hyCheck(${r.id})">確認した</button>` : ''}</div>`).join('') || '<p>まだ報告はありません。</p>'}`;
 };
@@ -256,7 +266,7 @@ async function hySave() {
 }
 async function hyCheck(id) {
   if (DEMO) { alert('見本モードなので保存しません'); return; }
-  const me = (await sb('staff_profiles?select=user_id'))[0]?.user_id;
+  const me = myUid();
   try { await sb(`hiyari?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: '確認済', prevention: document.getElementById('hp_' + id).value, manager_comment: document.getElementById('hc_' + id).value, checked_by: me, checked_at: new Date().toISOString() }) });
     renderLeoView('hiyari'); } catch (e) { alert(e.message); }
 }
@@ -303,4 +313,98 @@ async function renderLeoView(name) {
   await loadDuty();
   try { $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button>` + await LEO_VIEWS[name](); }
   catch (e) { $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button><p>${esc(e.message)}</p>`; }
+}
+
+// ===== 請求の印（全職員）：欠席時対応・子育てサポート・学校休業日を日ごとに =====
+const canBill = () => ROLE === '事務' || DUTY === '管理者';
+const isTrip = d => !!d && !/送迎なし|保護者|なし/.test(d);
+let BILL_MONTH = today().slice(0, 7);
+const monthTabs = view => { const [y, m] = BILL_MONTH.split('-').map(Number), mk = (yy, mm) => `${yy + Math.floor((mm - 1) / 12)}-${String(((mm - 1) % 12 + 12) % 12 + 1).padStart(2, '0')}`;
+  return `<p class="ptabs"><button onclick="BILL_MONTH='${mk(y, m - 1)}';renderLeoView('${view}')">← 前の月</button> <b>${y}年${m}月</b> <button onclick="BILL_MONTH='${mk(y, m + 1)}';renderLeoView('${view}')">次の月 →</button></p>`; };
+const DEMO_BILL = {
+  nikki: [['01', '児童A', '利用', '14:45', '17:00', '職員X', '職員Y'], ['02', '児童A', '欠席'], ['03', '児童C', '利用', '10:00', '13:00', '送迎なし', '送迎なし'], ['05', '児童A', '利用', '10:00', '15:30', '職員X', '']]
+    .map(([d, c, k, s, e, p, q]) => ({ day: BILL_MONTH + '-' + d, child: c, kind: k, start_time: s, end_time: e, pick_driver: p, drop_driver: q })),
+  flags: [{ day: BILL_MONTH + '-02', child: '児童A', absent_support: true, absent_note: '（見本）母より発熱の連絡。様子を聞き、次回の予定を確認', kosodate: false, holiday: false }],
+  kids: [{ name: '児童A', kana: 'ｼﾞﾄﾞｳA', jukyusha_no: '9900000001', city_no: '999999', kind: '放デイ', cap_monthly: 4600, mushouka: false, contract_days: 23, contract_start: '2026-04-01' },
+    { name: '児童C', kana: 'ｼﾞﾄﾞｳC', jukyusha_no: '9900000003', city_no: '999999', kind: '児発', cap_monthly: 4600, mushouka: true, contract_days: 10, contract_start: '2026-04-01' }],
+};
+async function billData() {
+  if (DEMO) return { nikki: DEMO_BILL.nikki, flags: DEMO_BILL.flags };
+  const [y, m] = BILL_MONTH.split('-').map(Number), last = new Date(y, m, 0).getDate(), a = BILL_MONTH + '-01', b = `${BILL_MONTH}-${last}`;
+  const [nikki, flags, jis] = await Promise.all([sb(`leo_nikki?day=gte.${a}&day=lte.${b}&kind=in.(利用,欠席)&order=day,row_no&select=day,child,kind,service,start_time,end_time,pick_driver,drop_driver`),
+    sb(`leo_day_flags?day=gte.${a}&day=lte.${b}`), sb(`leo_jisseki?day=gte.${a}&day=lte.${b}&select=day,child,start_time,end_time`)]);
+  const jt = {}; jis.forEach(j => jt[j.day + j.child] = j);   // 時間は実績記録を優先（請求元）
+  nikki.forEach(n => { const j = jt[n.day + n.child]; if (j && j.start_time) { n.start_time = j.start_time; n.end_time = j.end_time; } });
+  return { nikki: nikki.filter(n => n.child), flags };
+}
+LEO_VIEWS.shirushi = async function () {
+  const { nikki, flags } = await billData(), F = {}; flags.forEach(f => F[f.day + f.child] = f);
+  return `<h3>請求の印（欠席時対応・子育てサポート）</h3>${demoNote()}${monthTabs('shirushi')}
+    <p class="note">その日のうちに付けてください。<b>欠席時対応</b>＝お休みの連絡を受けて、様子を聞き・次の利用を相談した日（何を話したか必ず書く）。<b>子育てサポート</b>＝保護者が支援に参加・見学した日。<b>学校休業日</b>＝夏休みなど学校がない日（放デイ）。</p>` +
+    (nikki.length ? nikki.map((n, i) => { const f = F[n.day + n.child] || {}, ab = n.kind === '欠席';
+      return `<div class="card rec" data-i="${i}" data-day="${n.day}" data-child="${esc(n.child)}"><b>${fmtDay(n.day)} ${esc(n.child)}</b> ${ab ? '<span class="badge">欠席</span>' : esc((n.start_time || '') + '〜' + (n.end_time || ''))}<br>
+        ${ab ? `<label><input type="checkbox" data-k="absent_support" ${f.absent_support ? 'checked' : ''}> 欠席時対応をした</label><input data-k="absent_note" placeholder="誰から・何を話したか" value="${esc(f.absent_note || '')}">`
+          : `<label><input type="checkbox" data-k="kosodate" ${f.kosodate ? 'checked' : ''}> 子育てサポート（保護者が参加・見学）</label> <label><input type="checkbox" data-k="holiday" ${f.holiday ? 'checked' : ''}> 学校休業日</label>`}</div>`; }).join('') +
+      '<button onclick="saveShirushi()">保存する</button><div id="sh_msg"></div>' : '<p>この月の日誌がまだありません。</p>');
+};
+async function saveShirushi() {
+  const rows = [...document.querySelectorAll('.rec[data-day]')].map(el => { const g = k => el.querySelector(`[data-k=${k}]`);
+    return { day: el.dataset.day, child: el.dataset.child, absent_support: !!g('absent_support')?.checked, absent_note: g('absent_note')?.value || null, kosodate: !!g('kosodate')?.checked, holiday: !!g('holiday')?.checked }; });
+  const bad = rows.find(r => r.absent_support && !(r.absent_note || '').trim()); const m = $('sh_msg');
+  if (bad) { m.textContent = `${bad.child}さん（${bad.day}）：欠席時対応は、話した内容を書いてください。`; return; }
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try { await sb('leo_day_flags?on_conflict=day,child', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }); m.textContent = '保存しました。'; }
+  catch (e) { m.textContent = e.message; }
+}
+
+// ===== 請求（事務・管理者だけ）：児童マスタ（受給者証）→ CSVを作る。国保連への提出はここではしない =====
+const KID_F = [['name', '児童名（日誌と同じ）'], ['kana', 'フリガナ（半角ｶﾅ）'], ['jukyusha_no', '受給者証番号（10桁）'], ['city_no', '市町村番号（6桁）'], ['kind', '種別'], ['cap_monthly', '負担上限月額'],
+  ['mushouka', '無償化'], ['contract_days', '契約支給量（日）'], ['contract_start', '契約開始日']];
+LEO_VIEWS.seikyu = async function () {
+  if (!canBill()) return '<p>この画面は事務・管理者だけです。</p>';
+  const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children?order=name'), { nikki } = await billData();
+  const names = [...new Set(nikki.map(n => n.child))], known = new Set(kids.map(k => k.name)), missing = names.filter(n => !known.has(n));
+  const inp = (k, f, v) => f === 'kind' ? `<select data-f="kind">${['放デイ', '児発'].map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
+    : f === 'cap_monthly' ? `<select data-f="cap_monthly">${[0, 4600, 37200].map(o => `<option ${o == v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
+    : f === 'mushouka' ? `<input type="checkbox" data-f="mushouka" ${v ? 'checked' : ''}>` : `<input data-f="${f}" value="${esc(v ?? '')}" ${f === 'contract_start' ? 'type="date"' : ''} size="${f === 'name' ? 10 : 12}">`;
+  const row = k => `<tr class="kid">${KID_F.map(([f]) => `<td>${inp(k, f, k[f])}</td>`).join('')}</tr>`;
+  return `<h3>請求CSVを作る（事務）</h3>${demoNote()}${monthTabs('seikyu')}
+    <p class="note">ここで作るのはファイルだけです。国保連への送信は今まで通り「取込送信ソフト」で、中身を確かめてから行ってください。単価は6級地 10.36円（児発・放デイ／センター以外）。</p>
+    <h4>1. 児童マスタ（受給者証）</h4>${missing.length ? `<p class="note" style="color:#c00">この月の日誌にいて、マスタにない児童：${missing.map(esc).join('、')}（下の空き行に入れてください）</p>` : ''}
+    <div style="overflow-x:auto"><table class="tbl"><tr>${KID_F.map(([, l]) => `<th>${l}</th>`).join('')}</tr>${kids.map(row).join('')}${(missing.length ? missing.map(n => ({ name: n })) : [{}]).map(row).join('')}</table></div>
+    <button onclick="saveKids()">マスタを保存</button> <span id="kd_msg"></span>
+    <h4>2. ファイルを作る</h4><label>事業所番号（10桁）<input id="office_no" value="${esc(localStorage.getItem('leo_office_no') || (DEMO ? '9999999999' : ''))}" size="12"></label>
+    <button onclick="makeCsv()">請求CSVを作る（J111・J611）</button><div id="csv_out"></div>`;
+};
+async function saveKids() {
+  const rows = [...document.querySelectorAll('tr.kid')].map(tr => { const o = {}; tr.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = i.type === 'checkbox' ? i.checked : i.value.trim()); return o; }).filter(o => o.name);
+  const m = $('kd_msg'), bad = rows.find(r => !/^\d{10}$/.test(r.jukyusha_no) || !/^\d{6}$/.test(r.city_no));
+  if (bad) { m.textContent = `${bad.name}：受給者証番号は10桁・市町村番号は6桁の数字で入れてください。`; return; }
+  rows.forEach(r => { r.cap_monthly = +r.cap_monthly; r.contract_days = r.contract_days ? +r.contract_days : null; r.contract_start = r.contract_start || null; });
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try { await sb('leo_children?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }); m.textContent = '保存しました。'; }
+  catch (e) { m.textContent = e.message; }
+}
+const loadSjis = () => window.Encoding ? Promise.resolve() : new Promise((ok, ng) => { const s = document.createElement('script');
+  s.src = 'vendor/encoding.min.js'; s.onload = ok; s.onerror = () => ng(new Error('文字コード変換の部品を読み込めませんでした')); document.head.appendChild(s); });
+async function makeCsv() {
+  const out = $('csv_out'), office = $('office_no').value.trim();
+  if (!/^\d{10}$/.test(office)) { out.textContent = '事業所番号を10桁で入れてください。'; return; }
+  localStorage.setItem('leo_office_no', office);
+  try { await loadSjis(); if (!window.LeoBilling) await new Promise((ok, ng) => { const s = document.createElement('script'); s.src = 'leo_billing.js'; s.onload = ok; s.onerror = ng; document.head.appendChild(s); });
+    const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children'), { nikki, flags } = await billData(), F = {}, K = {};
+    flags.forEach(f => F[f.day + f.child] = f);
+    kids.forEach(k => K[k.name] = { ...k, contract_start: (k.contract_start || '').replace(/-/g, '') });
+    const recs = nikki.map(n => { const f = F[n.day + n.child] || {}; return { day: n.day, child: n.child, status: n.kind === '欠席' ? '欠席' : '出席', start: n.start_time, end: n.end_time,
+      pick: isTrip(n.pick_driver), drop: isTrip(n.drop_driver), holiday: f.holiday, absent_support: f.absent_support, kosodate: f.kosodate }; });
+    const ym = BILL_MONTH.replace('-', ''), r = LeoBilling.build(ym, office, K, recs);
+    const nm = [...new Set(nikki.map(n => n.child))].filter(n => !K[n]);
+    const file = (rows, name) => { const b = new Blob([new Uint8Array(Encoding.convert(Encoding.stringToCode(LeoBilling.toCsv(rows)), { to: 'SJIS', from: 'UNICODE' }))], { type: 'text/csv' });
+      return `<a class="card" style="display:inline-block" href="${URL.createObjectURL(b)}" download="${name}">⬇ ${name}</a>`; };
+    const yen = n => n.toLocaleString('ja-JP');
+    out.innerHTML = `${file(r.claim, `J111${ym.slice(2)}.CSV`)} ${file(r.jisseki, `J611${ym.slice(2)}.CSV`)}
+      <table class="tbl"><tr><th>児童</th><th>利用日数</th><th>送迎(片道)</th><th>単位</th><th>費用</th><th>利用者負担</th><th>給付費</th></tr>${r.bills.map(b => `<tr><td>${esc(b.name)}</td><td>${b.use}</td><td>${b.trips}</td><td>${yen(b.units)}</td><td>${yen(b.cost)}</td><td>${yen(b.burden)}</td><td>${yen(b.benefit)}</td></tr>`).join('')}</table>
+      ${[...nm.map(n => `${n}：マスタがないので入れていません`), ...r.warn].map(w => `<p class="note" style="color:#c00">⚠ ${esc(w)}</p>`).join('')}
+      <p class="note">作ったファイルは、取込送信ソフトで読み込んで、エラーと金額を確かめてください（送信はまだしないでください）。</p>`; }
+  catch (e) { out.textContent = e.message; }
 }

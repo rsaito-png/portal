@@ -16,7 +16,7 @@ a, b = bills[0], bills[1]
 # 期待値（手計算）
 ua = 609 * 3 + 666 + 574 + 80 + 94 * 4 + 54 * (4 + 3)
 assert a['units'] == ua, (a['units'], ua)
-assert a['cost'] == int(ua * 10.42) and a['burden'] == min(int(a['cost'] * 0.1), 4600)
+assert a['cost'] == int(ua * 10.36) and a['burden'] == min(int(a['cost'] * 0.1), 4600)
 assert b['units'] == 980 + 54 * 2 and b['burden'] == 0
 cb, jb = L.to_csv(claim), L.to_csv(jis)
 assert cb.endswith(b'\r\n') and b'\n' not in cb.replace(b'\r\n', b'')

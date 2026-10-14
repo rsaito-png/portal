@@ -40,6 +40,8 @@ window.PORTAL_CONFIG = {
       ['🔍', 'アセスメント（フォーム）', 'https://drive.google.com/open?id=1kspL8oAWVxTwzaqeQZQe684eiUAj9PpcvdpbrqF-gEc', '手入力'],
       ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ）'],
       ['🖊️', '保護者の実績確認', '#leo/kakunin', '児童ごとのリンク作成・確認済みの一覧', '', null, '児発管'],
+      ['✍️', '請求の印（欠席時対応・子育てサポート）', '#leo/shirushi', 'その日のうちに付ける'],
+      ['💴', '請求CSVを作る（事務）', '#leo/seikyu', '児童マスタ・受給者証・CSV（送信はしない）', '', null, '事務'],
       ['🔧', '直した所（事務）', '#leo/edits', '修正の反映状況・衝突の確認', '', null, '事務'],
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },

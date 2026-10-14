@@ -89,7 +89,7 @@ async function render() {
   if (o) {
     $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
       <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
-      <div class="grid">${o.tiles.filter(t => !t[6] || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage())).map(t => tileHtml(t, o.color)).join('')}</div>`;
+      <div class="grid">${o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage())).map(t => tileHtml(t, o.color)).join('')}</div>`;
     if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
     return;
   }
