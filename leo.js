@@ -153,6 +153,21 @@ const LEO_VIEWS = {
       (rows.length ? `<table><tr><th>日付・行</th><th>項目</th><th>前 → 後</th><th>状態</th></tr>${rows.map(r =>
         `<tr${r.status === '衝突' ? ' style="background:#fdecec"' : ''}><td>${esc(r.day)}<br><small>${esc(r.row_key)}行</small></td><td>${esc(label[r.field] || r.field)}<br><small>${esc(r.who)} ${esc(r.edited_at)}</small></td><td><s>${esc(r.old_value)}</s> → <b>${esc(r.new_value)}</b></td><td>${esc(r.status)}${r.apply_note && r.status !== '反映済' ? `<br><small>${esc(r.apply_note)}</small>` : ''}</td></tr>`).join('')}</table>` : '<p>まだ修正はありません。</p>');
   },
+  async nikki() {
+    PERIOD = 'today';
+    const rows = (await loadNikki()).filter(r => r.kind === '利用');
+    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直したらすぐ日誌に反映されます（1分ほど）。日誌のほうが先に変わっていたときは反映せず「衝突」になります。食事・おやつは日誌で直接直してください。</p>` +
+      rows.map(r => `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）
+        ${NIKKI_FIELDS.map(([f, l]) => `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(r[f])}" value="${esc(r[f])}"></label>`).join('')}</div>`).join('') +
+      `<button onclick="saveNikki()">直した所を送る</button><div id="saved"></div>`;
+  },
+  async jisseki() {
+    const rows = DEMO ? DEMO_DATA.jisseki : await sb('leo_jisseki?order=day.desc,child&limit=200');
+    return `<h3>実績記録（見る・直す）</h3>${demoNote()}<p class="note">利用料・加算などの請求の項目はここには出しません。</p>
+      <table><tr><th>日付</th><th>児童</th><th>状況</th><th>時間</th></tr>${rows.map(r =>
+      `<tr><td>${esc(r.day)}</td><td>${esc(r.child)}</td><td>${esc(r.status)}</td><td>${esc(r.start_time)}〜${esc(r.end_time)}</td></tr>`).join('')}</table>
+      <p class="note">直したいときは日誌側で直すと、夜の転記で実績にも入ります。</p>`;
+  },
 };
 
 async function saveNikki() {
