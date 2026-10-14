@@ -299,7 +299,7 @@ LEO_VIEWS.home = async function () {
   return `<h3>今日やること（児発管）</h3>${demoNote()}<p class="note">上から順に片づければ大丈夫です。終わったものは自動で消えます。</p>` +
     (todo.length ? todo.map(([p, i, t, href, sub]) => `<a class="card rec" href="${href}" style="display:block;text-decoration:none;color:#222;${p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800'}"><span style="font-size:22px">${i}</span> <b>${t}</b><br><small>${sub}</small></a>`).join('')
       : '<p>今日やることはありません。</p>') +
-    `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、表の入力・送迎の配慮は <a href="#leo/master">入力画面</a> から。</p>`;
+    `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、表の入力・送迎の配慮は <a href="#leo/master">入力画面</a>、受給者証の情報（児童マスタ）は <a href="#leo/seikyu">請求・児童マスタ</a> から。</p>`;
 };
 
 async function saveNikki() {
@@ -366,7 +366,7 @@ const KID_F = [['name', '児童名（日誌と同じ）'], ['kana', '児童フ�
   ['mushouka', '無償化'], ['contract_days', '契約支給量（日）'], ['contract_start', '契約開始日'], ['first_date', '初回利用日（この契約で最初に来た日）'], ['kinyu_no', '事業者記入欄番号'], ['gensan', '計画未作成の減算']];
 const OFFICE_GENSAN = [['支減', '支援プログラム未公表'], ['評価減', '自己評価結果等未公表'], ['開所減1', '開所時間減算（4時間未満）'], ['開所減2', '開所時間減算（4〜6時間）']];
 LEO_VIEWS.seikyu = async function () {
-  if (!canBill()) return '<p>この画面は事務・管理者だけです。</p>';
+  if (!canManage()) return '<p>この画面は事務・管理者・児発管だけです。</p>';
   const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children?order=name'), { nikki } = await billData();
   const names = [...new Set(nikki.map(n => n.child))], known = new Set(kids.map(k => k.name)), missing = names.filter(n => !known.has(n));
   const inp = (k, f, v) => f === 'kind' ? `<select data-f="kind">${['放デイ', '児発'].map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
