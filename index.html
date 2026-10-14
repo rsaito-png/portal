@@ -19,7 +19,8 @@ button{background:var(--main);color:#fff;border:0}
 <div id="login" class="card"><p>メールアドレスとパスワードでログインしてください。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
 <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
-<button onclick="login()">ログイン</button><div id="msg"></div></div>
+<button onclick="login()">ログイン</button>
+<button onclick="location.search='?demo=1'" style="background:#fff;color:var(--main);border:1px solid var(--main)">見本を見る</button><div id="msg"></div></div>
 <div id="home" hidden><p id="hi"></p><div class="grid" id="tiles"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
@@ -53,11 +54,15 @@ function tileHtml([icon, name, url, note]) {
   return `<a class="tile" ${link}><span>${icon}</span>${name}<small>${note}</small></a>`;
 }
 
+// 見本モード（?demo=1）: ログイン不要・見本データのみ
+const DEMO = new URLSearchParams(location.search).get('demo') === '1';
+
 function show() {
-  const s = JSON.parse(localStorage.getItem('sess') || 'null');
+  const s = DEMO ? { email: '見本（デモ）', exp: Infinity } : JSON.parse(localStorage.getItem('sess') || 'null');
   if (!s || s.exp < Date.now()) { localStorage.removeItem('sess'); return; }
   $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
-  $('hi').textContent = s.email + ' でログイン中';
+  $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
+  if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
   $('tiles').innerHTML = C.tiles.map(tileHtml).join('');
 }
 
