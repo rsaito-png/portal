@@ -59,3 +59,8 @@
 - 送迎画面に児童ごとの配慮（`leo_child_care`）を表示。
 - 請求画面に要件チェック：定員10超過、配置表の職員2人未満、欠席時対応の内容空・日誌が欠席でない、時間なし。子育てサポート加算は月4回上限を追加（Python/JSとも）。
 - LINEヒヤリ：公式LINEのリッチメニューに https://rsaito-png.github.io/portal/#leo/hiyari?from=line を貼れば、報告フォームが開いた状態になり「LINEから」と記録。LINEのトーク本文を自動で取り込む仕組みは未（Messaging APIの設定が必要）。
+
+## 追記（10/15 6:40）個別支援計画画面の作り直し
+- 齊藤さんの指摘を受け、作成マニュアル（2026年10月版）・ボットの手順（SKILL.md / plan_generation_procedure.md / plan_tools.py）・管理表/同意GASに合わせて #leo/plan を作り直し。
+- 管理表（Google）を正とする「いまどこ？」画面に変更（見るだけ・書き換えなし）。前回のポータル独自の記録フォーム（leo_plan_steps）は画面から外した（表は空のまま残置）。
+- 日付の目安は plan_tools.py と同じ規則（JSで再現し、5か月分で一致を確認）。
