@@ -838,3 +838,34 @@ async function copyLine(id, child, did) {
   const m = $(id + '_m'); try { await navigator.clipboard.writeText($(id).value); m.textContent = 'コピーしました。公式LINEのトークに貼って送ってください。'; } catch (e) { m.textContent = 'コピーできませんでした。長押しで選んでコピーしてください。'; }
   if (!DEMO && did) try { await sb(`leo_line_drafts?id=eq.${did}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ sent_line: true }) }); } catch (e) { }
 }
+
+// ===== 日誌（児童ごと・日ごと）：Google日誌の内容を読み取り表示＋職員の下書き（です・ます調）。11/1まで並行運転（日誌は読み取りだけ） =====
+let DIA_DAY = today();
+const DIA_DEMO = { rows: [{ child: '児童A', kind: '利用', start_time: '14:45', end_time: '17:00', pick_driver: '職員X', drop_driver: '職員Y', activity: '（見本）公園で鬼ごっこをした。' }], drafts: [{ child: '児童A', day: today(), body: '（見本）公園で鬼ごっこをしました。', author: '職員X' }] };
+LEO_VIEWS.diary = async function () {
+  let rows, drafts;
+  if (DEMO) ({ rows, drafts } = DIA_DEMO);
+  else { const [n, d] = await Promise.all([sb(`leo_nikki?day=eq.${DIA_DAY}&kind=in.(利用,欠席)&order=row_no`), sb(`leo_diary_draft?day=eq.${DIA_DAY}`).catch(() => null)]); rows = n; drafts = d; }
+  const noTable = drafts === null; drafts = drafts || [];
+  const D = Object.fromEntries(drafts.map(x => [x.child, x]));
+  const me = DEMO ? '職員X' : await myName();
+  const idOf = k => 'dr_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
+  return `<h3>日誌（児童ごと）</h3>${demoNote()}
+    <p class="ptabs"><button onclick="DIA_DAY=addDays(DIA_DAY,-1);renderLeoView('diary')">← 前の日</button> <b>${fmtDay(DIA_DAY)}</b> <button onclick="DIA_DAY=addDays(DIA_DAY,1);renderLeoView('diary')">次の日 →</button></p>
+    <p class="note">上はGoogleの日誌から読み取った内容（見るだけ）。下の「下書き」は、です・ます調で書いて保存します。11/1までは、いまの日誌が正式です（ここへ書いても日誌には入りません）。</p>
+    ${noTable ? '<p style="color:#c00">下書きの保存場所がまだありません（管理者が準備中です）。</p>' : ''}
+    ${rows.map(r => { const k = r.child, d = D[k], id = idOf(k);
+      return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}</small></summary>
+        <div style="padding:0 14px 14px"><p class="note">迎え：${esc(r.pick_driver || '-')}　送り：${esc(r.drop_driver || '-')}</p>
+        ${r.activity ? `<p style="white-space:pre-wrap"><b>日誌の活動記録</b><br>${esc(r.activity)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
+        <b>下書き（です・ます調）</b>${d ? `<small>　${esc(d.author || '')}</small>` : ''}
+        <textarea id="${id}" rows="6" style="width:100%;font-size:16px;box-sizing:border-box" ${noTable ? 'disabled' : ''}>${esc(d ? d.body : '')}</textarea>
+        <button ${noTable ? 'disabled' : ''} onclick="saveDiary('${esc(k)}','${id}')">保存</button><div id="${id}_m"></div></div></details>`; }).join('') || '<p>この日の日誌に利用の子がいません。</p>'}`;
+};
+async function saveDiary(child, id) {
+  const body = $(id).value.trim(), m = $(id + '_m'); if (!body) { m.textContent = '本文を書いてください。'; return; }
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try { const author = await myName();
+    await sb('leo_diary_draft?on_conflict=child,day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child, day: DIA_DAY, body, author, updated_at: new Date().toISOString() }) });
+    m.textContent = '保存しました。'; } catch (e) { m.textContent = e.message; }
+}
