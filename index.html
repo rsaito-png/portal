@@ -12,6 +12,7 @@ button{background:var(--main);color:#fff;border:0}
 .tile{background:#fff;border-radius:12px;padding:22px 10px;text-align:center;text-decoration:none;color:#222;box-shadow:0 1px 3px #0002;font-size:18px}
 .office{border-left:6px solid var(--c);text-align:left;padding:18px 14px}
 .office small{display:inline;margin-left:6px}
+.office{display:flex;align-items:center;gap:10px;min-height:56px}.office .lg{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;background:#fff}.office .tx{min-width:0}
 .tile.main{grid-column:1/-1;padding:30px 10px;font-size:22px}
 .sample{text-align:left;font-size:15px;margin:8px 0 0;padding-left:22px}
 table{width:100%;border-collapse:collapse;background:#fff;font-size:14px}td,th{border-bottom:1px solid #eee;padding:6px 4px;text-align:left}
@@ -98,7 +99,7 @@ async function render() {
     return;
   }
   $('view').innerHTML = `<h3>事業所をえらんでください</h3>
-    <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.name}<small>${x.kind}</small></a>`).join('')}</div>
+    <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
     <h3>${C.shared.name}</h3>
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t)).join('')}</div>
     ${ROLE === C.clerk.role ? `<h3>${C.clerk.name}（事務の方のみ表示）</h3>

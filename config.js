@@ -27,7 +27,7 @@ window.PORTAL_CONFIG = {
   // 補足の書き方: 「自動」＝仕組みで入る／「手入力」＝人が入れる／「要確認」＝動いているか未確認
   // ※個人データは書かない（このリポジトリは公開）。リンクだけ置く
   offices: [
-    { id: 'leo', name: 'レオ', kind: '児発・放デイ', color: '#e8833a', tiles: [
+    { id: 'leo', logo: 'img/logo/leo.webp', name: 'レオ', kind: '児発・放デイ', color: '#e8833a', tiles: [
       ['📋', '今日やること（児発管）', '#leo/home', '計画の期限・ヒヤリハット確認・実績確認', 'main', null, '児発管'],
       ['⚠️', 'ヒヤリハット', '#leo/hiyari', '全員で読む・報告はここから', 'main'],
       ['💬', '公式LINE', 'https://line.me/R/ti/p/@468rfild', '報告はこちらから', 'main'],
@@ -60,7 +60,7 @@ window.PORTAL_CONFIG = {
       ['📝', '個別支援計画', '', '未整備'],
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
-    { id: 'kintoun', name: '金斗雲', kind: '居宅介護', color: '#c9a227', tiles: [
+    { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227', tiles: [
       ['✅', '実績記録一覧', 'https://drive.google.com/open?id=1kDBy-Jubfg8FXpFwvypxVL-SEaFZmqSntzUpjNCFVhY', 'GAS Webアプリから入力'],
       ['⏰', '出退勤記録', 'https://drive.google.com/open?id=19cjW6X2ryxKP91Ea37Eh8RJjRE-I3-zF1YEctr8lrcU', 'GAS＋手動'],
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
@@ -68,7 +68,7 @@ window.PORTAL_CONFIG = {
       ['📝', '居宅介護計画', '', '未整備'],
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
-    { id: 'rydeen', name: 'RYDEEN', kind: 'B型', color: '#3a7bd5', tiles: [
+    { id: 'rydeen', logo: 'img/logo/rydeen.webp', name: 'RYDEEN', kind: 'B型', color: '#3a7bd5', tiles: [
       ['📣', 'SNS代行（LINE素材受信）', '', 'LINE受信で自動下書き・要確認'],
       ['📓', '日誌', '', '未整備（11月開所準備）'],
       ['✅', '実績', '', '未整備'],
