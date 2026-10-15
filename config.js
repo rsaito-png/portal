@@ -76,7 +76,7 @@ window.PORTAL_CONFIG = {
       ['✅', '実績', '', '未整備'],
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
-    { id: 'suishodama', name: '水晶玉', kind: '相談支援', color: '#8e5bb5', tiles: [
+    { id: 'suishodama', logo: 'img/logo/suishodama.webp', logoFit: 'contain', name: '水晶玉', kind: '相談支援', color: '#8e5bb5', tiles: [
       ['🗂️', '計画相談', '', '未整備'], ['👀', 'モニタリング', '', '未整備'], ['📁', '書類', '', '準備中'] ] },
   ],
   // 法人共通（ホームの下に表示）
