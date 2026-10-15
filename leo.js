@@ -378,14 +378,26 @@ LEO_VIEWS.seikyu = async function () {
     <button onclick="makeCsv()">請求CSVを作る（K112/K122・K611）</button><div id="csv_out"></div>`;
 };
 // ===== 利用者情報（児童ごとにワンストップ）：受給者証(leo_children)・送迎の配慮(leo_child_care)・連絡先/送迎/アルバム(leo_child_info) =====
-const UI = { sel: null, adding: false };
+const UI = { sel: null, adding: false, tab: 'basic' };
+// アセスメント項目（キー＝leo_child_assess.data のキー。ポータル内オリジナルのアセスメント入力でも同じ構造を使う）
+const ASSESS_SECTIONS = [
+  ['基本・診断', [['birth','生年月日'],['school','学校・園の名前と学年'],['diagnosis','診断名・障がい名など',1],['techo','手帳（種別・判定）'],['agencies','これまでに関わった機関・病院名',1],['visit_status','通院の状況',1],['meds_status','服薬の状況',1],['meds_regular','常用している薬',1],['other_service','他に通っている事業所']]],
+  ['家族・関係', [['family','家族構成（職業・学年）',1],['rel','親子関係・兄弟関係の特徴',1]]],
+  ['かかりつけ', [['hp_pediatric','小児科（病院・医師）'],['hp_ortho','整形外科'],['hp_ent','耳鼻咽喉科'],['hp_derm','皮膚科'],['hp_other','その他の科']]],
+  ['食事・排泄・身辺自立', [['allergy','アレルギーの有無'],['allergy_detail','アレルギーの内容',1],['utensil','食具'],['likes','好きな食べ物'],['dislikes','嫌いな食べ物'],['amount','食べる量'],['urine','小便（回数/日）'],['wipe','自分で拭けるか'],['stool','大便（回数/日）'],['handwash','手洗い'],['gargle','うがい'],['dress','着衣'],['undress','脱衣'],['button','ボタンの付け外し']]],
+  ['遊び・性格', [['play_home','遊び（自宅）',1],['play_out','遊び（自宅以外）',1],['interest','興味関心',1],['personality','性格',1],['panic','パニックの時の様子・切り替え方',1],['other_msg','その他伝えたいこと',1]]],
+  ['健康状態', [['temp','平熱'],['convulsion','ひきつけ・痙攣の経験'],['convulsion_detail','（詳細）'],['h_bleed','出血が止まりにくい'],['h_fall','転びやすい'],['h_skin','皮膚が弱い'],['h_earnose','耳・鼻の病気'],['h_hernia','脱腸'],['h_joint','関節がはずれやすい'],['h_cold','風邪をひきやすい'],['h_tonsil','扁桃腺で熱が出やすい'],['h_asthma','喘息が出やすい'],['h_allergic','アレルギー体質'],['h_vaccine','予防接種で高熱'],['h_rash','湿疹が出やすい'],['h_drugrash','薬で湿疹'],['h_vomit','吐きやすい'],['h_diarrhea','下痢をしやすい'],['h_constipation','便秘をしやすい'],['under_doctor','現在医者にかかっているか'],['health_other','その他、身体の心配',1]]],
+  ['保護者の願い', [['wish_life','生活',1],['wish_habit','基本的生活習慣',1],['wish_motor','運動や感覚',1],['wish_cog','認知や行動',1],['wish_lang','言語とコミュニケーション',1],['wish_human','人間関係',1]]],
+  ['同意・書類', [['photo_consent','写真・動画の掲載（ホームページ・Instagram等）'],['photo_detail','同意する場合の範囲',1],['doc_insurance','保険証の写真（リンク）'],['doc_jukyusha','受給者証の写真（リンク）']]]];
+
 const WD = ['月', '火', '水', '木', '金', '土', '日'], TMODE = ['送迎あり', '迎えのみ', '送りのみ', '保護者送迎', 'なし'];
 const INFO_F = [['guardian_name', '保護者氏名'], ['guardian_phone', '保護者 電話'], ['guardian_phone2', '予備の電話'], ['emergency_contact', '緊急連絡先（続柄・電話）'], ['home_address', '自宅住所']];
 LEO_VIEWS.userinfo = async function () {
   const mg = canManage();
-  const [kids, infos, cares, nk] = DEMO ? [DEMO_BILL.kids, [], [], []] : await Promise.all([mg ? sb('leo_children?order=name') : [], sb('leo_child_info?order=name').catch(() => []), sb('leo_child_care').catch(() => []), billData().then(d => d.nikki).catch(() => [])]);
+  const [kids, infos, cares, nk, asses] = DEMO ? [DEMO_BILL.kids, [], [], [], []] : await Promise.all([mg ? sb('leo_children?order=name') : [], sb('leo_child_info?order=name').catch(() => []), sb('leo_child_care').catch(() => []), billData().then(d => d.nikki).catch(() => []), sb('leo_child_assess?order=name').catch(() => [])]);
+  const A = Object.fromEntries(asses.map(x => [x.name, x]));
   const I = Object.fromEntries(infos.map(x => [x.name, x])), K = Object.fromEntries(kids.map(x => [x.name, x])), C = Object.fromEntries(cares.map(x => [x.child, x.note]));
-  const names = [...new Set([...kids.map(x => x.name), ...infos.map(x => x.name), ...cares.map(x => x.child), ...nk.map(n => n.child)])].filter(Boolean).sort((a, b) => a.localeCompare(b, 'ja'));
+  const names = [...new Set([...kids.map(x => x.name), ...infos.map(x => x.name), ...cares.map(x => x.child), ...asses.map(x => x.name), ...nk.map(n => n.child)])].filter(Boolean).sort((a, b) => a.localeCompare(b, 'ja'));
   const css = `<style>.ui-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}.ui-list a{display:block;border:1px solid #ccd;border-radius:8px;padding:10px;background:#fff;text-decoration:none;color:#222}.ui-list a small{display:block;color:#666}.uic{border:1px solid #ccd;border-radius:8px;margin:8px 0;background:#fff}.uic h4{margin:0;padding:8px 10px;background:#eef;border-radius:8px 8px 0 0}.uig{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 12px;padding:8px 10px}.uig label span{display:block;font-size:.8em;color:#555}.uig input:not([type=checkbox]),.uig select,.uig textarea{width:100%;box-sizing:border-box;margin:2px 0;padding:8px}.uig .wide{grid-column:1/-1}.uil a{margin-right:10px}</style>`;
   const nm = UI.sel;
   if (!nm && !UI.adding) {
@@ -395,11 +407,20 @@ LEO_VIEWS.userinfo = async function () {
       <p class="note">請求CSVは <a href="#leo/seikyu">請求</a> から（ここの受給者証の内容が使われます）。</p>`;
   }
   const k = K[nm] || {}, i = I[nm] || {}, ro = mg ? '' : 'disabled';
+  if (UI.tab === 'assess' && nm) {
+    const a = A[nm] || {}, d = a.data || {};
+    const tabs = `<p><button class="back" onclick="uiTab('basic')">基本</button> <b style="padding:6px 10px;border-bottom:3px solid #36c">アセスメント</b></p>`;
+    return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${demoNote()}</h3>${tabs}
+      <p class="note">${a.source ? '取り込み元：' + esc(a.source) + '。' : 'まだ入力がありません。'}診断名・服薬などの機微情報を含みます。レオ職員だけが見られます。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
+      <div id="uiw" data-name="${esc(nm)}">${ASSESS_SECTIONS.map(([t, fs]) => `<div class="uic"><h4>${t}</h4><div class="uig">${fs.map(([f, l, w]) => `<label${w ? ' class="wide"' : ''}><span>${l}</span>${w ? `<textarea data-t="as" data-f="${f}" rows="2" ${ro}>${esc(d[f] || '')}</textarea>` : `<input data-t="as" data-f="${f}" value="${esc(d[f] || '')}" ${ro}>`}</label>`).join('')}</div></div>`).join('')}</div>
+      ${mg ? `<button onclick="uiSaveAssess()">保存</button> <span id="ui_msg"></span>` : ''}`;
+  }
   const kin = (f, l, v, extra = '') => `<label><span>${l}</span><input data-t="info" data-f="${f}" value="${esc(v ?? '')}" ${extra} ${ro}></label>`;
   const jk = mg ? `<div class="uic"><h4>① 受給者証（請求に使います）</h4><div class="uig">${KID_F.filter(([f]) => f !== 'name').map(([f, l]) => `<label><span>${l}</span>${kidInput(k, f, k[f])}</label>`).join('')}</div></div>` : '';
   return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${nm ? esc(nm) : '（新しい児童）'}${demoNote()}</h3>
     <div id="uiw" data-name="${esc(nm || '')}">
     ${UI.adding ? `<div class="uic"><div class="uig"><label><span>児童名（日誌と同じ表記）</span><input id="ui_newname" data-t="new"></label></div></div>` : ''}
+    ${nm ? `<p><b style="padding:6px 10px;border-bottom:3px solid #36c">基本</b> <button class="back" onclick="uiTab('assess')">アセスメント${A[nm] ? '' : '（未入力）'}</button></p>` : ''}
     <p class="uil"><a href="#leo/plan">個別支援計画（いまどこ？）</a><a href="#leo/keikaku">計画の管理表</a><a href="#leo/kata">送迎 型表</a><a href="#leo/cal">予定</a><a href="#leo/kakunin">実績確認</a>${i.album_url ? `<a href="${esc(i.album_url)}" target="_blank" rel="noopener">📷 Googleフォト アルバム</a>` : ''}</p>
     ${jk}
     <div class="uic"><h4>${mg ? '②' : '①'} 送迎</h4><div class="uig">
@@ -412,13 +433,23 @@ LEO_VIEWS.userinfo = async function () {
     <div class="uic"><h4>${mg ? '④' : '③'} Googleフォト・メモ</h4><div class="uig">${kin('album_url', '共有アルバムのリンク（https://…）', i.album_url, 'type="url"')}<label class="wide"><span>メモ</span><textarea data-t="info" data-f="note" rows="3" ${ro}>${esc(i.note || '')}</textarea></label></div></div>
     </div>${mg ? `<button onclick="uiSave()">保存</button> <span id="ui_msg"></span>` : ''}`;
 };
-window.uiOpen = n => { UI.sel = n; UI.adding = false; renderLeoView('userinfo'); window.scrollTo(0, 0); };
+window.uiTab = t => { UI.tab = t; renderLeoView('userinfo'); window.scrollTo(0, 0); };
+window.uiOpen = n => { UI.tab = 'basic'; UI.sel = n; UI.adding = false; renderLeoView('userinfo'); window.scrollTo(0, 0); };
 window.uiAdd = () => { UI.sel = null; UI.adding = true; renderLeoView('userinfo'); };
 const kidInput = (k, f, v) => { const h = document.createElement('div'); return (f === 'kind' ? `<select data-t="kid" data-f="kind">${['放デイ', '児発'].map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
     : f === 'cap_monthly' ? `<select data-t="kid" data-f="cap_monthly">${[0, 4600, 37200].map(o => `<option ${o == v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
     : f === 'mushouka' ? `<input type="checkbox" data-t="kid" data-f="mushouka" ${v ? 'checked' : ''}>`
     : f === 'gensan' ? `<select data-t="kid" data-f="gensan">${[['', 'なし'], ['未計画', '未作成（1〜2月目）'], ['未計画2', '未作成（3月目以降）']].map(([o, l]) => `<option value="${o}" ${(v || [])[0] === o || (!o && !(v || []).length) ? 'selected' : ''}>${l}</option>`).join('')}</select>`
     : `<input data-t="kid" data-f="${f}" value="${esc(v ?? '')}" ${/contract_start|contract_end|first_date/.test(f) ? 'type="date"' : ''}>`); };
+async function uiSaveAssess() {
+  const w = $('uiw'), m = $('ui_msg'), name = w.dataset.name, data = {};
+  w.querySelectorAll('[data-t="as"]').forEach(x => { if (x.value.trim()) data[x.dataset.f] = x.value.trim(); });
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try {
+    await sb('leo_child_assess?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ name, data, source: 'ポータル入力', updated_at: new Date().toISOString() }]) });
+    await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
+  } catch (e) { m.textContent = e.message; }
+}
 async function uiSave() {
   const w = $('uiw'), m = $('ui_msg'), name = (UI.adding ? $('ui_newname').value : w.dataset.name).trim();
   if (!name) { m.textContent = '児童名を入れてください。'; return; }
