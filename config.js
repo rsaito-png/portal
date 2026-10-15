@@ -80,7 +80,7 @@ window.PORTAL_CONFIG = {
       ['⏰', '出退勤記録', 'https://drive.google.com/open?id=19cjW6X2ryxKP91Ea37Eh8RJjRE-I3-zF1YEctr8lrcU', 'GAS＋手動'],
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
       ['⚠️', 'ヒヤリハット週報', 'https://drive.google.com/open?id=1urelD2ecz7HEu7ZQ1busmKXkH0J-T_WAGpljx5AY3lY', 'Bot依頼で作成'],
-      ['📝', '居宅介護計画', '', '未整備'],
+      ['📝', '居宅介護計画の同意', '#kintoun/consent', '計画を見て、iPadで同意（Googleフォームの代わり）'],
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'rydeen', logo: 'img/logo/rydeen.webp', name: 'RYDEEN', kind: 'B型', color: '#3a7bd5', tiles: [
