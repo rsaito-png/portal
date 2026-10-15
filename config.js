@@ -63,6 +63,7 @@ window.PORTAL_CONFIG = {
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227', tiles: [
+      ['🏯', '金斗雲システム', 'https://script.google.com/a/macros/psr-seishinkai.org/s/AKfycby5I92_qF1j0YqAYhsUvIAS8WHpRczQDY8pxUD4aaYEV1ftIAAQqKre0vb1Fvia0XrYvg/exec', '@psr-seishinkai.org のアカウントで開く'],
       ['✅', '実績記録一覧', 'https://drive.google.com/open?id=1kDBy-Jubfg8FXpFwvypxVL-SEaFZmqSntzUpjNCFVhY', 'GAS Webアプリから入力'],
       ['⏰', '出退勤記録', 'https://drive.google.com/open?id=19cjW6X2ryxKP91Ea37Eh8RJjRE-I3-zF1YEctr8lrcU', 'GAS＋手動'],
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
