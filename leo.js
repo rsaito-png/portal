@@ -378,7 +378,7 @@ LEO_VIEWS.seikyu = async function () {
   return `<h3>請求CSVを作る（事務）</h3>${demoNote()}${monthTabs('seikyu')}
     <p class="note">ここで作るのはファイルだけです。国保連への送信は今まで通り「取込送信ソフト」で、中身を確かめてから行ってください。単価は6級地 10.36円（児発・放デイ／センター以外）。</p>
     <h4>1. 児童マスタ（受給者証）</h4>${missing.length ? `<p class="note" style="color:#c00">この月の日誌にいて、マスタにない児童：${missing.map(esc).join('、')}（下の空き行に入れてください）</p>` : ''}
-    <div style="overflow-x:auto"><table class="tbl"><tr>${KID_F.map(([, l]) => `<th>${l}</th>`).join('')}</tr>${kids.map(row).join('')}${(missing.length ? missing.map(n => ({ name: n })) : [{}]).map(row).join('')}</table></div>
+    <style>table.mst{width:max-content;min-width:100%}table.mst input,table.mst select{width:auto;min-width:9em;margin:2px 0;padding:8px}table.mst input[type=checkbox]{min-width:0;width:auto}table.mst input[data-f=kinyu_no]{min-width:4em}table.mst td:first-child,table.mst th:first-child{position:sticky;left:0;background:#fff;z-index:1}table.mst input[data-f=name]{min-width:8em;font-weight:bold}</style><div style="overflow-x:auto"><table class="tbl mst"><tr>${KID_F.map(([, l]) => `<th>${l}</th>`).join('')}</tr>${kids.map(row).join('')}${(missing.length ? missing.map(n => ({ name: n })) : [{}]).map(row).join('')}</table></div>
     <button onclick="saveKids()">マスタを保存</button> <span id="kd_msg"></span>
     <h4>2. ファイルを作る</h4><label>事業所番号（10桁）<input id="office_no" value="${esc(localStorage.getItem('leo_office_no') || (DEMO ? '9999999999' : ''))}" size="12"></label>
     <p class="note">事業所全体にかかる減算（今はなし。かかった月だけ印を付けます。基本報酬のサービスコードが減算用のコードに変わります）：
