@@ -25,7 +25,7 @@ h3{font-size:15px;color:#555;margin:20px 0 8px}
 #out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:14px}
 #msg{color:#c00;min-height:1em}
 .tile .badge{display:inline-block;font-size:13px;margin-bottom:4px}
-.cat{margin:14px 0}.cat summary{font-size:18px;font-weight:bold;padding:14px 12px;background:#fff;border-radius:12px;box-shadow:0 1px 3px #0002;cursor:pointer;list-style:none;min-height:24px}.cat summary::-webkit-details-marker{display:none}.cat summary::before{content:'▶ ';font-size:13px;color:#888}.cat[open] summary::before{content:'▼ '}.cat summary small{margin-left:8px;color:#888;font-size:13px}.cat .grid{margin-top:10px}
+h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.tile{min-width:0}.nxc{display:block;overflow:hidden;min-width:0;background:#fff;border-radius:14px;padding:20px 16px;text-decoration:none;color:#222;box-shadow:0 1px 4px #0003}.nxc span{font-size:30px;margin-right:10px}.nxc b{font-size:22px}.nxc small{display:block;color:#777;font-size:14px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile.big{padding:30px 10px;font-size:20px;font-weight:bold}.tile small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style></head><body>
 <header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
@@ -84,26 +84,34 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 }
 
 
-// 事業所画面の本体。o.cats があれば「上に目立たせる＋折りたたみカテゴリ」、無ければ従来のタイル一覧
-function officeBody(o) {
-  const vis = o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()));
-  if (!o.cats) return `<div class="grid">${vis.map(t => tileHtml(t, o.color)).join('')}</div>`;
-  let st = {}; try { st = JSON.parse(localStorage.getItem('tree_' + o.id) || '{}'); } catch (e) {}
-  const used = new Set(o.top || []); o.cats.forEach(c => c[2].forEach(n => used.add(n)));
-  const byName = n => vis.filter(t => t[1] === n);
-  const top = (o.top || []).flatMap(byName).map(t => { const u = t.slice(); u[4] = 'main'; return tileHtml(u, o.color); }).join('');
-  const cats = o.cats.map(c => [c[0], c[1], c[2].flatMap(byName)]);
+// 事業所画面の本体。o.groups があれば「次にやること＋大ボタン（最大6〜8）」、無ければ従来のタイル一覧
+const visTiles = o => o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()));
+const shortName = (o, n) => (o.short || {})[n] || n;
+const myDuty = () => DUTY === '管理者' ? '管理者' : DUTY === '児発管' ? '児発管' : ROLE === '事務' ? '事務' : '現場支援員';
+function groupList(o) {
+  const vis = visTiles(o), used = new Set(); o.groups.forEach(g => g[2].forEach(n => used.add(n)));
   const rest = vis.filter(t => !used.has(t[1]));
-  if (rest.length) cats.push(['📂 その他', false, rest]);
-  const det = cats.filter(c => c[2].length).map(c => {
-    const open = c[0] in st ? st[c[0]] : c[1];
-    return `<details class="cat" ${open ? 'open' : ''} ontoggle="treeSave('${o.id}',this)" data-k="${c[0]}"><summary>${c[0]}<small>${c[2].length}</small></summary><div class="grid">${c[2].map(t => { const u = t.slice(); u[4] = ''; return tileHtml(u, o.color); }).join('')}</div></details>`;
-  }).join('');
-  return `<div class="grid">${top}</div>${det}`;
+  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(i === o.groups.length - 1 ? rest : []) })).filter(g => g.tiles.length);
 }
-function treeSave(id, el) {
-  let st = {}; try { st = JSON.parse(localStorage.getItem('tree_' + id) || '{}'); } catch (e) {}
-  st[el.dataset.k] = el.open; localStorage.setItem('tree_' + id, JSON.stringify(st));
+const tl = (t, name, cls, color) => { const link = t[2] ? `href="${t[2]}"${/^https?:/.test(t[2]) ? ' target="_blank" rel="noopener"' : ''}` : 'style="opacity:.5"';
+  return `<a class="tile ${cls}" ${link} style="border-top:4px solid ${color}"><span>${t[0]}</span>${name}<small>${t[3]}</small></a>`; };
+function officeBody(o) {
+  if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(t, o.color)).join('')}</div>`;
+  const vis = visTiles(o);
+  const nx = ((o.next || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
+  const next = `<h3 class="nx">次にやること</h3><div class="nxl">${nx.map(t => `<a class="nxc" href="${t[2]}" style="border-left:8px solid ${o.color}"><span>${t[0]}</span><b>${shortName(o, t[1])}</b><small>${t[3]}</small></a>`).join('')}</div>`;
+  const gs = groupList(o);
+  const btns = gs.map(g => g.tiles.length === 1 && g.tiles[0][2] ? `<a class="tile big" href="${g.tiles[0][2]}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`
+    : `<a class="tile big" href="#${o.id}/g${g.k}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`).join('');
+  return `${next}<h3 class="nx">メニュー</h3><div class="grid">${btns}</div>`;
+}
+// 大ボタンの先（1階層）。#leo/g0 など
+function groupView(o, k) {
+  const g = groupList(o).find(x => String(x.k) === k); if (!g) return false;
+  $('view').innerHTML = `<button class="back" onclick="location.hash='${o.id}'">← ${o.name}へ</button>
+    <h3 style="color:${o.color};font-size:20px">${g.icon} ${g.label}</h3><div class="grid">${g.tiles.map(t => tl(t, shortName(o, t[1]), '', o.color)).join('')}</div>`;
+  if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
+  return true;
 }
 
 // 画面切替は URL の #事業所id で行う（戻るボタン・ブラウザの戻るが両方効く）
@@ -111,6 +119,7 @@ async function render() {
   if (typeof loadDuty === 'function') await loadDuty();
   const [id, sub] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
+  { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'uketsuke') return renderUketsuke();
   if (id === 'sign' && typeof renderSign === 'function') return renderSign();
   if (id === 'clerk' && sub === 'docs' && typeof renderDocsAdmin === 'function') return renderDocsAdmin();
