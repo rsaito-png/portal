@@ -421,7 +421,7 @@ LEO_VIEWS.userinfo = async function () {
     <div id="uiw" data-name="${esc(nm || '')}">
     ${UI.adding ? `<div class="uic"><div class="uig"><label><span>児童名（日誌と同じ表記）</span><input id="ui_newname" data-t="new"></label></div></div>` : ''}
     ${nm ? `<p><b style="padding:6px 10px;border-bottom:3px solid #36c">基本</b> <button class="back" onclick="uiTab('assess')">アセスメント${A[nm] ? '' : '（未入力）'}</button></p>` : ''}
-    <p class="uil"><a href="#leo/plan">個別支援計画（いまどこ？）</a><a href="#leo/keikaku">計画の管理表</a><a href="#leo/kata">送迎 型表</a><a href="#leo/cal">予定</a><a href="#leo/kakunin">実績確認</a>${i.album_url ? `<a href="${esc(i.album_url)}" target="_blank" rel="noopener">📷 Googleフォト アルバム</a>` : ''}</p>
+    <p class="uil">${i.album_url ? `<a href="${esc(i.album_url)}" target="_blank" rel="noopener">📷 Googleフォト アルバム</a>` : ''}</p>
     ${jk}
     <div class="uic"><h4>${mg ? '②' : '①'} 送迎</h4><div class="uig">
       <label><span>送迎の種類</span><select data-t="info" data-f="transport_mode" ${ro}><option value=""></option>${TMODE.map(o => `<option ${o === i.transport_mode ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
