@@ -103,7 +103,7 @@ async function renderDocsAdmin() {
     let rows = ov; if (ES_FILTER === '未完了') rows = ov.filter(need); if (ES_FILTER === '期限90日以内') rows = ov.filter(soon);
     const tabs = ['すべて', '未完了', '期限90日以内'].map(f => `<button class="${f === ES_FILTER ? 'on' : ''}" onclick="ES_FILTER='${f}';renderDocsAdmin()">${f}</button>`).join('');
     $('view').innerHTML = ES_PRINT_CSS + back + `<h3>書類管理（契約書・誓約書）</h3>${DEMO ? '<p class="note">見本データです（架空）</p>' : ''}
-      <p class="note">職員を選ぶと、全文と署名の記録が1枚で出ます（印刷・PDF可）。紙で締結済みの分は、署名なしで日付と備考だけ登録します。</p>
+      <p class="note"><a href="esign-help.html">使い方</a>／職員を選ぶと、全文と署名の記録が1枚で出ます（印刷・PDF可）。紙で締結済みの分は、署名なしで日付と備考だけ登録します。</p>
       <p class="ptabs">${tabs}</p><table><tr><th>氏名</th><th>契約書</th><th>契約終了日</th><th>誓約書</th></tr>
       ${rows.map(x => `<tr style="cursor:pointer;${need(x) ? 'background:#fff6e5' : ''}" onclick="ES_SEL='${esc(x.user_id)}';renderDocsAdmin()"><td>${esc(x.full_name || '（氏名未登録）')}<br><small>${esc(x.office)}</small></td>
       <td>${cell(x.contract_status, x.contract_method, x.contract_date, x.contract_version ? '・第' + x.contract_version + '版' : '')}</td>
