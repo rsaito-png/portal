@@ -19,8 +19,10 @@ window.PORTAL_CONFIG = {
       ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
     { name: '補助金・助成金', tiles: [
       ['💰', '補助金・助成金', '', '準備中'] ] },
+    { name: '税務', tiles: [
+      ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'] ] },
     { name: 'その他', tiles: [
-      ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'] ] } ] },
+      ['📁', 'その他', '', '準備中'] ] } ] },
 
   // 事業所ごとのタイル（2026-10-14 稼働システム一覧から作成。リンク先は既存のGoogleファイル）
   // tiles は [アイコン, 名前, リンク(空なら準備中), 補足, 'main'なら横幅いっぱい, 見本モードで出す見本行, 見せる役割（例 '事務'）]
