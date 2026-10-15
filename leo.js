@@ -431,7 +431,17 @@ LEO_VIEWS.userinfo = async function () {
       <label class="wide"><span>送迎のメモ</span><textarea data-t="info" data-f="transport_note" rows="2" ${ro}>${esc(i.transport_note || '')}</textarea></label></div></div>
     <div class="uic"><h4>${mg ? '③' : '②'} 保護者・連絡先</h4><div class="uig">${INFO_F.map(([f, l]) => kin(f, l, i[f])).join('')}</div></div>
     <div class="uic"><h4>${mg ? '④' : '③'} Googleフォト・メモ</h4><div class="uig">${kin('album_url', '共有アルバムのリンク（https://…）', i.album_url, 'type="url"')}<label class="wide"><span>メモ</span><textarea data-t="info" data-f="note" rows="3" ${ro}>${esc(i.note || '')}</textarea></label></div></div>
-    </div>${mg ? `<button onclick="uiSave()">保存</button> <span id="ui_msg"></span>` : ''}`;
+    </div>${mg ? `<button onclick="uiSave()">保存</button> <span id="ui_msg"></span>` : ''}${mg && nm ? `<p style="margin-top:28px"><button onclick="uiDelete()" style="color:#c00;border-color:#c00">この児童を削除</button></p>` : ''}`;
+};
+window.uiDelete = async () => {
+  const w = $('uiw'), name = w && w.dataset.name, m = $('ui_msg'); if (!name) return;
+  if (!confirm(`「${name}」を削除します。\n\n消えるもの：受給者証・送迎・連絡先・アセスメント（利用者情報の全項目）\n消えないもの：日誌などの記録\n\n元に戻せません。よろしいですか？`)) return;
+  if (DEMO) { alert('見本モードなので削除しません。'); return; }
+  try {
+    for (const [t, c] of [['leo_child_assess', 'name'], ['leo_child_info', 'name'], ['leo_child_care', 'child'], ['leo_children', 'name']])
+      await sb(`${t}?${c}=eq.${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    UI.sel = null; UI.adding = false; await renderLeoView('userinfo'); const mm = $('ui_msg'); if (mm) mm.textContent = '削除しました。';
+  } catch (e) { (m || { }).textContent = e.message; alert('削除できませんでした：' + e.message); }
 };
 window.uiTab = t => { UI.tab = t; renderLeoView('userinfo'); window.scrollTo(0, 0); };
 window.uiOpen = n => { UI.tab = 'basic'; UI.sel = n; UI.adding = false; renderLeoView('userinfo'); window.scrollTo(0, 0); };
