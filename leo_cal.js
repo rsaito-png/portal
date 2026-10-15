@@ -113,7 +113,7 @@ LEO_VIEWS.cal = async function () {
     h += calForm(e, [...new Set([...ch.map(x => x.name), ...evs.map(x => x.child).filter(Boolean)])].sort(), [...new Set(evs.map(x => x.staff).filter(Boolean))].sort());
   }
   h += CAL.mode === 'day' ? calDay(a, evs, care) : CAL.mode === 'week' ? calWeek(evs) : calMonth(evs);
-  h += `<p style="margin-top:12px;font-size:13px">関連：<a href="#leo/sougei">自分の送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/seikyu">児童マスタ</a>' : ''}</p>
+  h += `<p style="margin-top:12px;font-size:13px">関連：<a href="#leo/sougei">自分の送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/userinfo">利用者情報</a>' : ''}</p>
     <p class="note">11/1まではGoogleカレンダーの予定を毎時取り込んでいます（Google側は変えません）。ポータルで直した予定はそのまま残ります。</p>`;
   return h;
 };
