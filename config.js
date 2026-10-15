@@ -17,7 +17,8 @@ window.PORTAL_CONFIG = {
   clerk: { name: '事務', role: '事務', tiles: [
     ['💴', '茶夢 請求データ管理', 'https://drive.google.com/open?id=1a-Jm3-37o7BCKB-5_7LoACxtxQnpkK38QpFO8bCa0lU', 'GAS＋手動・要確認'],
     ['📊', 'レオ 実績記録（請求元）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から自動転記'],
-    ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'] ] },
+    ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'],
+    ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
 
   // 事業所ごとのタイル（2026-10-14 稼働システム一覧から作成。リンク先は既存のGoogleファイル）
   // tiles は [アイコン, 名前, リンク(空なら準備中), 補足, 'main'なら横幅いっぱい, 見本モードで出す見本行, 見せる役割（例 '事務'）]
@@ -76,8 +77,23 @@ window.PORTAL_CONFIG = {
   // 法人共通（ホームの下に表示）
   shared: { name: '法人共通', tiles: [
     ['📨', 'Chat受付', '#uketsuke', 'Google Chatの受付窓口に来た依頼・報告'],
+    ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
     ['🎓', '法定研修', 'https://drive.google.com/open?id=1TlSFx02IxdE-bUeoHRJC-n55MLNFIWgxc6s3IJRP8L4', 'GAS Webアプリ・要確認'],
     ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
     ['⏰', '出退勤（新・テスト）', 'https://rsaito-png.github.io/kintai/', 'テスト版'] ] },
+  // 電子サイン（労働契約書・誓約書）。他法人は employer と defaults を書き換える。文面（テンプレート）はDBに登録
+  esign: {
+    enabled: true,
+    employer: { name: '一般社団法人 心理社会的リハビリテーション・星心会', address: '三重県四日市市山城町59-4', rep: '代表理事 齊藤連' },
+    docTypes: { labor_contract: '労働条件通知書兼雇用契約書', confidentiality: '秘密情報の保持に関する誓約書' },
+    renewalNoticeDays: [90, 30],
+    // 契約書の既定値（個人ごとに画面で直せる）
+    defaults: { probation: 'なし', overtime: '所定時間外労働 無／休日労働 無', holidays: '不定', leave: '年次有給休暇（法定）',
+      retire: '定年なし。その他の退職・解雇については就業規則による', premium: '就業規則による',
+      pay: '毎月末日締切、翌月15日支払、銀行振込', bonus: '無', raise: '無', retirement_pay: '無',
+      insurance: '社会保険の加入 （　）／雇用保険の適用 （　）', remarks: '' },
+    // 事業所ごとの既定（就業場所・仕事内容）。例を書いておく
+    officeDefaults: { 'レオ': { place: 'レオ', job: '' }, '茶夢': { place: '茶夢', job: '' }, '金斗雲': { place: '金斗雲', job: '' } },
+  },
 };

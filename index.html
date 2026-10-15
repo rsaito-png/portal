@@ -47,6 +47,7 @@ h3{font-size:15px;color:#555;margin:20px 0 8px}
 <script src="leo.js"></script>
 <script src="leo_cal.js"></script>
 <script src="uketsuke.js"></script>
+<script src="esign.js"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -86,6 +87,8 @@ async function render() {
   const [id, sub] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   if (id === 'uketsuke') return renderUketsuke();
+  if (id === 'sign' && typeof renderSign === 'function') return renderSign();
+  if (id === 'clerk' && sub === 'docs' && typeof renderDocsAdmin === 'function') return renderDocsAdmin();
   const o = C.offices.find(x => x.id === id);
   if (o) {
     $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
@@ -100,6 +103,7 @@ async function render() {
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t)).join('')}</div>
     ${ROLE === C.clerk.role ? `<h3>${C.clerk.name}（事務の方のみ表示）</h3>
     <div class="grid">${C.clerk.tiles.map(t => tileHtml(t, '#555')).join('')}</div>` : ''}`;
+  if (typeof esignBadge === 'function') esignBadge();
 }
 window.addEventListener('hashchange', render);
 let ROLE = C.defaultRole;
