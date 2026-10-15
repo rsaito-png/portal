@@ -95,7 +95,29 @@ function groupList(o) {
 }
 const tl = (t, name, cls, color) => { const link = t[2] ? `href="${t[2]}"${/^https?:/.test(t[2]) ? ' target="_blank" rel="noopener"' : ''}` : 'style="opacity:.5"';
   return `<a class="tile ${cls}" ${link} style="border-top:4px solid ${color}"><span>${t[0]}</span>${name}<small>${t[3]}</small></a>`; };
+function leoHomeBody(o) {
+  const vis = visTiles(o), col = o.color;
+  const mine = ((o.mine || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
+  const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
+  const g = groupList(o).length ? `<a class="tile big" href="#${o.id}/g0" style="border-top:4px solid ${col}"><span>📂</span>その他</a>` : '';
+  return `<h3 class="nx">みんなで確認（毎日）</h3><div class="grid">
+    ${big('#leo/sougeiall', '🚐', '今日の送迎', 'hs_today', "PERIOD='today'")}
+    ${big('#leo/sougeiall', '🚐', '明日の送迎', 'hs_tomorrow', "PERIOD='tomorrow'")}
+    ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
+    ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}</div>
+    <h3 class="nx">${myDuty()}の仕事</h3><div class="grid">${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}</div>`;
+}
+async function leoHomeStatus() {
+  try { if (DEMO || typeof sb !== 'function') return;
+    const t = today(), tm = addDays(t, 1), rows = await sb(`leo_nikki?day=gte.${t}&day=lte.${tm}&kind=eq.利用&select=day,pick_driver,pick_car,drop_driver,drop_car,child`);
+    const f = (id, d) => { const rs = rows.filter(r => r.day === d), bad = rs.reduce((n, r) => n + (!r.pick_driver || !r.pick_car ? 1 : 0) + (!r.drop_driver || !r.drop_car ? 1 : 0), 0), el = document.getElementById(id); if (!el) return;
+      el.innerHTML = !rs.length ? '日誌なし' : bad ? `<b style="color:#c00">未確定 ${bad}件</b>（${rs.length}人）` : `${rs.length}人・確定`; };
+    f('hs_today', t); f('hs_tomorrow', tm);
+    const k = document.getElementById('hs_kids'); if (k) k.textContent = rows.filter(r => r.day === t).length + '人';
+  } catch (e) { }
+}
 function officeBody(o) {
+  if (o.home && o.groups) { setTimeout(leoHomeStatus, 0); return leoHomeBody(o); }
   if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(t, o.color)).join('')}</div>`;
   const vis = visTiles(o);
   const nx = ((o.next || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
