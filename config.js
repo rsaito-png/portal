@@ -10,15 +10,17 @@ window.PORTAL_CONFIG = {
   roles: ['職員', '事務'],
   defaultRole: '職員',
   // 事務だけに見せる区画（画面で隠すだけ。データ側の保護は Supabase のRLSで別途行う）
-  clerk: { name: '事務', role: '事務', tiles: [
-    ['💴', '請求CSV', '', '準備中'],
-    ['📊', '実績集計', '', '準備中'] ] },
-  // 事務だけに見せる区画（画面で隠すだけ。データ側の保護は Supabase のRLSで別途行う）
-  clerk: { name: '事務', role: '事務', tiles: [
-    ['💴', '茶夢 請求データ管理', 'https://drive.google.com/open?id=1a-Jm3-37o7BCKB-5_7LoACxtxQnpkK38QpFO8bCa0lU', 'GAS＋手動・要確認'],
-    ['📊', 'レオ 実績記録（請求元）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から自動転記'],
-    ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'],
-    ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
+  clerk: { name: '事務', role: '事務', groups: [
+    { name: '国保連請求', tiles: [
+      ['💴', 'レオ 請求CSVを作る', '#leo/seikyu', '請求CSV（送信はしない）'],
+      ['💴', '茶夢 請求データ管理', 'https://drive.google.com/open?id=1a-Jm3-37o7BCKB-5_7LoACxtxQnpkK38QpFO8bCa0lU', 'GAS＋手動・要確認'],
+      ['📊', 'レオ 実績記録（請求元）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から自動転記'] ] },
+    { name: '人事労務', tiles: [
+      ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
+    { name: '補助金・助成金', tiles: [
+      ['💰', '補助金・助成金', '', '準備中'] ] },
+    { name: 'その他', tiles: [
+      ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'] ] } ] },
 
   // 事業所ごとのタイル（2026-10-14 稼働システム一覧から作成。リンク先は既存のGoogleファイル）
   // tiles は [アイコン, 名前, リンク(空なら準備中), 補足, 'main'なら横幅いっぱい, 見本モードで出す見本行, 見せる役割（例 '事務'）]
@@ -80,7 +82,8 @@ window.PORTAL_CONFIG = {
     ['📨', 'Chat受付', '#uketsuke', 'Google Chatの受付窓口に来た依頼・報告'],
     ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
-    ['🎓', '法定研修', 'https://drive.google.com/open?id=1TlSFx02IxdE-bUeoHRJC-n55MLNFIWgxc6s3IJRP8L4', 'GAS Webアプリ・要確認'],
+    ['🎓', '法定研修（システム）', 'https://script.google.com/a/macros/psr-seishinkai.org/s/AKfycbyj476D28RbnLAR5GB6tZqXK12mbFJBcCfeyFgDTwimcvYfWknf2LGzwlbUwBfSpzR9/exec', '@psr-seishinkai.org のアカウントで開いてください'],
+    ['📝', '法定研修 受講確認フォーム', 'https://docs.google.com/forms/d/e/1FAIpQLSehMPxXuuCXdyA9MTmR8WR6YEaullRPG10MIkx7q9pNrUclbA/viewform', '研修を受けたら職員が回答'],
     ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
     ['⏰', '出退勤（新・テスト）', 'https://rsaito-png.github.io/kintai/', 'テスト版'] ] },
   // 電子サイン（労働契約書・誓約書）。他法人は employer と defaults を書き換える。文面（テンプレート）はDBに登録

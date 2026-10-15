@@ -102,7 +102,7 @@ async function render() {
     <h3>${C.shared.name}</h3>
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t)).join('')}</div>
     ${ROLE === C.clerk.role ? `<h3>${C.clerk.name}（事務の方のみ表示）</h3>
-    <div class="grid">${C.clerk.tiles.map(t => tileHtml(t, '#555')).join('')}</div>` : ''}`;
+    ${(C.clerk.groups || [{ name: '', tiles: C.clerk.tiles || [] }]).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}` : ''}`;
   if (typeof esignBadge === 'function') esignBadge();
 }
 window.addEventListener('hashchange', render);
