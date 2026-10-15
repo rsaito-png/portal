@@ -85,8 +85,7 @@ window.PORTAL_CONFIG = {
       ['📁', '書類', '', '準備中'] ] },
     { id: 'rydeen', logo: 'img/logo/rydeen.webp', name: 'RYDEEN', kind: 'B型', color: '#3a7bd5', tiles: [
       ['📣', 'SNS代行（LINE素材受信）', '', 'LINE受信で自動下書き・要確認'],
-      ['📓', '日誌', '', '未整備（11月開所準備）'],
-      ['✅', '実績', '', '未整備'],
+      ['🏠', 'B型システム（日誌・実績記録票・請求CSV・契約・個別支援計画・勤務実績）', '#rydeen/home', '職員は管理画面、利用者は今日の作業・マニュアル・日報（B型の権限が必要）', 'main'],
       ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'suishodama', logo: 'img/logo/suishodama.webp', logoFit: 'contain', name: '水晶玉', kind: '相談支援', color: '#8e5bb5', tiles: [

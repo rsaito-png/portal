@@ -43,3 +43,7 @@ begin
 end $$;
 revoke all on function public.bp_create_worker(text,text,text) from public, anon;
 grant execute on function public.bp_create_worker(text,text,text) to authenticated;
+
+-- 署名・説明記録の時刻はサーバー時刻を使う（端末の時計に依存しない）
+create or replace function public.bp_now() returns timestamptz language sql stable as $$ select now() $$;
+grant execute on function public.bp_now() to authenticated;
