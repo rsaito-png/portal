@@ -14,7 +14,7 @@ export async function sha256(text: string): Promise<string> {
 export function renderBody(body: string, vals: Record<string, string>) {
   return body.replace(/\{\{([^}]+)\}\}/g, (_, k) => (vals[k.trim()]?.trim() ? vals[k.trim()] : TBD));
 }
-export const hashContent = (title: string, body: string, fields: Record<string, string>) => sha256(JSON.stringify({ title, body, fields }));
+export const hashContent = (title: string, body: string, fields: Record<string, string>) => sha256(JSON.stringify(canon({ title, body, fields })));
 export const CONSENT_ITEMS = [
   '文書の内容を読み、職員から説明を受けました。',
   '質問する機会があり、内容を理解しました。',
