@@ -24,6 +24,8 @@ label{font-size:13px;color:#555;display:block}h2{margin:6px 0 10px;font-size:20p
 .sec td{background:#f0f3f5;font-weight:bold}.tot td{font-weight:bold}
 details{border-bottom:1px solid #eee;padding:4px 0}summary{cursor:pointer;padding:4px 0}
 .scroll{overflow-x:auto}
+.ptitle{display:none}
+@media print{header,nav,.noprint,#nav{display:none!important}body{background:#fff}main{max-width:none;padding:0}.card{box-shadow:none;border:1px solid #ccc;break-inside:avoid}.ptitle{display:block;margin:6px 0}textarea{border:0}table{font-size:11px}}
 </style></head><body>
 <header><span>📒 会計（簡易）</span><span><a href="index.html">← ポータルへ</a></span></header>
 <main>
@@ -37,5 +39,7 @@ details{border-bottom:1px solid #eee;padding:4px 0}summary{cursor:pointer;paddin
 </main>
 <script src="config.js?v=202610161900"></script>
 <script src="cf.js?v=202610172"></script>
-<script src="acc.js?v=202610172"></script>
+<script src="taxcalc.js?v=202610173"></script>
+<script src="tax.js?v=202610173"></script>
+<script src="acc.js?v=202610173"></script>
 </body></html>
