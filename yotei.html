@@ -83,10 +83,10 @@ function build() {
 }
 function check(a) {
   for (const [w, s] of Object.entries(S.wd)) if (s.use && s.parent !== '母の送り' && !s.school_time) return `${w}曜日の学校（園）お迎え時刻を入れてください。`;
-  for (const d of a.days) { const n = +d.day.slice(8) + '日';
-    if ((d.kind === '母の迎え' || d.kind === '時刻変更') && !d.time) return `${mm(D)}/${n}（${d.kind === '母の迎え' ? '施設へ来る時刻' : '学校（園）お迎え時刻'}）を入れてください。`;
-    if (d.kind === '追加利用' && !d.time) return `${mm(D)}/${n}（追加利用）の学校（園）お迎え時刻を入れてください。`;
-    if (d.kind === '送り場所変更' && !d.place.trim()) return `${mm(D)}/${n}の送り先を入れてください。`; }
+  for (const d of a.days) { const n = +d.day.slice(8);
+    if ((d.kind === '母の迎え' || d.kind === '時刻変更') && !d.time) return `${mm(D)}/${n}日（${d.kind === '母の迎え' ? '施設へ来る時刻' : '学校（園）お迎え時刻'}）を入れてください。`;
+    if (d.kind === '追加利用' && !d.time) return `${mm(D)}/${n}日（追加利用）の学校（園）お迎え時刻を入れてください。`;
+    if (d.kind === '送り場所変更' && !d.place.trim()) return `${mm(D)}/${n}日の送り先を入れてください。`; }
   return '';
 }
 async function send() {
