@@ -57,7 +57,8 @@ async function sb(path, opt = {}, retried) {
   if (r.status === 401 && !retried && await refreshSess()) return sb(path, opt, true);
   if (r.status === 401) throw new Error('ログインの有効期限が切れました。ページを再読み込みして、ログインし直してください（401）');
   if (!r.ok) throw new Error('読み込めませんでした（' + r.status + '）');
-  return r.status === 204 || r.status === 201 ? null : r.json();
+  if (r.status === 204) return null;
+  const tx = await r.text(); if (!tx) return null; try { return JSON.parse(tx); } catch (e) { return null; }
 }
 // 期間: 今日・明日・今週（日誌タブがある日だけ。データは毎晩22時の同期分）
 let PERIOD = 'today';

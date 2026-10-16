@@ -63,7 +63,7 @@ async function chairSend() {
   const el = $('ch_in'), t = el.value.trim(), m = $('ch_m'); if (!t) return;
   m.style.color = '#2e6b4f';
   try { const r = await sb('chair_idea', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ text: t }) }); el.value = ''; m.textContent = '受けました';
-    const id = r[0].id; CH.last = { id, text: t };
+    const id = r && r[0] && r[0].id; if (!id) { m.textContent = '受けました'; return; } CH.last = { id, text: t };
     const ss = JSON.parse(localStorage.getItem('sess') || '{}');
     fetch(C.supabaseUrl + '/functions/v1/chair-classify', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + ss.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
       .then(x => x.json()).then(j => chairShowBucket(id, j.bucket || 'あとで')).catch(() => chairShowBucket(id, 'あとで')); }
