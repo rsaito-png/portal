@@ -822,14 +822,26 @@ async function planResend(kind, child, term, planId, doc) {
 }
 // ④ 職員モニタリング：今の計画期間の活動記録（日誌Q列＋ポータルの下書き由来）を日付順にまとめる。ボットが文章に整える
 async function staffMon(name, term, cur) {
-  if (DEMO) { pmsg(name, '<p class="note">見本モードなので作りません。</p>'); return; }
-  try { const r = (await trackRows()).find(x => x['児童名'] === name) || {}, m = String(r['現在の計画期間'] || '').match(/(\d{4})年(\d{1,2})月/);
-    const from = m ? `${m[1]}-${String(m[2]).padStart(2, '0')}-01` : addDays(today(), -183), to = today();
-    const rows = (await sb(`leo_nikki_full?day=gte.${from}&day=lte.${to}&order=day&select=day,child,activity_text`)).filter(x => String(x.child).replace(/\s/g, '') === name.replace(/\s/g, '') && x.activity_text);
-    if (!rows.length) { pmsg(name, '<p class="note">この期間の活動記録がありません。</p>'); return; }
+  const B = copyBtnEl(), NN = x => String(x || '').replace(/[\s\u3000]/g, '');
+  const bad = h => copyNote(B, `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">${h}</p>`, name);
+  if (DEMO) { copyNote(B, '<p class="note">見本モードなので作りません。</p>', name); return; }
+  if (B) B.disabled = true;
+  try {
+    copyNote(B, '<p class="note">作っています…</p>', name);
+    const r = (await trackRows()).find(x => NN(x['児童名']) === NN(name)) || {}, tk = r._track || {};
+    const m = String(r['現在の計画期間'] || '').match(/(\d{4})年\s*(\d{1,2})月/);
+    let from = m ? `${m[1]}-${String(m[2]).padStart(2, '0')}-01` : (tk.period_from || null);
+    if (!from && tk.next_start) from = addDays(tk.next_start, -183);
+    if (!from) from = addDays(today(), -183);
+    const to = today();
+    const rows = (await sb(`leo_nikki_full?day=gte.${from}&day=lte.${to}&order=day&select=day,child,activity_text`)).filter(x => NN(x.child) === NN(name) && x.activity_text && String(x.activity_text).trim());
+    if (!rows.length) { bad(`この期間（${from}〜${to}）の活動記録がありません。日誌に活動記録が入っていません`); return; }
     const text = `【${from}〜${to} の活動記録から（${rows.length}日分）】\n` + rows.map(x => `${fmtDay(x.day)}　${x.activity_text}`).join('\n');
     await sb('leo_staff_mon?on_conflict=child,term', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child: name, term, period_from: from, period_to: to, text: text.slice(0, 20000), source: '自動（簡易）' }) });
-    renderLeoView('plan'); } catch (e) { pmsg(name, esc(e.message)); }
+    copyNote(B, `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">作りました（${rows.length}日分）</p>`, name);
+    setTimeout(() => renderLeoView('plan'), 1500);
+  } catch (e) { bad('失敗しました：' + esc(e.message)); }
+  finally { if (B) B.disabled = false; }
 }
 // ===== 配置表・型表・管理表の入力（児発管・管理者・事務）＋ 送迎の配慮 =====
 const MASTER_LABEL = { kata: '送迎 型表', keikaku: '個別支援計画 管理表', haichi: '職員配置表', care: '送迎の配慮（児童ごと）' };
