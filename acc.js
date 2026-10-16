@@ -41,6 +41,62 @@ async function accLogin() {
   boot();
 }
 
+/* ---- キャッシュフロー（資金=現金・銀行・カード口座。口座間の振替は合計から除外） ---- */
+async function fetchAll(q) { const out = []; for (let o = 0; ; o += 1000) { const p = await sb(q + `&order=id&limit=1000&offset=${o}`); out.push(...p); if (p.length < 1000) break; } return out; }
+let CF = null;
+const cfPrevFY = () => { const f = fiscalYear(todayJST()), y = +f.from.slice(0, 4) - 1; return { from: `${y}-06-01`, to: `${y + 1}-05-31` }; };
+function cfSvg(rows) {
+  const W = 760, H = 240, pl = 64, pr = 10, pt = 14, pb = 28, n = rows.length; if (!n) return '';
+  const ends = rows.map(r => r.total.end), maxB = Math.max(...rows.flatMap(r => [r.total.in, r.total.out]), 1);
+  const lo = Math.min(0, ...ends), hi = Math.max(1, ...ends, maxB), y = v => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo)), bw = (W - pl - pr) / n, x = i => pl + bw * (i + .5), f = v => Math.abs(v) >= 1e4 ? Math.round(v / 1e4) + '万' : v;
+  let g = ''; for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="#eee"/><text x="${pl - 4}" y="${y(v) + 4}" font-size="10" text-anchor="end" fill="#777">${f(Math.round(v))}</text>`; }
+  const bars = rows.map((r, i) => `<rect x="${x(i) - bw * .36}" y="${y(r.total.in)}" width="${bw * .34}" height="${Math.max(0, y(0) - y(r.total.in))}" fill="#6bb58a"/><rect x="${x(i)}" y="${y(r.total.out)}" width="${bw * .34}" height="${Math.max(0, y(0) - y(r.total.out))}" fill="#e39a8c"/><text x="${x(i)}" y="${H - 10}" font-size="10" text-anchor="middle" fill="#555">${+r.month.slice(5)}月</text>`).join('');
+  const line = ends.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px">${g}${bars}<path d="${line}" fill="none" stroke="#2e5fa8" stroke-width="2"/>${ends.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="#2e5fa8"/>`).join('')}</svg>
+    <p class="note"><span style="color:#2e5fa8">━</span> 月末残高　<span style="color:#6bb58a">■</span> 入金　<span style="color:#e39a8c">■</span> 出金</p>`;
+}
+async function vCash(sp) {
+  if (!M.accounts) await loadMasters();
+  const fy = fiscalYear(todayJST()), from = sp.get('from') || fy.from, to = sp.get('to') || fy.to, pf = cfPrevFY();
+  const lines = await fetchAll(`acc_lines?select=id,side,amount,account_id,dept_id,entry_id,acc_entries!inner(entry_date,kind,partner_id)&acc_entries.entry_date=lte.${to}`);
+  const wal = M.wallets, r = cfCompute(lines, wal, from, to), aName = id => M.accounts.find(a => a.id === +id)?.name ?? '科目' + id, dName = id => +id ? (M.depts.find(d => d.id === +id)?.name ?? '部門' + id) : '(部門なし)';
+  const tot = r.rows.reduce((s, x) => ({ in: s.in + x.total.in, out: s.out + x.total.out }), { in: 0, out: 0 }), first = r.rows[0]?.total.open ?? 0, last = r.rows.at(-1)?.total.end ?? 0;
+  const mon = m => m.replace('-', '年') + '月';
+  // 未決済
+  const accs = M.accounts.filter(a => a.name === '未払金' || a.name === '未収入金').map(a => ({ id: a.id, name: a.name, side: a.name === '未払金' ? 'C' : 'D' }));
+  const wk = lines.filter(l => accs.some(a => a.id === l.account_id)), open = cfOpen(wk, accs).sort((a, b) => a.date.localeCompare(b.date));
+  const today = todayJST(), age = d => Math.round((new Date(today) - new Date(d)) / 864e5), pay = open.filter(o => o.side === 'C'), rcv = open.filter(o => o.side === 'D');
+  const cardBal = wal.filter(w => w.kind === 'card').map(w => ({ name: w.name, bal: -lines.filter(l => l.account_id === w.account_id && l.acc_entries.entry_date <= today).reduce((s, l) => s + (l.side === 'D' ? l.amount : -l.amount), 0) }));
+  const openTbl = (t, a) => a.length ? `<table><tr><th>発生日</th><th>科目</th><th class="r">経過日数</th><th class="r">金額</th></tr>${a.map(o => `<tr><td>${o.date}</td><td>${esc(o.account)}</td><td class="r">${age(o.date)}</td><td class="r">${yen(o.amount)}</td></tr>`).join('')}<tr class="tot"><td colspan="3">${t}合計</td><td class="r">${yen(a.reduce((s, o) => s + o.amount, 0))}</td></tr></table>` : `<p class="note">${t}はありません。</p>`;
+  const monthOf = a => { const g = {}; a.forEach(o => g[o.date.slice(0, 7)] = (g[o.date.slice(0, 7)] || 0) + o.amount); return Object.entries(g).map(([m, v]) => `${mon(m)} ${yen(v)}`).join(' ／ '); };
+  const breakdown = (src, nameOf, m) => { const ks = Object.keys(src).filter(k => src[k][m]); if (!ks.length) return '<p class="note">なし</p>';
+    return `<table><tr><th></th><th class="r">入金</th><th class="r">出金</th></tr>${ks.sort((a, b) => (src[b][m].in + src[b][m].out) - (src[a][m].in + src[a][m].out)).map(k => `<tr><td>${esc(nameOf(k))}</td><td class="r">${yen(src[k][m].in)}</td><td class="r">${yen(src[k][m].out)}</td></tr>`).join('')}</table>`; };
+  CF = { r, from, to, open, cardBal, aName, dName };
+  $('view').innerHTML = `<h2>キャッシュフロー</h2><div class="card"><div class="g"><div><label>期間 開始</label><input type="date" id="c_f" value="${from}"></div><div><label>終了</label><input type="date" id="c_t" value="${to}"></div>
+    <button class="sub" onclick="location.hash='cash?from='+$('c_f').value+'&to='+$('c_t').value">表示</button>
+    <button class="sub" onclick="location.hash='cash'">今期</button><button class="sub" onclick="location.hash='cash?from=${pf.from}&to=${pf.to}'">前期</button><button class="sub" onclick="cfCsv()">CSV出力</button></div>
+    <p class="note">資金＝現金・銀行・カード口座（カードは未払分がマイナス）。口座間の振替は合計から除外（口座別には「振替」列で表示）。決済済みの入出金のみ（未払金・未収入金は下の「今後の見込み」）。</p></div>
+    <div class="card"><h3>期間合計</h3><p>期首残高 <b>${yen(first)}</b> ＋ 入金 <b>${yen(tot.in)}</b> − 出金 <b>${yen(tot.out)}</b> ＝ 期末残高 <b>${yen(last)}</b>（差引 ${yen(tot.in - tot.out)}）</p>${cfSvg(r.rows)}</div>
+    <div class="card scroll"><h3>月次推移（合計）</h3><table><tr><th>月</th><th class="r">月初残高</th><th class="r">入金合計</th><th class="r">出金合計</th><th class="r">月末残高</th></tr>
+    ${r.rows.map(x => `<tr><td>${mon(x.month)}</td><td class="r">${yen(x.total.open)}</td><td class="r">${yen(x.total.in)}</td><td class="r">${yen(x.total.out)}</td><td class="r">${yen(x.total.end)}</td></tr>`).join('')}</table></div>
+    <div class="card scroll"><h3>口座別</h3>${wal.map(w => `<details><summary>${esc(w.name)}　期末 ${yen(r.rows.at(-1)?.wallets[w.id].end ?? 0)}</summary><table><tr><th>月</th><th class="r">月初</th><th class="r">入金</th><th class="r">出金</th><th class="r">振替</th><th class="r">月末</th></tr>
+      ${r.rows.map(x => { const c = x.wallets[w.id]; return `<tr><td>${mon(x.month)}</td><td class="r">${yen(c.open)}</td><td class="r">${yen(c.in)}</td><td class="r">${yen(c.out)}</td><td class="r">${yen(c.tr)}</td><td class="r">${yen(c.end)}</td></tr>`; }).join('')}</table></details>`).join('')}</div>
+    <div class="card"><h3>月別の内訳（クリックで展開）</h3>${r.rows.map(x => `<details><summary>${mon(x.month)}　入金 ${yen(x.total.in)} ／ 出金 ${yen(x.total.out)}</summary><div class="cols"><div><b>科目別</b>${breakdown(r.byAcc, aName, x.month)}</div><div><b>部門別</b>${breakdown(r.byDept, dName, x.month)}</div></div></details>`).join('')}</div>
+    <div class="card"><h3>今後の見込み（未決済）</h3><p class="note">未払金・未収入金は期日の項目がないため、発生日の古い順に、支払・入金済み分を先入先出で消し込んだ残りを表示します（期日別＝発生月ごとの合計）。</p>
+    <div class="cols"><div><b>未払金（支出の見込み）</b>${openTbl('未払金', pay)}<p class="note">${monthOf(pay)}</p></div><div><b>未収入金（収入の見込み）</b>${openTbl('未収入金', rcv)}<p class="note">${monthOf(rcv)}</p></div></div>
+    <b>クレジットカード未払（本日時点の残高）</b><table>${cardBal.map(c => `<tr><td>${esc(c.name)}</td><td class="r">${yen(c.bal)}</td></tr>`).join('')}<tr class="tot"><td>カード未払合計</td><td class="r">${yen(cardBal.reduce((s, c) => s + c.bal, 0))}</td></tr></table>
+    <p><b>支出見込み合計 ${yen(pay.reduce((s, o) => s + o.amount, 0) + cardBal.reduce((s, c) => s + Math.max(0, c.bal), 0))} 円　／　収入見込み合計 ${yen(rcv.reduce((s, o) => s + o.amount, 0))} 円</b></p></div>`;
+}
+function cfCsv() {
+  if (!CF) return; const { r, open, cardBal, aName, dName } = CF, q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"', L = [];
+  L.push(['資金推移（合計）'], ['月', '月初残高', '入金合計', '出金合計', '月末残高']); r.rows.forEach(x => L.push([x.month, x.total.open, x.total.in, x.total.out, x.total.end]));
+  L.push([], ['口座別'], ['口座', '月', '月初', '入金', '出金', '振替', '月末']); M.wallets.forEach(w => r.rows.forEach(x => { const c = x.wallets[w.id]; L.push([w.name, x.month, c.open, c.in, c.out, c.tr, c.end]); }));
+  for (const [t, src, nm] of [['科目別', r.byAcc, aName], ['部門別', r.byDept, dName]]) { L.push([], [t + '内訳'], [t, '月', '入金', '出金']); Object.keys(src).forEach(k => r.months.forEach(m => src[k][m] && L.push([nm(k), m, src[k][m].in, src[k][m].out]))); }
+  L.push([], ['未決済（見込み）'], ['種別', '発生日', '金額']); open.forEach(o => L.push([o.account, o.date, o.amount])); cardBal.forEach(c => L.push(['カード未払 ' + c.name, '', c.bal]));
+  const b = new Blob(['\ufeff' + L.map(a => a.map(q).join(',')).join('\r\n')], { type: 'text/csv' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = `cashflow_${CF.from}_${CF.to}.csv`; a.click();
+}
+
 /* ---- マスタ ---- */
 let M = {};
 async function loadMasters() {
@@ -63,14 +119,14 @@ async function saveEntry(e, lines) {
 const accByName = async name => (await sb('acc_accounts?select=id&name=eq.' + encodeURIComponent(name)))[0]?.id;
 
 /* ---- 画面ルーター ---- */
-const TABS = [['deal', '取引入力'], ['journal', '仕訳帳'], ['transfer', '振替'], ['bank', 'CSV取込'], ['report', '試算表'], ['master', 'マスタ']];
+const TABS = [['deal', '取引入力'], ['journal', '仕訳帳'], ['transfer', '振替'], ['bank', 'CSV取込'], ['report', '試算表'], ['cash', 'キャッシュフロー'], ['master', 'マスタ']];
 let FLASH = '', FLASHCLS = 'ok', FLASHT = 0;
 function flash(m, cls) { FLASH = m; FLASHCLS = cls || 'ok'; FLASHT = Date.now(); }
 async function route() {
   const [t, q] = (location.hash.slice(1) || 'deal').split('?'); const tab = TABS.find(x => x[0] === t) ? t : 'deal'; const sp = new URLSearchParams(q || '');
   $('nav').innerHTML = TABS.map(([k, l]) => `<a href="#${k}" class="${k === tab ? 'on' : ''}">${l}</a>`).join('');
   $('view').innerHTML = '<p class="note">読み込み中…</p>';
-  try { await ({ deal: vDeal, journal: vJournal, transfer: vTransfer, bank: vBank, report: vReport, master: vMaster })[tab](sp); }
+  try { await ({ deal: vDeal, journal: vJournal, transfer: vTransfer, bank: vBank, report: vReport, cash: vCash, master: vMaster })[tab](sp); }
   catch (e) { $('view').innerHTML = `<p class="ng">${esc(e.message)}</p>`; }
 }
 window.addEventListener('hashchange', route);
