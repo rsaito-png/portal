@@ -1,4 +1,4 @@
-// スタッフ業務報告。1日1回・1行でOK。管理者（can_manage）は朝の1画面で確認。
+// スタッフリーダー報告。1日1回・1行でOK。管理者（can_manage）は朝の1画面で確認。
 // データ: staff_report / staff_todo / staff_roster()（supabase/staff_report.sql）
 const SR = { staleDays: 3, tab: null };
 const srToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
@@ -8,13 +8,13 @@ async function srRpc(fn) { const s = JSON.parse(localStorage.getItem('sess') || 
 function srMe() { const s = JSON.parse(localStorage.getItem('sess') || '{}'); return JSON.parse(atob(s.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; }
 async function renderReport() {
   const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
-  if (DEMO) return $('view').innerHTML = back + '<h3>業務報告</h3>' + demoNote() + '<p>見本モードでは表示しません。</p>';
+  if (DEMO) return $('view').innerHTML = back + '<h3>リーダー報告</h3>' + demoNote() + '<p>見本モードでは表示しません。</p>';
   $('view').innerHTML = '<p>読み込み中…</p>';
   try {
     const me = srMe(), day = srToday();
     const [reps, todos] = await Promise.all([sb(`staff_report?staff=eq.${me}&order=day.desc&limit=7`), sb(`staff_todo?assignee=eq.${me}&status=neq.done&order=due.nulls.last,created_at`)]);
     const t = reps.find(r => r.day === day);
-    $('view').innerHTML = back + `<div id="chair_msg">${typeof chairMsgHtml === 'function' ? await chairMsgHtml() : ''}</div><h3>今日の業務報告</h3>
+    $('view').innerHTML = back + `<div id="chair_msg">${typeof chairMsgHtml === 'function' ? await chairMsgHtml() : ''}</div><h3>今日のリーダー報告</h3>
       <div class="card"><p>${t ? '✅ 今日は報告済みです（直せます）' : '⬜ 今日はまだです'}</p>
       <button onclick="srSend(true)" style="font-size:20px;padding:14px 24px;width:100%">問題なし</button>
       <p>または1行でOK：<textarea id="sr_b" rows="3" maxlength="2000" style="width:100%;font-size:16px" placeholder="今日やったこと">${esc(t && !t.no_problem ? t.body || '' : '')}</textarea></p>
@@ -39,7 +39,7 @@ async function srTodo(id) {
 // 管理者の朝の1画面
 async function renderReportAdmin() {
   const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
-  if (DEMO) return $('view').innerHTML = back + '<h3>業務報告（朝の確認）</h3>' + demoNote() + '<p>見本モードでは表示しません。</p>';
+  if (DEMO) return $('view').innerHTML = back + '<h3>リーダー報告（朝の確認）</h3>' + demoNote() + '<p>見本モードでは表示しません。</p>';
   $('view').innerHTML = '<p>読み込み中…</p>';
   try {
     const day = srToday(), since = new Date(Date.now() - 14 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
@@ -51,7 +51,7 @@ async function renderReportAdmin() {
     const stale = todos.filter(x => srAgo(x.updated_at) >= SR.staleDays || (x.due && x.due < day));
     const troubles = reps.filter(r => r.trouble && srAgo(r.day + 'T00:00:00+09:00') <= 7);
     const sec = (h, c) => `<div class="card"><h4>${h}</h4>${c}</div>`;
-    $('view').innerHTML = back + `<h3>業務報告（朝の確認）　${esc(day)}</h3>
+    $('view').innerHTML = back + `<h3>リーダー報告（朝の確認）　${esc(day)}</h3>
       ${sec(`📭 今日まだ報告がない人（${miss.length}／${targets.length}）`, miss.length ? miss.map(r => `<p>${esc(r.name)}　<small>最後の報告：${esc(last(r.user_id) || '14日以内なし')}</small></p>`).join('') : '<p>全員報告済みです。</p>')}
       ${sec(`⏳ 動いていないToDo（${stale.length}）`, stale.length ? stale.map(x => `<p>${esc(nm[x.assignee] || '？')}：<b>${esc(x.title)}</b>　<small>${srST[x.status]}・${srAgo(x.updated_at)}日動きなし${x.due ? '・期限 ' + esc(x.due) : ''}${x.due && x.due < day ? ' ⚠️期限切れ' : ''}</small> <button class="back" onclick="srDel(${x.id})">消す</button></p>`).join('') : '<p>ありません。</p>')}
       ${sec(`🆘 スタッフの困りごと（直近7日 ${troubles.length}）`, troubles.length ? troubles.map(r => `<p>${esc(nm[r.staff] || '？')}　<small>${esc(r.day)}</small><br>${esc(r.trouble)}</p>`).join('') : '<p>ありません。</p>')}

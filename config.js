@@ -10,7 +10,7 @@ window.PORTAL_CONFIG = {
   roles: ['職員', '事務'],
   defaultRole: '職員',
   // 事務だけに見せる区画（画面で隠すだけ。データ側の保護は Supabase のRLSで別途行う）
-  clerk: { name: '事務', role: '事務', groups: [
+  clerk: { name: '総務', role: '事務', groups: [
     { name: '国保連請求', tiles: [
       ['💴', 'レオ 請求CSVを作る', '#leo/seikyu', '請求CSV（送信はしない）'],
       ['💴', '茶夢 請求データ管理', 'https://drive.google.com/open?id=1a-Jm3-37o7BCKB-5_7LoACxtxQnpkK38QpFO8bCa0lU', 'GAS＋手動・要確認'],
@@ -18,7 +18,7 @@ window.PORTAL_CONFIG = {
       ['✍️', 'レオ 請求の印（欠席時対応・子育てサポート）', '#leo/shirushi', 'その日のうちに付ける'],
       ['📊', 'レオ 実績記録（請求元）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から自動転記'] ] },
     { name: '人事労務', tiles: [
-      ['🌅', '業務報告（朝の確認）', '#report/admin', '報告がない人・動いていないToDo・困りごと／ToDoを出す（管理者のみ）'],
+      ['🌅', 'リーダー報告（朝の確認）', '#report/admin', '報告がない人・動いていないToDo・困りごと／ToDoを出す（管理者のみ）'],
       ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
     { name: '補助金・助成金', tiles: [
       ['💰', '補助金・助成金', '', '準備中'] ] },
@@ -104,10 +104,8 @@ window.PORTAL_CONFIG = {
   // 法人共通（ホームの下に表示）
   shared: { name: '法人共通', tiles: [
     ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
-    ['📝', '今日の業務報告・私のToDo', '#report', '1行か「問題なし」で送る・指示されたToDoを見る'],
     ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
-    ['🎓', '法定研修（システム）', '#ht', '研修・委員会・訓練の記録と受講証明（事業所ごと）'],
     ['📝', '法定研修 受講確認フォーム', 'https://docs.google.com/forms/d/e/1FAIpQLSehMPxXuuCXdyA9MTmR8WR6YEaullRPG10MIkx7q9pNrUclbA/viewform', '研修を受けたら職員が回答'],
     ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
     ['⏰', '出退勤（新・テスト）', 'https://rsaito-png.github.io/kintai/', 'テスト版'] ] },

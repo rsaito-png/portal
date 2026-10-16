@@ -45,10 +45,10 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=202610161510"></script>
+<script src="config.js?v=202610161620"></script>
 <script src="leo.js?v=202610161500"></script>
 <script src="kin.js?v=202610161430"></script>
-<script src="report.js?v=202610161430"></script>
+<script src="report.js?v=202610161620"></script>
 <script src="ht.js?v=202610161540"></script>
 <script src="chair.js?v=202610161421"></script>
 <script src="mgr.js?v=202610161458"></script>
@@ -170,12 +170,15 @@ async function render() {
     if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
   }
-  $('view').innerHTML = `<h3>事業所をえらんでください</h3>
+  const topT = [['📣', 'リーダー報告', '#report', '1行か「問題なし」で送る・ToDoを見る', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
+  const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
+  $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
+    <h3>事業所</h3>
     <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
-    <h3>${C.shared.name}</h3>
-    <div class="grid">${C.shared.tiles.map(t => tileHtml(t)).join('')}</div>
-    ${ROLE === C.clerk.role ? `<h3>${C.clerk.name}（事務の方のみ表示）</h3>
-    ${(C.clerk.groups || [{ name: '', tiles: C.clerk.tiles || [] }]).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}` : ''}`;
+    ${ROLE === C.clerk.role ? `<h3>総務（事務の方のみ表示）</h3>
+    ${(C.clerk.groups || []).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}` : ''}
+    <h3>未整理</h3>
+    <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
   chairTile(); chairMsgShow();
 }
