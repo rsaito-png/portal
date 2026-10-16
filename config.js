@@ -5,7 +5,7 @@ window.PORTAL_CONFIG = {
   themeColor: '#2e6b4f',
   supabaseUrl: 'https://zvrardoyxocmqhvyddnf.supabase.co',
   supabaseKey: 'sb_publishable_C3S0K18If_cNj6gpgIct9w_3NFMdnCT', // 公開用キー（ブラウザに出してよい種類）
-  helpText: 'わからないことは Google Chat の受付でボットに話しかけてください。',
+  helpText: '分からないことは、ポータルの「受付」から送ってください。',
   // 役割。ログインユーザーの役割は Supabase の app_metadata.role（未設定なら defaultRole）
   roles: ['職員', '事務'],
   defaultRole: '職員',
@@ -40,7 +40,7 @@ window.PORTAL_CONFIG = {
         '管理者': ['今日やること（児発管）', '個別支援計画（いまどこ？）', '保護者の実績確認'],
         '事務': ['事務画面へ', 'レオの予定（利用・送迎・勤務）', '利用者情報（児童ごと）'] },
       short: { '日誌（児童ごと）': '日誌', '日誌（見る・直す）': '今日の日誌', '今日やること（児発管）': '今日やること', '個別支援計画（いまどこ？）': '個別支援計画', 'レオの予定（利用・送迎・勤務）': '予定', '利用者情報（児童ごと）': '利用者情報', '事務画面へ': '事務画面へ', '保護者の実績確認': '実績確認', 'LINE報告を書く': 'LINE報告' },
-      groups: [['📂', 'その他', ['今日の送迎（自分の担当）', 'みんなの送迎', 'レオの予定（利用・送迎・勤務）', '送迎 型表', '職員配置表', '日誌（児童ごと）', '日誌（見る・直す）', '日誌の元シート', '実績記録（見るだけ）', '利用者情報（児童ごと）', 'アセスメント（フォーム）', '個別支援計画（いまどこ？）', '個別支援計画 管理表', '今日やること（児発管）', '配置表・型表・管理表・送迎の配慮の入力', 'LINE報告を書く', '保護者の実績確認', '公式LINE', '写真（Googleフォト）', 'Chat受付', '書類']]],
+      groups: [['📂', 'その他', ['今日の送迎（自分の担当）', 'みんなの送迎', 'レオの予定（利用・送迎・勤務）', '送迎 型表', '職員配置表', '日誌（児童ごと）', '日誌（見る・直す）', '日誌の元シート', '実績記録（見るだけ）', '利用者情報（児童ごと）', 'アセスメント（フォーム）', '個別支援計画（いまどこ？）', '個別支援計画 管理表', '今日やること（児発管）', '配置表・型表・管理表・送迎の配慮の入力', 'LINE報告を書く', '保護者の実績確認', '公式LINE', '写真（Googleフォト）', '受付', '書類']]],
       tiles: [
       ['📋', '今日やること（児発管）', '#leo/home', '計画の期限・ヒヤリハット確認・実績確認', 'main', null, '児発管'],
       ['⚠️', 'ヒヤリハット', '#leo/hiyari', '全員で読む・報告はここから', 'main'],
@@ -65,7 +65,7 @@ window.PORTAL_CONFIG = {
       ['🧩', '個別支援計画（いまどこ？）', '#leo/plan', '管理表から・次にやること'],
       ['🗂️', '配置表・型表・管理表・送迎の配慮の入力', '#leo/master', 'ポータルの表を直す', '', null, '児発管'],
       ['🏢', '事務画面へ', '#', '請求・書類など事務の仕事はこちら', '', null, '事務'],
-      ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
+      ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f', tiles: [
       ['📋', '日報システム', 'https://docs.google.com/forms/d/e/1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g/viewform', 'Googleフォーム'],
@@ -73,7 +73,7 @@ window.PORTAL_CONFIG = {
       ['🍱', '献立報告', 'https://drive.google.com/open?id=1v6o0V93U2xi-2ruwqV5VhEBk04rxMQuqs5rAddy1Sb4', '手入力・要確認'],
       ['⚠️', 'ヒヤリハット週報', 'https://drive.google.com/open?id=18dCSBTXlw2_YS-niadV8UCqjCottsVzI6i3uJDbpvpM', 'Bot依頼で作成'],
       ['📝', '個別支援計画', '', '未整備'],
-      ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
+      ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227', tiles: [
       ['🏯', '金斗雲システム', 'https://script.google.com/a/macros/psr-seishinkai.org/s/AKfycby5I92_qF1j0YqAYhsUvIAS8WHpRczQDY8pxUD4aaYEV1ftIAAQqKre0vb1Fvia0XrYvg/exec', '@psr-seishinkai.org のアカウントで開く'],
@@ -82,20 +82,20 @@ window.PORTAL_CONFIG = {
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
       ['⚠️', 'ヒヤリハット週報', 'https://drive.google.com/open?id=1urelD2ecz7HEu7ZQ1busmKXkH0J-T_WAGpljx5AY3lY', 'Bot依頼で作成'],
       ['📝', '居宅介護計画の同意', '#kintoun/consent', '計画を見て、iPadで同意（Googleフォームの代わり）'],
-      ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
+      ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'rydeen', logo: 'img/logo/rydeen.webp', name: 'RYDEEN', kind: 'B型', color: '#3a7bd5', tiles: [
       ['📣', 'SNS代行（LINE素材受信）', '', 'LINE受信で自動下書き・要確認'],
       ['📓', '日誌', '', '未整備（11月開所準備）'],
       ['✅', '実績', '', '未整備'],
-      ['📨', 'Chat受付', '#uketsuke', 'Chatの受付窓口に来た依頼・報告'],
+      ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'suishodama', logo: 'img/logo/suishodama.webp', logoFit: 'contain', name: '水晶玉', kind: '相談支援', color: '#8e5bb5', tiles: [
       ['🗂️', '計画相談', '', '未整備'], ['👀', 'モニタリング', '', '未整備'], ['📁', '書類', '', '準備中'] ] },
   ],
   // 法人共通（ホームの下に表示）
   shared: { name: '法人共通', tiles: [
-    ['📨', 'Chat受付', '#uketsuke', 'Google Chatの受付窓口に来た依頼・報告'],
+    ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
     ['📝', '今日の業務報告・私のToDo', '#report', '1行か「問題なし」で送る・指示されたToDoを見る'],
     ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
