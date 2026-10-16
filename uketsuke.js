@@ -17,6 +17,10 @@ async function renderUketsuke() {
     const tabs = ['未完了', 'すべて'].map(f => `<button class="${f === UK_FILTER ? 'on' : ''}" onclick="UK_FILTER='${f}';renderUketsuke()">${f}</button>`).join('');
     $('view').innerHTML = back + `<h3>Chat受付</h3>${DEMO ? '<p class="note">見本データです（架空）</p>' : ''}
       <p class="note">Google Chat の「受付窓口」に書かれた依頼・報告です。${ROLE === '事務' ? '事務なので全事業所を表示しています。' : '自分の事業所の分だけ表示しています。'}対応したら状態を変えてください。</p>
+      <div class="card"><h4>✏️ ここから送る（Chatが使えない時もこちら）</h4>
+      <select id="uk_c">${['その他','日誌','送迎','請求','計画','記録'].map(c => `<option>${c}</option>`).join('')}</select>
+      <textarea id="uk_b" rows="3" maxlength="4000" style="width:100%;font-size:16px" placeholder="依頼・報告を書いてください"></textarea>
+      <button onclick="ukSend()" style="font-size:18px;padding:10px 24px">送る</button> <span id="uk_m" class="note"></span></div>
       <p class="ptabs">${tabs}</p>` + (rows.length ? Object.entries(groups).map(([o, rs]) => `<h4>${esc(o)}（${rs.length}件）</h4><table>
       <tr><th>No・日時</th><th>分類・送った人</th><th>内容</th><th>状態</th></tr>${rs.map(r => `<tr${r.status === '未対応' ? ' style="background:#fff6e5"' : ''}>
       <td>${r.id}<br><small>${new Date(r.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</small></td>
@@ -29,4 +33,11 @@ async function ukStatus(id, sel) {
   if (DEMO) { alert('見本モードなので保存しません'); return; }
   try { await sb(`uketsuke?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: sel.value }), headers: { Prefer: 'return=minimal' } }); }
   catch (e) { alert(e.message); renderUketsuke(); }
+}
+async function ukSend() {
+  const b = $('uk_b').value.trim(), m = $('uk_m');
+  if (!b) { m.textContent = '内容を書いてください。'; return; }
+  if (DEMO) { m.textContent = '見本モードなので送りません'; return; }
+  try { const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/uketsuke_submit', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + JSON.parse(localStorage.getItem('sess') || '{}').token, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_category: $('uk_c').value, p_body: b }) });
+    if (!r.ok) throw new Error('送れませんでした（' + r.status + '）'); renderUketsuke(); } catch (e) { m.textContent = e.message; }
 }
