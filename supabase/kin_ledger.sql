@@ -134,3 +134,30 @@ alter table public.kin_user add column if not exists contract_start date;       
 alter table public.kin_office_setting add column if not exists area_grade_code text check (char_length(area_grade_code) <= 10); -- 地域区分コード（国保連IFの値）
 alter table public.kin_office_setting add column if not exists form_type text check (char_length(form_type) <= 10);             -- 様式種別（例: J611実績記録票の様式種別）
 -- 既存列: 支給決定期間=valid_from/valid_to、市町村番号=city_no、上限月額=cap_amount、事業所番号=office_no、地域区分=area_grade
+
+-- サービス提供実績記録表（月次集計）。確認済み(署名済み＋職員名あり)の訪問から利用者別に作る。請求CSV(J111/J611)の入力に使う。
+-- 単位は基本部分(コード表の単位数。早朝・夜間・深夜は割増込みコード)。加算(特定事業所・処遇改善)は請求CSV生成側で計算する。
+create table if not exists public.kin_jisseki_line (
+  id bigint generated always as identity primary key,
+  month text not null check (month ~ '^\d{4}-\d{2}$'),
+  user_id bigint not null references public.kin_user(id) on delete cascade,
+  visit_id bigint not null unique references public.kin_visit(id) on delete cascade,
+  service_date date not null, start_time time not null, end_time time not null, actual_minutes int not null,
+  service text not null, time_band text, duration_class text, service_code text, units int,
+  review text check (char_length(review) <= 200), -- 要確認（コード未登録・時間帯またぎ など）
+  built_at timestamptz not null default now(), built_by uuid default auth.uid());
+create index if not exists kin_jisseki_line_um on public.kin_jisseki_line(month, user_id);
+create table if not exists public.kin_jisseki_month (
+  month text not null check (month ~ '^\d{4}-\d{2}$'),
+  user_id bigint not null references public.kin_user(id) on delete cascade,
+  status text not null default '集計済み' check (status in ('集計済み','本人確認済み','確定')),
+  total_count int not null default 0, total_minutes int not null default 0, total_units int not null default 0, review_count int not null default 0,
+  built_at timestamptz not null default now(), confirmed_at timestamptz, memo text check (char_length(memo) <= 500),
+  primary key (month, user_id));
+do $$ declare t text; begin
+  foreach t in array array['kin_jisseki_line','kin_jisseki_month'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t||'_rw', t);
+    execute format($p$create policy %I on public.%I for all to authenticated using (public.my_office() = '金斗雲' or public.can_manage()) with check (public.my_office() = '金斗雲' or public.can_manage())$p$, t||'_rw', t);
+    execute format('revoke all on public.%I from anon', t);
+  end loop; end $$;
