@@ -1,0 +1,104 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>レオ ご利用予定</title>
+<style>
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222}
+header{background:#e8833a;color:#fff;padding:14px 16px;font-size:18px}
+main{max-width:600px;margin:auto;padding:12px}.card{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 3px #0002;margin:12px 0}
+h3{margin:0 0 6px;font-size:17px}.note{color:#666;font-size:13px;line-height:1.5}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00;font-weight:bold}
+input[type=text],input[type=time],textarea{font-size:17px;padding:8px;border:1px solid #bbb;border-radius:8px;box-sizing:border-box}
+textarea{width:100%}.wd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-bottom:1px solid #eee;padding:10px 0}.wd b{width:2.4em;font-size:19px}
+.wd label{font-size:16px}.day{border-bottom:1px solid #eee;padding:8px 0}.day.off{opacity:.45}.day>div:first-child{font-size:17px;font-weight:bold}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chip{font-size:14px;padding:7px 10px;border:1px solid #bbb;border-radius:18px;background:#fff;color:#333;width:auto;margin:0}
+.chip.on{background:#e8833a;border-color:#e8833a;color:#fff}.sub{margin:6px 0 2px 4px;font-size:15px}.sub input{width:8em}.sub input.pl{width:12em}
+button.go{font-size:19px;width:100%;padding:15px;border:0;border-radius:10px;background:#e8833a;color:#fff;margin-top:6px}button.go:disabled{background:#bbb}
+.sum{background:#fff8ec;border:1px solid #f0c890;border-radius:8px;padding:10px;font-size:15px;line-height:1.6}
+</style></head><body><header id="hd">レオ　ご利用予定</header><main id="m"><p>読み込み中…</p></main>
+<script src="config.js"></script>
+<script>
+// 保護者向け（ログインなし）：来月のご利用予定。現行Googleフォーム「【レオ】◯月のご利用予定の確認」と同じ内容（曜日ごとの学校お迎え時刻／お休み／保護者が送る・迎えに来る日／お迎え時刻が違う日／追加利用／祖父母宅などへ送る日）
+const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search), DEMO = q.get('demo') === '1', T = q.get('t') || '';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const $ = id => document.getElementById(id), M = $('m'), DOW = '日月火水木金土';
+let D, S = { wd: {}, days: {}, note: '' }, SENT = false;
+const bad = () => M.innerHTML = '<div class="card">リンクが正しくないか、期限が切れています。お手数ですがレオまでご連絡ください。</div>';
+const fmtDL = s => { const x = new Date(s); return x.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+const hm = s => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : ''; };
+function monthDays() { const [y, m] = D.month.split('-').map(Number), n = new Date(y, m, 0).getDate(), out = [];
+  for (let d = 1; d <= n; d++) { const w = new Date(y, m - 1, d).getDay(); if (w === 0) continue; out.push({ iso: `${D.month}-${String(d).padStart(2, '0')}`, d, w: DOW[w] }); } return out; }
+const KINDS = [['休み', 'お休み'], ['母の送り', '保護者が施設まで送る'], ['母の迎え', '保護者が施設へ迎えに来る'], ['時刻変更', '学校（園）のお迎え時刻が違う'], ['送り場所変更', '祖父母宅などへ送る']];
+async function load() {
+  if (DEMO) D = { child: '児童A（見本）', month: q.get('m') || '2026-12', expired: false, deadline: '2026-11-25T00:00:00Z', answered_at: null, closed: ['2026-12-29', '2026-12-30', '2026-12-31'],
+    regular: [{ dow: '月', weekly: true, parent: '', school_time: null, pick_place: '〇〇小学校', drop_place: '自宅' }, { dow: '水', weekly: true, parent: '母の送り', school_time: null }, { dow: '金', weekly: true, parent: '', school_time: null, pick_place: '〇〇小学校', drop_place: '自宅' }, { dow: '木', weekly: false, parent: '', school_time: null }],
+    prev: { month: '2026-11', same_month: false, answer: { weekdays: { 月: { use: true, school_time: '15:00' }, 金: { use: true, school_time: '14:30' } } } } };
+  else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); const r = await rpc('leo_sched_get', { p_token: T }); D = r.ok ? await r.json() : null; if (!D) return bad(); }
+  // 初期値＝前回（または今回すでに送った）回答 → 型表 の順
+  const pa = (D.prev && D.prev.answer) || {}, pw = pa.weekdays || {};
+  const dows = [...new Set([...(D.regular || []).map(r => r.dow), ...Object.keys(pw)])];
+  const list = (dows.length ? dows : ['月', '火', '水', '木', '金']).sort((a, b) => '月火水木金土'.indexOf(a) - '月火水木金土'.indexOf(b));
+  for (const w of list) { const r = (D.regular || []).find(x => x.dow === w) || {}, p = pw[w] || {};
+    S.wd[w] = { use: p.use !== undefined ? !!p.use : (r.weekly !== false && !!r.dow), school_time: hm(p.school_time || r.school_time), pick_place: p.pick_place || r.pick_place || '', drop_place: p.drop_place || r.drop_place || '自宅', parent: r.parent || '', irregular: r.weekly === false }; }
+  if (D.prev && D.prev.same_month) { S.note = pa.note || ''; for (const x of pa.days || []) { const e = S.days[x.day] = S.days[x.day] || {}; e[x.kind] = { time: hm(x.time), place: x.place || '' }; } }
+  render();
+}
+const mm = D => +D.month.split('-')[1];
+function render() {
+  const dl = fmtDL(D.deadline), done = D.answered_at ? `<p class="ok">${fmtDL(D.answered_at)} にご回答いただいています。直すときは、このまま直して、もう一度送ってください。</p>` : '';
+  if (D.expired) { M.innerHTML = `<div class="card"><b>${esc(D.child)}</b> さん<br>このリンクの回答期限（${dl}）が過ぎました。お手数ですがレオまでご連絡ください。</div>`; return; }
+  $('hd').textContent = `レオ　${mm(D)}月のご利用予定`;
+  const wds = Object.keys(S.wd);
+  M.innerHTML = `${DEMO ? '<div class="card err">見本です（架空のデータ。送信されません）</div>' : ''}
+  <div class="card"><b style="font-size:18px">${esc(D.child)}</b> さん　${mm(D)}月のご利用予定<p class="note">回答期限：${dl} まで（期限までは何度でも送り直せます。いちばん新しい回答が使われます）。いつもどおりなら、確認して「送信する」だけで大丈夫です。</p>${done}</div>
+  <div class="card"><h3>① いつもの曜日</h3><p class="note">ご利用する曜日にチェックして、学校（園）へのお迎え時刻（いつもの下校・降園時刻）を入れてください。</p>
+  ${wds.map(w => { const s = S.wd[w], pd = s.parent === '母の送り';
+    return `<div class="wd"><b>${w}</b><label><input type="checkbox" ${s.use ? 'checked' : ''} onchange="S.wd['${w}'].use=this.checked;renderDays()"> 利用する</label>${s.irregular ? '<span class="note">（不定期）</span>' : ''}
+      ${pd ? '<span class="note">いつも保護者の方が施設まで送ってくださる曜日です</span>' : `<span>学校（園）お迎え時刻 <input type="time" value="${esc(s.school_time)}" oninput="S.wd['${w}'].school_time=this.value"></span>`}
+      ${pd ? '' : `<details style="width:100%"><summary class="note">お迎え・送りの場所を変える</summary><div class="sub">お迎え場所 <input class="pl" type="text" maxlength="100" value="${esc(s.pick_place)}" oninput="S.wd['${w}'].pick_place=this.value"> 　送り場所 <input class="pl" type="text" maxlength="100" value="${esc(s.drop_place)}" oninput="S.wd['${w}'].drop_place=this.value"></div></details>`}</div>`; }).join('')}
+  <p class="note">上にない曜日に来たい日は、下の「追加利用」から日を選んでください。</p></div>
+  <div class="card"><h3>② 日ごとの連絡</h3><p class="note">いつもと違う日だけ、ボタンを押してください。ない日は何も押さなくて大丈夫です。（日曜・事業所のお休みの日は出ていません）</p><div id="days"></div></div>
+  <div class="card"><h3>③ そのほか（任意）</h3><textarea rows="3" maxlength="500" placeholder="職員への連絡があれば" oninput="S.note=this.value">${esc(S.note)}</textarea></div>
+  <div class="card"><button class="go" id="go" onclick="send()">送信する</button><p id="r"></p></div>
+  <p class="note">このページはご家庭ごとの専用リンクです。ほかの方には送らないでください。</p>`;
+  renderDays();
+}
+function renderDays() {
+  const cl = new Set(D.closed || []), out = [];
+  for (const x of monthDays()) { if (cl.has(x.iso)) continue;
+    const reg = S.wd[x.w] && S.wd[x.w].use, e = S.days[x.iso] || {}, kinds = reg ? KINDS : [['追加利用', '追加で利用したい']], off = !!e['休み'];
+    const chips = kinds.map(([k, l]) => `<button type="button" class="chip ${e[k] ? 'on' : ''}" onclick="tog('${x.iso}','${k}')">${l}</button>`).join('');
+    const subs = Object.keys(e).filter(k => e[k] && k !== '休み').map(k => k === '母の送り' ? '' :
+      k === '送り場所変更' ? `<div class="sub">送り先 <input class="pl" type="text" maxlength="100" placeholder="祖父母宅" value="${esc(e[k].place)}" oninput="S.days['${x.iso}']['${k}'].place=this.value"></div>`
+      : `<div class="sub">${k === '母の迎え' ? '施設へ来る時刻' : k === '追加利用' ? '学校（園）お迎え時刻' : '学校（園）お迎え時刻'} <input type="time" value="${esc(e[k].time)}" oninput="S.days['${x.iso}']['${k}'].time=this.value"></div>`).join('');
+    out.push(`<div class="day ${reg ? '' : 'nr'}"><div>${mm(D)}/${x.d}（${x.w}）<span class="note">${reg ? '' : '　いつもは利用しない日'}</span></div><div class="chips">${chips}</div>${subs}</div>`);
+  }
+  $('days').innerHTML = out.join('') || '<p class="note">日がありません</p>';
+}
+function tog(iso, k) { const e = S.days[iso] = S.days[iso] || {}; if (e[k]) delete e[k]; else { if (k === '休み') for (const z of Object.keys(e)) delete e[z]; else delete e['休み']; e[k] = { time: '', place: '' }; } if (!Object.keys(e).length) delete S.days[iso]; renderDays(); }
+function build() {
+  const weekdays = {}, days = [];
+  for (const [w, s] of Object.entries(S.wd)) weekdays[w] = { use: s.use, school_time: s.use && s.parent !== '母の送り' ? s.school_time : '', pick_place: s.pick_place, drop_place: s.drop_place };
+  for (const x of monthDays()) { const e = S.days[x.iso]; if (!e) continue; for (const [k, v] of Object.entries(e)) days.push({ day: x.iso, kind: k, time: v.time || '', place: v.place || '' }); }
+  return { weekdays, days, note: S.note.trim() };
+}
+function check(a) {
+  for (const [w, s] of Object.entries(S.wd)) if (s.use && s.parent !== '母の送り' && !s.school_time) return `${w}曜日の学校（園）お迎え時刻を入れてください。`;
+  for (const d of a.days) { const n = +d.day.slice(8) + '日';
+    if ((d.kind === '母の迎え' || d.kind === '時刻変更') && !d.time) return `${mm(D)}/${n}（${d.kind === '母の迎え' ? '施設へ来る時刻' : '学校（園）お迎え時刻'}）を入れてください。`;
+    if (d.kind === '追加利用' && !d.time) return `${mm(D)}/${n}（追加利用）の学校（園）お迎え時刻を入れてください。`;
+    if (d.kind === '送り場所変更' && !d.place.trim()) return `${mm(D)}/${n}の送り先を入れてください。`; }
+  return '';
+}
+async function send() {
+  const out = $('r'), a = build(), e = check(a); if (e) { out.innerHTML = `<span class="err">${esc(e)}</span>`; return; }
+  const sum = a.days.length ? a.days.map(d => `${mm(D)}/${+d.day.slice(8)} ${d.kind}${d.time ? ' ' + d.time : ''}${d.place ? ' ' + esc(d.place) : ''}`).join('<br>') : 'いつもどおり（個別の連絡なし）';
+  if (DEMO) { out.innerHTML = `<span class="ok">見本なので送信しません。</span><div class="sum">${sum}</div>`; return; }
+  $('go').disabled = true; out.textContent = '送信中…';
+  try { const r = await rpc('leo_sched_submit', { p_token: T, p_answer: a });
+    if (r.ok) { out.innerHTML = `<span class="ok">送信しました。ありがとうございました。</span><div class="sum">${sum}</div><p class="note">直すときは、このページでもう一度送ってください。</p>`; }
+    else { let m = ''; try { m = (await r.json()).message || ''; } catch (x) { } out.innerHTML = `<span class="err">送信できませんでした。${esc(m.replace(/^.*?:/, '') || '時間をおいてもう一度お試しください。')}</span>`; }
+  } catch (x) { out.innerHTML = '<span class="err">送信できませんでした。通信を確認してもう一度お試しください。</span>'; }
+  $('go').disabled = false;
+}
+load();
+</script></body></html>
