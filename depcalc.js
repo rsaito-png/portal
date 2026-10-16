@@ -44,6 +44,7 @@
   }
   function assess(assets, Y) {
     const rows = [], excluded = [], prevJan1 = `${Y - 1}-01-01`, jan1 = `${Y}-01-01`;
+    assets = assets.filter(a => !a.is_adjust);
     for (const a of assets) {
       const c = classify(a, Y);
       if (!c.target) { excluded.push({ a, why: c.why, gone: c.gone }); continue; }
@@ -74,40 +75,82 @@
   const DB200 = { 3: [.667, 1, .11089], 4: [.5, 1, .12499], 5: [.4, .5, .108], 6: [.333, .334, .09911], 7: [.286, .334, .0868], 8: [.25, .334, .07909], 9: [.222, .25, .07126], 10: [.2, .25, .06552], 11: [.182, .2, .05992], 12: [.167, .2, .05566], 13: [.154, .167, .0518], 14: [.143, .167, .04854], 15: [.133, .143, .04565], 16: [.125, .143, .04294], 17: [.118, .125, .04038], 18: [.111, .112, .03884], 19: [.105, .112, .03693], 20: [.1, .112, .03486] };
   const slRate = n => Math.ceil(1000 / n - 1e-9) / 1000;
   const fyOfDate = s => { const y = +s.slice(0, 4), m = +s.slice(5, 7); return m >= 6 ? y : y - 1; }; // 6月〜5月期
-  // 期(開始年 fy)ごとの償却限度額を取得年の期から順に計算。月割（取得月から期末まで）。assumes: 各期とも限度額まで償却
-  function taxDep(a, fyTo) {
-    const out = {}, cost = a.cost, f0 = fyOfDate(a.acquired_on), n = a.life_years;
-    let bv = cost, kaitei = null; // kaitei: 改定取得価額（定率法で保証額を下回った後）
-    const end = a.disposed_on ? fyOfDate(a.disposed_on) : fyTo;
-    for (let f = f0; f <= Math.min(fyTo, end); f++) {
-      let months = 12; if (f === f0) { const m = +a.acquired_on.slice(5, 7); months = m >= 6 ? 12 - (m - 6) : 6 - m; }
-      if (a.disposed_on && f === end) { const m = +a.disposed_on.slice(5, 7), em = m >= 6 ? m - 5 : m + 7; months = Math.min(months, em); }
-      let d = 0;
-      if (a.dep_method === '償却しない') d = 0;
-      else if (a.dep_method === '一括償却(3年均等)') d = f - f0 < 3 ? Math.floor(cost / 3) : 0;
-      else if (a.dep_method === '少額一時損金(10万円未満)' || a.dep_method === '少額特例(30万円未満)') d = f === f0 ? cost : 0;
+  // ---- 減価償却エンジン（台帳→各期の償却費。月割、期=6/1〜5/31、fy=期首の西暦年）----
+  // 根拠: 法人税法施行令（定額法・200%定率法・一括償却資産・少額減価償却資産の特例）。償却率・改定償却率・保証率は耐用年数省令別表第八/第十の値。
+  const DBX = Object.assign({ 2: [1, 1, 0] }, DB200); // 2年は償却率1.000
+  const SPECIAL = ['一括償却(3年均等)', '少額一時損金(10万円未満)', '少額特例(30万円未満)'];
+  const monthsFirst = s => { const m = +s.slice(5, 7); return m >= 6 ? 12 - (m - 6) : 6 - m; };
+  const monthsEnd = s => { const m = +s.slice(5, 7); return m >= 6 ? m - 5 : m + 7; }; // 期首から除却月までの月数
+  // 戻り値 {fy: {dep, open, close, months, src}} 。dep_override（会計士の実績値）があればそれを優先し、以降は帳簿価額から継続計算
+  function schedule(a, upto) {
+    const out = {}, cost = a.cost || 0, ov = a.dep_override || {}, start = a.dep_start || a.acquired_on, f0 = fyOfDate(start), n = a.life_years, method = a.dep_method;
+    const last = upto ?? 2030, endFy = a.disposed_on ? fyOfDate(a.disposed_on) : last;
+    let bv = cost, kaitei = null;
+    const ovKeys = Object.keys(ov).map(Number);
+    for (let f = Math.min(f0, ...ovKeys); f <= last; f++) {
+      const open = bv; let d = 0, src = '計算', mo = f === f0 ? monthsFirst(start) : 12;
+      if (a.disposed_on && f === endFy) mo = Math.min(mo, monthsEnd(a.disposed_on));
+      if (ov[f] != null) { d = Math.round(+ov[f]); src = '実績'; }
+      else if (a.dep_calc === false || method === '償却しない' || f < f0 || f > endFy) d = 0;
+      else if (method === '一括償却(3年均等)') d = f - f0 < 2 ? Math.floor(cost / 3) : (f - f0 === 2 ? bv : 0);
+      else if (method === '少額一時損金(10万円未満)' || method === '少額特例(30万円未満)') d = f === f0 ? cost : 0;
       else if (!n) d = 0;
-      else if (a.dep_method === '定額法') d = Math.min(Math.floor(cost * slRate(n) * months / 12), Math.max(0, bv - 1));
-      else { // 定率法(200%)
-        const t = DB200[n] || [Math.round(2000 / n) / 1000, slRate(n), .05], [rate, krate, hosyo] = t;
-        if (kaitei == null) { const before = bv * rate; if (before < cost * hosyo) kaitei = bv; }
-        const base = kaitei != null ? kaitei * krate : bv * rate;
-        d = Math.min(Math.floor(base * months / 12), Math.max(0, bv - 1));
-      }
-      out[f] = d; bv -= d;
-      if (a.dep_method === '定率法' && n && kaitei == null) { const t = DB200[n] || [Math.round(2000 / n) / 1000, slRate(n), .05]; if (bv * t[0] < cost * t[2]) kaitei = bv; }
+      else if (method === '定額法') d = Math.min(Math.floor(cost * slRate(n) * mo / 12), Math.max(0, bv - 1));
+      else { const t = DBX[n] || [Math.round(2000 / n) / 1000, slRate(n), .05], [rate, krate, hosyo] = t;
+        if (kaitei == null && bv * rate < cost * hosyo) kaitei = bv;
+        const base = kaitei != null ? kaitei * krate : bv * rate; d = Math.min(Math.floor(base * mo / 12), Math.max(0, bv - 1)); }
+      if (d > bv) d = bv; // 帳簿価額を超えない（調整行は cost=0 なのでそのまま許可）
+      if (a.is_adjust) d = Math.round(+(ov[f] ?? 0));
+      out[f] = { dep: d, open, close: a.is_adjust ? 0 : bv - d, months: mo, src }; bv -= a.is_adjust ? 0 : d;
+      if (method === '定率法' && kaitei == null && n && DBX[n] && bv * DBX[n][0] < cost * DBX[n][2]) kaitei = bv;
     }
-    return { byFy: out, bv };
+    return out;
   }
-  function b16(assets, fy, bookDepByAcc, accName) { // fy: 期首年(2025=第5期)。bookDepByAcc: {account_id: 当期の帳簿償却費}
-    const fyFrom = `${fy}-06-01`, fyTo = `${fy + 1}-05-31`, groups = new Map(), detail = [];
+  // 部門への配賦: 期ごとの金額(dept_amt)を先に、残りを比率(dept_alloc)、それでも残れば部門なし
+  function deptParts(a, fy, d) {
+    const parts = {}; let rest = d; const amt = (a.dept_amt || {})[fy] || {};
+    for (const k of Object.keys(amt)) { const v = Math.min(rest, Math.round(+amt[k])); if (v > 0) { parts[k] = (parts[k] || 0) + v; rest -= v; } }
+    const al = a.dept_alloc || {}, tot = Object.values(al).reduce((s, v) => s + (+v), 0);
+    if (tot > 0 && rest > 0) { const base = rest; let used = 0; const ks = Object.keys(al); ks.forEach((k, i) => { const v = i === ks.length - 1 ? base - used : Math.floor(base * (+al[k]) / tot); if (v > 0) parts[k] = (parts[k] || 0) + v; used += v; }); rest = 0; }
+    if (rest !== 0) parts[''] = rest;
+    return parts;
+  }
+  // 期(fy)の償却費の集計。assets=台帳全件。戻り値 rows(資産別), byAcc, byDept, total, missing(科目未設定)
+  function depForYear(assets, fy) {
+    const rows = [], byAcc = {}, byDept = {}, missing = []; let total = 0;
     for (const a of assets) {
-      if (a.acquired_on > fyTo || (a.disposed_on && a.disposed_on < fyFrom) || a.dep_method === '償却しない' || ['一括償却(3年均等)', '少額一時損金(10万円未満)', '少額特例(30万円未満)'].includes(a.dep_method) || ['土地', '無形固定資産', '繰延資産'].includes(a.asset_class) && !a.life_years) continue;
-      const t = taxDep(a, fy), lim = t.byFy[fy] || 0, key = a.book_account_id ?? 0;
-      detail.push({ a, limit: lim });
+      const sc = schedule(a, fy)[fy]; if (!sc) continue;
+      rows.push({ a, ...sc });
+      if (!sc.dep) continue;
+      if (!a.book_account_id) { missing.push(a); continue; }
+      const k = a.dep_direct === false ? 'acc:' + a.book_account_id : a.book_account_id; byAcc[a.book_account_id] = (byAcc[a.book_account_id] || 0) + sc.dep;
+      const p = deptParts(a, fy, sc.dep); for (const d in p) byDept[d] = (byDept[d] || 0) + p[d]; total += sc.dep;
+    }
+    return { fy, rows, byAcc, byDept, total, missing };
+  }
+  // 決算整理仕訳（1期1本）。ids={exp:減価償却費, accum:減価償却累計額}。冪等キー freee_key='dep:<fy>'
+  function depEntry(assets, fy, ids, today) {
+    const R = depForYear(assets, fy), end = `${fy + 1}-05-31`, date = today && today < end ? today : end, lines = [];
+    const dept = {}; // 借方: 減価償却費（部門別）
+    for (const a of assets) { const sc = R.rows.find(r => r.a === a); if (!sc || !sc.dep || !a.book_account_id) continue; const p = deptParts(a, fy, sc.dep); for (const d in p) dept[d] = (dept[d] || 0) + p[d]; }
+    for (const d of Object.keys(dept).sort()) lines.push({ side: 'D', account_id: ids.exp, amount: dept[d], dept_id: d === '' ? null : +d });
+    const cr = {};
+    for (const a of assets) { const sc = R.rows.find(r => r.a === a); if (!sc || !sc.dep || !a.book_account_id) continue; const acc = a.dep_direct === false ? ids.accum : a.book_account_id; cr[acc] = (cr[acc] || 0) + sc.dep; }
+    for (const k of Object.keys(cr).sort((x, y) => x - y)) lines.push({ side: 'C', account_id: +k, amount: cr[k], dept_id: null });
+    return { entry: { entry_date: date, kind: 'manual', memo: `[決算整理] 減価償却（固定資産台帳から自動計算）第${fy - 2020}期${date < end ? '（年額の見込み）' : ''}`, freee_key: `dep:${fy}`, is_test: false }, lines, R };
+  }
+  // 法人税 別表十六: 償却限度額は台帳の償却計算（tax_*列は未導入のため帳簿と同じ年数・方法）。税法上、償却の対象にならないとした資産は a.tax_nondep=true で限度額0
+  function taxDep(a, fyTo) { const s = schedule(a, fyTo), out = {}; for (const f in s) out[f] = a.tax_nondep ? 0 : s[f].dep; return { byFy: out, bv: s[fyTo] ? s[fyTo].close : a.cost }; }
+  function b16(assets, fy, bookDepByAcc, accName) { // bookDepByAcc: {account_id: 当期の帳簿償却費}（生成済み仕訳の貸方）
+    const groups = new Map(), detail = [];
+    for (const a of assets) {
+      if (a.is_adjust || a.dep_method === '償却しない' || SPECIAL.includes(a.dep_method) || a.dep_calc === false) continue;
+      const sc = schedule(a, fy)[fy]; if (!sc || (!sc.dep && !(a.acquired_on <= `${fy + 1}-05-31` && (!a.disposed_on || a.disposed_on >= `${fy}-06-01`)))) continue;
+      const lim = a.tax_nondep ? 0 : sc.dep, key = a.book_account_id ?? 0; detail.push({ a, limit: lim });
       const g = groups.get(key) || { key, name: key ? accName(key) : '（帳簿の科目が未設定）', cost: 0, limit: 0, n: 0 }; g.cost += a.cost; g.limit += lim; g.n++; groups.set(key, g);
     }
-    const rows = [...groups.values()].map(g => { const book = g.key ? (bookDepByAcc[g.key] || 0) : g.limit; return { ...g, dep: book, excess: Math.max(0, book - g.limit) }; });
+    for (const a of assets) if (a.is_adjust && (a.dep_override || {})[fy] != null) { const key = a.book_account_id, g = groups.get(key); if (g) g.limit += +a.dep_override[fy]; } // 差額調整は限度額にも同額（超過を生まない）
+    const rows = [...groups.values()].map(g => { const book = g.key ? (bookDepByAcc[g.key] ?? g.limit) : g.limit; return { ...g, dep: book, excess: Math.max(0, book - g.limit) }; });
     return { rows, detail, totalLimit: rows.reduce((s, r) => s + r.limit, 0), totalDep: rows.reduce((s, r) => s + r.dep, 0), totalExcess: rows.reduce((s, r) => s + r.excess, 0) };
   }
 
@@ -131,7 +174,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}td.c{
   const ym = s => { const [y, m] = s.split('-').map(Number); return `令和${y - 2018}年${m}月`; };
 
   function build(ctx) { // ctx: {Y, assets, accName, info:{houjinNo,phone,bizType}, today}
-    const Y = ctx.Y, R = assess(ctx.assets, Y), info = ctx.info || {}, today = ctx.today || new Date().toISOString().slice(0, 10);
+    ctx.assets = ctx.assets.filter(a => !a.is_adjust); const Y = ctx.Y, R = assess(ctx.assets, Y), info = ctx.info || {}, today = ctx.today || new Date().toISOString().slice(0, 10);
     const review = ctx.assets.filter(a => a.needs_review), reviewTarget = R.rows.filter(r => r.a.needs_review), noLife = R.rows.filter(r => r.noLife);
     const sortedRows = [...R.rows].sort((x, y) => x.no - y.no || x.a.acquired_on.localeCompare(y.a.acquired_on));
     const offices = [...new Set(R.rows.map(r => r.a.location || r.a.office).filter(Boolean))];
@@ -199,6 +242,6 @@ td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}td.c{
       <h3>この書類でできていない・手書きが必要なこと</h3><ul class="note"><li>公式用紙への重ね書き（自作レイアウトです）／eLTAX送信</li><li>代表者名・資本金（基金）・事業開始年月・応答者・税理士名・8〜14の○・15〜17の記入</li><li>資産コード（市付番）・増加事由（新品／中古）・課税標準の特例</li><li>耐用年数・償却方法・取得日・取得価額の「要確認」資産の確定（税理士・固定資産台帳で確認）</li></ul>`);
     return { html: `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>償却資産申告書 ${era(Y).replace('年', '年度')}</title><style>${CSS}</style></head><body>${cover + check + form26 + ns + decPage + calc + ex + src}</body></html>`, R, warnings: warn };
   }
-  const api = { classify, evalAsset, assess, rateOf, firstYear, menzeiten, dueDate, taxDep, b16, build, SOURCES, TARGET_CLASSES, ENT, trunc3, era, eraDate, RT };
+  const api = { schedule, depForYear, depEntry, deptParts, DBX, classify, evalAsset, assess, rateOf, firstYear, menzeiten, dueDate, taxDep, b16, build, SOURCES, TARGET_CLASSES, ENT, trunc3, era, eraDate, RT };
   if (typeof module !== 'undefined') module.exports = api; else root.DEP = api;
 })(typeof window !== 'undefined' ? window : globalThis);
