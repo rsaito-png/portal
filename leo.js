@@ -660,7 +660,7 @@ LEO_VIEWS.plan = async function () {
     if (!mon && !r['フォーム回答日']) pend('保護者アンケート', S.filter(x => x.kind === 'mon' && x.term === term), 'mon');
     if (p && !p.genan_consent_at) pend('原案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '原案'), 'doui', '原案');
     if (p && p.genan_consent_at && !p.honan_consent_at) pend('本案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '本案'), 'doui', '本案');
-    const waitHtml = () => wait.map(w => `<p style="background:${w.days >= 7 ? '#fde8e8' : '#fff8db'};padding:8px;border-radius:6px;margin:6px 0"><small>⏳ <b>${w.label}</b>：送って <b>${w.days}日</b>・返事なし（${w.n}回送付、最後 ${md(new Date(w.last))}・${esc(w.via)}）</small></p>${mg ? btn('再送用にリンクをコピー（送った記録が残ります）', `planResend(${w.arg})`) : ''}`).join('');
+    const waitHtml = () => wait.map(w => `<p style="background:${w.days >= 7 ? '#fde8e8' : '#fff8db'};padding:8px;border-radius:6px;margin:6px 0"><small>⏳ <b>${w.label}</b>：送って <b>${w.days}日</b>・返事なし（${w.n}回送付、最後 ${md(new Date(w.last))}・${esc(w.via)}）</small></p>`).join('');
     const done = [!!mon || !!r['フォーム回答日'], !!sm, !!(p && p.genan && p.honan && p.assessment && p.kaigi), !!(p && p.plan_made), !!(p && p.genan_consent_at), !!(p && p.genan_consent_at && d && t >= d.kaigi), !!(p && p.honan_consent_at)];
     const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false), over = d && st < 7 && d.start < t, soon = d && st < 7 && !over && (d.start - t) / 864e5 <= 45;
     const key = N(name), open = PLAN_OPEN === key || (DEMO && /open=1/.test(location.search) && name === '児童B');
@@ -676,13 +676,15 @@ LEO_VIEWS.plan = async function () {
     else if (st === 4) { if (W) { act = `原案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '原案を保護者に送る'; ab = rb('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`); } }
     else if (st === 5) { act = `担当者会議を行う${d ? '（' + ds(d.kaigi) + '）' : ''}。終わったら本案を送る`; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); }
     else { if (W) { act = `本案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '本案を保護者に送る'; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); } }
+    const linkAct = /リンク|コピー/.test(ab) && !/^<button disabled/.test(ab);
+    const how = linkAct ? `<div style="background:#f4f7ff;border-radius:6px;padding:8px;margin:6px 0;font-size:15px">1. 下の青いボタンを押してコピー → 2. 公式LINEで<b>${esc(name)}</b>さんの保護者のトークに貼って送る</div>` : '';
     const checks = PLAN_STEPS2.map((lb, i) => `<div style="color:${done[i] ? '#2a7a2a' : i === st ? '#c00' : '#999'}">${done[i] ? '✔' : i === st ? '▶' : '・'} ${lb}</div>`).join('');
     const urgent = st < 7 && (over || soon || wait.length > 0);
     return { st, over, d, urgent, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${st >= 7 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:14px">
       <div style="font-size:17px"><b>${esc(name)}</b>　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</div>
       <div style="display:flex;gap:2px;margin:8px 0">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div>
       <div style="font-size:20px;font-weight:bold;margin:8px 0;color:${st >= 7 ? '#2a7a2a' : '#c00'}">${act}</div>
-      ${ab}
+      ${how}${ab}
       <details style="margin-top:8px" ${open ? 'open' : ''} ontoggle="if(this.open)PLAN_OPEN='${key}'"><summary style="cursor:pointer;color:#36c">くわしく見る</summary>
         <div style="margin-top:8px;font-size:14px">${checks}</div>
         <div>${waitHtml()}
@@ -770,14 +772,34 @@ async function planPrint(id) {
   w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(p.child)} 第${p.term_no}期</title><style>body{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:11pt;line-height:1.7;margin:20mm}h2{font-size:15pt}.pb{page-break-before:always}</style>` +
     docs.filter(Boolean).map((t, i) => `<div class="${i ? 'pb' : ''}">${markupHtml(t)}</div>`).join('') + '<script>setTimeout(()=>print(),300)<\/script>'); w.document.close();
 }
+// リンクのコピー：結果をボタンのすぐ下に必ず表示（成功＝緑、失敗＝URL欄を出して手でコピー）
+async function copyUrl(url) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(url); return true; } } catch (e) { }
+  try { const ta = document.createElement('textarea'); ta.value = url; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; }
+}
+function copyBtnEl() { const e = window.event; return e && e.currentTarget && e.currentTarget.tagName === 'BUTTON' ? e.currentTarget : null; }
+function copyNote(b, html, child) {
+  if (!b) { pmsg(child || '', html); return; }
+  let m = b.nextElementSibling; if (!m || !m.classList.contains('copymsg')) { m = document.createElement('div'); m.className = 'copymsg'; b.insertAdjacentElement('afterend', m); }
+  m.innerHTML = html; m.scrollIntoView({ block: 'nearest' });
+}
+function copyResult(b, url, ok, child, extra) {
+  const e = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  if (b) { if (!b.dataset.orig) b.dataset.orig = b.textContent; b.textContent = ok ? 'コピーしました ✔' : b.dataset.orig; clearTimeout(b._t); if (ok) b._t = setTimeout(() => { b.textContent = b.dataset.orig; }, 5000); }
+  copyNote(b, ok ? `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">コピーしました。公式LINEの1対1トークに貼って送ってください。</p><p class="note">${extra || ''}</p>`
+    : `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">自動でコピーできませんでした。下のリンクを長押し（または選択）してコピーし、公式LINEの1対1トークに貼って送ってください。</p><input readonly value="${e(url)}" onfocus="this.select()" onclick="this.select()" style="width:100%;font-size:14px"><p class="note">${extra || ''}</p>`, child);
+}
+function copyError(b, msg, child) { copyNote(b, `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">失敗しました：${String(msg).replace(/[<&]/g, '')}</p>`, child); }
 async function planLink(kind, child, term, planId, doc) {
   if (DEMO) { pmsg(child || '児童B', `<p class="note">見本：${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&demo=1${doc ? '&doc=' + encodeURIComponent(doc) : ''}</p>`); return; }
+  const B = copyBtnEl(); if (B) B.disabled = true;
   try { const tok = await sb('rpc/leo_make_token_link', { method: 'POST', body: JSON.stringify({ p_kind: kind, p_child: child, p_term: term, p_plan: planId || null, p_doc: doc }) });
     const url = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&t=${tok}`;
-    try { await navigator.clipboard.writeText(url); } catch (e) { }
+    const ok = await copyUrl(url);
     await planLogSend(kind, child, term, planId, doc, tok, null);
-    $('plan_editor').innerHTML = `<div class="card"><b>リンク（コピーしました）</b><p style="word-break:break-all"><small>${esc(url)}</small></p><p class="note">公式LINEの1対1トークに貼って送ってください。ほかの家庭には送らないでください。${kind === 'doui' ? 'リンクは30日で期限が切れ、同意が1回入ると使えなくなります。送る本文は、いまの計画書の写しです（あとで本文を直したときは、リンクをもう一度作ってください）。' : ''}</p></div>`; $('plan_editor').scrollIntoView(); }
-  catch (e) { alert(e.message); }
+    copyResult(B, url, ok, child, 'ほかの家庭には送らないでください。' + (kind === 'doui' ? 'リンクは30日で期限が切れ、同意が1回入ると使えなくなります。あとで本文を直したときは、リンクをもう一度作ってください。' : '')); }
+  catch (e) { copyError(B, e.message, child); }
+  finally { if (B) B.disabled = false; }
 }
 async function planLogSend(kind, child, term, planId, doc, tok, url, via) {
   try { if (!child && planId) { const p = await planGet(planId); child = p.child; term = `第${p.term_no}期`; }
@@ -785,15 +807,18 @@ async function planLogSend(kind, child, term, planId, doc, tok, url, via) {
 }
 // 再送：前と同じリンクをコピーし、送った記録を足す（ポータルからは送らない）
 async function planResend(kind, child, term, planId, doc) {
-  if (DEMO) { pmsg(child, '<p class="note">見本：リンクをコピーして、送った記録を1件足します。</p>'); return; }
+  const B = copyBtnEl();
+  if (DEMO) { copyNote(B, '<p class="note">見本：リンクをコピーして、送った記録を1件足します。</p>', child); return; }
+  try {
   const D0 = await planData(), N = s => String(s || '').replace(/\s/g, '');
   const prev = (D0.sends || []).filter(x => x.kind === kind && N(x.child) === N(child) && (kind === 'mon' ? x.term === term : x.plan_id === planId && x.doc === doc)).pop();
   let tok = kind === 'mon' ? (D0.links.find(l => N(l.child) === N(child) && l.term === term) || {}).token : (D0.clinks.filter(l => l.plan_id === planId && l.doc === doc && !l.used_at && new Date(l.expires_at) > new Date()).pop() || {}).token;
   let url = tok ? `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&t=${tok}` : prev && prev.url;
   if (!url) { await planLink(kind, kind === 'mon' ? child : '', kind === 'mon' ? term : '', planId, doc); return; }
-  try { await navigator.clipboard.writeText(url); } catch (e) { }
+  const ok = await copyUrl(url);
   await planLogSend(kind, child, term, planId, doc, tok || null, tok ? null : url, tok ? 'ポータル（再送）' : 'Google（再送）');
-  pmsg(child, `<div class="card"><b>再送用のリンク（コピーしました）</b><p style="word-break:break-all"><small>${esc(url)}</small></p><p class="note">${tok ? '' : 'これはGoogleフォームのリンクです（全員共通）。'}公式LINEの1対1トークに貼って送ってください。送った記録を1件足しました。</p></div>`);
+  copyResult(B, url, ok, child, (tok ? '' : 'これはGoogleフォームのリンクです（全員共通）。') + '送った記録を1件足しました。');
+  } catch (e) { copyError(B, e.message, child); }
 }
 // ④ 職員モニタリング：今の計画期間の活動記録（日誌Q列＋ポータルの下書き由来）を日付順にまとめる。ボットが文章に整える
 async function staffMon(name, term, cur) {
