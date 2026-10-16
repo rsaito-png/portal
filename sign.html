@@ -11,9 +11,10 @@ main{max-width:560px;margin:auto;padding:16px}.card{background:#fff;border-radiu
 .sm{color:#666;font-size:14px;margin:2px 0 0 34px;white-space:pre-wrap}
 #prev{border:2px dashed #888;border-radius:8px;min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;background:#fff;padding:8px}
 .mt{display:block;font-size:17px;margin:8px 0}.mt input{width:22px;height:22px;vertical-align:middle;margin-right:8px}
-body.lock{overflow:hidden;position:fixed;width:100%}
-#ov{position:fixed;inset:0;background:#fff;z-index:9;touch-action:none}#ov[hidden]{display:none}#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none}
-#ovb{position:absolute;left:0;right:0;bottom:0;padding:10px;background:#fffd;display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #ccc}#ovb span{color:#888;font-size:14px}#ovb button{margin:0}.ok2{width:auto;padding:10px 18px;font-size:16px;margin:0}
+body.lock{overflow:hidden;position:fixed;width:100%;touch-action:none}
+#ov{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;background:#fff;z-index:9;touch-action:none;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}#ov[hidden]{display:none}#cvw{flex:1;min-height:0;position:relative}#cv{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none}
+#dlg{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;background:#0007;z-index:20;display:flex;align-items:center;justify-content:center}#dlg[hidden]{display:none}#dlg div{background:#fff;border-radius:12px;padding:22px;max-width:80%;text-align:center;font-size:18px;box-sizing:border-box}#dlg b{display:block;font-size:22px;margin-bottom:8px;color:#2e6b4f}#dlg button{margin-top:14px}
+#ovb{flex:none;padding:8px 10px;background:#fff;display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #ccc}#ovb span{color:#888;font-size:14px}#ovb button{margin:0}.ok2{width:auto;padding:10px 18px;font-size:16px;margin:0}
 input[type=text],textarea{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #bbb;border-radius:8px;margin-top:4px}
 button{font-size:18px;width:100%;padding:14px;border:0;border-radius:8px;background:#2e6b4f;color:#fff;margin-top:14px}button:disabled{background:#999}
 .sub{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:6px 14px;font-size:14px;margin:6px 0}
@@ -55,7 +56,7 @@ async function load() {
    <p class="note" id="lt" hidden>「あとで署名」を選んでも、記録は署名待ちのまま残ります。このリンクは、あとでもう一度使えます。</p>
    <button id="go" onclick="send()">送信する</button><p id="r"></p></div>
   <p class="note">このページはご本人専用のリンクで、署名が済むと使えなくなります（期限：${esc(new Date(D.expires_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }))}まで）。ほかの方には送らないでください。選ばなかった訪問は、あらためて新しいリンクで署名します。</p>
-  <div id="ov" hidden><canvas id="cv"></canvas><div id="ovb"><span>指で書いてください</span><button class="sub" onclick="padClr()">書き直す</button><button class="sub" onclick="padClose(false)">閉じる</button><button class="ok2" onclick="padClose(true)">これでよい</button></div></div>`;
+  <div id="ov" hidden><div id="cvw"><canvas id="cv"></canvas></div><div id="ovb"><span>指で書いてください</span><button class="sub" onclick="padClr()">書き直す</button><button class="sub" onclick="padClose(false)">閉じる</button><button class="ok2" onclick="padClose(true)">これでよい</button></div></div>`;
   document.querySelectorAll('.vc').forEach(c => c.addEventListener('change', () => {}));
 }
 const meth = () => document.querySelector('input[name=mt]:checked').value;
@@ -63,13 +64,21 @@ function wsel(i, on) { document.querySelectorAll('.w' + i).forEach(c => c.checke
 function mtc() { const m = meth(); $('rel').hidden = m !== 'ご家族'; $('rsn').hidden = m !== '署名困難'; $('sg').hidden = !(m === '本人' || m === 'ご家族'); $('lt').hidden = m !== 'あとで署名'; $('go').textContent = m === 'あとで署名' ? 'あとで署名する（記録は残します）' : '送信する'; }
 // 全画面の署名パッド：記録ボット作の署名欄部品（signpad.js）を全画面の canvas で使い、画面全体で指の動きを拾う
 let pad = null, sigData = null;
+let scrollY0 = 0;
+function lockBody() { if (document.body.classList.contains('lock')) return; scrollY0 = window.scrollY; document.body.style.top = (-scrollY0) + 'px'; document.body.classList.add('lock'); }
+function unlockBody() { if (!document.body.classList.contains('lock')) return; document.body.classList.remove('lock'); document.body.style.top = ''; window.scrollTo(0, scrollY0); }
+function padRemeasure() { if (pad && !$('ov').hidden) pad.remeasure(); }
 function openPad() {
-  $('ov').hidden = false; document.body.classList.add('lock');
-  if (!pad) pad = createSignPad($('cv')); pad.clear();
+  lockBody(); $('ov').hidden = false;
+  if (!pad) pad = createSignPad($('cv')); pad.clear(); pad.remeasure();
+  requestAnimationFrame(padRemeasure);
 }
+window.addEventListener('resize', padRemeasure);
+window.addEventListener('orientationchange', () => { padRemeasure(); setTimeout(padRemeasure, 300); });
+function showDlg(t, m) { $('dlgt').textContent = t; $('dlgm').textContent = m || ''; $('dlg').hidden = false; }
 function padClr() { pad.clear(); sigData = null; }
 function padClose(ok) {
-  document.body.classList.remove('lock'); $('ov').hidden = true;
+  unlockBody(); $('ov').hidden = true;
   if (ok && pad.isDrawn()) { // 書いた範囲だけを切り出し、幅600pxまでに縮小してPNG化（白背景）
     const cv = $('cv'), g0 = cv.getContext('2d'), W = cv.width, H = cv.height, d = g0.getImageData(0, 0, W, H).data;
     let x0 = W, y0 = H, x1 = 0, y1 = 0;
@@ -88,9 +97,10 @@ async function send() {
   if (m === '署名困難' && !rs) { out.innerHTML = '<span class="err">理由を入れてください。</span>'; return; }
   if (DEMO) { out.innerHTML = '<span class="ok">見本なので送信しません。</span>'; return; }
   $('go').disabled = true;
-  const r = await rpc('kin_sign_submit', { p_token: T, p_visit_ids: ids, p_method: m, p_signature: (m === '本人' || m === 'ご家族') ? sigData : null, p_relation: m === 'ご家族' ? rel : null, p_reason: m === '署名困難' ? rs : null });
-  if (r.ok) { $m().innerHTML = '<div class="card ok">' + (m === 'あとで署名' ? 'あとで署名として記録しました（' + ids.length + '件）。このリンクは、期限までもう一度使えます。' : '署名を記録しました（' + ids.length + '件）。ありがとうございました。このページは閉じて大丈夫です。') + '</div>'; }
+  let r; try { r = await rpc('kin_sign_submit', { p_token: T, p_visit_ids: ids, p_method: m, p_signature: (m === '本人' || m === 'ご家族') ? sigData : null, p_relation: m === 'ご家族' ? rel : null, p_reason: m === '署名困難' ? rs : null }); } catch (e) { r = { ok: false }; }
+  if (r.ok) { showDlg('送信しました', ''); $m().innerHTML = '<div class="card ok">' + (m === 'あとで署名' ? 'あとで署名として記録しました（' + ids.length + '件）。このリンクは、期限までもう一度使えます。' : '署名を記録しました（' + ids.length + '件）。ありがとうございました。このページは閉じて大丈夫です。') + '</div>'; }
   else { $('go').disabled = false; out.innerHTML = '<span class="err">送信できませんでした。リンクが使用済み・期限切れの可能性があります。金斗雲までご連絡ください。</span>'; }
 }
 load();
-</script></body></html>
+</script>
+<div id="dlg" hidden><div><b id="dlgt"></b><span id="dlgm"></span><button onclick="document.getElementById('dlg').hidden=true">閉じる</button></div></div></body></html>
