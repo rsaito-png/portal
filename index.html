@@ -48,7 +48,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="config.js?v=202610161700"></script>
 <script src="leo.js?v=202610161500"></script>
 <script src="kin.js?v=202610161430"></script>
-<script src="report.js?v=202610161700"></script>
+<script src="report.js?v=202610161720"></script>
 <script src="ht.js?v=202610161540"></script>
 <script src="chair.js?v=202610161700"></script>
 <script src="mgr.js?v=202610161458"></script>
@@ -180,6 +180,7 @@ async function render() {
     <h3>未整理</h3>
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
+  if (typeof todoBadge === 'function') todoBadge();
   chairTile(); chairMsgShow();
 }
 window.addEventListener('hashchange', render);

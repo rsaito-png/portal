@@ -64,3 +64,11 @@ async function srAdd() {
   try { await sb('staff_todo', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ assignee: $('ta_who').value, title: t, due: $('ta_d').value || null }) }); (document.getElementById('ch_rep') ? chairReport() : renderReportAdmin()); } catch (e) { m.textContent = e.message; }
 }
 async function srDel(id) { if (!confirm('このToDoを消しますか')) return; try { await sb('staff_todo?id=eq.' + id, { method: 'DELETE' }); (document.getElementById('ch_rep') ? chairReport() : renderReportAdmin()); } catch (e) { alert(e.message); } }
+
+// 総合トップの「リーダー報告」に、自分宛ての未完了の指示の数を出す
+async function todoBadge() {
+  if (DEMO) return;
+  try { const me = srMe(), t = await sb(`staff_todo?assignee=eq.${me}&status=eq.open&select=id`);
+    const a = document.querySelector('a[href="#report"]'); if (a && t.length && !a.querySelector('.badge')) a.insertAdjacentHTML('afterbegin', `<span class="badge">新しい指示 ${t.length}</span>`);
+  } catch (e) { }
+}
