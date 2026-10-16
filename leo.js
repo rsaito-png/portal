@@ -407,7 +407,7 @@ LEO_VIEWS.seikyu = async function () {
   return `<h3>請求CSVを作る（事務）</h3>${demoNote()}
     <p class="note">ここで作るのはファイルだけです。国保連への送信は今まで通り「取込送信ソフト」で、中身を確かめてから行ってください。単価は6級地 10.36円（児発・放デイ／センター以外）。</p>
     <h4>1. 児童情報</h4><p class="note">受給者証・送迎・連絡先などの児童情報は、<a href="#leo/userinfo">利用者情報</a>で入力します（ここでは入力しません）。登録済み：${kids.length}人。${missing.length ? `<span style="color:#c00">この月の日誌にいて、未登録の児童：${missing.map(esc).join('、')}（<a href="#leo/userinfo">利用者情報</a>で追加）</span>` : ''}</p>
-    <h4>2. ファイルを作る</h4>${monthTabs('seikyu')}<p class="note">上の月が、請求の対象月です。</p><label>事業所番号（10桁）<input id="office_no" value="${esc(localStorage.getItem('leo_office_no') || (DEMO ? '9999999999' : ''))}" size="12"></label>
+    <h4>2. ファイルを作る</h4>${monthTabs('seikyu')}<p class="note">上の月が、請求の対象月です。</p><label>事業所番号（10桁）<input id="office_no" value="${esc(DEMO ? '9999999999' : '2450201047')}" size="12"></label>
     <p class="note">事業所全体にかかる減算（今はなし。かかった月だけ印を付けます。基本報酬のサービスコードが減算用のコードに変わります）：
       ${OFFICE_GENSAN.map(([k, l]) => `<label><input type="checkbox" class="og" value="${k}">${l}</label>`).join(' ')}</p>
     <button onclick="makeCsv()">請求CSVを作る（K112/K122・K611）</button><div id="csv_out"></div>`;
@@ -547,7 +547,6 @@ const loadSjis = () => window.Encoding ? Promise.resolve() : new Promise((ok, ng
 async function makeCsv() {
   const out = $('csv_out'), office = $('office_no').value.trim();
   if (!/^\d{10}$/.test(office)) { out.textContent = '事業所番号を10桁で入れてください。'; return; }
-  localStorage.setItem('leo_office_no', office);
   try { await loadSjis(); if (!window.LeoBilling) await new Promise((ok, ng) => { const s = document.createElement('script'); s.src = 'leo_billing.js'; s.onload = ok; s.onerror = ng; document.head.appendChild(s); });
     const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children'), { nikki, flags } = await billData(), F = {}, K = {};
     flags.forEach(f => F[f.day + f.child] = f);
