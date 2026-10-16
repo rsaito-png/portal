@@ -923,7 +923,7 @@ LEO_VIEWS.line = async function () {
     <p class="note">保護者さんへの報告文を、子どもごとに書きます。書けたら「LINE用にコピー」→ 公式LINEの1対1トークに貼って送ってください。日誌の活動記録（である調）は自動で作ります。</p>
     ${kids.map(k => { const d = D[k], a = A[k], id = 'ln_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
       return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${d ? (d.sent_line ? '✅ LINE送信済' : '✏️ 下書きあり') : '⬜ まだ'}${a ? '／日誌 ' + esc(a.source) : ''}</small></summary>
-        <div style="padding:0 14px 14px"><textarea id="${id}" rows="8" style="width:100%;font-size:16px;box-sizing:border-box" placeholder="本日もありがとうございました。…">${esc(d ? d.body : '')}</textarea>
+        <div style="padding:0 14px 14px"><textarea id="${id}" rows="20" style="width:100%;font-size:16px;box-sizing:border-box" placeholder="本日もありがとうございました。…">${esc(d ? d.body : '')}</textarea>
         <p class="note">最後の行に名前（${esc(me || '自分の名前')}）を入れてください。</p>
         <button onclick="saveLine('${esc(k)}','${id}',${d ? d.id : 'null'})">保存</button>
         <button onclick="copyLine('${id}','${esc(k)}',${d ? d.id : 'null'})">LINE用にコピー（送った印をつける）</button>
@@ -963,7 +963,7 @@ LEO_VIEWS.diary = async function () {
         <div style="padding:0 14px 14px"><p class="note">迎え：${esc(r.pick_driver || '-')}　送り：${esc(r.drop_driver || '-')}</p>
         ${r.activity ? `<p style="white-space:pre-wrap"><b>日誌の活動記録</b><br>${esc(r.activity)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
         <b>下書き（です・ます調）</b>${d ? `<small>　${esc(d.author || '')}</small>` : ''}
-        <textarea id="${id}" rows="6" style="width:100%;font-size:16px;box-sizing:border-box" ${noTable ? 'disabled' : ''}>${esc(d ? d.body : '')}</textarea>
+        <textarea id="${id}" rows="14" style="width:100%;font-size:16px;box-sizing:border-box" ${noTable ? 'disabled' : ''}>${esc(d ? d.body : '')}</textarea>
         <button ${noTable ? 'disabled' : ''} onclick="saveDiary('${esc(k)}','${id}')">保存</button><div id="${id}_m"></div></div></details>`; }).join('') || '<p>この日の日誌に利用の子がいません。</p>'}`;
 };
 async function saveDiary(child, id) {
@@ -992,7 +992,7 @@ LEO_VIEWS.linedraft = async function () {
     ${noTable ? '<p style="color:#c00">保存場所の準備ができていません。</p>' : ''}
     ${kids.map(k => { const d = D[k], id = ldId(k);
       return `<div class="card"><b style="font-size:17px">■${esc(k)}</b>　<span id="${id}_s">${d ? '✅ 書いた' : '⬜ まだ'}</span>${d && d.author ? `<small>　${esc(d.author)}</small>` : ''}
-        <textarea id="${id}" rows="6" style="width:100%;font-size:16px;box-sizing:border-box;margin-top:6px" ${noTable ? 'disabled' : ''} oninput="ldDirty('${id}')">${esc(d ? d.body : '')}</textarea>
+        <textarea id="${id}" rows="14" style="width:100%;font-size:16px;box-sizing:border-box;margin-top:6px" ${noTable ? 'disabled' : ''} oninput="ldDirty('${id}')">${esc(d ? d.body : '')}</textarea>
         <button ${noTable ? 'disabled' : ''} onclick="ldSave('${esc(k)}','${id}')">保存</button>
         <button id="${id}_c" onclick="ldCopy('${id}')">コピー</button> <span id="${id}_cm" style="color:#080"></span> <span id="${id}_m"></span></div>`; }).join('') || '<p>この日の利用の子がいません。</p>'}`;
 };
