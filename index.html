@@ -46,7 +46,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
 <script src="config.js?v=202610161700"></script>
-<script src="leo.js?v=202610161500"></script>
+<script src="leo.js?v=202610161800"></script>
 <script src="kin.js?v=202610161430"></script>
 <script src="report.js?v=202610161720"></script>
 <script src="ht.js?v=202610161540"></script>
@@ -113,8 +113,7 @@ function leoHomeBody(o) {
     ${big('#leo/sougeiall', '🚐', '明日の送迎', 'hs_tomorrow', "PERIOD='tomorrow'")}
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/linedraft', '✉️', 'LINEの下書き', '', '')}
-    ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
-    <a class="tile big" href="https://chat.line.biz/U09e93081492c29e963d2bba78499043f" target="_blank" rel="noopener" style="border-top:4px solid ${col}"><span>💬</span>公式LINE</a></div>
+    ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}</div>
     <h3 class="nx">${myDuty() === '事務' ? '情報' : myDuty() + 'の仕事'}</h3><div class="grid">${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}</div>
     ${rt}`;
 }

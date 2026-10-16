@@ -918,7 +918,7 @@ LEO_VIEWS.line = async function () {
     kids = [...new Set(n.map(x => x.child).filter(Boolean))]; drafts = d; act = a; }
   const A = Object.fromEntries(act.map(x => [x.child, x])), D = {}; drafts.forEach(x => (D[x.child] ||= x));
   const me = DEMO ? '職員X' : await myName();
-  return `<h3>LINE報告を書く</h3>${demoNote()}
+  return `<h3>LINE報告を書く</h3><a href="https://chat.line.biz/U09e93081492c29e963d2bba78499043f" target="_blank" rel="noopener" style="display:block;background:#06c755;color:#fff;text-align:center;font-size:20px;font-weight:bold;padding:14px;border-radius:10px;text-decoration:none;margin:6px 0 12px">💬 公式LINEを開く（新しいタブ）</a>${demoNote()}
     <p class="ptabs"><button onclick="LINE_DAY=addDays(LINE_DAY,-1);renderLeoView('line')">← 前の日</button> <b>${fmtDay(LINE_DAY)}</b> <button onclick="LINE_DAY=addDays(LINE_DAY,1);renderLeoView('line')">次の日 →</button></p>
     <p class="note">保護者さんへの報告文を、子どもごとに書きます。書けたら「LINE用にコピー」→ 公式LINEの1対1トークに貼って送ってください。日誌の活動記録（である調）は自動で作ります。</p>
     ${kids.map(k => { const d = D[k], a = A[k], id = 'ln_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
@@ -985,7 +985,7 @@ LEO_VIEWS.linedraft = async function () {
   const noTable = drafts === null; drafts = drafts || [];
   const D = Object.fromEntries(drafts.map(x => [x.child, x]));
   const done = kids.filter(k => D[k]).length;
-  return `<h3>✉️ LINEの下書き</h3>${demoNote()}
+  return `<h3>✉️ LINEの下書き</h3><a href="https://chat.line.biz/U09e93081492c29e963d2bba78499043f" target="_blank" rel="noopener" style="display:block;background:#06c755;color:#fff;text-align:center;font-size:20px;font-weight:bold;padding:14px;border-radius:10px;text-decoration:none;margin:6px 0 12px">💬 公式LINEを開く（新しいタブ）</a>${demoNote()}
     <p class="ptabs"><button onclick="LD_DAY=addDays(LD_DAY,-1);renderLeoView('linedraft')">← 前の日</button> <input type="date" value="${LD_DAY}" onchange="if(this.value){LD_DAY=this.value;renderLeoView('linedraft')}" style="font-size:16px"> <button onclick="LD_DAY=addDays(LD_DAY,1);renderLeoView('linedraft')">次の日 →</button> <button onclick="LD_DAY=today();renderLeoView('linedraft')">今日</button></p>
     <p style="font-size:18px"><b>${fmtDay(LD_DAY)}：${done} / ${kids.length}人 書けました</b>${kids.length - done ? `（まだ：${kids.filter(k => !D[k]).map(esc).join('、')}）` : kids.length ? ' ✅ 全員書けました' : ''}</p>
     <p class="note">です・ます調で書いて「保存」。「コピー」して公式LINEの1対1トークに貼って送ってください。</p>
