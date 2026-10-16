@@ -42,10 +42,20 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
 const planText = b => esc(String(b || '').split('\n').filter(l => !/^【(利用者名|作成者)】/.test(l)).join('\n')).replace(/^(【[^】\n]*】|\d\.[^\n]*)/gm, '<b>$1</b>');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-async function sb(path, opt = {}) {
-  const s = JSON.parse(localStorage.getItem('sess') || '{}');
+// ログインの有効期限（約1時間）が切れたら、保存してある更新用の鍵で自動更新する
+async function refreshSess() {
+  const s = JSON.parse(localStorage.getItem('sess') || '{}'); if (!s.refresh) return false;
+  try { const r = await fetch(C.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh }) });
+    if (!r.ok) return false; const j = await r.json();
+    localStorage.setItem('sess', JSON.stringify({ ...s, token: j.access_token, refresh: j.refresh_token || s.refresh, exp: Date.now() + j.expires_in * 1000 })); return true; } catch (e) { return false; }
+}
+async function sb(path, opt = {}, retried) {
+  let s = JSON.parse(localStorage.getItem('sess') || '{}');
+  if (!DEMO && s.exp && s.exp < Date.now() + 30000 && !retried) { if (await refreshSess()) s = JSON.parse(localStorage.getItem('sess') || '{}'); }
   const r = await fetch(C.supabaseUrl + '/rest/v1/' + path, { ...opt,
     headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json', ...(opt.headers || {}) } });
+  if (r.status === 401 && !retried && await refreshSess()) return sb(path, opt, true);
+  if (r.status === 401) throw new Error('ログインの有効期限が切れました。ページを再読み込みして、ログインし直してください（401）');
   if (!r.ok) throw new Error('読み込めませんでした（' + r.status + '）');
   return r.status === 204 || r.status === 201 ? null : r.json();
 }
