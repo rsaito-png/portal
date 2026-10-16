@@ -95,7 +95,7 @@ async function chairReport() {
   const el = $('ch_rep'); if (!el) return;
   try {
     const day = srToday(), since = chDay(-14);
-    const [ros, reps, todos] = await Promise.all([srRpc('staff_roster'), sb(`staff_report?day=gte.${since}&order=day.desc`), sb('staff_todo?status=neq.done&order=due.nulls.last,updated_at')]);
+    const [ros, reps, todos] = await Promise.all([srRpc('staff_roster'), sb(`staff_report?day=gte.${since}&order=day.desc`), sb('staff_todo?status=neq.done&order=due.asc.nullslast,updated_at')]);
     const nm = Object.fromEntries(ros.map(r => [r.user_id, r.name])), targets = ros.filter(r => r.daily_report), have = new Set(reps.filter(r => r.day === day).map(r => r.staff));
     const miss = targets.filter(r => !have.has(r.user_id)), by = {}; todos.forEach(x => (by[x.assignee] = by[x.assignee] || []).push(x));
     el.innerHTML = `<p style="font-size:18px">📭 今日まだ報告がない人（${miss.length}／${targets.length}）：<b>${miss.map(r => esc(r.name)).join('、') || 'なし'}</b></p>
