@@ -48,6 +48,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="config.js"></script>
 <script src="leo.js"></script>
 <script src="kin.js"></script>
+<script src="report.js"></script>
 <script src="leo_cal.js"></script>
 <script src="uketsuke.js"></script>
 <script src="esign.js"></script>
@@ -144,6 +145,7 @@ async function render() {
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
+  if (id === 'report') return sub === 'admin' ? renderReportAdmin() : renderReport();
   if (id === 'uketsuke') return renderUketsuke();
   if (id === 'sign' && typeof renderSign === 'function') return renderSign();
   if (id === 'clerk' && sub === 'docs' && typeof renderDocsAdmin === 'function') return renderDocsAdmin();

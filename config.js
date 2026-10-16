@@ -18,6 +18,7 @@ window.PORTAL_CONFIG = {
       ['✍️', 'レオ 請求の印（欠席時対応・子育てサポート）', '#leo/shirushi', 'その日のうちに付ける'],
       ['📊', 'レオ 実績記録（請求元）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から自動転記'] ] },
     { name: '人事労務', tiles: [
+      ['🌅', '業務報告（朝の確認）', '#report/admin', '報告がない人・動いていないToDo・困りごと／ToDoを出す（管理者のみ）'],
       ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
     { name: '補助金・助成金', tiles: [
       ['💰', '補助金・助成金', '', '準備中'] ] },
@@ -95,6 +96,7 @@ window.PORTAL_CONFIG = {
   // 法人共通（ホームの下に表示）
   shared: { name: '法人共通', tiles: [
     ['📨', 'Chat受付', '#uketsuke', 'Google Chatの受付窓口に来た依頼・報告'],
+    ['📝', '今日の業務報告・私のToDo', '#report', '1行か「問題なし」で送る・指示されたToDoを見る'],
     ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
     ['🎓', '法定研修（システム）', 'https://script.google.com/a/macros/psr-seishinkai.org/s/AKfycbyj476D28RbnLAR5GB6tZqXK12mbFJBcCfeyFgDTwimcvYfWknf2LGzwlbUwBfSpzR9/exec', '@psr-seishinkai.org のアカウントで開いてください'],
