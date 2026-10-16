@@ -154,6 +154,7 @@ async function render() {
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'report') return sub === 'admin' ? renderReportAdmin() : renderReport();
+  if (id === 'ht') return renderHt();
   if (id === 'chair') return renderChair();
   if (id === 'uketsuke') return renderUketsuke();
   if (id === 'sign' && typeof renderSign === 'function') return renderSign();

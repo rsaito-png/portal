@@ -106,7 +106,7 @@ window.PORTAL_CONFIG = {
     ['📝', '今日の業務報告・私のToDo', '#report', '1行か「問題なし」で送る・指示されたToDoを見る'],
     ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
-    ['🎓', '法定研修（システム）', 'https://script.google.com/a/macros/psr-seishinkai.org/s/AKfycbyj476D28RbnLAR5GB6tZqXK12mbFJBcCfeyFgDTwimcvYfWknf2LGzwlbUwBfSpzR9/exec', '@psr-seishinkai.org のアカウントで開いてください'],
+    ['🎓', '法定研修（システム）', '#ht', '研修・委員会・訓練の記録と受講証明（事業所ごと）'],
     ['📝', '法定研修 受講確認フォーム', 'https://docs.google.com/forms/d/e/1FAIpQLSehMPxXuuCXdyA9MTmR8WR6YEaullRPG10MIkx7q9pNrUclbA/viewform', '研修を受けたら職員が回答'],
     ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
     ['⏰', '出退勤（新・テスト）', 'https://rsaito-png.github.io/kintai/', 'テスト版'] ] },
