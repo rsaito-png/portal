@@ -81,7 +81,7 @@ begin
   if not found then return null; end if;
   select coalesce(jsonb_agg(jsonb_build_object('dow', k->>'曜日', 'start', k->>'利用開始', 'end', k->>'利用終了',
       'weekly', coalesce(k->>'利用週', '毎週') <> '不定期', 'parent', coalesce(k->>'保護者送迎', ''),
-      'school_time', nullif(k->>'学校お迎え時刻（基準）※空欄なら迎え開始', ''), 'pick_place', nullif(k->>'迎え場所', ''), 'drop_place', coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'))
+      'school_time', coalesce(nullif(k->>'学校お迎え時刻（基準）※空欄なら迎え開始', ''), nullif(k->>'迎え開始', '')), 'pick_place', nullif(k->>'迎え場所', ''), 'drop_place', coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'))
       order by position(k->>'曜日' in '月火水木金土')), '[]') into reg from leo_sched_kata(r.child) k;
   select coalesce(jsonb_agg(day order by day), '[]') into closed from leo_events where kind = '休所' and day >= r.month and day < (r.month + interval '1 month')::date;
   select jsonb_build_object('month', a.month, 'answered_at', a.answered_at, 'same_month', a.month = r.month, 'answer', a.answer) into prev
