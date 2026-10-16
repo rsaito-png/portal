@@ -46,8 +46,9 @@ function txCalc() {
   const lg = TX.ledger(cache.lines, accs, fy.from, fy.to), fs = TX.statements(lg);
   const cap = fs.bs.E.filter(r => /資本金|資本準備金|その他資本剰余金|新株式申込証拠金/.test(r.category)).reduce((s, r) => s + r.bal, 0);
   const hjIn = { months: 12, capital: d.capital === '' || d.capital == null ? cap : d.capital, emp50: (d.emp50 ?? '1') !== '0', loss: d.loss, credit: d.credit, interim: d.interim, kintoCityOv: d.kintoCityOv, kintoPrefOv: d.kintoPrefOv, entertainTotal: d.entertainTotal, entSmall: d.entSmall, entMeal: d.entMeal, adds: d.adds, subs: d.subs, dep: d.dep };
-  const hj = TX.hojin(hjIn, fs, fy.from), sh = TX.shohi(cache.lines, accs, fy.from, fy.to, { taxable: (d.taxable ?? '1') !== '0', kind: d.kind || 5, pA: d.pA, pB: d.pB, u80: d.u80, u70: d.u70, interimC: d.interimC }, fy.to);
-  TXS.calc = { lg, fs, hj, sh, cap };
+  const hj = TX.hojin(hjIn, fs, fy.from), sh = TX.shohi(cache.lines, accs, fy.from, fy.to, { taxable: (d.taxable ?? '0') === '1', kind: d.kind || 5, pA: d.pA, pB: d.pB, u80: d.u80, u70: d.u70, interimC: d.interimC }, fy.to);
+  const pfy = fyOf(fy.y - 1), shPrev = TX.shohi(cache.lines, accs, pfy.from, pfy.to, {}, pfy.to);
+  TXS.calc = { lg, fs, hj, sh, cap, shPrev, pfy };
 }
 // 第5期（令和7.6.1〜8.5.31）の実際の申告書（税理士作成・電子申告済み・令和8.7.28決算確定）の値。写真(別表一・四・五(一))から転記。
 const ACT5 = { b4: { net: 2222843, nouzei: 868200, depEx: 232383, addSub: 1100583, jigyo: 14100, kari: 3309326, shotoku: 346, income: 3309672 },
@@ -172,7 +173,7 @@ function txHj() {
     ck('地方法人税額（31）', hj.chihou, A5.b1.chihou), ck('地方法人税 確定（100円未満切捨て・40）', TX.fH(hj.chihou), A5.b1.chihouFinal), ck('道府県民税（均等割＋法人税割）', kenM, A5.ken), ck('市町村民税（均等割＋法人税割）', shiM, A5.shi),
     ck('事業税＋特別法人事業税（別表五から逆算）', jigM, A5.jigyoTotal), ck('納税充当金（納付見込の総額）', hj.final + TX.fH(hj.chihou) + kenM + shiM + jigM, A5.paid),
     { r: ['【別表五(一)】', '', '', ''], c: 'sec' }, ck('繰越損益金 期末', retClose, A5.b5.ret[3]), ck('納税充当金 期末', taxClose, A5.b5.nouzeiJ[3]), ck('差引合計額 期末', r5tot[3], A5.b5.total[3]),
-    { r: ['【消費税】', '', '', ''], c: 'sec' }, ['消費税の申告書（写真なし）', sh0.gen.total, '要確認', '申告書が未入手。非課税売上が大半。課税事業者かは税理士に確認'] ] : [];
+    { r: ['【消費税】', '', '', ''], c: 'sec' }, ['消費税の申告書', '—', '申告なし（免税事業者）', '免税事業者のため申告・納付なし'] ] : [];
   const addCols = [['label', '項目', 's', '260px'], ['amount', '金額', 'n'], ['kind', '処分（留保/社外流出）', 's']], subCols = [['label', '項目（例: 前期の事業税の認容、受取配当等の益金不算入）', 's', '260px'], ['amount', '金額', 'n']];
   return `<div class="card noprint"><h3>入力（この期）</h3><div class="g">${iN('capital', '資本金等の額（円）※空欄=貸借対照表から', '', `BS上の自動値: ${yen(cap)}円。一般社団法人は基金等がなければ0。`)}
     ${iSel('emp50', '市内の従業者数', [['1', '50人以下'], ['0', '50人超']], '1')}${iN('loss', '繰越欠損金の当期控除額（別表七(一)）', 0)}${iN('credit', '所得税額控除・外国税額控除（別表六）', 0, '利息の源泉所得税は帳簿の少額な法人税等に含まれます')}${iN('interim', '法人税の中間納付額', 0)}${iN('kintoCityOv', '市民税 均等割の実額（空欄=資本金等・従業者数から自動）', '', '第5期の申告書から逆算: 100,000円（市民税135,700−法人税割35,700）。要確認')}${iN('kintoPrefOv', '県民税 均等割の実額（空欄=自動）', '')}</div>
@@ -203,18 +204,22 @@ function txSh() {
   const cmp = [['課税売上高（税抜）', Math.round(sh.taxableSalesEx), Math.round(sh.taxableSalesEx)], ['課税売上割合', pct(sh.ratio, 3), '—'], ['課税標準額に対する消費税額（国税7.8%/6.24%）', sh.salesTax, sh.salesTax], ['控除対象仕入税額', sh.gen.credit, sh.simp.credit],
     ['（簡易課税 みなし仕入率・事業区分）', '—', pct(sh.simp.rate, 0) + '・第' + sh.simp.kind + '種'],
     ['納付する消費税（国税・100円未満切捨て）', sh.gen.nat, sh.simp.nat], ['地方消費税（国税×22/78）', sh.gen.loc, sh.simp.loc], { r: ['納付税額の概算（国税+地方）', sh.gen.total, sh.simp.total], c: 'tot' }, ['中間納付額（入力）', sh.interim, sh.interim], { r: ['差引納付（還付）概算', sh.gen.total - sh.interim, sh.simp.total - sh.interim], c: 'tot' }];
+  const ps = TXS.calc.shPrev, pf = TXS.calc.pfy, L = 10000000, ex = Math.round(sh.taxableSalesEx), pex = Math.round(ps.taxableSalesEx);
+  const jd = v => v > L ? '1,000万円超（課税事業者の可能性）' : '1,000万円以下';
+  const jud = [['今期 ' + TXS.fy.label, ex, ex - L, jd(ex)], ['前期 ' + pf.label, pex, pex - L, jd(pex)], ['課税売上割合（今期）', pct(sh.ratio, 3), '', '']];
   const mtd = [['一括比例配分方式', sh.genProp.credit, sh.genProp.total], ['個別対応方式', sh.genInd.credit, sh.genInd.total]];
   const detail = Object.entries(sh.byAcc).map(([k, v]) => { const [n, c] = k.split('|'); return [n, { P10: '課税仕入10%', P8R: '課税仕入8%', S10: '課税売上10%', S8R: '課税売上8%', EXEMPT: '非課税売上' }[c], v]; }).sort((a, b) => a[1].localeCompare(b[1]) || b[2] - a[2]);
-  return `<div class="card noprint"><h3>入力（この期）</h3><div class="g">${iSel('taxable', '消費税の課税事業者', [['1', '課税事業者（適格請求書発行事業者の登録あり）'], ['0', '免税事業者（納税なし）']], '1')}${iSel('kind', '簡易課税の事業区分', [[1, '第1種 卸売90%'], [2, '第2種 小売80%'], [3, '第3種 製造等70%'], [4, '第4種 その他60%'], [5, '第5種 サービス業等50%'], [6, '第6種 不動産40%']], 5)}
+  return `<div class="card noprint"><h3>入力（この期）</h3><div class="g">${iSel('taxable', '消費税の事業者区分', [['0', '免税事業者（申告・納付なし）'], ['1', '課税事業者（概算を表示）']], '0')}${iSel('kind', '簡易課税の事業区分', [[1, '第1種 卸売90%'], [2, '第2種 小売80%'], [3, '第3種 製造等70%'], [4, '第4種 その他60%'], [5, '第5種 サービス業等50%'], [6, '第6種 不動産40%']], 5)}
     ${iN('pA', '課税売上のみに対応する課税仕入（税込）', 0, '個別対応方式の区分1')}${iN('pB', '非課税売上のみに対応する課税仕入（税込）', 0, '区分2。残りは共通対応')}
     ${iN('u80', '適格請求書なし仕入（税込）〜2026/9/30 → 80%控除', 0)}${iN('u70', '適格請求書なし仕入（税込）2026/10/1〜2028/9/30 → 70%控除', 0)}${iN('interimC', '消費税の中間納付額', 0)}</div>
     <button onclick="txSave()">💾 入力を保存して再計算</button></div>
-    ${sh.taxable ? '' : '<p class="warn">「免税事業者」を選択中です。実際の納税はありませんが、参考として両方式の概算を表示します。</p>'}
-    <div class="warn">この法人は課税売上（雑収入等）が小さく、売上の大半が非課税（利用料）です。<b>課税売上割合が極めて低いため、仕入税額控除はほぼ使えず、原則課税でも簡易課税でも納付額は小さくなります。</b>課税事業者かどうか（基準期間の課税売上高1,000万円以下で、適格請求書発行事業者の登録がなければ免税）、簡易課税制度選択届出書の提出有無、2割特例の適用可否（令和8年9月30日までの属する課税期間）を税理士に確認してください。</div>
+    ${sh.taxable ? '' : `<div class="card" style="border-left:4px solid #2e7d32"><h3>免税事業者のため消費税の申告・納付は不要です</h3><p>概算納付額（原則課税・簡易課税）は表示していません。課税事業者に変更した場合のみ、上の「消費税の事業者区分」で切り替えると従来の概算を表示します。以下の集計は参考です。</p></div>`}
+    ${tSec('免税の判定の目安（課税売上高 1,000万円超か）', ['期', '課税売上高（税抜）', '1,000万円との差', '判定の目安'], jud, { num: true, note: '免税事業者の判定は<b>基準期間（前々事業年度）</b>の課税売上高が1,000万円以下かどうかで行います（特定期間の判定・インボイス登録の有無も影響）。ここでは今期と前期の課税売上を目安として表示します。正式な判定は税理士に確認してください。' })}
+    ${sh.taxable ? `<div class="warn">この法人は課税売上（雑収入等）が小さく、売上の大半が非課税（利用料）です。課税売上割合が極めて低いため、仕入税額控除はほぼ使えません。簡易課税制度選択届出書の提出有無、2割特例の適用可否を税理士に確認してください。</div>` : ''}
     ${tSec('課税売上・非課税売上の集計', ['区分', '税込金額', '課税標準額（税抜）', '消費税額（国税）'], t1, { note: '税区分と取引から集計（税込経理）。税区分が付いていない取引は集計に入りません。' })}
     ${tSec('課税仕入の集計', ['区分', '税込金額', '仕入に係る消費税額（国税分）'], t2)}
-    ${tSec('原則課税 と 簡易課税 の概算比較', ['項目', '原則課税（' + sh.method + '）', '簡易課税'], cmp, { num: true, note: '有利なのは <b>' + sh.preferred + '</b>（概算）。簡易課税は事前の届出が必要で、基準期間の課税売上高5,000万円以下が条件です。' })}
-    ${tSec('（参考）原則課税の控除方式別', ['方式', '控除対象仕入税額', '納付税額（国+地方）'], mtd)}
+    ${sh.taxable ? tSec('原則課税 と 簡易課税 の概算比較', ['項目', '原則課税（' + sh.method + '）', '簡易課税'], cmp, { num: true, note: '有利なのは <b>' + sh.preferred + '</b>（概算）。簡易課税は事前の届出が必要で、基準期間の課税売上高5,000万円以下が条件です。' }) : ''}
+    ${sh.taxable ? tSec('（参考）原則課税の控除方式別', ['方式', '控除対象仕入税額', '納付税額（国+地方）'], mtd) : ''}
     ${tSec('集計の明細（科目×税区分）', ['科目', '税区分', '税込金額'], detail)}
     <div class="card"><h3>注意（インボイス）</h3><ul><li>適格請求書（インボイス）の登録番号がない事業者からの課税仕入は、経過措置で仕入税額の<b>80%（〜2026/9/30）、70%（2026/10/1〜2028/9/30）、50%（〜2030/9/30）、30%（〜2031/9/30）</b>のみ控除できます。この画面は取引ごとに登録番号を持たないため、該当額を上の欄に入力してください。</li>
     <li>1万円未満の課税仕入は少額特例（基準期間の課税売上高1億円以下）で請求書なしでも控除できます（令和11年9月30日まで）。</li>
@@ -238,7 +243,7 @@ function txVf() {
     <li>この画面の概算は、<b>税引前利益 ${yen(fs.pl.pretax)}円</b>に交際費・償却超過などの調整を<b>まだ加算していない</b>状態の所得（${yen(income)}円）で計算しています。帳簿の法人税等が概算より約${yen(Math.round(Math.max(0, fs.pl.tax - hj.total)))}円大きいのは、申告上の加算項目（償却超過額・役員給与・寄付金・交際費・未払金の損金性など）が税理士の計算で加算されている可能性が高いためです。<b>仮に547,000円が法人税だとすると、所得は約364万円</b>（15%で逆算）となり、この画面の所得より約${yen(Math.round(547000 / 0.15 - income))}円多い計算です（あくまで仮定。申告書で確認）。</li>
     <li>前期（第4期）分の事業税は第5期の損金（減算）になりますが、入力が空のため、その分概算は大きめに出ます。逆方向の差です。</li>
     <li>均等割（県22,000円＋市50,000円）は資本金等0円・従業者50人以下の前提です。実際の資本金等・従業者数で変わります。</li>
-    <li>税率は上記のとおり令和8年度の公表値（四日市市の法人税割は超過税率7.2%）。<b>消費税の納付は帳簿の法人税等には含まれていません</b>（${yen(sh.gen.total)}円〜）。</li></ol></div>
+    <li>税率は上記のとおり令和8年度の公表値（四日市市の法人税割は超過税率7.2%）。<b>消費税の納付は帳簿の法人税等には含まれていません</b>${sh.taxable ? `（${yen(sh.gen.total)}円〜）` : '（免税事業者のため納付なし）'}。</li></ol></div>
     ${tSec('2026/7/30 の納付（freee）', ['項目', '金額（円）'], pay)}
     <div class="card"><h3>次にやること</h3><p>税理士が作成した第5期の申告書（別表一・四・五）の数字を「入力」欄に入れ、概算との差を詰めてください。差が減れば、翌期以降の見積りの精度が上がります。</p></div>`;
 }
