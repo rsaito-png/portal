@@ -56,13 +56,11 @@ async function renderReportAdmin() {
       ${sec(`⏳ 動いていないToDo（${stale.length}）`, stale.length ? stale.map(x => `<p>${esc(nm[x.assignee] || '？')}：<b>${esc(x.title)}</b>　<small>${srST[x.status]}・${srAgo(x.updated_at)}日動きなし${x.due ? '・期限 ' + esc(x.due) : ''}${x.due && x.due < day ? ' ⚠️期限切れ' : ''}</small> <button class="back" onclick="srDel(${x.id})">消す</button></p>`).join('') : '<p>ありません。</p>')}
       ${sec(`🆘 スタッフの困りごと（直近7日 ${troubles.length}）`, troubles.length ? troubles.map(r => `<p>${esc(nm[r.staff] || '？')}　<small>${esc(r.day)}</small><br>${esc(r.trouble)}</p>`).join('') : '<p>ありません。</p>')}
       ${sec(`✅ 今日の報告（${today.length}）`, today.map(r => `<p>${esc(nm[r.staff] || '？')}：${r.no_problem ? '問題なし' : esc(r.body || '')}</p>`).join('') || '<p>まだありません。</p>')}
-      ${sec('➕ ToDoを出す', `<p><select id="ta_who">${ros.map(r => `<option value="${r.user_id}">${esc(r.name)}</option>`).join('')}</select>
-        <input id="ta_t" maxlength="300" placeholder="指示の内容" style="width:100%"> 期限 <input id="ta_d" type="date" style="width:auto"> <button onclick="srAdd()">出す</button> <span id="ta_m" class="note"></span></p>`)}
       <p class="note">全ToDo（未完了 ${todos.length}）は動きなし ${SR.staleDays} 日以上か期限切れのものだけ上に出しています。</p>`;
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}（管理者のみ見られます）</p>`; }
 }
 async function srAdd() {
   const t = $('ta_t').value.trim(), m = $('ta_m'); if (!t) { m.textContent = '内容を入れてください。'; return; }
-  try { await sb('staff_todo', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ assignee: $('ta_who').value, title: t, due: $('ta_d').value || null }) }); renderReportAdmin(); } catch (e) { m.textContent = e.message; }
+  try { await sb('staff_todo', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ assignee: $('ta_who').value, title: t, due: $('ta_d').value || null }) }); (document.getElementById('ch_rep') ? chairReport() : renderReportAdmin()); } catch (e) { m.textContent = e.message; }
 }
-async function srDel(id) { if (!confirm('このToDoを消しますか')) return; try { await sb('staff_todo?id=eq.' + id, { method: 'DELETE' }); renderReportAdmin(); } catch (e) { alert(e.message); } }
+async function srDel(id) { if (!confirm('このToDoを消しますか')) return; try { await sb('staff_todo?id=eq.' + id, { method: 'DELETE' }); (document.getElementById('ch_rep') ? chairReport() : renderReportAdmin()); } catch (e) { alert(e.message); } }
