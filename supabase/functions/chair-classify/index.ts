@@ -13,12 +13,12 @@ Deno.serve(async (req) => {
     const [idea] = await (await rest(`chair_idea?id=eq.${Number(id)}&select=id,text`)).json();
     if (!idea) return new Response('{"error":"nf"}', { status: 404, headers: cors });
     const cfg: Record<string, any> = Object.fromEntries((await (await rest('chair_config')).json()).map((r: any) => [r.k, r.v]));
-    const names: string[] = cfg.buckets || [], J = '会長が判断', L = 'あとで', all = [...names, J, L];
+    const names: string[] = cfg.buckets || [], J = '会長が判断', G = 'Grok Botがやる', L = 'あとで', all = [...names, J, G, L];
     const fb: any[] = await (await rest('chair_idea_feedback?order=created_at.desc&limit=15&select=text,fixed_bucket')).json();
     let bucket = L, note = '';
     if (AI) {
       try {
-        const sys = `会長の思いつきメモ1行を次のどれか1つに分類。担当別:${names.join('/')}（その人宛・その人の仕事なら）、${J}（会長だけが決められること）、${L}（迷う・急ぎでない）。過去に会長が直した例:\n` +
+        const sys = `会長の思いつきメモ1行を次のどれか1つに分類。担当別:${names.join('/')}（その人宛・その人の仕事なら）、${J}（会長だけが決められること）、${G}（システム構築・技術・ポータル・スクリプト・データ・調べもの等、Grok Botが自分で進められる作業。会長の判断や入力が要るなら${J}）、${L}（迷う・急ぎでない）。過去に会長が直した例:\n` +
           fb.map((f) => `「${f.text}」→${f.fixed_bucket}`).join('\n') + `\nJSONのみ出力: {"bucket":"…","note":"15字以内の理由"}`;
         const r = await fetch('https://api.x.ai/v1/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer ' + AI, 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: Deno.env.get('AI_MODEL') || 'grok-4-fast-non-reasoning', max_tokens: 80, temperature: 0, messages: [{ role: 'system', content: sys }, { role: 'user', content: idea.text }] }) });
@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
         if (all.includes(j.bucket)) { bucket = j.bucket; note = String(j.note || '').slice(0, 40); }
       } catch (_) { /* 失敗したら下の簡易判定 */ }
     }
+    if (bucket === L && !note && /システム|構築|ポータル|スクリプト|データ|調べ|調査|実装|修正|バグ|作って|画面|API|DB|SQL|自動化|連携|移行/i.test(idea.text) && !/(決め|判断|どうする|どっち|確認して)/.test(idea.text)) { bucket = G; note = '作業・調べもの'; }
     if (bucket === L && !note) {
       const hit = names.find((n) => idea.text.includes(n)); const same = fb.find((f) => f.text && (idea.text.includes(f.text.slice(0, 6)) || f.text.includes(idea.text.slice(0, 6))));
       if (same) { bucket = same.fixed_bucket; note = '前の直しから'; } else if (hit) { bucket = hit; note = '名前から'; }

@@ -1,6 +1,6 @@
 // 会長ページ（会長専用）。会長は1行入れるだけ。整理・優先づけ・記憶はAIの朝のルーティン（tools: chair_ai.py）
 // データ: chair_idea / chair_today / chair_message / chair_config（supabase/chair.sql）
-const CH = { ok: null, cfg: { buckets: [], owner: '会長', org: '' }, J: '会長が判断', L: 'あとで' };
+const CH = { ok: null, cfg: { buckets: [], owner: '会長', org: '' }, J: '会長が判断', L: 'あとで', G: 'Grok Botがやる' };
 const chDay = (n = 0) => { const d = new Date(Date.now() + 9 * 36e5 + n * 864e5); return d.toISOString().slice(0, 10); };
 async function chairCheck() {
   if (DEMO) return false;
@@ -32,7 +32,7 @@ async function renderChair() {
     const [cf, ideas, today] = await Promise.all([sb('chair_config'), sb('chair_idea?order=created_at.desc&limit=400'), sb(`chair_today?day=eq.${chDay()}&order=rank`)]);
     cf.forEach(r => CH.cfg[r.k] = r.v);
     CH.ideas = ideas;
-    const bks = [...CH.cfg.buckets, CH.J, CH.L], open = ideas.filter(i => i.status === 'open'), byId = Object.fromEntries(ideas.map(i => [i.id, i]));
+    const bks = [...CH.cfg.buckets, CH.J, CH.G, CH.L], open = ideas.filter(i => i.status === 'open'), byId = Object.fromEntries(ideas.map(i => [i.id, i]));
     const td = today.map(t => byId[t.idea_id]).filter(i => i && i.status === 'open');
     const doneToday = today.map(t => byId[t.idea_id]).filter(i => i && i.status === 'done').length;
     const yst = chDay(-1), ycnt = ideas.filter(i => new Date(new Date(i.created_at).getTime() + 9 * 36e5).toISOString().slice(0, 10) === yst).length;
@@ -72,7 +72,7 @@ async function chairSend() {
 // 振り分け結果を一行で出す。違えばその場で1タップで直せる（直した内容はAIが覚える）
 function chairShowBucket(id, b) {
   const m = $('ch_m'); if (!m || !CH.last || CH.last.id !== id) return; CH.last.ai = b;
-  const bks = [...CH.cfg.buckets, CH.J, CH.L], lab = x => x === CH.J ? '会長が判断' : x === CH.L ? 'あとで' : x + 'さんへ';
+  const bks = [...CH.cfg.buckets, CH.J, CH.G, CH.L], lab = x => x === CH.J ? '会長が判断' : x === CH.G ? 'Grok Botがやる' : x === CH.L ? 'あとで' : x + 'さんへ';
   m.innerHTML = `受けました　→ <b>${esc(lab(b))}</b><div style="margin-top:6px">${bks.filter(x => x !== b).map(x => `<button class="back" style="font-size:15px;margin:2px" onclick="chairFix(${id},'${esc(x)}')">${esc(lab(x))}</button>`).join('')}</div>`;
 }
 async function chairFix(id, b) { await chairMove(id, b, CH.last && CH.last.id === id ? CH.last : null); chairList(); const m = $('ch_m'); if (m) { m.textContent = '直しました → ' + b + '（覚えます）'; setTimeout(() => { if ($('ch_m')) $('ch_m').textContent = ''; }, 3000); } }
@@ -107,7 +107,7 @@ async function chairReport() {
 // 思いつき一覧（バケツごと・新しい順・完了は既定で非表示）。送信後・移動後・完了後にすぐ更新
 CH.open = CH.open || {}; CH.showDone = false;
 function chairItem(i) {
-  const bks = [...CH.cfg.buckets, CH.J, CH.L], done = i.status === 'done';
+  const bks = [...CH.cfg.buckets, CH.J, CH.G, CH.L], done = i.status === 'done';
   return `<div class="card" style="padding:12px"><div style="font-size:19px">${esc(i.text)}</div>
     ${i.ai_note ? `<div style="color:#666;font-size:14px;margin-top:4px">🤖 ${esc(i.ai_note)}</div>` : ''}
     <div style="font-size:13px;color:#888;margin-top:4px">${i.due ? '期限 ' + esc(i.due) + '　' : ''}${esc(new Date(new Date(i.created_at).getTime() + 9 * 36e5).toISOString().slice(5, 16).replace('T', ' '))}${done ? '　✔完了' : ''}</div>
@@ -117,10 +117,10 @@ function chairItem(i) {
 async function chairList() {
   const el = $('ch_list'); if (!el) return;
   try { CH.ideas = await sb('chair_idea?order=created_at.desc&limit=500'); } catch (e) { el.textContent = e.message; return; }
-  const bks = [...CH.cfg.buckets, CH.J, CH.L], vis = CH.ideas.filter(i => CH.showDone || i.status === 'open');
+  const bks = [...CH.cfg.buckets, CH.J, CH.G, CH.L], vis = CH.ideas.filter(i => CH.showDone || i.status === 'open');
   const sec = (key, label, arr) => `<details ${CH.open[key] ? 'open' : ''} ontoggle="CH.open['${esc(key)}']=this.open" style="margin:8px 0;border:2px solid #ddd;border-radius:10px;padding:0 10px">
     <summary style="font-size:22px;padding:14px 0;font-weight:bold">${esc(label)}　<span style="color:${arr.length ? '#b8860b' : '#aaa'}">${arr.length}件</span></summary>${arr.map(chairItem).join('') || '<p class="note">なし</p>'}</details>`;
-  el.innerHTML = sec('__all', '全部', vis) + bks.map(b => sec(b, b === CH.J || b === CH.L ? b : b + 'さん', vis.filter(i => i.bucket === b))).join('')
+  el.innerHTML = sec('__all', '全部', vis) + bks.map(b => sec(b, b === CH.J || b === CH.G || b === CH.L ? b : b + 'さん', vis.filter(i => i.bucket === b))).join('')
     + `<p style="text-align:right;margin:10px 0"><a href="javascript:void 0" style="font-size:13px;color:#888" onclick="CH.showDone=!CH.showDone;chairList()">${CH.showDone ? '完了を隠す' : '完了も表示'}</a></p>`;
 }
 async function chairUndo(id) { try { await sb('chair_idea?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'open', done_at: null }) }); renderChair(); } catch (e) { alert(e.message); } }

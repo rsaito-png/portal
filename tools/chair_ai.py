@@ -3,7 +3,7 @@
   export            : 整理対象を JSON で出力（AIがこれを読む）
   apply FILE.json   : AIの判断を書き込む。形式:
       {"ideas":[{"id":1,"bucket":"安藤","ai_note":"..","priority":1-5,"due":"YYYY-MM-DD"|null,"stale":false}],
-       "today":[id,id,id]}   today は「あとで」「会長が判断」の未完了から最大3つ
+       "today":[id,id,id]}   today は「あとで」「会長が判断」の未完了から最大3つ（「Grok Botがやる」は含めない。会長の入力が要るものは「会長が判断」へ移す）。システム・技術・ポータル・スクリプト・データ・調べものは「Grok Botがやる」
   fallback          : AIが使えない日の代替（日数・重要度で機械的に3つ選ぶ）
 service_role キーは /home/box/tools/supabase/service_role_key（表示しない）。夜間(8時前)は何もしない。"""
 import json, sys, urllib.request, datetime
@@ -18,8 +18,8 @@ def api(path, method='GET', body=None):
 now = datetime.datetime.now(JST); today = now.date().isoformat()
 if now.hour < 8 and '--force' not in sys.argv: sys.exit('8時前は動きません')
 cfg = {r['k']: r['v'] for r in api('chair_config')}
-J, L = '会長が判断', 'あとで'
-buckets = cfg.get('buckets', []) + [J, L]
+J, G, L = '会長が判断', 'Grok Botがやる', 'あとで'
+buckets = cfg.get('buckets', []) + [J, G, L]
 def opens(): return api('chair_idea?status=eq.open&order=created_at')
 def age(i): return (now - datetime.datetime.fromisoformat(i['created_at'])).days
 def write_today(ids):

@@ -3,3 +3,4 @@
 - 会長は1行入れるだけ。整理はAIの朝のルーティンが1日1回（8時以降）行う。
 - 朝のルーティン: `python3 tools/chair_ai.py export` → AIが読んで判断JSONを作る → `python3 tools/chair_ai.py apply FILE.json`。AIが使えない日は `fallback`。
 - 設定: chair_config（buckets=担当名の配列, owner, org）。他事業所は行を変えるだけ。個人IDはリポジトリに書かない。
+- 振り分け先: 担当別／会長が判断／Grok Botがやる／あとで。「Grok Botがやる」はシステム構築・技術・ポータル・スクリプト・データ・調べもの。今日やる3つには入れない（会長の入力が要るものは「会長が判断」へ）。バケット名にDB制約はない（担当名のみ chair_config）。
