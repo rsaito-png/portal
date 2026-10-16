@@ -84,8 +84,7 @@ create table if not exists public.kin_visit (
   id bigint generated always as identity primary key,
   visit_date date not null,
   user_id bigint not null references public.kin_user(id) on delete restrict,
-  staff_name text not null check (char_length(staff_name) between 1 and 60),
-  second_staff text check (char_length(second_staff) <= 60), -- 2人目の職員
+  staff_name text check (char_length(staff_name) between 1 and 60), -- 空は後日入力
   service text not null default '身体介護' check (service in ('身体介護','家事援助','通院等介助')),
   start_time time not null, end_time time not null,
   actual_minutes int generated always as ((extract(epoch from (end_time - start_time))/60)::int) stored, -- 実時間(分)。開始・終了から自動計算、手入力不可
@@ -109,9 +108,21 @@ create policy kin_visit_rw on public.kin_visit for all to authenticated using (p
 revoke all on public.kin_visit from anon;
 
 -- 既存テーブルへの反映（冪等）
-alter table public.kin_visit add column if not exists second_staff text check (char_length(second_staff) <= 60);
 alter table public.kin_visit add column if not exists addition text check (char_length(addition) <= 100);
 do $$ begin
   if not exists (select 1 from pg_constraint where conname='kin_visit_time_order') then
     alter table public.kin_visit add constraint kin_visit_time_order check (end_time > start_time); end if;
 end $$;
+
+-- 追加列（取り込み用）。職員名は後日入力があるため空を許す。
+alter table public.kin_visit drop column if exists second_staff;
+alter table public.kin_visit alter column staff_name drop not null;
+alter table public.kin_visit add column if not exists sv_confirm_1 text check (char_length(sv_confirm_1) <= 60);  -- サ責確認 確認者
+alter table public.kin_visit add column if not exists sv_confirm_2 timestamptz;                                     -- サ責確認 日時
+alter table public.kin_visit add column if not exists sv_confirm_3 text check (char_length(sv_confirm_3) <= 1000); -- サ責確認 コメント
+alter table public.kin_visit add column if not exists sign_reason text check (char_length(sign_reason) <= 500);     -- 署名困難の理由
+alter table public.kin_visit add column if not exists late_signed text check (char_length(late_signed) <= 100);                    -- 後日署名（元の値のまま）
+alter table public.kin_visit add column if not exists recorded_at timestamptz;                                       -- 入力日時
+alter table public.kin_visit add column if not exists staff_confirmed_at timestamptz;                                -- 職員確認 日時
+alter table public.kin_visit alter column late_signed drop default;
+do $$ begin if (select data_type from information_schema.columns where table_name='kin_visit' and column_name='late_signed')='boolean' then alter table public.kin_visit alter column late_signed type text using case when late_signed then 'はい' end; end if; end $$;
