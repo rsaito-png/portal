@@ -12,7 +12,7 @@ async function renderReport() {
   $('view').innerHTML = '<p>読み込み中…</p>';
   try {
     const me = srMe(), day = srToday();
-    const [reps, todos] = await Promise.all([sb(`staff_report?staff=eq.${me}&order=day.desc&limit=7`), sb(`staff_todo?assignee=eq.${me}&status=neq.done&order=due.nulls.last,created_at`)]);
+    const [reps, todos] = await Promise.all([sb(`staff_report?staff=eq.${me}&order=day.desc&limit=7`), sb(`staff_todo?assignee=eq.${me}&status=neq.done&order=due.asc.nullslast,created_at`)]);
     const t = reps.find(r => r.day === day);
     $('view').innerHTML = back + `<div id="chair_msg">${typeof chairMsgHtml === 'function' ? await chairMsgHtml() : ''}</div><h3>今日のリーダー報告</h3>
       <div class="card"><p>${t ? '✅ 今日は報告済みです（直せます）' : '⬜ 今日はまだです'}</p>
@@ -43,7 +43,7 @@ async function renderReportAdmin() {
   $('view').innerHTML = '<p>読み込み中…</p>';
   try {
     const day = srToday(), since = new Date(Date.now() - 14 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
-    const [ros, reps, todos] = await Promise.all([srRpc('staff_roster'), sb(`staff_report?day=gte.${since}&order=day.desc`), sb('staff_todo?status=neq.done&order=due.nulls.last,updated_at')]);
+    const [ros, reps, todos] = await Promise.all([srRpc('staff_roster'), sb(`staff_report?day=gte.${since}&order=day.desc`), sb('staff_todo?status=neq.done&order=due.asc.nullslast,updated_at')]);
     const nm = Object.fromEntries(ros.map(r => [r.user_id, r.name])), targets = ros.filter(r => r.daily_report);
     const today = reps.filter(r => r.day === day), have = new Set(today.map(r => r.staff));
     const miss = targets.filter(r => !have.has(r.user_id));
