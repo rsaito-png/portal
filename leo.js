@@ -716,7 +716,7 @@ LEO_VIEWS.plan = async function () {
       </details></div>` };
   }).sort((a, b) => (a.st >= 7) - (b.st >= 7) || b.over - a.over || (a.d?.start || 0) - (b.d?.start || 0));
   return `<h3>個別支援計画</h3>${demoNote()}<p class="note">各カードの赤い行と下のボタンだけ進めれば大丈夫です。細かい情報は「くわしく見る」にあります。保護者へのリンクはコピーして、公式LINEの1対1トークで送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。</p>
-    ${cards.filter(c => c.urgent).map(c => c.html).join('') || '<p class="note">いま急ぎの子はいません。</p>'}${cards.some(c => !c.urgent) ? `<details style="margin-top:10px" ${cards.some(c => !c.urgent && PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">いま急ぎではない子（${cards.filter(c => !c.urgent).length}人）</summary>${cards.filter(c => !c.urgent).map(c => c.html).join('')}</details>` : ''}${cards.length ? '' : '<p>管理表の行がありません。</p>'}${mg ? trackEditList(rows) : ''}<div id="plan_editor"></div>`;
+    ${cards.filter(c => c.urgent).map(c => c.html).join('') || '<p class="note">いま急ぎの子はいません。</p>'}${cards.some(c => !c.urgent) ? `<details style="margin-top:10px" ${cards.some(c => !c.urgent && PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">いま急ぎではない子（${cards.filter(c => !c.urgent).length}人）</summary>${cards.filter(c => !c.urgent).map(c => c.html).join('')}</details>` : ''}${cards.length ? '' : '<p>管理表の行がありません。</p>'}<div id="plan_editor"></div>`;
 };
 // 管理表の行を直す（児発管・管理者・事務）。ポータルの表だけを直す。Googleの管理表へは書き戻さない
 function trackEditList(rows) {
