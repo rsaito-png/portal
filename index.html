@@ -104,7 +104,7 @@ function leoHomeBody(o) {
   const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
   const g = groupList(o).map(x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`).join('');
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
-  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : 'style="opacity:.5"'} style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`).join('')}</div>` : '';
+  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`).join('')}</div>` : '';
   return `<h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#leo/sougeiall', '🚐', '今日の送迎', 'hs_today', "PERIOD='today'")}
     ${big('#leo/sougeiall', '🚐', '明日の送迎', 'hs_tomorrow', "PERIOD='tomorrow'")}
