@@ -14,7 +14,7 @@ async function renderReport() {
     const me = srMe(), day = srToday();
     const [reps, todos] = await Promise.all([sb(`staff_report?staff=eq.${me}&order=day.desc&limit=7`), sb(`staff_todo?assignee=eq.${me}&status=neq.done&order=due.nulls.last,created_at`)]);
     const t = reps.find(r => r.day === day);
-    $('view').innerHTML = back + `<h3>今日の業務報告</h3>
+    $('view').innerHTML = back + `<div id="chair_msg">${typeof chairMsgHtml === 'function' ? await chairMsgHtml() : ''}</div><h3>今日の業務報告</h3>
       <div class="card"><p>${t ? '✅ 今日は報告済みです（直せます）' : '⬜ 今日はまだです'}</p>
       <button onclick="srSend(true)" style="font-size:20px;padding:14px 24px;width:100%">問題なし</button>
       <p>または1行でOK：<textarea id="sr_b" rows="3" maxlength="2000" style="width:100%;font-size:16px" placeholder="今日やったこと">${esc(t && !t.no_problem ? t.body || '' : '')}</textarea></p>

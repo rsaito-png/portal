@@ -45,10 +45,11 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=202610162010"></script>
-<script src="leo.js?v=202610162010"></script>
+<script src="config.js?v=202610162200"></script>
+<script src="leo.js?v=202610162200"></script>
 <script src="kin.js?v=202610161600"></script>
 <script src="report.js?v=202610161600"></script>
+<script src="chair.js?v=202610162200"></script>
 <script src="leo_yotei.js?v=202610161830"></script>
 <script src="leo_cal.js?v=202610161830"></script>
 <script src="uketsuke.js?v=202610161600"></script>
@@ -152,6 +153,7 @@ async function render() {
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'report') return sub === 'admin' ? renderReportAdmin() : renderReport();
+  if (id === 'chair') return renderChair();
   if (id === 'uketsuke') return renderUketsuke();
   if (id === 'sign' && typeof renderSign === 'function') return renderSign();
   if (id === 'clerk' && sub === 'docs' && typeof renderDocsAdmin === 'function') return renderDocsAdmin();
@@ -161,6 +163,7 @@ async function render() {
       <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
       ${officeBody(o)}`;
     if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
+    if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
   }
   $('view').innerHTML = `<h3>事業所をえらんでください</h3>
@@ -170,6 +173,7 @@ async function render() {
     ${ROLE === C.clerk.role ? `<h3>${C.clerk.name}（事務の方のみ表示）</h3>
     ${(C.clerk.groups || [{ name: '', tiles: C.clerk.tiles || [] }]).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}` : ''}`;
   if (typeof esignBadge === 'function') esignBadge();
+  chairTile(); chairMsgShow();
 }
 window.addEventListener('hashchange', render);
 let ROLE = C.defaultRole;
