@@ -834,7 +834,11 @@ async function staffMon(name, term, cur) {
     if (!from && tk.next_start) from = addDays(tk.next_start, -183);
     if (!from) from = addDays(today(), -183);
     const to = today();
-    const rows = (await sb(`leo_nikki_full?day=gte.${from}&day=lte.${to}&order=day&select=day,child,activity_text`)).filter(x => NN(x.child) === NN(name) && x.activity_text && String(x.activity_text).trim());
+    const full = (await sb(`leo_nikki_full?day=gte.${from}&day=lte.${to}&order=day&select=day,child,activity_text`)).filter(x => NN(x.child) === NN(name) && x.activity_text && String(x.activity_text).trim());
+    // 日誌（DB）に行がない過去の日は、活動記録（leo_activity）から直接補う
+    const have = new Set(full.map(x => x.day));
+    const extra = (await sb(`leo_activity?day=gte.${from}&day=lte.${to}&order=day&select=day,child,text`)).filter(x => NN(x.child) === NN(name) && x.text && String(x.text).trim() && !have.has(x.day)).map(x => ({ day: x.day, child: x.child, activity_text: x.text }));
+    const rows = full.concat(extra).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
     if (!rows.length) { bad(`この期間（${from}〜${to}）の活動記録がありません。日誌に活動記録が入っていません`); return; }
     const text = `【${from}〜${to} の活動記録から（${rows.length}日分）】\n` + rows.map(x => `${fmtDay(x.day)}　${x.activity_text}`).join('\n');
     await sb('leo_staff_mon?on_conflict=child,term', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child: name, term, period_from: from, period_to: to, text: text.slice(0, 20000), source: '自動（簡易）' }) });
