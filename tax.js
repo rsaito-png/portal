@@ -65,7 +65,7 @@ async function vTax(sp) {
   const y = +(sp.get('fy') || 2025), fy = fyOf(y); TXS.sub = TXSUBS.find(x => x[0] === sp.get('s')) ? sp.get('s') : 'fs';
   const change = !TXS.fy || TXS.fy.y !== y; TXS.fy = fy;
   if (!TXS.accs) TXS.accs = await sb('acc_accounts?select=id,name,type,category,sort&limit=1000');
-  if (!TXS.partners) TXS.partners = new Map((await fetchAll('acc_partners?select=id,name')).map(p => [p.id, p.name]));
+  if (!TXS.partners) { const pr = await fetchAll('acc_partners?select=id,name,is_personal'); TXS.partners = new Map(pr.map(p => [p.id, p.name])); TXS.pers = new Set(pr.filter(p => p.is_personal).map(p => p.id)); }
   if (!TXS.cache || TXS.cache.to !== fy.to || sp.get('reload')) TXS.cache = { to: fy.to, lines: await fetchAll(`acc_lines?select=id,side,amount,account_id,tax_code,entry_id,acc_entries!inner(entry_date,kind,partner_id,memo)&acc_entries.entry_date=lte.${fy.to}`) };
   if (change || sp.get('reload')) { const r = await sb(`acc_tax_inputs?select=data&fy_start=eq.${fy.from}`); TXS.data = r[0]?.data || {}; TXS.seeded = false; if (y === 2025 && !r[0]) { TXS.data = JSON.parse(JSON.stringify(SEED5)); TXS.seeded = true; } }
   txCalc(); TXCSV.length = 0;
@@ -74,8 +74,11 @@ async function vTax(sp) {
   $('view').innerHTML = `<div class="noprint"><h2>申告（決算書・法人税・消費税）</h2>
     <div class="warn"><b>電子申告（e-Tax／eLTAX）は税理士または本人が行います。本出力は概算で、必ず税理士の確認が必要です。</b>この画面から税務署・自治体へ送信することはありません。</div>
     ${done()}<div class="card"><div class="g"><div><label>事業年度</label><select id="tx_fy" onchange="location.hash='tax?s='+TXS.sub+'&fy='+this.value">${fyOpts}</select></div>
-    <button class="sub" onclick="window.print()">🖨 印刷／PDF保存</button><button class="sub" onclick="txCsvDownload('${TXS.sub}')">⬇ この画面をCSV</button></div>
+    <button class="sub" onclick="window.print()">🖨 印刷／PDF保存</button>
+    <button onclick="txPack('all')">📦 申告書類一式を出力（紙提出用）</button><button class="sub" onclick="txCsvDownload('${TXS.sub}')">⬇ この画面をCSV</button></div>
     ${fy.from < '2025-06-01' ? '<p class="ng">第4期以前の取引はまだ移行していないため、この期の数字は不完全です。</p>' : ''}
+    <p class="note">一式＝表紙・提出前チェックリスト・入力不足の警告・税務署／県税事務所／市役所の綴り・根拠URL。別に出す: <a href="javascript:txPack('nta')">税務署分のみ</a>｜<a href="javascript:txPack('pref')">県税事務所分のみ</a>｜<a href="javascript:txPack('city')">市役所分のみ</a>。新しい画面が開くので、印刷→「PDFに保存」。様式は公式様式に準じた自作レイアウトです。</p>
+    <details><summary>基本情報（申告書の表紙・各様式の欄に入ります）</summary><div class="g">${iS('houjinNo', '法人番号（13桁）', '')}${iS('phone', '電話番号', '')}${iS('bizType', '事業種目', '')}${iS('repAddr', '代表者の住所', '')}</div><button onclick="txSave()">💾 基本情報を保存</button></details>
     <nav style="margin:8px 0 0">${TXSUBS.map(([k, l]) => `<a href="#tax?s=${k}&fy=${y}" class="${k === TXS.sub ? 'on' : ''}">${l}</a>`).join('')}</nav></div></div>
     <div class="ptitle"><b>${ENT}</b>　${fy.label}　${TXSUBS.find(x => x[0] === TXS.sub)[1]}（概算・税理士確認前）</div>${body}
     <p class="note noprint">根拠: 税率・様式は国税庁・三重県・四日市市の公開情報（URLは taxcalc.js 冒頭の注記と README の「申告タブ」）。税率改正時は taxcalc.js の TAXRATES を更新します。</p>`;
@@ -246,4 +249,16 @@ function txVf() {
     <li>税率は上記のとおり令和8年度の公表値（四日市市の法人税割は超過税率7.2%）。<b>消費税の納付は帳簿の法人税等には含まれていません</b>${sh.taxable ? `（${yen(sh.gen.total)}円〜）` : '（免税事業者のため納付なし）'}。</li></ol></div>
     ${tSec('2026/7/30 の納付（freee）', ['項目', '金額（円）'], pay)}
     <div class="card"><h3>次にやること</h3><p>税理士が作成した第5期の申告書（別表一・四・五）の数字を「入力」欄に入れ、概算との差を詰めてください。差が減れば、翌期以降の見積りの精度が上がります。</p></div>`;
+}
+
+/* ---- 申告書類一式（紙提出用）: taxpack.js ---- */
+function txPack(only) {
+  txGather();
+  const ctx = { fy: TXS.fy, d: { ...TXS.data, savedFlag: !TXS.seeded }, accs: TXS.accs, cache: TXS.cache, only, partnerName: pName, isPersonal: id => TXS.pers && TXS.pers.has(+id), hasPersonal: true };
+  const r = TXP.build(ctx), w = window.open('', '_blank');
+  if (!w) { alert('ポップアップがブロックされました。許可してもう一度押してください。'); return; }
+  w.document.open(); w.document.write(r.html); w.document.close();
+  const n = r.warnings.filter(x => x[0] === '要入力' || x[0] === 'エラー').length;
+  flash(n ? `入力不足・エラーが${n}件あります（チェックリストの次ページ）` : '一式を開きました', n ? 'ng' : 'ok');
+  setTimeout(() => { try { w.focus(); } catch (e) {} }, 300);
 }

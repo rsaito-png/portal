@@ -51,3 +51,8 @@
   - 消費税・インボイス https://www.nta.go.jp/taxes/shiraberu/zeimokubetsu/shohi/keigenzeiritsu/invoice_about.htm
   - 交際費（中小法人） https://www.nta.go.jp/taxes/shiraberu/taxanswer/hojin/5265.htm
 - 税理士ボットの履歴は読めなかったため、税務前提は公開情報と freee の帳簿のみ。
+
+### 申告書類一式（紙提出用）
+- 申告タブの「📦 申告書類一式を出力」（`taxpack.js`）。表紙・提出前チェックリスト・入力不足の警告・税務署（別表一/四/五(一)/五(二)/十五/十六・決算書・内訳書）・県（第6号）・市（第20号）・根拠URL。印刷→PDF保存。
+- 様式は公式様式に**準じた自作レイアウト**（公式PDFへの重ね書きではない）。未対応: 法人事業概況説明書・適用額明細書・納付書・別表六/七。
+- 検証・サンプル出力: `SUPABASE_SERVICE_KEY=… node tools/taxpack_sample.js 2025 /出力先`（第5期は実際の申告書19項目と照合）。個人の取引先名・役員名は出力しない。
