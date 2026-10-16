@@ -70,7 +70,7 @@ async function ytPlan() {
     const ev = p.events || [], by = {}; ev.forEach(e => (by[e.day] = by[e.day] || []).push(e));
     const cnt = k => ev.filter(e => e.kind === k).length, mn = +YT_MONTH.slice(5, 7);
     box.innerHTML = `<p><b>${mn}月分の確認</b>：利用 ${cnt('利用')}件／休み ${cnt('休み')}件／迎え ${cnt('迎え')}件／送り ${cnt('送り')}件　（回答済み ${p.answered}/${p.children}人）</p>
-      ${p.closed && p.closed.length ? `<p class="note">お休み（休所）：${p.closed.map(d => +d.slice(8) + '日').join('・')}</p>` : '<p class="note" style="color:#c60">⚠ 休所日が登録されていません。祝日（11/3・11/23 など）や休みの日は、レオの予定で「休所」を先に入れてください。</p>'}
+      ${p.closed && p.closed.length ? `<p class="note">お休み（休所）：${p.closed.map(d => +d.slice(8) + '日').join('・')}</p>` : '<p class="note" style="color:#c60">⚠ 休所日が登録されていません。祝日（11/3・11/23 など）や休みの日は、児童の利用・送迎予定で「休所」を先に入れてください。</p>'}
       ${p.warnings.length ? `<div style="background:#fff4e0;padding:8px;border-radius:6px"><b>⚠ 確認が必要 ${p.warnings.length}件</b><br>${p.warnings.map(w => `${esc(w.child)}：${esc(w.msg)}`).join('<br>')}</div>` : '<p style="color:#080">⚠ 確認が必要なものはありません</p>'}
       <details><summary>日ごとの中身を見る</summary>${Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}</h4><small>${by[d].sort((a, b) => ({ 利用: 0, 休み: 1, 迎え: 2, 送り: 3 })[a.kind] - ({ 利用: 0, 休み: 1, 迎え: 2, 送り: 3 })[b.kind] || (a.start_time || '').localeCompare(b.start_time || '')).map(ytHm).join('<br>')}</small>`).join('')}</details>
       ${p.google_events > 0 ? `<p style="color:#c00">この月には Googleカレンダー由来の予定が ${p.google_events}件 あります。二重になるため確定できません。Googleで作る処理（25日のGAS）を止めてからにしてください。</p>`
@@ -81,7 +81,7 @@ async function ytCommit() {
   const box = document.getElementById('yt_plan');
   if (!confirm(YT_MONTH.slice(5, 7) + '月分の予定を作ります。よいですか？')) return;
   try { const r = await sb('rpc/leo_sched_commit', { method: 'POST', body: JSON.stringify({ p_month: YT_MONTH }) });
-    box.innerHTML = `<p style="color:#080;font-size:17px">✅ ${r.inserted}件の予定を作りました。<a href="#leo/cal">レオの予定</a>／<a href="#leo/sougeiall">みんなの送迎</a>で見られます。</p>`; }
+    box.innerHTML = `<p style="color:#080;font-size:17px">✅ ${r.inserted}件の予定を作りました。<a href="#leo/cal">児童の利用・送迎予定</a>／<a href="#leo/sougeiall">みんなの送迎</a>で見られます。</p>`; }
   catch (e) { box.innerHTML += `<p style="color:#c00">${esc(e.message)}</p>`; }
 }
 window.ytCopyAll = ytCopyAll; window.ytPlan = ytPlan; window.ytCommit = ytCommit;

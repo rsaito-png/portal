@@ -104,7 +104,7 @@ LEO_VIEWS.cal = async function () {
   const [evs, cc, ch] = await Promise.all([calLoad(), DEMO ? [] : sb('leo_child_care?select=child,note').catch(() => []), canManage() && !DEMO ? sb('leo_children?select=name').catch(() => []) : []]);
   const care = Object.fromEntries(cc.filter(x => x.note).map(x => [nk(x.child), x.note]));
   const [a, b] = calRange(), btn = (m, l) => `<button onclick="calMode('${m}')"${CAL.mode === m ? ' style="font-weight:bold;background:#06c;color:#fff"' : ''}>${l}</button>`;
-  let h = `<h3>レオの予定</h3>${demoNote()}<p class="calbar"><style>.calbar button{width:auto !important;display:inline-block !important;padding:6px 12px !important;margin:2px !important}</style>${btn('day', '日')}${btn('week', '週')}${btn('month', '月')}
+  let h = `<h3>児童の利用・送迎予定</h3>${demoNote()}<p class="calbar"><style>.calbar button{width:auto !important;display:inline-block !important;padding:6px 12px !important;margin:2px !important}</style>${btn('day', '日')}${btn('week', '週')}${btn('month', '月')}
     <button onclick="calMove(-1)">◀</button><button onclick="CAL.d=today();renderLeoView('cal')">今日</button><button onclick="calMove(1)">▶</button>
     ${canManage() && !DEMO ? ` <button onclick="calEdit('new')">＋追加</button>` : ''}</p>
     <h4 style="margin:4px 0">${CAL.mode === 'day' ? calMd(a) : CAL.mode === 'week' ? `${calMd(a)}〜${calMd(b)}` : `${+CAL.d.slice(0, 4)}年${+CAL.d.slice(5, 7)}月`}</h4>`;
