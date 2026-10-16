@@ -74,3 +74,40 @@ begin
 end $$;
 revoke all on function public.kin_sign_submit from public;
 grant execute on function public.kin_sign_submit to anon, authenticated;
+
+-- v2: 署名方法4種（本人／ご家族／署名困難／あとで署名）。署名困難・あとで は画像なし。ログは追記のみ。
+alter table public.kin_sign_log add column if not exists method text not null default '本人';
+alter table public.kin_sign_log add column if not exists relation text check (char_length(relation) <= 30);
+alter table public.kin_sign_log add column if not exists reason text check (char_length(reason) <= 500);
+alter table public.kin_sign_log alter column signature drop not null;
+alter table public.kin_sign_log drop constraint if exists kin_sign_log_method_chk;
+alter table public.kin_sign_log add constraint kin_sign_log_method_chk check (method in ('本人','ご家族','署名困難','あとで署名'));
+drop function if exists public.kin_sign_submit(text, bigint[], text);
+create or replace function public.kin_sign_submit(p_token text, p_visit_ids bigint[], p_method text, p_signature text, p_relation text, p_reason text)
+returns int language plpgsql security definer set search_path = public as $$
+declare l kin_sign_links; n int := 0; v kin_visit; lid bigint; kind text; rel text := nullif(trim(coalesce(p_relation,'')),''); rs text := nullif(trim(coalesce(p_reason,'')),'');
+begin
+  if p_method not in ('本人','ご家族','署名困難','あとで署名') then raise exception '署名方法が正しくありません'; end if;
+  if p_visit_ids is null or cardinality(p_visit_ids) = 0 then raise exception '訪問を選んでください'; end if;
+  if p_method in ('本人','ご家族') and (p_signature is null or p_signature not like 'data:image/png;base64,%' or char_length(p_signature) > 300000) then raise exception '署名が正しくありません'; end if;
+  if p_method = 'ご家族' and rel is null then raise exception '続柄を入れてください'; end if;
+  if p_method = '署名困難' and rs is null then raise exception '理由を入れてください'; end if;
+  select * into l from kin_sign_links where token = p_token and length(p_token) = 48 for update;
+  if not found or l.used_at is not null or l.expires_at <= now() then raise exception 'リンクが正しくないか、期限切れ・使用済みです'; end if;
+  kind := case p_method when 'ご家族' then left('ご家族（' || rel || '）', 30) else p_method end;
+  for v in select * from kin_visit where id = any(p_visit_ids) and user_id = l.user_id and sign_status <> '署名済み' order by id for update loop
+    insert into kin_sign_log(token, visit_id, user_id, signer_kind, method, relation, reason, signature)
+      values (p_token, v.id, l.user_id, kind, p_method, case when p_method='ご家族' then rel end, case when p_method='署名困難' then rs end, case when p_method in ('本人','ご家族') then p_signature end) returning id into lid;
+    if p_method <> 'あとで署名' then
+      update kin_visit set sign_status = '署名済み', signed_at = now(), signer_kind = kind, sign_reason = case when p_method='署名困難' then rs end,
+        signature_url = case when p_method in ('本人','ご家族') then 'kin_sign_log:' || lid end,
+        late_signed = case when p_method in ('本人','ご家族') then 'はい（本人のスマホから署名）' else late_signed end, updated_at = now() where id = v.id;
+    end if;
+    n := n + 1;
+  end loop;
+  if n = 0 then raise exception '署名できる訪問がありません'; end if;
+  if p_method <> 'あとで署名' then update kin_sign_links set used_at = now() where token = p_token; end if; -- あとで署名はリンクを消費しない
+  return n;
+end $$;
+revoke all on function public.kin_sign_submit(text, bigint[], text, text, text, text) from public;
+grant execute on function public.kin_sign_submit(text, bigint[], text, text, text, text) to anon, authenticated;
