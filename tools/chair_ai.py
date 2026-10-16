@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""会長ページのAI整理（1日1回・朝6時以降）。AIの判断は「1回のまとめ処理」だけ。
+"""会長ページのAI整理（1日1回・朝8時以降）。AIの判断は「1回のまとめ処理」だけ。
   export            : 整理対象を JSON で出力（AIがこれを読む）
   apply FILE.json   : AIの判断を書き込む。形式:
       {"ideas":[{"id":1,"bucket":"安藤","ai_note":"..","priority":1-5,"due":"YYYY-MM-DD"|null,"stale":false}],
        "today":[id,id,id]}   today は「あとで」「会長が判断」の未完了から最大3つ
   fallback          : AIが使えない日の代替（日数・重要度で機械的に3つ選ぶ）
-service_role キーは /home/box/tools/supabase/service_role_key（表示しない）。夜間(6時前)は何もしない。"""
+service_role キーは /home/box/tools/supabase/service_role_key（表示しない）。夜間(8時前)は何もしない。"""
 import json, sys, urllib.request, datetime
 URL = 'https://zvrardoyxocmqhvyddnf.supabase.co/rest/v1/'
 KEY = open('/home/box/tools/supabase/service_role_key').read().strip()
@@ -16,7 +16,7 @@ def api(path, method='GET', body=None):
     with urllib.request.urlopen(req) as r:
         b = r.read(); return json.loads(b) if b else None
 now = datetime.datetime.now(JST); today = now.date().isoformat()
-if now.hour < 6 and '--force' not in sys.argv: sys.exit('6時前は動きません')
+if now.hour < 8 and '--force' not in sys.argv: sys.exit('8時前は動きません')
 cfg = {r['k']: r['v'] for r in api('chair_config')}
 J, L = '会長が判断', 'あとで'
 buckets = cfg.get('buckets', []) + [J, L]
@@ -36,7 +36,7 @@ elif cmd == 'apply':
         i = cur.get(x['id'])
         if not i: continue
         p = {'ai_note': (x.get('ai_note') or '')[:200] or None, 'priority': x.get('priority'), 'due': x.get('due') or None, 'stale': bool(x.get('stale')), 'ai_at': now.isoformat()}
-        if i['ai_at'] is None and x.get('bucket') in buckets: p['bucket'] = x['bucket']   # 会長が手で動かした分は上書きしない
+        if (i['ai_at'] is None or i.get('ai_bucket') == i['bucket']) and x.get('bucket') in buckets: p['bucket'] = x['bucket']   # 会長が手で動かした分は上書きしない
         api('chair_idea?id=eq.%d' % i['id'], 'PATCH', p)
     cur = {i['id']: i for i in opens()}
     ids = [i for i in d.get('today', []) if i in cur and cur[i]['bucket'] in (J, L)][:3]

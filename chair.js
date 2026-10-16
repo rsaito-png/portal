@@ -47,7 +47,7 @@ async function renderChair() {
     $('view').innerHTML = back + `<h3 class="nx" style="font-size:22px">👑 会長ページ</h3>
       <div class="card"><input id="ch_in" maxlength="1000" placeholder="思いついたことを一行で" style="font-size:20px;padding:14px"
         onkeydown="if(event.key==='Enter')chairSend()"><button style="font-size:22px;padding:14px;margin-top:8px" onclick="chairSend()">送る</button><div id="ch_m" style="font-size:20px;color:#2e6b4f;min-height:1.4em;margin-top:6px"></div></div>
-      <h3 class="nx">🎯 今日やる3つ</h3>${td.length ? td.map(i => item(i)).join('') : `<div class="card"><p style="font-size:18px">${today.length ? '🎉 今日の3つは終わりました（' + doneToday + '件）' : '朝のAI整理のあとに出ます。'}</p></div>`}
+      <h3 class="nx">🎯 今日やる3つ</h3>${td.length ? td.map(i => item(i)).join('') : `<div class="card"><p style="font-size:18px">${today.length ? '🎉 今日の3つは終わりました（' + doneToday + '件）' : '朝8時すぎのAI整理のあとに出ます。'}</p></div>`}
       <h3 class="nx">🌅 朝のまとめ</h3><div class="card" style="font-size:18px">
         <p>昨日たまった思いつき：<b>${ycnt}件</b>${fresh ? `　<small>（AIの整理まち ${fresh}件）</small>` : ''}</p>
         <p style="margin:0">担当別の未完了：</p><p style="margin:4px 0">${cnt.map(([b, n]) => `<span style="display:inline-block;margin:2px 8px 2px 0;${n ? 'font-weight:bold' : 'color:#aaa'}">${esc(b)} ${n}</span>`).join('')}</p></div>
@@ -61,10 +61,27 @@ async function renderChair() {
 }
 async function chairSend() {
   const el = $('ch_in'), t = el.value.trim(), m = $('ch_m'); if (!t) return;
-  try { await sb('chair_idea', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ text: t }) }); el.value = ''; m.textContent = '受けました'; setTimeout(() => { if ($('ch_m')) $('ch_m').textContent = ''; }, 2500); }
+  m.style.color = '#2e6b4f';
+  try { const r = await sb('chair_idea', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ text: t }) }); el.value = ''; m.textContent = '受けました';
+    const id = r[0].id; CH.last = { id, text: t };
+    const ss = JSON.parse(localStorage.getItem('sess') || '{}');
+    fetch(C.supabaseUrl + '/functions/v1/chair-classify', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + ss.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      .then(x => x.json()).then(j => chairShowBucket(id, j.bucket || 'あとで')).catch(() => chairShowBucket(id, 'あとで')); }
   catch (e) { m.style.color = '#c00'; m.textContent = '送れませんでした：' + e.message; }
 }
-async function chairMove(id, b) { try { await sb('chair_idea?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ bucket: b }) }); } catch (e) { alert(e.message); } }
+// 振り分け結果を一行で出す。違えばその場で1タップで直せる（直した内容はAIが覚える）
+function chairShowBucket(id, b) {
+  const m = $('ch_m'); if (!m || !CH.last || CH.last.id !== id) return; CH.last.ai = b;
+  const bks = [...CH.cfg.buckets, CH.J, CH.L], lab = x => x === CH.J ? '会長が判断' : x === CH.L ? 'あとで' : x + 'さんへ';
+  m.innerHTML = `受けました　→ <b>${esc(lab(b))}</b><div style="margin-top:6px">${bks.filter(x => x !== b).map(x => `<button class="back" style="font-size:15px;margin:2px" onclick="chairFix(${id},'${esc(x)}')">${esc(lab(x))}</button>`).join('')}</div>`;
+}
+async function chairFix(id, b) { await chairMove(id, b, CH.last && CH.last.id === id ? CH.last : null); const m = $('ch_m'); if (m) { m.textContent = '直しました → ' + b + '（覚えます）'; setTimeout(() => { if ($('ch_m')) $('ch_m').textContent = ''; }, 3000); } }
+async function chairMove(id, b, ref) {
+  try { const i = ref ? { text: ref.text, ai_bucket: ref.ai } : (CH.ideas || []).find(x => x.id === id);
+    await sb('chair_idea?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ bucket: b }) });
+    if (i && i.ai_bucket && i.ai_bucket !== b) await sb('chair_idea_feedback', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ text: i.text, ai_bucket: i.ai_bucket, fixed_bucket: b }) });
+  } catch (e) { alert(e.message); }
+}
 async function chairDone(id) { try { await sb('chair_idea?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'done', done_at: new Date().toISOString() }) }); renderChair(); } catch (e) { alert(e.message); } }
 async function chairCur() { try { const m = await sb('chair_message?active=eq.true&order=created_at.desc&limit=1'); const e = $('ch_cur'); if (e) e.innerHTML = m.length ? `<p>いま表示中：<b>${esc(m[0].body)}</b></p>` : '<p class="note">いま表示中の一言はありません。</p>'; } catch (e) { } }
 async function chairMsgSend() {

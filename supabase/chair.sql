@@ -39,3 +39,12 @@ create table if not exists public.chair_config (k text primary key, v jsonb not 
 alter table public.chair_config enable row level security;
 drop policy if exists cc_all on public.chair_config; create policy cc_all on public.chair_config for all to authenticated using (public.is_chair()) with check (public.is_chair());
 -- 例: insert into chair_config values ('buckets','["担当A","担当B"]'), ('owner','"会長"'), ('org','"法人名"');
+
+-- 送った直後のAI振り分け（Edge Function chair-classify）と、直した内容の記憶
+alter table public.chair_idea add column if not exists ai_bucket text;   -- AIが最初につけた振り分け（会長が直したか見分ける）
+create table if not exists public.chair_idea_feedback (
+  id bigint generated always as identity primary key,
+  text text not null, ai_bucket text, fixed_bucket text not null,
+  created_at timestamptz not null default now());
+alter table public.chair_idea_feedback enable row level security;
+drop policy if exists cf_all on public.chair_idea_feedback; create policy cf_all on public.chair_idea_feedback for all to authenticated using (public.is_chair()) with check (public.is_chair());
