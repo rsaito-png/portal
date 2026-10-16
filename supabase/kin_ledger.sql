@@ -126,3 +126,11 @@ alter table public.kin_visit add column if not exists recorded_at timestamptz;  
 alter table public.kin_visit add column if not exists staff_confirmed_at timestamptz;                                -- 職員確認 日時
 alter table public.kin_visit alter column late_signed drop default;
 do $$ begin if (select data_type from information_schema.columns where table_name='kin_visit' and column_name='late_signed')='boolean' then alter table public.kin_visit alter column late_signed type text using case when late_signed then 'はい' end; end if; end $$;
+
+-- 請求CSV用の不足列（値が分からないものは空のまま。推測で埋めない）
+alter table public.kin_user add column if not exists name_kana text check (char_length(name_kana) <= 100);            -- 氏名カナ
+alter table public.kin_user add column if not exists decided_service_code text check (char_length(decided_service_code) <= 20); -- 決定サービスコード
+alter table public.kin_user add column if not exists contract_start date;                                              -- 契約開始日（サービス開始日とは別）
+alter table public.kin_office_setting add column if not exists area_grade_code text check (char_length(area_grade_code) <= 10); -- 地域区分コード（国保連IFの値）
+alter table public.kin_office_setting add column if not exists form_type text check (char_length(form_type) <= 10);             -- 様式種別（例: J611実績記録票の様式種別）
+-- 既存列: 支給決定期間=valid_from/valid_to、市町村番号=city_no、上限月額=cap_amount、事業所番号=office_no、地域区分=area_grade

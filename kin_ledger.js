@@ -8,6 +8,8 @@ function klWarn(u) {
   if (!u.valid_from || !u.valid_to) w.push('支給決定期間が空欄'); else if (u.valid_to < t) w.push('受給者証の期限切れ');
   else if (u.valid_to < new Date(Date.now() + 9 * 3600e3 + 60 * 864e5).toISOString().slice(0, 10)) w.push('受給者証 60日以内に期限');
   if (!u.jukyusha_no) w.push('受給者証番号が空欄');
+  [['city_no', '市町村番号'], ['name_kana', '氏名カナ'], ['decided_service_code', '決定サービスコード'], ['contract_start', '契約開始日']].forEach(([k, l]) => { if (!u[k]) w.push(l + 'が空欄（請求CSVに必要）'); });
+  if (u.cap_amount == null) w.push('負担上限月額が空欄（請求CSVに必要）');
   return w;
 }
 async function renderKinLedger() {
@@ -21,10 +23,11 @@ async function renderKinLedger() {
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }
 async function klList() {
-  const us = await sb('kin_user?select=*&order=name');
+  const [us, [of]] = await Promise.all([sb('kin_user?select=*&order=name'), sb('kin_office_setting?select=*&order=id.desc&limit=1').then(r => r.length ? r : [null])]);
+  const ow = klOfficeWarn(of);
   const rows = us.map(u => { const w = klWarn(u);
     return `<tr><td>${esc(u.name)}</td><td>${esc(u.city || '')}</td><td>${esc(u.valid_to || '')}</td><td>${u.needs_check ? '<b style="color:#c60">⚠要確認</b> ' + esc(u.check_memo || '') : ''}${w.map(x => `<span style="color:#b00">⚠${esc(x)}</span>`).join(' ')}</td><td><button onclick="KL.id=${u.id};renderKinLedger()">開く</button></td></tr>`; }).join('');
-  return `<p><button onclick="klNew()">＋利用者を追加</button></p>` + (us.length ? `<table class="tbl"><tr><th>氏名</th><th>市町村</th><th>有効期限</th><th>注意</th><th></th></tr>${rows}</table><p>${us.length}名／要確認 ${us.filter(u => u.needs_check).length}名／警告あり ${us.filter(u => klWarn(u).length).length}名</p>` : '<p>まだ登録がありません（データ取り込み待ちです）。</p>');
+  return (ow.length ? `<p style="color:#b00">⚠ ${esc(ow.join(' ／ '))}（「事業所設定」タブで入力）</p>` : '') + `<p><button onclick="klNew()">＋利用者を追加</button></p>` + (us.length ? `<table class="tbl"><tr><th>氏名</th><th>市町村</th><th>有効期限</th><th>注意</th><th></th></tr>${rows}</table><p>${us.length}名／要確認 ${us.filter(u => u.needs_check).length}名／警告あり ${us.filter(u => klWarn(u).length).length}名</p>` : '<p>まだ登録がありません（データ取り込み待ちです）。</p>');
 }
 async function klNew() { const n = prompt('利用者の氏名'); if (!n || !n.trim()) return;
   try { const r = await sb('kin_user', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: n.trim() }) }); KL.id = r[0].id; renderKinLedger(); } catch (e) { alert(e.message); } }
@@ -37,7 +40,7 @@ async function klUserView(id) {
   return `<h3>${esc(u.name)}</h3>${klWarn(u).map(x => `<p style="color:#b00">⚠ ${esc(x)}</p>`).join('')}
   <div class="card"><h4>基本・受給者証</h4>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
-  ${f('name', '氏名')}${f('birth', '生年月日', 'date')}${f('address', '住所')}${f('phone', '電話')}${f('emergency', '緊急連絡先')}${f('jukyusha_no', '受給者証番号')}${f('city', '市町村')}${f('city_no', '市町村番号')}${f('shien_kubun', '障害支援区分')}${f('valid_from', '支給決定 開始', 'date')}${f('valid_to', '支給決定 終了', 'date')}${f('soudan_office', '相談支援事業所')}${f('soudan_person', '相談員')}${f('sabisek', 'サービス提供責任者')}${f('cap_amount', '負担上限額（円）', 'number', 'min=0')}${f('cap_from', '上限額 開始', 'date')}${f('cap_to', '上限額 終了', 'date')}${f('start_date', 'サービス開始日', 'date')}</div>
+  ${f('name', '氏名')}${f('birth', '生年月日', 'date')}${f('address', '住所')}${f('phone', '電話')}${f('emergency', '緊急連絡先')}${f('jukyusha_no', '受給者証番号')}${f('city', '市町村')}${f('city_no', '市町村番号')}${f('shien_kubun', '障害支援区分')}${f('valid_from', '支給決定 開始', 'date')}${f('valid_to', '支給決定 終了', 'date')}${f('soudan_office', '相談支援事業所')}${f('soudan_person', '相談員')}${f('sabisek', 'サービス提供責任者')}${f('cap_amount', '負担上限額（円）', 'number', 'min=0')}${f('cap_from', '上限額 開始', 'date')}${f('cap_to', '上限額 終了', 'date')}${f('start_date', 'サービス開始日', 'date')}${f('name_kana', '氏名カナ')}${f('decided_service_code', '決定サービスコード')}${f('contract_start', '契約開始日', 'date')}</div>
   <p><label><input type="checkbox" id="ku_cap_mgmt" style="width:auto" ${u.cap_mgmt ? 'checked' : ''}> 上限額管理が必要</label>　<label><input type="checkbox" id="ku_needs_check" style="width:auto" ${u.needs_check ? 'checked' : ''}> ⚠要確認</label></p>
   <p><label>身体介護 月支給量(時間)　<input id="ku_supply_body_hours" type="number" min="0" step="0.5" style="width:90px" value="${u.supply_body_hours ?? ''}"></label>　<label><input type="checkbox" id="ku_supply_body_conflict" style="width:auto" ${u.supply_body_conflict ? 'checked' : ''}> 支給量が資料で食い違い（空のまま）</label></p>
   <label>要確認メモ<br>${klIn('ku_check_memo', u.check_memo)}</label>
@@ -50,7 +53,7 @@ async function klUserView(id) {
 }
 async function klSaveUser(id) {
   const g = k => klV('ku_' + k), b = { name: g('name') }; if (!b.name) return $('ku_m').textContent = '氏名は必須です';
-  ['birth', 'address', 'phone', 'emergency', 'jukyusha_no', 'city', 'city_no', 'shien_kubun', 'valid_from', 'valid_to', 'soudan_office', 'soudan_person', 'sabisek', 'cap_from', 'cap_to', 'start_date', 'check_memo'].forEach(k => b[k] = g(k));
+  ['birth', 'address', 'phone', 'emergency', 'jukyusha_no', 'city', 'city_no', 'shien_kubun', 'valid_from', 'valid_to', 'soudan_office', 'soudan_person', 'sabisek', 'cap_from', 'cap_to', 'start_date', 'name_kana', 'decided_service_code', 'contract_start', 'check_memo'].forEach(k => b[k] = g(k));
   b.cap_amount = g('cap_amount') == null ? null : +g('cap_amount'); b.supply_body_hours = g('supply_body_hours') == null ? null : +g('supply_body_hours'); b.supply_body_conflict = $('ku_supply_body_conflict').checked; b.cap_mgmt = $('ku_cap_mgmt').checked; b.needs_check = $('ku_needs_check').checked; b.updated_at = new Date().toISOString();
   try { await sb(`kin_user?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderKinLedger(); } catch (e) { $('ku_m').textContent = e.message; }
 }
@@ -70,19 +73,21 @@ async function klDocEdit(id, c, s, locked) {
 }
 async function klDel(t, id) { if (!confirm('削除しますか？')) return; try { await sb(`${t}?id=eq.${id}`, { method: 'DELETE' }); renderKinLedger(); } catch (e) { alert(e.message); } }
 async function klDelUser(id) { if (!confirm('この利用者と、支給・書類履歴をすべて削除します。よろしいですか？')) return; try { await sb(`kin_user?id=eq.${id}`, { method: 'DELETE' }); KL.id = null; renderKinLedger(); } catch (e) { alert(e.message); } }
+const klOfficeWarn = o => [['office_no', '事業所番号'], ['area_grade', '地域区分'], ['area_grade_code', '地域区分コード'], ['form_type', '様式種別']].filter(([k]) => !o || !o[k]).map(([, l]) => '事業所設定：' + l + 'が空欄（請求CSVに必要）');
 async function klOffice() {
   const [o] = await sb('kin_office_setting?select=*&order=id.desc&limit=1'); const ad = (o && o.additions) || [];
   const names = ['特定事業所加算Ⅱ', '処遇改善加算Ⅱ', '早朝', '夜間', '深夜'];
   const act = n => (ad.find(a => a.name === n) || {}).active ? 'checked' : '';
   return `<div class="card"><h4>事業所設定（利用者とは別）</h4><p class="note">編集は管理側のみ。加算・減算は請求CSV生成時に必ず反映します。</p>
-  <p><label>事業所番号 ${klIn('ko_no', o && o.office_no)}</label> <label>地域区分 ${klIn('ko_area', o && o.area_grade, 'text', 'placeholder="7級地"')}</label></p>
+  <p><label>事業所番号 ${klIn('ko_no', o && o.office_no)}</label> <label>地域区分 ${klIn('ko_area', o && o.area_grade, 'text', 'placeholder="7級地"')}</label> <label>地域区分コード（国保連） ${klIn('ko_areacode', o && o.area_grade_code)}</label> <label>様式種別 ${klIn('ko_form', o && o.form_type)}</label></p>
+  ${klOfficeWarn(o).map(x => `<p style="color:#b00">⚠ ${esc(x)}</p>`).join('')}
   <p>${names.map((n, i) => `<label style="margin-right:14px"><input type="checkbox" id="ko_a${i}" style="width:auto" ${act(n)}> ${n}</label>`).join('')}</p>
   <p><button onclick="klSaveOffice(${o ? o.id : 'null'})">保存</button> <span id="ko_m"></span></p></div>`;
 }
 async function klSaveOffice(id) {
   const [o0] = id ? await sb(`kin_office_setting?id=eq.${id}&select=additions`) : [null]; const old = (o0 && o0.additions) || [];
   const names = ['特定事業所加算Ⅱ', '処遇改善加算Ⅱ', '早朝', '夜間', '深夜'];
-  const b = { office_no: klV('ko_no'), area_grade: klV('ko_area'), additions: old.filter(a => !names.includes(a.name)).concat(names.map((n, i) => Object.assign({ kind: '加算' }, old.find(a => a.name === n) || {}, { active: $('ko_a' + i).checked }))), updated_at: new Date().toISOString() };
+  const b = { office_no: klV('ko_no'), area_grade: klV('ko_area'), area_grade_code: klV('ko_areacode'), form_type: klV('ko_form'), additions: old.filter(a => !names.includes(a.name)).concat(names.map((n, i) => Object.assign({ kind: '加算' }, old.find(a => a.name === n) || {}, { active: $('ko_a' + i).checked }))), updated_at: new Date().toISOString() };
   try { await sb(id ? `kin_office_setting?id=eq.${id}` : 'kin_office_setting', { method: id ? 'PATCH' : 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); $('ko_m').textContent = '保存しました'; } catch (e) { $('ko_m').textContent = e.message + '（管理側のみ編集できます）'; }
 }
 async function klCode() {
