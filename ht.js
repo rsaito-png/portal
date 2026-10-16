@@ -275,8 +275,8 @@ function htPrint(title, pages) {
   const w = window.open('', '_blank'); if (!w) return alert('ポップアップがブロックされました。許可してもう一度押してください');
   w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:12px;color:#000}.pg{page-break-after:always;padding:6mm}.pg:last-child{page-break-after:auto}
     h1{font-size:20px;text-align:center;margin:0 0 10px}table{border-collapse:collapse;width:100%;margin:6px 0}td,th{border:1px solid #000;padding:4px;vertical-align:top;font-size:11px}th{background:#eee;width:22%;text-align:left}.l td,.l th{width:auto}.sg td{height:46px}.nt{font-size:10px;color:#444}@media print{.np{display:none}}</style></head><body>
-    <p class="np"><button onclick="print()">印刷／PDFに保存</button></p>${pages.join('')}</body></html>`);
-  w.document.close(); setTimeout(() => w.print(), 400);
+    <p class="np"><button onclick="print()">印刷する（PDFに保存も選べます）</button></p>${pages.join('')}</body></html>`);
+  w.document.close();
 }
 const htKV = rows => '<table>' + rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('') + '</table>';
 function htImpl(tid) {
