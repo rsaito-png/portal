@@ -656,12 +656,28 @@ LEO_VIEWS.plan = async function () {
     const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false), over = d && st < 7 && d.start < t, soon = d && st < 7 && !over && (d.start - t) / 864e5 <= 45;
     const key = N(name), open = PLAN_OPEN === key || (DEMO && /open=1/.test(location.search) && name === '児童B');
     const btn = (label, fn, dis) => `<button ${dis ? 'disabled' : ''} onclick="${fn}" style="display:block;width:100%;margin:6px 0;padding:12px;font-size:16px;border-radius:8px">${label}</button>`;
-    return { st, over, d, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<details class="card" ${open ? 'open' : ''} ontoggle="if(this.open)PLAN_OPEN='${key}'" style="border-left:6px solid ${st >= 7 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:0">
-      <summary style="padding:14px;cursor:pointer;font-size:17px;list-style:none"><b>${esc(name)}</b>　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜${d.end.getFullYear()}/${md(d.end)}）` : ''}</small> <span style="float:right">▼</span><br>
-        <small>${st >= 7 ? '本案の同意まで済み' : 'いま：' + PLAN_STEPS2[st]}${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</small>
-        <div style="display:flex;gap:2px;margin-top:6px">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div></summary>
-      <div style="padding:0 14px 14px">
-        ${waitHtml()}
+    const W = wait[0], ds = x => x ? md(x) : '';
+    const rb = (l, f, dis) => mg ? btn(l, f, dis) : '';
+    let act = '', ab = '';
+    if (st >= 7) act = '✅ 本案の同意まで済み。いまやることはありません';
+    else if (st === 0) { if (W) { act = `保護者アンケートの返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '保護者アンケートのリンクを送る'; ab = rb('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`); } }
+    else if (st === 1) { act = '職員モニタリングを作る'; ab = rb('活動記録から作る', `staffMon('${esc(name)}','${term}',${cur})`); }
+    else if (st === 2) { if (p) { act = '計画書の4書類を確認する'; ab = btn('書類を開いて直す', `planEdit(${p.id})`); } else { act = '計画書のひな形を作る'; ab = d ? rb('計画書を作る（ひな形）', `planNew('${esc(name)}',${n},${d.start.getFullYear()},${d.start.getMonth() + 1})`) : ''; } }
+    else if (st === 3) { act = '内容を確認して「計画書作成＝済」にする'; ab = rb('確認した（計画書作成＝済）', `planMade(${p.id})`, !(p.genan && p.honan)); }
+    else if (st === 4) { if (W) { act = `原案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '原案を保護者に送る'; ab = rb('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`); } }
+    else if (st === 5) { act = `担当者会議を行う${d ? '（' + ds(d.kaigi) + '）' : ''}。終わったら本案を送る`; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); }
+    else { if (W) { act = `本案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '本案を保護者に送る'; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); } }
+    const checks = PLAN_STEPS2.map((lb, i) => `<div style="color:${done[i] ? '#2a7a2a' : i === st ? '#c00' : '#999'}">${done[i] ? '✔' : i === st ? '▶' : '・'} ${lb}</div>`).join('');
+    const urgent = st < 7 && (over || soon || wait.length > 0);
+    return { st, over, d, urgent, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${st >= 7 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:14px">
+      <div style="font-size:17px"><b>${esc(name)}</b>　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</div>
+      <div style="display:flex;gap:2px;margin:8px 0">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div>
+      <div style="font-size:20px;font-weight:bold;margin:8px 0;color:${st >= 7 ? '#2a7a2a' : '#c00'}">${act}</div>
+      ${ab}
+      <details style="margin-top:8px" ${open ? 'open' : ''} ontoggle="if(this.open)PLAN_OPEN='${key}'"><summary style="cursor:pointer;color:#36c">くわしく見る</summary>
+        <div style="margin-top:8px;font-size:14px">${checks}</div>
+        <div>${waitHtml()}
+        
         ${d ? `<p><small>書類に入れる日付（作成者 齊藤連）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : '<p class="note">管理表の「次期開始月」がありません。</p>'}
         <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '　✅ 確認済' : '　<span class="badge">未確認</span>'}</small></p>${now.note ? `<p><small>${esc(now.note)}</small></p>` : ''}${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
         <h4>1. 保護者アンケート</h4>${mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
@@ -675,10 +691,11 @@ LEO_VIEWS.plan = async function () {
           <p><small>原案：${p.genan_consent_at ? '✅ ' + new Date(p.genan_consent_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'まだ'}／本案：${p.honan_consent_at ? '✅ ' + new Date(p.honan_consent_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'まだ'}</small></p>
           ${mg ? btn('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`, !p.plan_made) + btn('本案の同意リンクを作る（原案の同意と会議のあと）', `planLink('doui','','',${p.id},'本案')`, !p.genan_consent_at) : ''}`
           : (mg && d ? btn(`第${n}期の計画書を作る（ひな形）`, `planNew('${esc(name)}',${n},${d.start.getFullYear()},${d.start.getMonth() + 1})`) : '<p class="note">まだありません。</p>')}
-        <div id="pm_${key}"></div></div></details>` };
+        <div id="pm_${key}"></div></div>
+      </details></div>` };
   }).sort((a, b) => (a.st >= 7) - (b.st >= 7) || b.over - a.over || (a.d?.start || 0) - (b.d?.start || 0));
-  return `<h3>個別支援計画</h3>${demoNote()}<p class="note">名前をタップすると開きます。上から順に進めます。保護者へのリンクはコピーして、公式LINEの1対1トークで送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。</p>
-    ${planWaitList(cards)}${cards.map(c => c.html).join('') || '<p>管理表の行がありません。</p>'}<div id="plan_editor"></div>`;
+  return `<h3>個別支援計画</h3>${demoNote()}<p class="note">各カードの赤い行と下のボタンだけ進めれば大丈夫です。細かい情報は「くわしく見る」にあります。保護者へのリンクはコピーして、公式LINEの1対1トークで送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。</p>
+    ${cards.filter(c => c.urgent).map(c => c.html).join('') || '<p class="note">いま急ぎの子はいません。</p>'}${cards.some(c => !c.urgent) ? `<details style="margin-top:10px" ${cards.some(c => !c.urgent && PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">いま急ぎではない子（${cards.filter(c => !c.urgent).length}人）</summary>${cards.filter(c => !c.urgent).map(c => c.html).join('')}</details>` : ''}${cards.length ? '' : '<p>管理表の行がありません。</p>'}<div id="plan_editor"></div>`;
 };
 function planWaitList(cards) {
   const w = cards.flatMap(c => c.wait).sort((a, b) => b.days - a.days);
