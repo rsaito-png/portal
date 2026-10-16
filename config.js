@@ -91,7 +91,7 @@ window.PORTAL_CONFIG = {
       ['⚠️', 'ヒヤリハット週報', 'https://drive.google.com/open?id=1urelD2ecz7HEu7ZQ1busmKXkH0J-T_WAGpljx5AY3lY', 'Bot依頼で作成'],
       ['📒', '台帳', '#kintoun/ledger', '利用者・支給と利用・事業所設定・書類履歴'],
       ['📝', '訪問記録', '#kintoun/visit', '訪問ごとの記録（一覧・追加・編集）'],
-      ['📄', '利用契約書', '#kintoun/contract', '準備中（計画書・契約書・重要事項説明書）'],
+      ['📄', '利用契約書・重要事項説明書', '#kintoun/contract', '契約書・重要事項説明書・計画書の署名状況／署名リンク発行'],
       ['🖨️', '訪問記録の印刷', '#kintoun/print', '利用者・月を選んで印刷／PDF（署名つき）'],
       ['🧾', 'サービス提供実績記録表', '#kintoun/jisseki', '月次集計（算定コード・単位）／印刷'],
       ['✅', '記録・署名チェック', '#kintoun/check', '署名待ち・職員名空・二重記録・記録漏れ／署名リンク発行'],

@@ -8,7 +8,7 @@ function klWarn(u) {
   if (!u.valid_from || !u.valid_to) w.push('支給決定期間が空欄'); else if (u.valid_to < t) w.push('受給者証の期限切れ');
   else if (u.valid_to < new Date(Date.now() + 9 * 3600e3 + 60 * 864e5).toISOString().slice(0, 10)) w.push('受給者証 60日以内に期限');
   if (!u.jukyusha_no) w.push('受給者証番号が空欄');
-  [['city_no', '市町村番号'], ['name_kana', '氏名カナ'], ['decided_service_code', '決定サービスコード'], ['contract_start', '契約開始日']].forEach(([k, l]) => { if (!u[k]) w.push(l + 'が空欄（請求CSVに必要）'); });
+  [['city_no', '市町村番号'], ['name_kana', '氏名カナ'], ['decided_service_code', '決定サービスコード'], ['contract_start', '契約開始日'], ['address_class', '住所区分（59-4／715-5。契約書・重要事項説明書の本文が変わります）']].forEach(([k, l]) => { if (!u[k]) w.push(l + 'が空欄（請求CSVに必要）'); });
   if (u.cap_amount == null) w.push('負担上限月額が空欄（請求CSVに必要）');
   return w;
 }
@@ -40,7 +40,7 @@ async function klUserView(id) {
   return `<h3>${esc(u.name)}</h3>${klWarn(u).map(x => `<p style="color:#b00">⚠ ${esc(x)}</p>`).join('')}
   <div class="card"><h4>基本・受給者証</h4>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
-  ${f('name', '氏名')}${f('birth', '生年月日', 'date')}${f('address', '住所')}${f('phone', '電話')}${f('emergency', '緊急連絡先')}${f('jukyusha_no', '受給者証番号')}${f('city', '市町村')}${f('city_no', '市町村番号')}${f('shien_kubun', '障害支援区分')}${f('valid_from', '支給決定 開始', 'date')}${f('valid_to', '支給決定 終了', 'date')}${f('soudan_office', '相談支援事業所')}${f('soudan_person', '相談員')}${f('sabisek', 'サービス提供責任者')}${f('cap_amount', '負担上限額（円）', 'number', 'min=0')}${f('cap_from', '上限額 開始', 'date')}${f('cap_to', '上限額 終了', 'date')}${f('start_date', 'サービス開始日', 'date')}${f('name_kana', '氏名カナ')}${f('decided_service_code', '決定サービスコード')}${f('contract_start', '契約開始日', 'date')}</div>
+  ${f('name', '氏名')}${f('birth', '生年月日', 'date')}${f('address', '住所')}${f('phone', '電話')}${f('emergency', '緊急連絡先')}${f('jukyusha_no', '受給者証番号')}${f('city', '市町村')}${f('city_no', '市町村番号')}${f('shien_kubun', '障害支援区分')}${f('valid_from', '支給決定 開始', 'date')}${f('valid_to', '支給決定 終了', 'date')}${f('soudan_office', '相談支援事業所')}${f('soudan_person', '相談員')}${f('sabisek', 'サービス提供責任者')}${f('cap_amount', '負担上限額（円）', 'number', 'min=0')}${f('cap_from', '上限額 開始', 'date')}${f('cap_to', '上限額 終了', 'date')}${f('start_date', 'サービス開始日', 'date')}${f('name_kana', '氏名カナ')}${f('decided_service_code', '決定サービスコード')}${f('contract_start', '契約開始日', 'date')}<label>住所区分<br><select id="ku_address_class"><option value="">未設定</option><option ${u.address_class === '59-4' ? 'selected' : ''}>59-4</option><option ${u.address_class === '715-5' ? 'selected' : ''}>715-5</option></select></label></div>
   <p><label><input type="checkbox" id="ku_cap_mgmt" style="width:auto" ${u.cap_mgmt ? 'checked' : ''}> 上限額管理が必要</label>　<label><input type="checkbox" id="ku_needs_check" style="width:auto" ${u.needs_check ? 'checked' : ''}> ⚠要確認</label></p>
   <p><label>身体介護 月支給量(時間)　<input id="ku_supply_body_hours" type="number" min="0" step="0.5" style="width:90px" value="${u.supply_body_hours ?? ''}"></label>　<label><input type="checkbox" id="ku_supply_body_conflict" style="width:auto" ${u.supply_body_conflict ? 'checked' : ''}> 支給量が資料で食い違い（空のまま）</label></p>
   <label>要確認メモ<br>${klIn('ku_check_memo', u.check_memo)}</label>
@@ -53,7 +53,7 @@ async function klUserView(id) {
 }
 async function klSaveUser(id) {
   const g = k => klV('ku_' + k), b = { name: g('name') }; if (!b.name) return $('ku_m').textContent = '氏名は必須です';
-  ['birth', 'address', 'phone', 'emergency', 'jukyusha_no', 'city', 'city_no', 'shien_kubun', 'valid_from', 'valid_to', 'soudan_office', 'soudan_person', 'sabisek', 'cap_from', 'cap_to', 'start_date', 'name_kana', 'decided_service_code', 'contract_start', 'check_memo'].forEach(k => b[k] = g(k));
+  ['birth', 'address', 'phone', 'emergency', 'jukyusha_no', 'city', 'city_no', 'shien_kubun', 'valid_from', 'valid_to', 'soudan_office', 'soudan_person', 'sabisek', 'cap_from', 'cap_to', 'start_date', 'name_kana', 'decided_service_code', 'contract_start', 'address_class', 'check_memo'].forEach(k => b[k] = g(k));
   b.cap_amount = g('cap_amount') == null ? null : +g('cap_amount'); b.supply_body_hours = g('supply_body_hours') == null ? null : +g('supply_body_hours'); b.supply_body_conflict = $('ku_supply_body_conflict').checked; b.cap_mgmt = $('ku_cap_mgmt').checked; b.needs_check = $('ku_needs_check').checked; b.updated_at = new Date().toISOString();
   try { await sb(`kin_user?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderKinLedger(); } catch (e) { $('ku_m').textContent = e.message; }
 }
