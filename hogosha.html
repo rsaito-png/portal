@@ -45,9 +45,9 @@ async function load() {
     if (d.expired) { $m().innerHTML = '<div class="card">このリンクは期限が切れています。お手数ですがレオまでご連絡ください。</div>'; return; }
     const mk = t => esc(t || '').split('\n').map(l => l.startsWith('#T ') ? `<h3 style="text-align:center">${l.slice(3)}</h3>` : l.startsWith('#R ') ? `<div style="text-align:right">${l.slice(3)}</div>` : `<div>${l || '&nbsp;'}</div>`).join('');
     $m().innerHTML = `<div class="card"><b>${esc(d.child)}</b> さん　第${d.term_no}期 個別支援計画（${esc(d.doc)}）<br><small>計画期間：${f(d.start)} 〜 ${f(d.end)}${d.sent_at ? '／送付日：' + dt(d.sent_at) : ''}</small>
-      <div style="margin-top:10px;font-size:15px;line-height:1.7">${mk(d.text) || '（まだ本文がありません。レオにお問い合わせください）'}</div></div>
+      <div style="margin-top:10px;font-size:15px;line-height:1.7">${mk(d.text) || '計画書の準備中です'}</div></div>
       ${d.done ? `<p class="ok">${dt(d.done)} に同意をいただきました。ありがとうございました。</p>`
-      : `<div class="card"><p>上の内容を確認しました。この個別支援計画（${esc(d.doc)}）に同意します。</p><button id="agb" onclick="sendDoui()">同意します</button><p id="r"></p></div>
+      : `<div class="card"><p>上の内容を確認しました。この個別支援計画（${esc(d.doc)}）に同意します。</p>${d.text ? '<button id="agb" onclick="sendDoui()">同意します</button>' : '<p class="note">計画書の準備ができるまで、同意はできません。</p>'}<p id="r"></p></div>
       <p class="note">${d.doc === '原案' ? '原案に同意していただいたあと、担当者会議を経て、本案の同意をあらためてお願いします。' : ''}このページはご家庭ごとの専用リンクです。ほかの方には送らないでください。同意は1回だけ受け付けます。</p>`}`;
   }
 }

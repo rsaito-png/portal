@@ -75,3 +75,21 @@ begin
 end $$;
 revoke all on function public.leo_doui_get, public.leo_doui_submit from public;
 grant execute on function public.leo_doui_get, public.leo_doui_submit to anon, authenticated;
+
+-- 【プライバシー】保護者に出すのは、その段階の計画書本文（原案 or 本案）だけ。アセスメント・担当者会議録・モニタリングの語が本文に入っていたら、出さない・同意も受けない（フェイルクローズ）
+create or replace function public.leo_plan_text_ok(t text) returns boolean language sql immutable as $$
+  select length(btrim(coalesce(t, ''))) > 0 and t !~ 'アセスメント|会議録|担当者会議|モニタリング|職員メモ' $$;
+create or replace function public.leo_doui_get(p_token text) returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('child', p.child, 'term_no', p.term_no, 'doc', l.doc, 'start', p.start_on, 'end', p.end_on,
+    'expired', (l.used_at is null and l.expires_at <= now()), 'sent_at', l.sent_at, 'done', l.used_at,
+    'text', case when l.used_at is null and l.expires_at <= now() then null
+      when public.leo_plan_text_ok(coalesce(l.text_snapshot, case l.doc when '原案' then p.genan else p.honan end)) then coalesce(l.text_snapshot, case l.doc when '原案' then p.genan else p.honan end) else null end)
+  from leo_plan_consent_links l join leo_plans p on p.id = l.plan_id where l.token = p_token and length(p_token) = 48 $$;
+do $$ begin
+  execute replace(pg_get_functiondef('public.leo_doui_submit'::regproc), E'  txt := coalesce(l.text_snapshot, case l.doc when ''原案'' then p.genan else p.honan end);',
+    E'  txt := coalesce(l.text_snapshot, case l.doc when ''原案'' then p.genan else p.honan end);\n  if not public.leo_plan_text_ok(txt) then raise exception ''計画書の準備中です''; end if;');
+  execute replace(pg_get_functiondef('public.leo_make_token_link'::regproc), E'    select token into t from leo_plan_consent_links where plan_id',
+    E'    if not public.leo_plan_text_ok(txt) then raise exception ''計画書の本文にアセスメント・会議録などが含まれています。本文を確認してください''; end if;\n    select token into t from leo_plan_consent_links where plan_id');
+end $$;
+-- 本文に不適切な語を含む未使用リンクは失効
+update public.leo_plan_consent_links set expires_at = now() where used_at is null and expires_at > now() and not public.leo_plan_text_ok(text_snapshot);
