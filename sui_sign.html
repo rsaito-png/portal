@@ -1,0 +1,88 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>計画書の確認と署名｜水晶玉</title>
+<style>
+.sui-doc{background:#fff;color:#000;font-size:12px}.sui-doc h2{font-size:15px;text-align:center}.sui-doc table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:560px}.sui-doc th,.sui-doc td{border:1px solid #444;padding:3px 4px;vertical-align:top;word-break:break-all;white-space:pre-wrap}.sui-doc th{background:#eee;font-weight:normal}.sui-doc .sec{margin:8px 0 2px;font-weight:bold}
+html,body{overscroll-behavior:none}
+#ov,#prev,#cv{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222;-webkit-text-size-adjust:100%}
+header{background:#2e6b4f;color:#fff;padding:14px 16px;font-size:18px}
+main{max-width:560px;margin:auto;padding:16px}.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin:12px 0}
+.pages img{width:100%;display:block;border:1px solid #ddd;margin:6px 0}.v{border-bottom:1px solid #eee;padding:10px 0}.v:last-child{border:0}.v label{display:flex;gap:10px;font-size:17px;align-items:flex-start}.v input{width:24px;height:24px;flex:none}
+.sm{color:#666;font-size:14px;margin:2px 0 0 34px;white-space:pre-wrap}
+#prev{border:2px dashed #888;border-radius:8px;min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;background:#fff;padding:8px}
+.mt{display:block;font-size:17px;margin:8px 0}.mt input{width:22px;height:22px;vertical-align:middle;margin-right:8px}
+body.lock{overflow:hidden;position:fixed;width:100%}
+#ov{position:fixed;inset:0;background:#fff;z-index:9;touch-action:none}#ov[hidden]{display:none}#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none}
+#ovb{position:absolute;left:0;right:0;bottom:0;padding:10px;background:#fffd;display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #ccc}#ovb span{color:#888;font-size:14px}#ovb button{margin:0}.ok2{width:auto;padding:10px 18px;font-size:16px;margin:0}
+input[type=text],textarea{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #bbb;border-radius:8px;margin-top:4px}
+button{font-size:18px;width:100%;padding:14px;border:0;border-radius:8px;background:#2e6b4f;color:#fff;margin-top:14px}button:disabled{background:#999}
+.sub{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:6px 14px;font-size:14px;margin:6px 0}
+.note{color:#777;font-size:13px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00}
+</style></head><body><header>水晶玉　計画書の確認と署名</header><main id="m"><p>読み込み中…</p></main>
+<script src="config.js"></script>
+<script src="signpad.js"></script>
+<script src="sui_render.js"></script>
+<script>
+// 本人向け：ログインなし。リンクのトークンで、その方の署名待ちの訪問だけを表示。1回限り・期限1週間。
+const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search), T = q.get('t') || '', DEMO = q.get('demo') === '1';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const $m = () => document.getElementById('m'), $ = id => document.getElementById(id);
+const fmt = d => { const x = new Date(d + 'T00:00:00+09:00'); return `${x.getMonth() + 1}/${x.getDate()}（${'日月火水木金土'[x.getDay()]}）`; };
+const DEMO_DATA = { name: '利用者A（見本）', explainer: '職員A', expires_at: new Date(Date.now() + 6048e5).toISOString(), docs: [{ code: 'keiyaku', label: '利用契約書', version: 'R8.10', pages: [] }] };
+let D = null;
+const bad = () => $m().innerHTML = '<div class="card">リンクが正しくないか、期限が切れている・すでに使われています。お手数ですが水晶玉までご連絡ください。</div>';
+async function load() {
+  if (DEMO) D = null;
+  else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); const r = await rpc('sui_sign_get', { p_token: T }); D = r.ok ? await r.json() : null; }
+  if (!D) return bad();
+  const d = suiDocHtml({ plan_type: D.plan_type, version: D.version, kind: D.kind, doc_class: D.doc_class, body: D.body });
+  $m().innerHTML = `<div class="card"><b>${esc(D.user_name)}</b> さん<br>説明職員（${esc(D.explainer)}）から説明を受けたうえで、内容をご確認ください。よければ下の方法で署名してください。</div>
+  <div class="card sui-doc" style="overflow-x:auto"><h2>${d.title}　v${D.version}</h2>${d.html}</div>
+  <div class="card"><b>署名の方法</b>
+   <label class="mt"><input type="radio" name="mt" value="本人" checked onchange="mtc()"> 本人が署名する</label>
+   <label class="mt"><input type="radio" name="mt" value="ご家族" onchange="mtc()"> 代理の方（ご家族など）が署名する</label>
+   <label class="mt"><input type="radio" name="mt" value="署名困難" onchange="mtc()"> 署名が難しい</label>
+   <label class="mt"><input type="radio" name="mt" value="あとで署名" onchange="mtc()"> あとで署名する</label>
+   <div id="rel" hidden><label>署名される方の氏名（必須）<input type="text" id="agv" maxlength="100"></label><label>本人との続柄（必須）<input type="text" id="relv" maxlength="50" placeholder="例：母"></label></div>
+   <div id="rsn" hidden><label>署名が難しい理由（必須）<textarea id="rsnv" rows="2" maxlength="500"></textarea></label></div>
+   <div id="sg"><p>署名（下の枠をタップすると、画面いっぱいで書けます）</p><div id="prev" onclick="openPad()">タップして署名を書く</div></div>
+   <p class="note" id="lt" hidden>「あとで署名」を選んでも、署名は済んでいない状態のまま記録されます。このリンクは、期限までもう一度使えます。</p>
+   <button id="go" onclick="send()">送信する</button><p id="r"></p></div>
+  <p class="note">このページはご本人専用のリンクで、署名が済むと使えなくなります（期限：${esc(new Date(D.expires_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }))}まで）。ほかの方には送らないでください。</p>
+  <div id="ov" hidden><canvas id="cv"></canvas><div id="ovb"><span>指で書いてください</span><button class="sub" onclick="padClr()">書き直す</button><button class="sub" onclick="padClose(false)">閉じる</button><button class="ok2" onclick="padClose(true)">これでよい</button></div></div>`;
+}
+const meth = () => document.querySelector('input[name=mt]:checked').value;
+function mtc() { const m = meth(); $('rel').hidden = m !== 'ご家族'; $('rsn').hidden = m !== '署名困難'; $('sg').hidden = !(m === '本人' || m === 'ご家族'); $('lt').hidden = m !== 'あとで署名'; $('go').textContent = m === 'あとで署名' ? 'あとで署名する（記録は残します）' : '送信する'; }
+// 全画面の署名パッド：記録ボット作の署名欄部品（signpad.js）を全画面の canvas で使い、画面全体で指の動きを拾う
+let pad = null, sigData = null;
+function openPad() {
+  $('ov').hidden = false; document.body.classList.add('lock');
+  if (!pad) pad = createSignPad($('cv')); pad.clear();
+}
+function padClr() { pad.clear(); sigData = null; }
+function padClose(ok) {
+  document.body.classList.remove('lock'); $('ov').hidden = true;
+  if (ok && pad.isDrawn()) { // 書いた範囲だけを切り出し、幅600pxまでに縮小してPNG化（白背景）
+    const cv = $('cv'), g0 = cv.getContext('2d'), W = cv.width, H = cv.height, d = g0.getImageData(0, 0, W, H).data;
+    let x0 = W, y0 = H, x1 = 0, y1 = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (d[i] < 200) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+    if (x1 < x0) { sigData = null; $('prev').textContent = 'タップして署名を書く'; return; }
+    const p = 16, sx = Math.max(0, x0 - p), sy = Math.max(0, y0 - p), sw = Math.min(W - sx, x1 - x0 + 2 * p), sh = Math.min(H - sy, y1 - y0 + 2 * p), sc = Math.min(1, 600 / sw);
+    const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(sw * sc)); t.height = Math.max(1, Math.round(sh * sc)); const g = t.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, t.width, t.height); g.drawImage(cv, sx, sy, sw, sh, 0, 0, t.width, t.height);
+    sigData = t.toDataURL('image/png'); $('prev').innerHTML = `<img src="${sigData}" alt="署名" style="max-width:100%;max-height:120px"><div class="note">タップして書き直し</div>`;
+  } else if (!sigData) $('prev').textContent = 'タップして署名を書く';
+}
+async function send() {
+  const out = $('r'), m = meth(), rel = $('relv') ? $('relv').value.trim() : '', ag = $('agv') ? $('agv').value.trim() : '', rs = $('rsnv') ? $('rsnv').value.trim() : '';
+  if ((m === '本人' || m === 'ご家族') && !sigData) { out.innerHTML = '<span class="err">署名を書いてください。</span>'; return; }
+  if (m === 'ご家族' && (!rel || !ag)) { out.innerHTML = '<span class="err">署名される方の氏名と続柄を入れてください。</span>'; return; }
+  if (m === '署名困難' && !rs) { out.innerHTML = '<span class="err">理由を入れてください。</span>'; return; }
+  $('go').disabled = true;
+  const r = await rpc('sui_sign_submit', { p_token: T, p_method: m, p_signature: (m === '本人' || m === 'ご家族') ? sigData : null, p_name: m === 'ご家族' ? ag : null, p_relation: m === 'ご家族' ? rel : null, p_reason: m === '署名困難' ? rs : null });
+  if (r.ok) { $m().innerHTML = '<div class="card ok">' + (m === 'あとで署名' ? 'あとで署名として記録しました。このリンクは、期限までもう一度使えます。' : '署名を記録しました。ありがとうございました。このページは閉じて大丈夫です。') + '</div>'; }
+  else { $('go').disabled = false; out.innerHTML = '<span class="err">送信できませんでした。リンクが使用済み・期限切れの可能性があります。</span>'; }
+}
+load();
+</script></body></html>
