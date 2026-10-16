@@ -79,12 +79,13 @@ async function klOffice() {
   <p><button onclick="klSaveOffice(${o ? o.id : 'null'})">保存</button> <span id="ko_m"></span></p></div>`;
 }
 async function klSaveOffice(id) {
+  const [o0] = id ? await sb(`kin_office_setting?id=eq.${id}&select=additions`) : [null]; const old = (o0 && o0.additions) || [];
   const names = ['特定事業所加算Ⅱ', '処遇改善加算Ⅱ', '早朝', '夜間', '深夜'];
-  const b = { office_no: klV('ko_no'), area_grade: klV('ko_area'), additions: names.map((n, i) => ({ name: n, kind: '加算', active: $('ko_a' + i).checked })), updated_at: new Date().toISOString() };
+  const b = { office_no: klV('ko_no'), area_grade: klV('ko_area'), additions: old.filter(a => !names.includes(a.name)).concat(names.map((n, i) => Object.assign({ kind: '加算' }, old.find(a => a.name === n) || {}, { active: $('ko_a' + i).checked }))), updated_at: new Date().toISOString() };
   try { await sb(id ? `kin_office_setting?id=eq.${id}` : 'kin_office_setting', { method: id ? 'PATCH' : 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); $('ko_m').textContent = '保存しました'; } catch (e) { $('ko_m').textContent = e.message + '（管理側のみ編集できます）'; }
 }
 async function klCode() {
   const cs = await sb('kin_service_code?select=*&order=service,id');
-  return `<p class="note">国保連のコード表と照合して登録します（器のみ・未登録）。身体介護の時間区分：20分未満／20分以上30分未満／30分以上1時間未満／1時間以上1時間30分未満／以降30分刻み。時間区分は記録の開始〜終了の実時間で決めます。</p>` +
-    (cs.length ? `<table class="tbl"><tr><th>種別</th><th>時間区分</th><th>時間帯区分</th><th>コード</th><th>単位</th></tr>${cs.map(c => `<tr><td>${esc(c.service)}</td><td>${esc(c.duration_class || '')}</td><td>${esc(c.time_band || '')}</td><td>${esc(c.code || '')}</td><td>${c.units ?? ''}</td></tr>`).join('')}</table>` : '<p>未登録</p>');
+  return `<p class="note">国保連のコード表と照合して登録します（令和8年6月施行版・居宅介護。身体介護の時間区分：30分未満／30分以上1時間未満／1時間以上1時間30分未満／以降30分刻み（20分以上30分未満の区分は居宅介護にはありません）。時間区分は記録の開始〜終了の実時間で決めます。</p>` +
+    (cs.length ? `<table class="tbl"><tr><th>種別</th><th>時間区分</th><th>時間帯区分</th><th>コード</th><th>単位</th><th>備考</th></tr>${cs.map(c => `<tr><td>${esc(c.service)}</td><td>${esc(c.duration_class || '')}</td><td>${esc(c.time_band || '')}</td><td>${esc(c.code || '')}</td><td>${c.units ?? ''}</td><td>${esc(c.memo || '')}</td></tr>`).join('')}</table>` : '<p>未登録</p>');
 }
