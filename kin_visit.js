@@ -13,7 +13,7 @@ async function kvList() {
   const [vs, us] = await Promise.all([sb(`kin_visit?visit_date=gte.${m}-01&visit_date=lt.${next}&select=*&order=visit_date.desc,start_time`), sb('kin_user?select=id,name&order=name')]);
   const nm = Object.fromEntries(us.map(u => [u.id, u.name]));
   const rows = vs.map(v => `<tr><td>${esc(v.visit_date)}</td><td>${esc(nm[v.user_id] || '')}</td><td>${v.staff_name ? esc(v.staff_name) : '<span style="color:#c60">（未入力）</span>'}</td><td>${esc(v.service)}</td><td>${esc(v.start_time.slice(0, 5))}〜${esc(v.end_time.slice(0, 5))}</td><td>${v.actual_minutes}分</td><td>${esc(v.addition || '')}</td><td>${v.sign_status === '署名済み' ? '✅' : '⬜未署名'}</td><td>${v.staff_confirmed ? '職✔' : ''}${v.sab_confirmed ? ' サ✔' : ''}</td><td><button onclick="KV.id=${v.id};renderKinVisit()">開く</button></td></tr>`).join('');
-  return `<h3>金斗雲 訪問記録</h3><p>月 <input type="month" id="kv_m" value="${esc(m)}" onchange="KV.month=this.value||KV.month;renderKinVisit()"> <button onclick="KV.id='new';renderKinVisit()">＋訪問を追加</button></p>` +
+  return `<h3>金斗雲 訪問記録</h3><p>月 <input type="month" id="kv_m" value="${esc(m)}" onchange="KV.month=this.value||KV.month;renderKinVisit()"> <button onclick="KV.id='new';renderKinVisit()">＋訪問を追加</button> <button class="back" onclick="location.hash='kintoun/check'">✅記録・署名チェック／署名リンク発行へ</button></p>` +
     (vs.length ? `<table class="tbl"><tr><th>提供日</th><th>利用者</th><th>職員</th><th>種別</th><th>時間</th><th>実時間</th><th>加算</th><th>署名</th><th>確認</th><th></th></tr>${rows}</table><p>${vs.length}件／未署名 ${vs.filter(v => v.sign_status !== '署名済み').length}件</p>` : '<p>この月の記録はありません。</p>');
 }
 async function kvForm(id) {

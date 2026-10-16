@@ -1,0 +1,73 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>ご利用の確認と署名｜金斗雲</title>
+<style>
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222;-webkit-text-size-adjust:100%}
+header{background:#2e6b4f;color:#fff;padding:14px 16px;font-size:18px}
+main{max-width:560px;margin:auto;padding:16px}.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin:12px 0}
+.v{border-bottom:1px solid #eee;padding:10px 0}.v:last-child{border:0}.v label{display:flex;gap:10px;font-size:17px;align-items:flex-start}.v input{width:24px;height:24px;flex:none}
+.sm{color:#666;font-size:14px;margin:2px 0 0 34px;white-space:pre-wrap}
+canvas{border:2px solid #888;border-radius:8px;width:100%;height:180px;touch-action:none;-webkit-user-select:none;user-select:none;background:#fff;display:block}
+button{font-size:18px;width:100%;padding:14px;border:0;border-radius:8px;background:#2e6b4f;color:#fff;margin-top:14px}button:disabled{background:#999}
+.sub{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:6px 14px;font-size:14px;margin:6px 0}
+.note{color:#777;font-size:13px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00}
+</style></head><body><header>金斗雲　ご利用の確認と署名</header><main id="m"><p>読み込み中…</p></main>
+<script src="config.js"></script>
+<script>
+// 本人向け：ログインなし。リンクのトークンで、その方の署名待ちの訪問だけを表示。1回限り・期限1週間。
+const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search), T = q.get('t') || '', DEMO = q.get('demo') === '1';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const $m = () => document.getElementById('m'), $ = id => document.getElementById(id);
+const fmt = d => { const x = new Date(d + 'T00:00:00+09:00'); return `${x.getMonth() + 1}/${x.getDate()}（${'日月火水木金土'[x.getDay()]}）`; };
+const DEMO_DATA = { name: '利用者A（見本）', expires_at: new Date(Date.now() + 6048e5).toISOString(), visits: [
+  { id: 1, date: '2026-11-02', start: '07:00', end: '07:30', minutes: 30, service: '身体介護', staff: '職員A', content: '朝食の準備・配膳・片付け', note: null },
+  { id: 2, date: '2026-11-02', start: '18:00', end: '18:30', minutes: 30, service: '身体介護', staff: '職員B', content: '夕食の準備', note: null }] };
+let D = null;
+const bad = () => $m().innerHTML = '<div class="card">リンクが正しくないか、期限が切れている・すでに使われています。お手数ですが金斗雲までご連絡ください。</div>';
+async function load() {
+  if (DEMO) D = DEMO_DATA;
+  else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); const r = await rpc('kin_sign_get', { p_token: T }); D = r.ok ? await r.json() : null; if (!D) return bad(); }
+  if (!D.visits.length) { $m().innerHTML = '<div class="card">署名待ちの訪問はありません。</div>'; return; }
+  $m().innerHTML = `<div class="card"><b>${esc(D.name)}</b> さん<br>内容をご確認のうえ、よければチェックを入れて署名してください。</div>
+  <div class="card">${D.visits.map(v => `<div class="v"><label><input type="checkbox" class="vc" value="${v.id}" checked><span>${fmt(v.date)} ${esc(v.start)}〜${esc(v.end)}（${v.minutes}分）　${esc(v.service)}${v.staff ? '　担当：' + esc(v.staff) : ''}</span></label>${v.content ? `<div class="sm">${esc(v.content)}</div>` : ''}${v.note ? `<div class="sm">特記：${esc(v.note)}</div>` : ''}</div>`).join('')}
+  <button class="sub" onclick="document.querySelectorAll('.vc').forEach(c=>c.checked=true)">すべて選ぶ</button> <button class="sub" onclick="document.querySelectorAll('.vc').forEach(c=>c.checked=false)">すべてはずす</button></div>
+  <div class="card"><b>署名</b>（指で枠の中に書いてください）<canvas id="cv"></canvas><button class="sub" onclick="clr()">書き直す</button>
+  <button id="go" onclick="send()">この内容で署名する</button><p id="r"></p></div>
+  <p class="note">このページはご本人専用のリンクで、1回だけ使えます（期限：${esc(new Date(D.expires_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }))}まで）。ほかの方には送らないでください。選ばなかった訪問は、あらためて新しいリンクで署名します。</p>`;
+  initCanvas();
+}
+let cv, cx, dirty = false, drawing = false, last = null;
+function pos(e) { const r = cv.getBoundingClientRect(), p = e.touches && e.touches[0] ? e.touches[0] : e; return { x: (p.clientX - r.left) * cv.width / r.width, y: (p.clientY - r.top) * cv.height / r.height }; }
+function start(e) { e.preventDefault(); drawing = true; last = pos(e); cx.beginPath(); cx.arc(last.x, last.y, cx.lineWidth / 2, 0, 7); cx.fill(); dirty = true; }
+function move(e) { if (!drawing) return; e.preventDefault(); const p = pos(e); cx.beginPath(); cx.moveTo(last.x, last.y); cx.lineTo(p.x, p.y); cx.stroke(); last = p; }
+function end(e) { if (e) e.preventDefault(); drawing = false; }
+function initCanvas() {
+  cv = $('cv'); const r = cv.getBoundingClientRect(), k = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(r.width * k); cv.height = Math.round(r.height * k); cx = cv.getContext('2d');
+  cx.fillStyle = '#000'; cx.strokeStyle = '#000'; cx.lineWidth = 3 * k; cx.lineCap = 'round'; cx.lineJoin = 'round';
+  const o = { passive: false };
+  if (window.PointerEvent) { // 新しいiOS Safariを含め pointer events が基本
+    cv.addEventListener('pointerdown', e => { try { cv.setPointerCapture(e.pointerId); } catch (_) {} start(e); }, o);
+    cv.addEventListener('pointermove', move, o); cv.addEventListener('pointerup', end, o); cv.addEventListener('pointercancel', end, o);
+  } else { // 古いブラウザ：touch / mouse
+    cv.addEventListener('touchstart', start, o); cv.addEventListener('touchmove', move, o); cv.addEventListener('touchend', end, o); cv.addEventListener('touchcancel', end, o);
+    cv.addEventListener('mousedown', start, o); window.addEventListener('mousemove', move, o); window.addEventListener('mouseup', () => end(), o);
+  }
+  cv.addEventListener('touchmove', e => e.preventDefault(), o); // 描画中のスクロール抑止（pointer経路でも念のため）
+}
+function clr() { cx.clearRect(0, 0, cv.width, cv.height); dirty = false; }
+async function send() {
+  const ids = [...document.querySelectorAll('.vc:checked')].map(c => +c.value), out = $('r');
+  if (!ids.length) { out.innerHTML = '<span class="err">署名する訪問を選んでください。</span>'; return; }
+  if (!dirty) { out.innerHTML = '<span class="err">署名を書いてください。</span>'; return; }
+  if (DEMO) { out.innerHTML = '<span class="ok">見本なので送信しません。</span>'; return; }
+  $('go').disabled = true;
+  // 白背景に合成してPNG化
+  const t = document.createElement('canvas'); t.width = cv.width; t.height = cv.height; const g = t.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, t.width, t.height); g.drawImage(cv, 0, 0);
+  const r = await rpc('kin_sign_submit', { p_token: T, p_visit_ids: ids, p_signature: t.toDataURL('image/png') });
+  if (r.ok) { $m().innerHTML = '<div class="card ok">署名しました（' + ids.length + '件）。ありがとうございました。このページは閉じて大丈夫です。</div>'; }
+  else { $('go').disabled = false; out.innerHTML = '<span class="err">送信できませんでした。リンクが使用済み・期限切れの可能性があります。金斗雲までご連絡ください。</span>'; }
+}
+load();
+</script></body></html>
