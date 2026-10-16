@@ -41,23 +41,11 @@ async function load() {
       <label><input type="radio" name="cf" value="相違があります"> 相違があります</label></div>
     <label>保護者氏名</label><input type="text" id="pn" maxlength="60" autocomplete="name">
     <label>相違点・ご意見（任意）</label><textarea id="cm" rows="3" maxlength="2000"></textarea>
-    <label>署名（任意・指でなぞってください）</label><canvas id="sg" width="600" height="180"></canvas><button class="sub" onclick="clr()">署名を消す</button>
     <button onclick="send()">送信する</button><p id="r"></p></div>
     <p class="note">このページはご家庭ごとの専用リンクです。ほかの方には送らないでください。</p>`;
-  pad();
 }
 const $m = () => document.getElementById('m');
 const bad = () => $m().innerHTML = '<div class="card">リンクが正しくないか、期限が切れています。お手数ですがレオまでご連絡ください。</div>';
-let drawn = false;
-function pad() {
-  const c = document.getElementById('sg'), x = c.getContext('2d'); x.lineWidth = 3; x.lineCap = 'round';
-  const p = e => { const b = c.getBoundingClientRect(); return [(e.clientX - b.left) * c.width / b.width, (e.clientY - b.top) * c.height / b.height]; };
-  let on = false;
-  c.onpointerdown = e => { on = true; x.beginPath(); x.moveTo(...p(e)); c.setPointerCapture(e.pointerId); };
-  c.onpointermove = e => { if (on) { x.lineTo(...p(e)); x.stroke(); drawn = true; } };
-  c.onpointerup = () => on = false;
-}
-function clr() { const c = document.getElementById('sg'); c.getContext('2d').clearRect(0, 0, c.width, c.height); drawn = false; }
 async function send() {
   const cf = document.querySelector('input[name=cf]:checked'), pn = document.getElementById('pn').value.trim(), out = document.getElementById('r');
   if (!cf) { out.innerHTML = '<span class="err">「確認」を選んでください。</span>'; return; }
@@ -65,7 +53,7 @@ async function send() {
   if (cf.value === '相違があります' && !document.getElementById('cm').value.trim()) { out.innerHTML = '<span class="err">相違点をお書きください。</span>'; return; }
   if (DEMO) { out.innerHTML = '<span class="ok">見本なので送信しません（本番では保存されます）。</span>'; return; }
   const r = await rpc('leo_confirm_submit', { p_token: T, p_confirm: cf.value, p_parent: pn, p_comment: document.getElementById('cm').value,
-    p_signature: drawn ? document.getElementById('sg').toDataURL('image/png') : '' });
+    p_signature: '' });
   out.innerHTML = r.ok ? '<span class="ok">送信しました。ありがとうございました。</span>' : '<span class="err">送信できませんでした。時間をおいてもう一度お試しください。</span>';
   if (r.ok) document.querySelector('.card:last-of-type button:last-of-type').disabled = true;
 }
