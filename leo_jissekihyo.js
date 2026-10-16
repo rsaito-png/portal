@@ -42,7 +42,7 @@ LEO_VIEWS.jissekihyo = async function () {
     : '<p>この月の実績がまだありません。</p>'}
     <p id="jhmsg" class="note"></p>
     <p><a href="#leo/kakunin">🖊️ リンクを作る・回答の詳細は「保護者の実績確認」へ</a>　<a href="#leo/jisseki">実績記録を見る</a></p>
-    <p class="note">送る日は今は毎月20日ごろ（Google側）。3日・前月分に変える予定です。ポータルのリンクは、この画面の「コピー」を公式LINEで送ります。Google側の回答はこの画面には自動では入りません。</p>`;
+    <p class="note">送る日は毎月初めです。ポータルのリンクは、この画面の「コピー」を公式LINEで送ります。Google側の回答はこの画面には自動では入りません。</p>`;
 };
 function jhCopy(t, b) { const u = DEMO ? KK_URL('').replace('t=', 'demo=1') : KK_URL(t); navigator.clipboard.writeText(u).then(() => { b.textContent = 'コピーしました'; }, () => prompt('このリンクをコピーしてください', u)); }
 async function jhSent(i, on) {
