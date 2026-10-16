@@ -119,14 +119,14 @@ async function saveEntry(e, lines) {
 const accByName = async name => (await sb('acc_accounts?select=id&name=eq.' + encodeURIComponent(name)))[0]?.id;
 
 /* ---- 画面ルーター ---- */
-const TABS = [['deal', '取引入力'], ['journal', '仕訳帳'], ['transfer', '振替'], ['bank', 'CSV取込'], ['report', '試算表'], ['cash', 'キャッシュフロー'], ['tax', '申告'], ['master', 'マスタ']];
+const TABS = [['deal', '取引入力'], ['journal', '仕訳帳'], ['transfer', '振替'], ['bank', 'CSV取込'], ['report', '試算表'], ['cash', 'キャッシュフロー'], ['tax', '申告'], ['dep', '償却資産'], ['master', 'マスタ']];
 let FLASH = '', FLASHCLS = 'ok', FLASHT = 0;
 function flash(m, cls) { FLASH = m; FLASHCLS = cls || 'ok'; FLASHT = Date.now(); }
 async function route() {
   const [t, q] = (location.hash.slice(1) || 'deal').split('?'); const tab = TABS.find(x => x[0] === t) ? t : 'deal'; const sp = new URLSearchParams(q || '');
   $('nav').innerHTML = TABS.map(([k, l]) => `<a href="#${k}" class="${k === tab ? 'on' : ''}">${l}</a>`).join('');
   $('view').innerHTML = '<p class="note">読み込み中…</p>';
-  try { await ({ deal: vDeal, journal: vJournal, transfer: vTransfer, bank: vBank, report: vReport, cash: vCash, tax: vTax, master: vMaster })[tab](sp); }
+  try { await ({ deal: vDeal, journal: vJournal, transfer: vTransfer, bank: vBank, report: vReport, cash: vCash, tax: vTax, dep: vDep, master: vMaster })[tab](sp); }
   catch (e) { $('view').innerHTML = `<p class="ng">${esc(e.message)}</p>`; }
 }
 window.addEventListener('hashchange', route);

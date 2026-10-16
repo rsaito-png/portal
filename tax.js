@@ -75,7 +75,7 @@ async function vTax(sp) {
     <div class="warn"><b>電子申告（e-Tax／eLTAX）は税理士または本人が行います。本出力は概算で、必ず税理士の確認が必要です。</b>この画面から税務署・自治体へ送信することはありません。</div>
     ${done()}<div class="card"><div class="g"><div><label>事業年度</label><select id="tx_fy" onchange="location.hash='tax?s='+TXS.sub+'&fy='+this.value">${fyOpts}</select></div>
     <button class="sub" onclick="window.print()">🖨 印刷／PDF保存</button>
-    <button onclick="txPack('all')">📦 申告書類一式を出力（紙提出用）</button><button class="sub" onclick="txCsvDownload('${TXS.sub}')">⬇ この画面をCSV</button></div>
+    <button onclick="txPack('all')">📦 申告書類一式を出力（紙提出用）</button><button class="sub" onclick="depPrintNow(2027)">🏭 償却資産申告書を出力（市役所・1月）</button><button class="sub" onclick="txCsvDownload('${TXS.sub}')">⬇ この画面をCSV</button></div>
     ${fy.from < '2025-06-01' ? '<p class="ng">第4期以前の取引はまだ移行していないため、この期の数字は不完全です。</p>' : ''}
     <p class="note">一式＝表紙・提出前チェックリスト・入力不足の警告・税務署／県税事務所／市役所の綴り・根拠URL。別に出す: <a href="javascript:txPack('nta')">税務署分のみ</a>｜<a href="javascript:txPack('pref')">県税事務所分のみ</a>｜<a href="javascript:txPack('city')">市役所分のみ</a>。新しい画面が開くので、印刷→「PDFに保存」。様式は公式様式に準じた自作レイアウトです。</p>
     <details><summary>基本情報（申告書の表紙・各様式の欄に入ります）</summary><div class="g">${iS('houjinNo', '法人番号（13桁）', '')}${iS('phone', '電話番号', '')}${iS('bizType', '事業種目', '')}${iS('repAddr', '代表者の住所', '')}</div><button onclick="txSave()">💾 基本情報を保存</button></details>
