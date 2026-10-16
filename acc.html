@@ -1,0 +1,39 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会計（簡易）</title>
+<style>
+:root{--main:#2e6b4f}
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222}
+header{background:var(--main);color:#fff;padding:14px 16px;font-size:18px;display:flex;justify-content:space-between;align-items:center}
+header a{color:#fff}
+main{max-width:1000px;margin:auto;padding:12px}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin-bottom:12px}
+input,select,button,textarea{font-size:16px;box-sizing:border-box;padding:9px;margin:3px 0;border-radius:8px;border:1px solid #bbb;max-width:100%}
+input:not([type=checkbox]):not([type=radio]),select{width:100%}
+button{background:var(--main);color:#fff;border:0;cursor:pointer;width:auto;padding:9px 16px}
+button.sub{background:#fff;color:#333;border:1px solid #bbb}
+button.red{background:#fff;color:#b00;border:1px solid #b00;padding:4px 10px}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+nav a{padding:8px 14px;background:#fff;border:1px solid #bbb;border-radius:8px;color:#333;text-decoration:none}
+nav a.on{background:var(--main);color:#fff;border-color:var(--main)}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{border-bottom:1px solid #eee;padding:5px 4px;text-align:left;vertical-align:top}
+.r{text-align:right}.note{color:#777;font-size:13px}.ok{background:#dff3e4;padding:8px;border-radius:8px}.ng{background:#fde2e2;padding:8px;border-radius:8px}.warn{background:#fff3c4;padding:8px;border-radius:8px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+.ln{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;border-bottom:1px solid #eee;padding:6px 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+label{font-size:13px;color:#555;display:block}h2{margin:6px 0 10px;font-size:20px}h3{margin:4px 0 8px;font-size:16px}
+.sec td{background:#f0f3f5;font-weight:bold}.tot td{font-weight:bold}
+.scroll{overflow-x:auto}
+</style></head><body>
+<header><span>📒 会計（簡易）</span><span><a href="index.html">← ポータルへ</a></span></header>
+<main>
+<div id="login" class="card" hidden><p>法人管理者のメールアドレスでログインしてください。</p>
+<input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
+<input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
+<button onclick="accLogin()">ログイン</button><div id="msg" style="color:#c00"></div></div>
+<div id="app" hidden><nav id="nav"></nav><div id="view"></div></div>
+<div id="deny" class="card" hidden>この画面は法人管理者だけが使えます。<br><a href="index.html">ポータルへ戻る</a></div>
+<p id="boot" class="note">読み込み中…</p>
+</main>
+<script src="config.js?v=202610161900"></script>
+<script src="acc.js?v=202610171"></script>
+</body></html>
