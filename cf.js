@@ -7,7 +7,7 @@
   function cfCompute(lines, wallets, from, to) {
     const wacc = new Map(wallets.map(w => [w.account_id, w.id])), months = monthsOf(from, to);
     const ents = new Map();
-    for (const l of lines) { const e = l.acc_entries; if (!e || e.entry_date > to) continue; let x = ents.get(l.entry_id); if (!x) ents.set(l.entry_id, x = { date: e.entry_date, kind: e.kind, ls: [] }); x.ls.push(l); }
+    for (const l of lines) { const e = l.acc_entries; if (!e || e.entry_date > to) continue; let x = ents.get(l.entry_id); if (!x) ents.set(l.entry_id, x = { date: e.kind === 'opening' ? '0000-01-01' : e.entry_date, kind: e.kind, ls: [] }); x.ls.push(l); }
     const z = () => ({ open: 0, in: 0, out: 0, tr: 0 });
     const W = {}; wallets.forEach(w => W[w.id] = Object.fromEntries(months.map(m => [m, z()]))); const open = {}; wallets.forEach(w => open[w.id] = 0);
     const T = Object.fromEntries(months.map(m => [m, { in: 0, out: 0 }]));

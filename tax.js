@@ -45,10 +45,17 @@ function txCalc() {
   const { fy, cache, accs } = TXS, d = TXS.data;
   const lg = TX.ledger(cache.lines, accs, fy.from, fy.to), fs = TX.statements(lg);
   const cap = fs.bs.E.filter(r => /資本金|資本準備金|その他資本剰余金|新株式申込証拠金/.test(r.category)).reduce((s, r) => s + r.bal, 0);
-  const hjIn = { months: 12, capital: d.capital === '' || d.capital == null ? cap : d.capital, emp50: (d.emp50 ?? '1') !== '0', loss: d.loss, credit: d.credit, interim: d.interim, entertainTotal: d.entertainTotal, entSmall: d.entSmall, entMeal: d.entMeal, adds: d.adds, subs: d.subs, dep: d.dep };
+  const hjIn = { months: 12, capital: d.capital === '' || d.capital == null ? cap : d.capital, emp50: (d.emp50 ?? '1') !== '0', loss: d.loss, credit: d.credit, interim: d.interim, kintoCityOv: d.kintoCityOv, kintoPrefOv: d.kintoPrefOv, entertainTotal: d.entertainTotal, entSmall: d.entSmall, entMeal: d.entMeal, adds: d.adds, subs: d.subs, dep: d.dep };
   const hj = TX.hojin(hjIn, fs, fy.from), sh = TX.shohi(cache.lines, accs, fy.from, fy.to, { taxable: (d.taxable ?? '1') !== '0', kind: d.kind || 5, pA: d.pA, pB: d.pB, u80: d.u80, u70: d.u70, interimC: d.interimC }, fy.to);
   TXS.calc = { lg, fs, hj, sh, cap };
 }
+// 第5期（令和7.6.1〜8.5.31）の実際の申告書（税理士作成・電子申告済み・令和8.7.28決算確定）の値。写真(別表一・四・五(一))から転記。
+const ACT5 = { b4: { net: 2222843, nouzei: 868200, depEx: 232383, addSub: 1100583, jigyo: 14100, kari: 3309326, shotoku: 346, income: 3309672 },
+  b1: { income: 3309672, hz: 496350, credit: 346, diff: 496000, interim: 0, final: 496000, chihouBase: 496000, chihou: 51088, chihouFinal: 51000 },
+  b5: { ret: [-114403, -114403, 2108440, 2108440], nouzeiJ: [167500, 167500, 868200, 868200], hojin: [-48900, -48900, -547000, -547000], ken: [-22400, -22400, -26900, -26900], shi: [-82100, -82100, -135700, -135700], total: [-100303, -100303, 2499423, 2499423] },
+  ken: 26900, shi: 135700, jigyoTotal: 158600 /* 868,200−547,000−26,900−135,700（別表五から逆算。事業税＋特別法人事業税） */, paid: 868200, fixedDate: '2026-07-28' };
+const SEED5 = { subs: [{ label: '納税充当金から支出した事業税等の金額（前期事業税の認容・別表四13）', amount: 14100 }], credit: 346, interim: 0, dep: [{ name: '償却超過額（申告書 別表四10・別表五(一)3 より）', cost: '', dep: 232383, limit: 0 }], kintoCityOv: 100000,
+  b5: [{ label: '未納法人税（未納地方法人税を含む）', open: -48900, dec: -48900, inc: -547000 }, { label: '未納道府県民税（均等割を含む）', open: -22400, dec: -22400, inc: -26900 }, { label: '未納市町村民税（均等割を含む）', open: -82100, dec: -82100, inc: -135700 }] };
 const pName = id => +id ? (TXS.partners.get(+id) || '取引先' + id) : '(取引先未設定)';
 
 /* ---- 画面本体 ---- */
@@ -59,7 +66,7 @@ async function vTax(sp) {
   if (!TXS.accs) TXS.accs = await sb('acc_accounts?select=id,name,type,category,sort&limit=1000');
   if (!TXS.partners) TXS.partners = new Map((await fetchAll('acc_partners?select=id,name')).map(p => [p.id, p.name]));
   if (!TXS.cache || TXS.cache.to !== fy.to || sp.get('reload')) TXS.cache = { to: fy.to, lines: await fetchAll(`acc_lines?select=id,side,amount,account_id,tax_code,entry_id,acc_entries!inner(entry_date,kind,partner_id,memo)&acc_entries.entry_date=lte.${fy.to}`) };
-  if (change || sp.get('reload')) { const r = await sb(`acc_tax_inputs?select=data&fy_start=eq.${fy.from}`); TXS.data = r[0]?.data || {}; }
+  if (change || sp.get('reload')) { const r = await sb(`acc_tax_inputs?select=data&fy_start=eq.${fy.from}`); TXS.data = r[0]?.data || {}; TXS.seeded = false; if (y === 2025 && !r[0]) { TXS.data = JSON.parse(JSON.stringify(SEED5)); TXS.seeded = true; } }
   txCalc(); TXCSV.length = 0;
   const body = await ({ fs: txFs, ns: txNs, hj: txHj, sh: txSh, vf: txVf })[TXS.sub]();
   const fyOpts = [2024, 2025, 2026].map(v => `<option value="${v}"${v === y ? ' selected' : ''}>${fyOf(v).label}</option>`).join('');
@@ -126,14 +133,14 @@ function txNs() {
 
 /* ---- (3) 法人税・地方税 ---- */
 function txHj() {
-  const { fs, hj, cap } = TXS.calc, d = TXS.data, T = TX.TAXRATES, e = hj.ent, y = TXS.fy;
+  const { fs, hj, cap, sh: sh0 } = TXS.calc, d = TXS.data, T = TX.TAXRATES, e = hj.ent, y = TXS.fy;
   const dz = TX.doozoku(d.dz), kinds = [['留保', '留保'], ['社外流出', '社外流出']];
-  const b1 = [['所得金額（別表四 差引計）', hj.income], ['法人税額（税率: 年800万円以下15%／超23.2%）', hj.hz], ['税額控除（所得税額控除等・入力）', hj.credit], ['差引法人税額', Math.max(0, hj.hz - hj.credit)], ['中間納付額（入力）', hj.interim], { r: ['差引確定法人税額（納付）', hj.final], c: 'tot' },
-    ['課税標準法人税額', TX.fK(hj.hz)], ['地方法人税額（10.3%）', hj.chihou], { r: ['防衛特別法人税（' + (hj.boeiOn ? '(基準法人税額−500万円)×4%' : '令和8年4月1日以後開始事業年度から。この期は対象外') + '）', hj.boei], c: '' }];
+  const b1 = [['所得金額（別表四 差引計）', hj.income], ['法人税額（税率: 年800万円以下15%／超23.2%）', hj.hz], ['税額控除（所得税額控除等・入力）', hj.credit], ['差引所得に対する法人税額（1,000円未満切捨て）', hj.hzNet], ['中間納付額（入力）', hj.interim], { r: ['差引確定法人税額（納付）', hj.final], c: 'tot' },
+    ['課税標準法人税額（別表一28→30・1,000円未満切捨て）', TX.fK(hj.hz)], ['地方法人税額（10.3%）', hj.chihou], { r: ['防衛特別法人税（' + (hj.boeiOn ? '(基準法人税額−500万円)×4%' : '令和8年4月1日以後開始事業年度から。この期は対象外') + '）', hj.boei], c: '' }];
   const b4 = [['当期利益又は当期欠損の額（税引後の当期純利益）', hj.preTax, ''], { r: ['【加算】', '', ''], c: 'sec' }, ...hj.adds.map(r => [r.label, +r.amount || 0, r.kind]), { r: ['加算 小計', hj.sA, ''], c: 'tot' }, { r: ['【減算】', '', ''], c: 'sec' }, ...hj.subs.map(r => [r.label, +r.amount || 0, r.kind || '']), { r: ['減算 小計', hj.sS, ''], c: 'tot' },
     ['仮計', hj.sub1, ''], ['（繰越欠損金の当期控除額 別表七(一)）', -hj.loss, ''], { r: ['所得金額又は欠損金額（千円未満切捨て）', hj.income, ''], c: 'tot' }];
   // 別表五(一)
-  const so = fs.bs.L.find(r => r.name === '未払法人税等'), taxOpen = so?.open ?? 0, taxClose = so?.bal ?? 0, taxFinal = hj.hz - hj.credit - hj.interim + hj.chihou + hj.boei + hj.kPref + hj.kCity + hj.zHzPref + hj.zHzCity;
+  const so = fs.bs.L.find(r => r.name === '未払法人税等'), taxOpen = so?.open ?? 0, taxClose = so?.bal ?? 0, taxFinal = hj.hzNet - hj.interim + hj.chihou + hj.boei + hj.kPref + hj.kCity + hj.zHzPref + hj.zHzCity;
   const retO = fs.bs.retainedOpen;
   const retClose = fs.eq.re.close, o5 = d.b5 || [], o5sum = o5.reduce((s, r) => s + (+r.open || 0), 0), o5inc = o5.reduce((s, r) => s + (+r.inc || 0), 0), o5dec = o5.reduce((s, r) => s + (+r.dec || 0), 0);
   const depEx = hj.depExcess;
@@ -154,16 +161,28 @@ function txHj() {
     ['防衛特別法人税', '(基準法人税額−500万円)×4%（令和8年4月1日以後開始事業年度〜）', 'https://www.nta.go.jp/publication/pamph/pdf/0025004-109_1.pdf'], ['三重県 法人事業税', '所得 400万以下 3.5% / 400〜800万 5.3% / 超 7.0%', 'https://www.pref.mie.lg.jp/ZEIMU/HP/16336017880.htm'],
     ['特別法人事業税', '事業税所得割（標準税率で計算）×37%', 'https://www.soumu.go.jp/main_sosiki/jichi_zeisei/czaisei/czaisei_seido/150790_01.html'], ['三重県 法人県民税', '均等割 資本金等1千万円以下 22,000円（みえ森と緑の県民税2,000円を含む）／法人税割 1.0%', 'https://www.pref.mie.lg.jp/ZEIMU/HP/16338017882.htm'],
     ['四日市市 法人市民税', '均等割 資本金等1千万円以下・従業者50人以下 50,000円／法人税割 7.2%（標準6.0%＋超過1.2%）', 'https://www.city.yokkaichi.lg.jp/www/contents/1001000000675/index.html']];
-  const est = [['法人税', hj.hz], ['地方法人税', hj.chihou], ['防衛特別法人税', hj.boei], ['法人事業税（所得割）', hj.biz], ['特別法人事業税', hj.spBiz], ['県民税 均等割', hj.kPref], ['県民税 法人税割（1.0%）', hj.zHzPref], ['市民税 均等割', hj.kCity], ['市民税 法人税割（7.2%）', hj.zHzCity], { r: ['法人税等の概算 合計', hj.total], c: 'tot' }, ['（参考）帳簿の法人税、住民税及び事業税', fs.pl.tax], ['差（概算 − 帳簿）', hj.total - fs.pl.tax]];
+  const est = [['法人税（所得税額控除後・1,000円未満切捨て）', hj.hzNet], ['地方法人税（100円未満切捨て）', TX.fH(hj.chihou)], ['防衛特別法人税', hj.boei], ['法人事業税（所得割）', hj.biz], ['特別法人事業税', hj.spBiz], ['県民税 均等割', hj.kPref], ['県民税 法人税割（1.0%）', hj.zHzPref], ['市民税 均等割', hj.kCity], ['市民税 法人税割（7.2%）', hj.zHzCity], { r: ['法人税等の概算 合計', hj.total], c: 'tot' }, ['（参考）帳簿の法人税、住民税及び事業税', fs.pl.tax], ['差（概算 − 帳簿）', hj.total - fs.pl.tax]];
+
+  // 実際の申告書との比較（第5期のみ）
+  const A5 = ACT5, ck = (l, mine, act) => ({ r: [l, mine, act, mine === act ? '✅ 一致' : '⚠ 差 ' + yen(mine - act)] });
+  const addNz = (hj.adds.find(r => r.auto && /納税充当金/.test(r.label)) || {}).amount || 0, kenM = hj.kPref + hj.zHzPref, shiM = hj.kCity + hj.zHzCity, jigM = hj.biz + hj.spBiz;
+  const cmpRows = y.y === 2025 ? [{ r: ['【別表四】', '', '', ''], c: 'sec' }, ck('当期利益（税引後）', hj.preTax, A5.b4.net), ck('加算: 損金経理した納税充当金（5）', addNz, A5.b4.nouzei), ck('加算: 減価償却超過額（10）', hj.depExcess, A5.b4.depEx), ck('減算: 納税充当金から支出した事業税等（13）', hj.sS, A5.b4.jigyo),
+    ck('仮計（26）', hj.sub1 - hj.adds.filter(r => /^法人税額から控除/.test(r.label)).reduce((t, r) => t + (+r.amount || 0), 0), A5.b4.kari), ck('法人税額から控除される所得税額（29）', hj.credit, A5.b4.shotoku), ck('所得金額（52）', hj.income0, A5.b4.income),
+    { r: ['【別表一・地方税】', '', '', ''], c: 'sec' }, ck('法人税額（千円未満切捨て後の所得×15%）', hj.hz, A5.b1.hz), ck('所得税額控除', hj.credit, A5.b1.credit), ck('差引所得に対する法人税額（13）', hj.hzNet, A5.b1.diff), ck('中間納付額', hj.interim, A5.b1.interim), ck('確定法人税額（15）', hj.final, A5.b1.final),
+    ck('地方法人税額（31）', hj.chihou, A5.b1.chihou), ck('地方法人税 確定（100円未満切捨て・40）', TX.fH(hj.chihou), A5.b1.chihouFinal), ck('道府県民税（均等割＋法人税割）', kenM, A5.ken), ck('市町村民税（均等割＋法人税割）', shiM, A5.shi),
+    ck('事業税＋特別法人事業税（別表五から逆算）', jigM, A5.jigyoTotal), ck('納税充当金（納付見込の総額）', hj.final + TX.fH(hj.chihou) + kenM + shiM + jigM, A5.paid),
+    { r: ['【別表五(一)】', '', '', ''], c: 'sec' }, ck('繰越損益金 期末', retClose, A5.b5.ret[3]), ck('納税充当金 期末', taxClose, A5.b5.nouzeiJ[3]), ck('差引合計額 期末', r5tot[3], A5.b5.total[3]),
+    { r: ['【消費税】', '', '', ''], c: 'sec' }, ['消費税の申告書（写真なし）', sh0.gen.total, '要確認', '申告書が未入手。非課税売上が大半。課税事業者かは税理士に確認'] ] : [];
   const addCols = [['label', '項目', 's', '260px'], ['amount', '金額', 'n'], ['kind', '処分（留保/社外流出）', 's']], subCols = [['label', '項目（例: 前期の事業税の認容、受取配当等の益金不算入）', 's', '260px'], ['amount', '金額', 'n']];
   return `<div class="card noprint"><h3>入力（この期）</h3><div class="g">${iN('capital', '資本金等の額（円）※空欄=貸借対照表から', '', `BS上の自動値: ${yen(cap)}円。一般社団法人は基金等がなければ0。`)}
-    ${iSel('emp50', '市内の従業者数', [['1', '50人以下'], ['0', '50人超']], '1')}${iN('loss', '繰越欠損金の当期控除額（別表七(一)）', 0)}${iN('credit', '所得税額控除・外国税額控除（別表六）', 0, '利息の源泉所得税は帳簿の少額な法人税等に含まれます')}${iN('interim', '法人税の中間納付額', 0)}</div>
+    ${iSel('emp50', '市内の従業者数', [['1', '50人以下'], ['0', '50人超']], '1')}${iN('loss', '繰越欠損金の当期控除額（別表七(一)）', 0)}${iN('credit', '所得税額控除・外国税額控除（別表六）', 0, '利息の源泉所得税は帳簿の少額な法人税等に含まれます')}${iN('interim', '法人税の中間納付額', 0)}${iN('kintoCityOv', '市民税 均等割の実額（空欄=資本金等・従業者数から自動）', '', '第5期の申告書から逆算: 100,000円（市民税135,700−法人税割35,700）。要確認')}${iN('kintoPrefOv', '県民税 均等割の実額（空欄=自動）', '')}</div>
     <h4>別表四 加算（自動分は下に表示。ここには追加分を入力）</h4>${iRows('adds', addCols, 3)}<h4>別表四 減算</h4>${iRows('subs', subCols, 3)}
     <h4>別表十五 交際費（入力）</h4><div class="g">${iN('entertainTotal', '支出交際費等の額（空欄=交際費勘定）', '')}${iN('entSmall', '1人5,000円以下の飲食費', 0)}${iN('entMeal', '接待飲食費（②50%基準を使う場合）', 0)}</div>
     <h4>別表十六 減価償却資産（資産ごとに入力。限度額は償却方法に応じ計算した額）</h4>${iRows('dep', [['name', '資産名', 's', '160px'], ['cost', '取得価額', 'n'], ['dep', '当期の償却費計上額', 'n'], ['limit', '償却限度額', 'n']], 3)}<p class="note">帳簿の減価償却費: ${yen(book)}円</p>
     <h4>別表五(一) その他の利益積立金（期首／減／増の入力）</h4>${iRows('b5', [['label', '項目', 's', '200px'], ['open', '期首現在', 'n'], ['dec', '当期減', 'n'], ['inc', '当期増', 'n']], 2)}
     <h4>別表二 同族会社の判定（社員・株主ごと）</h4>${iRows('dz', [['name', '氏名', 's'], ['votes', '議決権数（持株数）', 'n'], ['group', '同族グループ番号', 's']], 3)}
     <button onclick="txSave()">💾 入力を保存して再計算</button></div>
+    ${y.y === 2025 ? tSec('実際の申告書（第5期・税理士作成・電子申告済・令和8.7.28決算確定）と本システムの計算の比較', ['項目', '本システム', '実際の申告書', '結果'], cmpRows, { num: true, note: '申告書の値は別表一・四・五(一)の写真から転記して保存したものです（コード内 ACT5）。「入力」欄の初期値（前期事業税の認容14,100・所得税額控除346・償却超過232,383・市民税均等割100,000・別表五の未納税額）も申告書から設定しています。' + (TXS.seeded ? ' <b>まだDBに保存されていません。「入力を保存して再計算」を押すと確定します。</b>' : '') }) : ''}
     ${tSec('別表一（各事業年度の所得に係る法人税額の計算）の概算', ['項目', '金額（円）'], b1)}
     ${tSec('別表四（所得の金額の計算に関する明細書）', ['区分', '金額（円）', '処分'], b4, { num: false, note: '自動加算: 納税充当金繰入（帳簿の法人税等の全額）、交際費不算入、償却超過額。<b>前期分の事業税の認容など減算は未入力のままです。</b>' })}
     ${tSec('別表五(一) 利益積立金額の計算に関する明細書（簡易）', ['区分', '期首現在', '当期減', '当期増', '差引翌期首'], [...r5, { r: ['差引合計額（利益積立金額）', ...r5tot], c: 'tot' }], { note: '繰越損益金は帳簿の期首・期末の繰越利益剰余金。未納法人税等の行は確定税額が決まったら「その他」に入力してください。' })}

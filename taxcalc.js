@@ -87,34 +87,38 @@
 
   // ---------------- 法人税・地方税 ----------------
   const tier = (tbl, v) => tbl.find(t => v <= t[0]);
-  function bizTax(income) { let r = 0, prev = 0; for (const [lim, rate] of TAXRATES.mieBiz) { if (income > prev) r += (Math.min(income, lim) - prev) * rate; prev = lim; } return fK(r); }
+  function bizTax(income) { let r = 0, prev = 0; for (const [lim, rate] of TAXRATES.mieBiz) { if (income > prev) r += (Math.min(income, lim) - prev) * rate; prev = lim; } return fH(r); }
   function corpTax(income, months) {
     const lim = TAXRATES.corp.lowLimit * months / 12, i = fK(Math.max(0, income));
-    return fH(Math.min(i, lim) * TAXRATES.corp.low + Math.max(0, i - lim) * TAXRATES.corp.high);
+    return fl(Math.min(i, lim) * TAXRATES.corp.low + Math.max(0, i - lim) * TAXRATES.corp.high); // 申告書の法人税額欄は端数処理前（確定額は別表一13で千円未満切捨て）
   }
   // inp: {preTax, taxBooked, adds:[{label,amount,kind}], subs:[...], loss, capital, emp50, months, fyStart, ...}
   function hojin(inp, fs, fyStart) {
     const months = inp.months || 12;
     const ent = entertain(inp, fs, months), dep = inp.dep || [], depExcess = dep.reduce((s, r) => s + Math.max(0, (+r.dep || 0) - (+r.limit || 0)), 0);
-    const autoAdds = [{ label: '損金経理をした法人税・住民税・事業税（納税充当金繰入）', amount: fs.pl.tax, kind: '留保', auto: true }];
+    const cr0 = +inp.credit || 0;
+    const autoAdds = [{ label: '損金経理をした納税充当金（帳簿の法人税等から所得税額控除分を除く）', amount: fs.pl.tax - cr0, kind: '留保', auto: true }];
+    if (cr0) autoAdds.push({ label: '法人税額から控除される所得税額（別表四 29・別表六）', amount: cr0, kind: '社外流出', auto: true });
     if (ent.disallow) autoAdds.push({ label: '交際費等の損金不算入額（別表十五）', amount: ent.disallow, kind: '社外流出', auto: true });
     if (depExcess) autoAdds.push({ label: '減価償却の償却超過額（別表十六）', amount: depExcess, kind: '留保', auto: true });
     const adds = [...autoAdds, ...(inp.adds || [])], subs = inp.subs || [];
     const sA = adds.reduce((s, r) => s + (+r.amount || 0), 0), sS = subs.reduce((s, r) => s + (+r.amount || 0), 0);
     const preTax = fs.pl.net; // 当期純利益（税等控除後）
     const sub1 = preTax + sA - sS, loss = +inp.loss || 0, income0 = sub1 - loss, income = Math.max(0, fK(income0));
-    const hz = corpTax(income, months), chihou = fH(fK(hz) * TAXRATES.chihou);
+    const hz = corpTax(income, months), chihou = fl(fK(hz) * TAXRATES.chihou); // 別表一31は端数処理前（確定額40は100円未満切捨て）
     const boeiOn = fyStart >= TAXRATES.boei.from, boei = boeiOn ? fH(Math.max(0, fK(hz) - TAXRATES.boei.deduct * months / 12) * TAXRATES.boei.rate) : 0;
     const cap = +inp.capital || 0, emp50 = inp.emp50 !== false;
     const kintoPref = tier(TAXRATES.mieKinto, cap)[1], kintoCity = tier(TAXRATES.ykKinto, cap)[emp50 ? 1 : 2], mm = months / 12;
-    const kPref = fl(kintoPref * mm), kCity = fl(kintoCity * mm);
+    const ovP = inp.kintoPrefOv !== '' && inp.kintoPrefOv != null ? +inp.kintoPrefOv : null, ovC = inp.kintoCityOv !== '' && inp.kintoCityOv != null ? +inp.kintoCityOv : null;
+    const kPref = ovP != null ? ovP : fl(kintoPref * mm), kCity = ovC != null ? ovC : fl(kintoCity * mm);
     const zHzPref = fH(fK(hz) * TAXRATES.mieHojin), zHzCity = fH(fK(hz) * TAXRATES.ykHojin);
     const biz = bizTax(income), spBiz = fH(biz * TAXRATES.special);
-    const total = hz + chihou + boei + kPref + kCity + zHzPref + zHzCity + biz + spBiz;
+    const credit0 = +inp.credit || 0, hzNet = fK(Math.max(0, hz - credit0));
+    const total = hzNet + fH(chihou) + boei + kPref + kCity + zHzPref + zHzCity + biz + spBiz;
     // 別表一 の中間納付・税額控除
     const credit = +inp.credit || 0, interim = +inp.interim || 0;
     return { months, ent, depExcess, adds, subs, sA, sS, preTax, sub1, loss, income0, income, hz, chihou, boei, boeiOn, kPref, kCity, zHzPref, zHzCity, biz, spBiz, total, credit, interim,
-      kintoPref, kintoCity, final: Math.max(0, hz - credit - interim) };
+      kintoPref, kintoCity, hzNet, final: Math.max(0, hzNet - interim) };
   }
   function entertain(inp, fs, months) {
     const acct = fs.pl.sgaRows.filter(r => r.name === '交際費').reduce((s, r) => s + r.bal, 0), total = inp.entertainTotal != null && inp.entertainTotal !== '' ? +inp.entertainTotal : acct;
