@@ -90,6 +90,7 @@ window.PORTAL_CONFIG = {
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
       ['⚠️', 'ヒヤリハット週報', 'https://drive.google.com/open?id=1urelD2ecz7HEu7ZQ1busmKXkH0J-T_WAGpljx5AY3lY', 'Bot依頼で作成'],
       ['📒', '台帳', '#kintoun/ledger', '利用者・支給と利用・事業所設定・書類履歴'],
+      ['📝', '訪問記録', '#kintoun/visit', '訪問ごとの記録（一覧・追加・編集）'],
       ['📝', '居宅介護計画の同意', '#kintoun/consent', '計画を見て、iPadで同意（Googleフォームの代わり）'],
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },

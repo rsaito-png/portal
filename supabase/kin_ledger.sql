@@ -78,3 +78,40 @@ revoke all on public.kin_user, public.kin_supply, public.kin_office_setting, pub
 -- 身体介護の月支給量（利用者単位）。食い違いのある人は空のまま conflict=true。
 alter table public.kin_user add column if not exists supply_body_hours numeric check (supply_body_hours >= 0);
 alter table public.kin_user add column if not exists supply_body_conflict boolean not null default false;
+
+-- 訪問記録（金斗雲・居宅介護）。署名トークン表は別途。取り込みは (source_file, source_row) の一意制約で冪等。
+create table if not exists public.kin_visit (
+  id bigint generated always as identity primary key,
+  visit_date date not null,
+  user_id bigint not null references public.kin_user(id) on delete restrict,
+  staff_name text not null check (char_length(staff_name) between 1 and 60),
+  second_staff text check (char_length(second_staff) <= 60), -- 2人目の職員
+  service text not null default '身体介護' check (service in ('身体介護','家事援助','通院等介助')),
+  start_time time not null, end_time time not null,
+  actual_minutes int generated always as ((extract(epoch from (end_time - start_time))/60)::int) stored, -- 実時間(分)。開始・終了から自動計算、手入力不可
+  check (end_time > start_time), -- 日またぎは想定しない
+  content text check (char_length(content) <= 1000), note text check (char_length(note) <= 1000),
+  report1 text check (char_length(report1) <= 1000), report2 text check (char_length(report2) <= 1000), report3 text check (char_length(report3) <= 1000),
+  report4 text check (char_length(report4) <= 1000), report5 text check (char_length(report5) <= 1000),
+  addition text check (char_length(addition) <= 100), -- 加算の有無（緊急時対応・初回加算など）
+  instruction_id text check (char_length(instruction_id) <= 60),
+  sign_status text not null default '未署名' check (sign_status in ('未署名','署名済み')),
+  signed_at timestamptz, signer_kind text check (char_length(signer_kind) <= 30),
+  signature_url text check (char_length(signature_url) <= 500), pdf_url text check (char_length(pdf_url) <= 500),
+  staff_confirmed boolean not null default false, sab_confirmed boolean not null default false,
+  source_file text check (char_length(source_file) <= 200), source_row int,
+  updated_by uuid default auth.uid(), updated_at timestamptz not null default now(),
+  unique (source_file, source_row));
+create index if not exists kin_visit_date on public.kin_visit(visit_date, user_id);
+alter table public.kin_visit enable row level security;
+drop policy if exists kin_visit_rw on public.kin_visit;
+create policy kin_visit_rw on public.kin_visit for all to authenticated using (public.my_office() = '金斗雲' or public.can_manage()) with check (public.my_office() = '金斗雲' or public.can_manage());
+revoke all on public.kin_visit from anon;
+
+-- 既存テーブルへの反映（冪等）
+alter table public.kin_visit add column if not exists second_staff text check (char_length(second_staff) <= 60);
+alter table public.kin_visit add column if not exists addition text check (char_length(addition) <= 100);
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname='kin_visit_time_order') then
+    alter table public.kin_visit add constraint kin_visit_time_order check (end_time > start_time); end if;
+end $$;
