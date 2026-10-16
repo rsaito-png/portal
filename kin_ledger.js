@@ -39,6 +39,7 @@ async function klUserView(id) {
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
   ${f('name', '氏名')}${f('birth', '生年月日', 'date')}${f('address', '住所')}${f('phone', '電話')}${f('emergency', '緊急連絡先')}${f('jukyusha_no', '受給者証番号')}${f('city', '市町村')}${f('city_no', '市町村番号')}${f('shien_kubun', '障害支援区分')}${f('valid_from', '支給決定 開始', 'date')}${f('valid_to', '支給決定 終了', 'date')}${f('soudan_office', '相談支援事業所')}${f('soudan_person', '相談員')}${f('sabisek', 'サービス提供責任者')}${f('cap_amount', '負担上限額（円）', 'number', 'min=0')}${f('cap_from', '上限額 開始', 'date')}${f('cap_to', '上限額 終了', 'date')}${f('start_date', 'サービス開始日', 'date')}</div>
   <p><label><input type="checkbox" id="ku_cap_mgmt" style="width:auto" ${u.cap_mgmt ? 'checked' : ''}> 上限額管理が必要</label>　<label><input type="checkbox" id="ku_needs_check" style="width:auto" ${u.needs_check ? 'checked' : ''}> ⚠要確認</label></p>
+  <p><label>身体介護 月支給量(時間)　<input id="ku_supply_body_hours" type="number" min="0" step="0.5" style="width:90px" value="${u.supply_body_hours ?? ''}"></label>　<label><input type="checkbox" id="ku_supply_body_conflict" style="width:auto" ${u.supply_body_conflict ? 'checked' : ''}> 支給量が資料で食い違い（空のまま）</label></p>
   <label>要確認メモ<br>${klIn('ku_check_memo', u.check_memo)}</label>
   <p><button onclick="klSaveUser(${u.id})">保存</button> <button class="back" onclick="KL.id=null;renderKinLedger()">一覧へ</button> <span id="ku_m"></span></p></div>
   <div class="card"><h4>支給と利用（複数行）</h4>${sup.length ? `<table class="tbl"><tr><th>種別</th><th>月の支給量</th><th>曜日</th><th>時間帯</th><th>支給時間(分)</th><th>支援内容</th><th>建物</th><th>計画期間</th><th></th></tr>${sr}</table>` : '<p>なし</p>'}
@@ -50,7 +51,7 @@ async function klUserView(id) {
 async function klSaveUser(id) {
   const g = k => klV('ku_' + k), b = { name: g('name') }; if (!b.name) return $('ku_m').textContent = '氏名は必須です';
   ['birth', 'address', 'phone', 'emergency', 'jukyusha_no', 'city', 'city_no', 'shien_kubun', 'valid_from', 'valid_to', 'soudan_office', 'soudan_person', 'sabisek', 'cap_from', 'cap_to', 'start_date', 'check_memo'].forEach(k => b[k] = g(k));
-  b.cap_amount = g('cap_amount') == null ? null : +g('cap_amount'); b.cap_mgmt = $('ku_cap_mgmt').checked; b.needs_check = $('ku_needs_check').checked; b.updated_at = new Date().toISOString();
+  b.cap_amount = g('cap_amount') == null ? null : +g('cap_amount'); b.supply_body_hours = g('supply_body_hours') == null ? null : +g('supply_body_hours'); b.supply_body_conflict = $('ku_supply_body_conflict').checked; b.cap_mgmt = $('ku_cap_mgmt').checked; b.needs_check = $('ku_needs_check').checked; b.updated_at = new Date().toISOString();
   try { await sb(`kin_user?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderKinLedger(); } catch (e) { $('ku_m').textContent = e.message; }
 }
 async function klAddSup(uid) {

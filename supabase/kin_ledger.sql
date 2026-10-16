@@ -74,3 +74,7 @@ do $$ declare t text; begin
   end loop;
 end $$;
 revoke all on public.kin_user, public.kin_supply, public.kin_office_setting, public.kin_service_code, public.kin_doc from anon;
+
+-- 身体介護の月支給量（利用者単位）。食い違いのある人は空のまま conflict=true。
+alter table public.kin_user add column if not exists supply_body_hours numeric check (supply_body_hours >= 0);
+alter table public.kin_user add column if not exists supply_body_conflict boolean not null default false;
