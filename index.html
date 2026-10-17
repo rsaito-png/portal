@@ -210,7 +210,7 @@ async function accTile() {
     if (document.getElementById('acc_tile')) return;
     let sec = document.getElementById('sumu_sec');
     if (!sec) { const mh = document.getElementById('misc_h'); if (!mh) return; mh.insertAdjacentHTML('beforebegin', '<div id="sumu_sec"><h3>総務（管理者）</h3></div>'); sec = document.getElementById('sumu_sec'); }
-    sec.insertAdjacentHTML('beforeend', '<h4>会計</h4><div class="grid"><a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a></div>'); } catch (e) {}
+    sec.insertAdjacentHTML('beforeend', '<h4>会計・経理</h4><div class="grid"><a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a></div>'); } catch (e) {}
 }
 window.addEventListener('hashchange', render);
 let ROLE = C.defaultRole;
