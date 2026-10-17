@@ -193,9 +193,9 @@ async function render() {
   $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
     <h3>事業所</h3>
     <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
-    ${ROLE === C.clerk.role ? `<h3>総務（事務の方のみ表示）</h3>
-    ${(C.clerk.groups || []).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}` : ''}
-    <h3>未整理</h3>
+    ${ROLE === C.clerk.role ? `<div id="sumu_sec"><h3>総務（事務の方のみ表示）</h3>
+    ${(C.clerk.groups || []).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}</div>` : ''}
+    <h3 id="misc_h">未整理</h3>
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof todoBadge === 'function') todoBadge();
@@ -207,8 +207,10 @@ async function accTile() {
   try { const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (!s) return;
     const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/acc_is_admin', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' });
     if (!r.ok || (await r.json()) !== true) return;
-    const g = document.querySelector('#view .grid'); if (!g || document.getElementById('acc_tile')) return;
-    g.insertAdjacentHTML('beforebegin', '<a id="acc_tile" class="tile" href="acc.html" style="display:block;border-top:4px solid #2e6b4f;margin-bottom:12px"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a>'); } catch (e) {}
+    if (document.getElementById('acc_tile')) return;
+    let sec = document.getElementById('sumu_sec');
+    if (!sec) { const mh = document.getElementById('misc_h'); if (!mh) return; mh.insertAdjacentHTML('beforebegin', '<div id="sumu_sec"><h3>総務（管理者）</h3></div>'); sec = document.getElementById('sumu_sec'); }
+    sec.insertAdjacentHTML('beforeend', '<h4>会計</h4><div class="grid"><a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a></div>'); } catch (e) {}
 }
 window.addEventListener('hashchange', render);
 let ROLE = C.defaultRole;
