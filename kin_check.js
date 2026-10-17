@@ -30,10 +30,18 @@ async function renderKinCheck() {
     const pendN = Object.values(pend).reduce((n, a) => n + a.length, 0);
     const stops = [['署名待ち', pendN], ['職員名が空', noStaff.length], ['二重記録', dup.length], ['記録漏れ', miss.length]];
     const stopN = stops.reduce((n, x) => n + x[1], 0);
+    let ll = '';
+    try {
+      const sl = await sb('kin_line_send_log?select=user_id,sent_at,status,error&order=sent_at.desc&limit=200');
+      const last = {}; sl.forEach(r => { if (!last[r.user_id]) last[r.user_id] = r; });
+      const bad = Object.values(last).filter(r => r.status !== '成功');
+      ll = `<div class="card" style="border:2px solid ${bad.length ? '#c0392b' : '#2e6b4f'}"><b>LINE自動送信（毎週日曜9:00）</b> ${sl.length ? '最終送信 ' + esc(new Date(sl[0].sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })) : 'まだ送信記録はありません'}` +
+        (bad.length ? '<ul>' + bad.map(r => `<li>${esc(nm[r.user_id] || '')}：${esc(r.status)}${r.error ? '（' + esc(r.error.slice(0, 80)) + '）' : ''}</li>`).join('') + '</ul>' : '') + '</div>';
+    } catch (e) { ll = ''; }
     const li = KC.link ? `<div class="card" style="border:2px solid #2e6b4f"><b>${esc(KC.link.name)} さんの署名リンク</b>（1回限り・1週間）<br><input id="kc_url" readonly value="${esc(KC.link.url)}" style="width:100%" onclick="this.select()"><p><button onclick="kcCopy()">コピー</button> <span id="kc_cm"></span> <button class="back" onclick="KC.link=null;renderKinCheck()">閉じる</button></p><p class="note">このURLをご本人に送ってください（LINE等）。新しく発行すると古い未使用リンクは使えなくなります。</p></div>` : '';
     const pr = Object.entries(pend).map(([uid, a]) => `<tr><td>${esc(nm[uid] || '')}</td><td>${a.length}件</td><td><button onclick="kcIssue(${uid},'${esc(nm[uid] || '').replace(/'/g, '')}')">署名リンク発行</button></td></tr>`).join('');
     const sec = (t, n, body) => `<div class="card"><h4>${t}　${n ? `<span style="color:#b00">${n}件</span>` : '<span style="color:#2e6b4f">なし ✅</span>'}</h4>${n ? body : ''}</div>`;
-    $('view').innerHTML = back + `<h3>金斗雲 記録・署名チェック</h3><p>月 <input type="month" value="${esc(m)}" onchange="KC.month=this.value||KC.month;renderKinCheck()"></p>${li}
+    $('view').innerHTML = back + `<h3>金斗雲 記録・署名チェック</h3><p>月 <input type="month" value="${esc(m)}" onchange="KC.month=this.value||KC.month;renderKinCheck()"></p>${ll}${li}
     <div class="card" style="border-left:6px solid ${stopN ? '#c60' : '#2e6b4f'}"><b>請求CSV：${stopN ? '⛔ 止める（下の条件が残っています）' : '✅ 出せる状態（この月の記録上は）'}</b><br>${stops.map(([k, n]) => `${k} ${n}件`).join(' ／ ')}${noCert.length ? `<br><span style="color:#c60">受給者証番号・支給決定期間が空の利用者 ${noCert.length}名（これが空の間はCSVを出せません）</span>` : ''}<p class="note">訪問記録 ${vs.length}件。記録漏れは「身体介護の予定の曜日・時間帯（前後30分）に訪問記録がない日」を今日まで照合しています。</p></div>
     ${sec('署名待ち（利用者別）', pendN, `<table class="tbl"><tr><th>利用者</th><th>件数</th><th></th></tr>${pr}</table>`)}
     ${sec('職員名が空の訪問', noStaff.length, `<table class="tbl"><tr><th>提供日</th><th>利用者</th><th>時間</th></tr>${noStaff.map(v => `<tr><td>${v.visit_date}</td><td>${esc(nm[v.user_id] || '')}</td><td>${v.start_time.slice(0, 5)}〜${v.end_time.slice(0, 5)}</td></tr>`).join('')}</table>`)}
