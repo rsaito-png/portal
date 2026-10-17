@@ -35,7 +35,7 @@ elif cmd == 'apply':
     for x in d.get('ideas', []):
         i = cur.get(x['id'])
         if not i: continue
-        p = {'ai_note': (x.get('ai_note') or '')[:200] or None, 'priority': x.get('priority'), 'due': x.get('due') or None, 'stale': bool(x.get('stale')), 'ai_at': now.isoformat()}
+        p = {'ai_note': (x.get('ai_note') or '')[:200] or None, 'priority': x.get('priority'), 'due': x.get('due') or i.get('due'), 'stale': bool(x.get('stale')), 'ai_at': now.isoformat()}
         if (i['ai_at'] is None or i.get('ai_bucket') == i['bucket']) and x.get('bucket') in buckets: p['bucket'] = x['bucket']   # 会長が手で動かした分は上書きしない
         api('chair_idea?id=eq.%d' % i['id'], 'PATCH', p)
     cur = {i['id']: i for i in opens()}

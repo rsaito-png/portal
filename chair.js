@@ -55,9 +55,28 @@ async function renderChair() {
       <h3 class="nx">📣 会長からの一言（職員に表示）</h3><div class="card"><div id="ch_cur"></div><textarea id="ch_msg" rows="2" maxlength="500" style="font-size:18px;width:100%" placeholder="職員への一言"></textarea>
         <button style="margin-top:6px" onclick="chairMsgSend()">表示する</button> <button class="back" onclick="chairMsgOff()">一言を消す</button> <span id="ch_mm" class="note"></span></div>
       <h3 class="nx">🌅 リーダー報告</h3><div id="ch_rep" class="card">読み込み中…</div>
-      <h3 class="nx">📋 思いつき一覧</h3><div id="ch_list"></div>`;
+      <h3 class="nx">📋 思いつき一覧</h3>
+      <div class="card" id="ch_add"><b>➕ ToDoを書き足す</b>
+        <input id="ch_at" maxlength="1000" placeholder="やることを一行で" style="font-size:19px;padding:12px;margin-top:6px" onkeydown="if(event.key==='Enter')chairAdd()">
+        <div style="margin-top:6px;font-size:16px">期限（任意） <input id="ch_ad" type="date" style="width:auto;font-size:16px"></div>
+        <div style="margin-top:6px;font-size:16px">担当 <select id="ch_ab" style="font-size:16px"><option value="">AIに任せる</option>${bks.map(b => `<option value="${esc(b)}">${esc(b === CH.J || b === CH.G || b === CH.L ? b : b + 'さん')}</option>`).join('')}</select></div>
+        <button style="margin-top:8px" onclick="chairAdd()">追加</button><div id="ch_am" style="font-size:18px;color:#2e6b4f;min-height:1.4em;margin-top:4px"></div></div>
+      <div id="ch_list"></div>`;
     chairList(); chairCur(); chairReport();
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
+}
+// 手で書き足すToDo。同じ chair_idea に入る。担当「AIに任せる」は送信と同じ自動分類、選んだ場合はその担当で固定（AIの上書きなし）
+async function chairAdd() {
+  const el = $('ch_at'), t = el.value.trim(), m = $('ch_am'), due = $('ch_ad').value, b = $('ch_ab').value; if (!t) { m.style.color = '#c00'; m.textContent = '内容を入れてください'; return; }
+  m.style.color = '#2e6b4f';
+  const row = { text: t }; if (due) row.due = due; if (b) { row.bucket = b; row.ai_at = new Date().toISOString(); }
+  try { const r = await sb('chair_idea', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+    el.value = ''; $('ch_ad').value = ''; $('ch_ab').value = ''; m.textContent = '追加しました' + (b ? '' : '（担当をAIが振り分け中）'); CH.open.__all = true; await chairList();
+    const id = r && r[0] && r[0].id; if (!id || b) return;
+    const ss = JSON.parse(localStorage.getItem('sess') || '{}');
+    fetch(C.supabaseUrl + '/functions/v1/chair-classify', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + ss.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      .then(x => x.json()).then(j => { if ($('ch_am')) $('ch_am').textContent = '追加しました → ' + (j.bucket || 'あとで'); chairList(); }).catch(() => chairList()); }
+  catch (e) { m.style.color = '#c00'; m.textContent = '追加できませんでした：' + e.message; }
 }
 async function chairSend() {
   const el = $('ch_in'), t = el.value.trim(), m = $('ch_m'); if (!t) return;
