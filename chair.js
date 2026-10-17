@@ -48,6 +48,8 @@ async function renderChair() {
       <div class="card"><input id="ch_in" maxlength="1000" placeholder="思いついたことを一行で" style="font-size:20px;padding:14px"
         onkeydown="if(event.key==='Enter')chairSend()"><button style="font-size:22px;padding:14px;margin-top:8px" onclick="chairSend()">送る</button><div id="ch_m" style="font-size:20px;color:#2e6b4f;min-height:1.4em;margin-top:6px"></div></div>
       <h3 class="nx">🎯 今日やる3つ</h3>${td.length ? td.map(i => item(i)).join('') : `<div class="card"><p style="font-size:18px">${today.length ? '🎉 今日の3つは終わりました（' + doneToday + '件）' : '朝8時すぎのAI整理のあとに出ます。'}</p></div>`}
+      <h3 class="nx">📋 思いつき一覧</h3>
+      <div id="ch_list"></div>
       <h3 class="nx">🌅 朝のまとめ</h3><div class="card" style="font-size:18px">
         <p>昨日たまった思いつき：<b>${ycnt}件</b>${fresh ? `　<small>（AIの整理まち ${fresh}件）</small>` : ''}</p>
         <p style="margin:0">担当別の未完了：</p><p style="margin:4px 0">${cnt.map(([b, n]) => `<span style="display:inline-block;margin:2px 8px 2px 0;${n ? 'font-weight:bold' : 'color:#aaa'}">${esc(b)} ${n}</span>`).join('')}</p></div>
@@ -55,8 +57,7 @@ async function renderChair() {
       <h3 class="nx">📣 会長からの一言（職員に表示）</h3><div class="card"><div id="ch_cur"></div><textarea id="ch_msg" rows="2" maxlength="500" style="font-size:18px;width:100%" placeholder="職員への一言"></textarea>
         <button style="margin-top:6px" onclick="chairMsgSend()">表示する</button> <button class="back" onclick="chairMsgOff()">一言を消す</button> <span id="ch_mm" class="note"></span></div>
       <h3 class="nx">🌅 リーダー報告</h3><div id="ch_rep" class="card">読み込み中…</div>
-      <h3 class="nx">📋 思いつき一覧</h3>
-      <div id="ch_list"></div>`;
+`;
     chairList(); chairCur(); chairReport();
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }
