@@ -1,0 +1,17 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>moon popup test</title>
+<body>
+<p id="out"></p>
+<script src="data/seed.js"></script>
+<script>
+const MOONSIGN=(()=>{const o={};let prev='';Object.keys(SEED.days).sort().forEach(k=>{
+  const g=String(SEED.days[k].ingress||'').match(/^(?:(\d{1,2}:\d{2})\s+)?(\S+座)/);if(!g){o[k]=null;return}
+  o[k]=g[1]?{from:prev||null,to:g[2],at:g[1]}:{to:g[2]};prev=g[2]});return o})();
+function moonSignLabel(k){const m=MOONSIGN[k];if(!m)return '';return m.at&&m.from?m.from+'→'+m.to:(m.to||'')}
+const DOW=['日','月','火','水','木','金','土'];
+function title(k){const d=new Date(k+'T00:00:00');const v=SEED.days[k]||{};
+  return {old:`${d.getMonth()+1}月${d.getDate()}日（${DOW[d.getDay()]}）${v.sign||''}`,
+          neu:`${d.getMonth()+1}月${d.getDate()}日（${DOW[d.getDay()]}）${moonSignLabel(k)}`}}
+const days=['2026-10-11','2026-10-12','2026-10-15','2026-10-16','2026-10-17'];
+document.getElementById('out').innerHTML=days.map(k=>{const t=title(k);return `<div><b>${k}</b><br>旧(太陽): ${t.old}<br>新(月): ${t.neu}</div>`}).join('<hr>');
+</script>
+</body></html>

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>太陽カレンダー日記</title>
+<style>
+:root{--bg:#14121f;--card:#1f1c30;--fg:#ece8f7;--mute:#9a94b8;--acc:#e8b84a;--line:#332f4d}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--fg)}
+header{position:sticky;top:0;background:var(--bg);padding:10px 12px;border-bottom:1px solid var(--line);z-index:2}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.nav button{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;font-size:18px;padding:6px 14px}
+.title{text-align:center}.title b{font-size:20px;color:var(--acc)}.title .hs{display:block;font-size:12px;font-weight:normal;color:var(--mute);line-height:1.4;margin-top:2px}.title small{display:block;color:var(--mute);font-size:12px}
+.marsbar{margin:8px 4px 0;padding:8px 10px;border:2px solid #c0392b;border-left-width:6px;border-radius:8px;background:#fdecea;color:#7a1208;font-size:13px;line-height:1.5;word-break:break-all}.marsbar b{color:#b0200f}.marsbar .mt{display:block}.marsbar .hs{font-size:12px;color:#8a2a1c}.marsbar .mhs{display:block;font-size:12px;color:#6b6b6b;line-height:1.4;margin-top:2px}.marsbar .mu{display:block;white-space:pre-wrap;word-break:break-word;font-size:12px;color:#7a1208;margin-top:2px}.marsbar .nx{display:block;font-size:12px;color:#8a2a1c;margin-top:2px}.theme,.marsbar{cursor:pointer}.marsbar .mh{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}.marsbar .mar{color:#b0200f;flex:none;font-size:12px}.marsbar .mw{font-size:11px}.marsbar .medit{margin-top:6px;border:1px solid #c0392b;background:#fff;color:#b0200f;border-radius:6px;padding:4px 10px;font-size:13px}.marsbar .mt{display:block}.theme{font-size:12px;color:var(--mute);margin-top:6px;text-align:center}
+main{padding:10px 8px 80px;max-width:720px;margin:auto}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{text-align:center;font-size:11px;color:var(--mute)}
+.cell{background:var(--card);border:1px solid var(--line);border-radius:8px;min-height:62px;padding:3px 4px;font-size:11px;position:relative;overflow:hidden;color:var(--fg);text-align:left}
+.cell.empty{background:none;border:none}
+.cell .n{font-size:13px;font-weight:600}.cell .m{position:absolute;right:3px;top:2px;font-size:13px}
+.newmoon{display:inline-block;width:14px;height:14px;border-radius:50%;background:#000;border:2px solid #fff;box-shadow:0 0 0 1px #888;vertical-align:-2px;box-sizing:border-box}
+.fullmoon{display:inline-block;width:14px;height:14px;border-radius:50%;background:#ffe9a0;border:1px solid #fff6d0;box-shadow:0 0 6px 2px rgba(255,225,120,.9);vertical-align:-2px;box-sizing:border-box}
+.cell.nm{background:#f7edc8;border-color:#e0cf8f;color:#222}
+.cell.nm .n,.cell.nm.sun .n,.cell.nm.sat .n{color:#222}
+.cell.nm .g{color:#5a4a1a}.cell.nm .mi{color:#b0200f}
+.cell .g{color:var(--mute);font-size:10px;display:block;white-space:nowrap;overflow:hidden}
+.cell .mi{color:#c0392b;font-weight:600}
+.cell.has::after{content:"";position:absolute;left:4px;bottom:4px;width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.cell.today{outline:2px solid var(--acc)}
+.sun .n{color:#ff8a8a}.sat .n{color:#8ab4ff}
+dialog{width:min(560px,100vw);max-height:100dvh;margin:auto;border:none;border-radius:14px;background:var(--bg);color:var(--fg);padding:14px}
+dialog::backdrop{background:#000a}
+.info{background:var(--card);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.6;margin:8px 0;white-space:pre-wrap}
+.info span{color:var(--mute)}
+textarea{width:100%;height:42dvh;min-height:180px;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;line-height:1.6;font-family:inherit}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+button.b{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:15px}
+button.pri{background:var(--acc);color:#222;border-color:var(--acc);font-weight:700}
+button.mic.on{background:#c0392b;border-color:#c0392b;animation:p 1s infinite}
+@keyframes p{50%{opacity:.6}}
+.status{font-size:12px;color:var(--mute);min-height:1.2em;margin-top:6px}
+#dlist .drow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px;word-break:break-all}#dlist .drow .b{padding:6px 10px;font-size:13px}.dinp{width:100%;padding:12px;margin:4px 0;font-size:16px}
+footer{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+</style></head><body>
+<dialog id="login" style="max-width:360px"><b>太陽カレンダー日記</b>
+ <div class="info" style="margin-top:10px">ログインすると日記が表示されます</div>
+ <input id="em" type="email" placeholder="メールアドレス" autocomplete="username" style="width:100%;padding:12px;margin:4px 0;font-size:16px">
+ <input id="pw" type="password" placeholder="パスワード(8文字以上)" autocomplete="current-password" style="width:100%;padding:12px;margin:4px 0;font-size:16px">
+ <div class="row"><button class="b pri" id="doLogin">ログイン</button><button class="b" id="doSignup">新規登録</button></div>
+ <div class="status" id="lstatus"></div></dialog>
+<header>
+ <div class="nav"><button id="prev" aria-label="前">‹</button>
+  <div class="title"><b id="sign"></b><small id="range"></small></div>
+  <button id="next" aria-label="次">›</button></div>
+ <div class="theme" id="theme"></div>
+ <div class="marsbar" id="marsbar"></div>
+</header>
+<main>
+ <div class="grid" id="dows"></div>
+ <div class="grid" id="grid" style="margin-top:4px"></div>
+ <footer>
+  <button class="b" id="today">今日へ</button>
+  <button class="b" id="dictBtn">📖 辞書</button>
+  <button class="b" id="logout">ログアウト</button>
+  <button class="b" id="exMd">Markdownで書き出し</button>
+  <button class="b" id="exCsv">CSVで書き出し</button>
+  <button class="b" id="exJson">JSONバックアップ</button>
+  <label class="b">JSON読み込み<input type="file" id="imp" accept=".json" hidden></label>
+ </footer>
+ <div class="status" id="gstatus" style="text-align:center"></div>
+</main>
+<dialog id="ddlg">
+ <div class="title"><b>📖 マイ辞書</b></div>
+ <div class="info">音声入力の認識結果を、誤表記→正表記に自動で直します。<br>例: 「ナカムラユカ」→「中村友香」（認識された通りの表記を誤表記に入れてください）</div>
+ <input id="dw" class="dinp" placeholder="誤表記（例: ナカムラユカ）">
+ <input id="dr" class="dinp" placeholder="正表記（例: 中村友香）">
+ <div class="row"><button class="b pri" id="dadd">追加</button></div>
+ <div id="dlist" style="margin-top:8px;max-height:30dvh;overflow:auto"></div>
+ <div class="status" id="dstatus"></div>
+ <div class="row"><button class="b" id="dex">辞書を書き出し</button><button class="b" id="dclose">閉じる</button></div>
+</dialog>
+<dialog id="tdlg">
+ <div class="title"><b id="ttitle"></b></div>
+ <textarea id="tta" style="height:28dvh" placeholder="テーマを入力"></textarea>
+ <div class="status" id="tstatus"></div>
+ <div class="row">
+  <button class="b mic" id="tmic">🎤 音声入力</button>
+  <button class="b pri" id="tsave">保存</button>
+  <button class="b" id="treset">既定に戻す</button>
+  <button class="b" id="tcancel">キャンセル</button>
+ </div>
+</dialog>
+<dialog id="dlg">
+ <div class="nav"><button class="b" id="dprev">‹</button><div class="title"><b id="dtitle"></b></div><button class="b" id="dnext">›</button></div>
+ <div class="info" id="dinfo"></div>
+ <textarea id="ta" placeholder="ここに日記を書く、またはマイクで話す"></textarea>
+ <div class="status" id="vstatus"></div>
+ <div class="row">
+  <button class="b mic" id="mic">🎤 音声入力</button>
+  <button class="b pri" id="save">保存</button>
+  <button class="b" id="close">閉じる</button>
+ </div>
+</dialog>
+<script src="js/config.js"></script>
+<script src="data/seed.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body></html>
