@@ -65,7 +65,7 @@ function sjBody(us, rows, demo) {
     ? `<table class="tbl"><tr><th>利用者</th><th>計画種類</th><th>新規／継続</th><th>加算</th><th></th></tr>${us.map(u => {
       const r = rows[u.id] || {};
       const sk = r.service_kind ? `<b>${esc(r.service_kind)}</b>` : (sjNormAdd(r.additions).length ? '<span style="color:#888">加算のみ</span>' : '<span style="color:#bbb">未記入</span>');
-      return `<tr><td>${esc(u.name)}</td><td>${esc(u.kind || '')}</td><td>${sk}${r.service_date ? `<br><span class="note">${esc(r.service_date)}</span>` : ''}</td><td style="font-size:14px">${esc(sjAddText(r.additions))}</td><td><button class="back" onclick="SJ.uid=${u.id};renderSuiJisseki()">開く</button></td></tr>`;
+      return `<tr><td>${esc(u.name)}</td><td>${esc(u.kind || '')}</td><td>${sk}${r.service_date ? `<br><span class="note">${esc(r.service_date)}</span>` : ''}</td><td style="font-size:14px">${esc(sjAddText(r.additions))}</td><td><button type="button" style="width:auto;padding:8px 16px" onclick="SJ.uid=${u.id};renderSuiJisseki()">開く</button></td></tr>`;
     }).join('')}</table>`
     : '<p>先に「利用者台帳」で利用者を追加してください。</p>';
   return `<div class="sui-big"><h3>月間実績（計画相談）</h3>
