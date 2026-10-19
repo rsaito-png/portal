@@ -63,7 +63,7 @@ async function renderSuiPlan() {
     <div class="card"><h4>計画の作成・版管理</h4><p>${['計画1', '計画2'].map(t => `<button onclick="siNewPlan('${t}','新規')">＋${siTypeLabel(t)}の計画案を新規作成</button>`).join(' ')} <button onclick="siNewPlan('モニタリング','新規')">＋モニタリング報告書を新規作成</button></p>
     ${ps.length ? `<table class="tbl"><tr><th>様式</th><th>区分</th><th>版</th><th>種別</th><th>状態</th><th>署名</th><th>送付</th><th></th></tr>${ps.map(p => `<tr><td>${esc(p.plan_type)}</td><td>${esc(p.doc_class || '')}</td><td>v${p.version}</td><td>${esc(p.kind)}${p.source_id ? '（計画案id' + p.source_id + 'から複製）' : p.prev_plan_id ? '（前回: id' + p.prev_plan_id + '）' : ''}</td><td>${p.status === '確定' ? '🔒確定' : '下書き'}</td><td>${p.doc_class ? (p.signed_on ? '✅' + esc(p.signed_on) + ' ' + esc(p.signer_kind || '') : '未') : '-'}</td><td>${p.doc_class ? (p.sent_on ? '✅' + esc(p.sent_on) : '未') : '-'}</td><td><button onclick="SUI.planId=${p.id};renderSuiPlan()">開く</button> <button class="back" onclick="siCont(${p.id})">継続（次の版）</button></td></tr>`).join('')}</table>` : '<p>まだ計画がありません。</p>'}</div>
     ${siRecPanel(u, rq, pend)}
-    <div class="card"><h4>AI下書き</h4><p style="color:#888">🚧 準備中（AIのキーが入ったあと、次の段階で作ります。依頼の状態が「作成済み」になると、下書きがここに自動で出ます）</p></div></div>`;
+    <div class="card"><h4>AI下書き</h4><p style="color:#888">録音の依頼を送ると、Grok Botが文字起こしから下書きを作ります（最大5分ほど）。状態が「作成済み」になると、下書きがここに自動で出ます。</p></div></div>`;
     siRestoreTx(u.id); siStartPoll(u.id, rq);
   } catch (e) { $('view').innerHTML = siBack + `<p>${esc(e.message)}</p>`; }
 }
