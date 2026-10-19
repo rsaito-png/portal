@@ -42,12 +42,23 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
 const planText = b => esc(String(b || '').split('\n').filter(l => !/^【(利用者名|作成者)】/.test(l)).join('\n')).replace(/^(【[^】\n]*】|\d\.[^\n]*)/gm, '<b>$1</b>');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-async function sb(path, opt = {}) {
-  const s = JSON.parse(localStorage.getItem('sess') || '{}');
+// ログインの有効期限（約1時間）が切れたら、保存してある更新用の鍵で自動更新する
+async function refreshSess() {
+  const s = JSON.parse(localStorage.getItem('sess') || '{}'); if (!s.refresh) return false;
+  try { const r = await fetch(C.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh }) });
+    if (!r.ok) return false; const j = await r.json();
+    localStorage.setItem('sess', JSON.stringify({ ...s, token: j.access_token, refresh: j.refresh_token || s.refresh, exp: Date.now() + j.expires_in * 1000 })); return true; } catch (e) { return false; }
+}
+async function sb(path, opt = {}, retried) {
+  let s = JSON.parse(localStorage.getItem('sess') || '{}');
+  if (!DEMO && s.exp && s.exp < Date.now() + 30000 && !retried) { if (await refreshSess()) s = JSON.parse(localStorage.getItem('sess') || '{}'); }
   const r = await fetch(C.supabaseUrl + '/rest/v1/' + path, { ...opt,
     headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json', ...(opt.headers || {}) } });
+  if (r.status === 401 && !retried && await refreshSess()) return sb(path, opt, true);
+  if (r.status === 401) throw new Error('ログインの有効期限が切れました。ページを再読み込みして、ログインし直してください（401）');
   if (!r.ok) throw new Error('読み込めませんでした（' + r.status + '）');
-  return r.status === 204 || r.status === 201 ? null : r.json();
+  if (r.status === 204) return null;
+  const tx = await r.text(); if (!tx) return null; try { return JSON.parse(tx); } catch (e) { return null; }
 }
 // 期間: 今日・明日・今週（日誌タブがある日だけ。データは毎晩22時の同期分）
 let PERIOD = 'today';
@@ -79,6 +90,7 @@ async function myName() {
   return p[0]?.nikki_name || '';
 }
 const same = (a, b) => a && b && a.replace(/\s/g, '') === b.replace(/\s/g, '');
+const ldNN = s => String(s || '').replace(/\s/g, '');
 const demoNote = () => DEMO ? '<p class="note">見本データです（架空）</p>' : '';
 
 const LEO_VIEWS = {
@@ -185,11 +197,18 @@ const LEO_VIEWS = {
   async nikki() {
     PERIOD = 'today';
     const rows = (await loadNikki()).filter(r => r.kind === '利用');
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直したらすぐ日誌に反映されます（1分ほど）。日誌のほうが先に変わっていたときは反映せず「衝突」になります。食事・おやつは日誌で直接直してください。</p>` +
-      rows.map(r => `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）
-        ${NIKKI_FIELDS.map(([f, l]) => f === 'activity'
-          ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(r[f])}">${esc(r[f])}</textarea></label>`
-          : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(r[f])}" value="${esc(r[f])}"></label>`).join('')}</div>`).join('') +
+    let act = [];
+    if (!DEMO) try { act = await sb(`leo_activity?day=eq.${today()}`); } catch (e) { }
+    const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
+    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直したらすぐ日誌に反映されます（1分ほど）。日誌のほうが先に変わっていたときは反映せず「衝突」になります。食事・おやつは日誌で直接直してください。活動記録はLINE下書きからの自動転記分も表示します。</p>` +
+      rows.map(r => { const a = A[String(r.child || '').replace(/\s/g, '')], actVal = (a && a.text) || r.activity || '';
+        return `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
+        ${NIKKI_FIELDS.map(([f, l]) => {
+          const v = f === 'activity' ? actVal : r[f];
+          return f === 'activity'
+            ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(v)}">${esc(v)}</textarea></label>`
+            : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(v)}" value="${esc(v)}"></label>`;
+        }).join('')}</div>`; }).join('') +
       `<button onclick="saveNikki()">直した所を送る</button><div id="saved"></div>`;
   },
   async jisseki() {
@@ -397,7 +416,7 @@ LEO_VIEWS.seikyu = async function () {
   return `<h3>請求CSVを作る（事務）</h3>${demoNote()}
     <p class="note">ここで作るのはファイルだけです。国保連への送信は今まで通り「取込送信ソフト」で、中身を確かめてから行ってください。単価は6級地 10.36円（児発・放デイ／センター以外）。</p>
     <h4>1. 児童情報</h4><p class="note">受給者証・送迎・連絡先などの児童情報は、<a href="#leo/userinfo">利用者情報</a>で入力します（ここでは入力しません）。登録済み：${kids.length}人。${missing.length ? `<span style="color:#c00">この月の日誌にいて、未登録の児童：${missing.map(esc).join('、')}（<a href="#leo/userinfo">利用者情報</a>で追加）</span>` : ''}</p>
-    <h4>2. ファイルを作る</h4>${monthTabs('seikyu')}<p class="note">上の月が、請求の対象月です。</p><label>事業所番号（10桁）<input id="office_no" value="${esc(localStorage.getItem('leo_office_no') || (DEMO ? '9999999999' : ''))}" size="12"></label>
+    <h4>2. ファイルを作る</h4>${monthTabs('seikyu')}<p class="note">上の月が、請求の対象月です。</p>
     <p class="note">事業所全体にかかる減算（今はなし。かかった月だけ印を付けます。基本報酬のサービスコードが減算用のコードに変わります）：
       ${OFFICE_GENSAN.map(([k, l]) => `<label><input type="checkbox" class="og" value="${k}">${l}</label>`).join(' ')}</p>
     <button onclick="makeCsv()">請求CSVを作る（K112/K122・K611）</button><div id="csv_out"></div>`;
@@ -535,9 +554,8 @@ async function uiSave() {
 const loadSjis = () => window.Encoding ? Promise.resolve() : new Promise((ok, ng) => { const s = document.createElement('script');
   s.src = 'vendor/encoding.min.js'; s.onload = ok; s.onerror = () => ng(new Error('文字コード変換の部品を読み込めませんでした')); document.head.appendChild(s); });
 async function makeCsv() {
-  const out = $('csv_out'), office = $('office_no').value.trim();
-  if (!/^\d{10}$/.test(office)) { out.textContent = '事業所番号を10桁で入れてください。'; return; }
-  localStorage.setItem('leo_office_no', office);
+  const out = $('csv_out'), office = '2450201047';
+  const _o = office;
   try { await loadSjis(); if (!window.LeoBilling) await new Promise((ok, ng) => { const s = document.createElement('script'); s.src = 'leo_billing.js'; s.onload = ok; s.onerror = ng; document.head.appendChild(s); });
     const kids = DEMO ? DEMO_BILL.kids : await sb('leo_children'), { nikki, flags } = await billData(), F = {}, K = {};
     flags.forEach(f => F[f.day + f.child] = f);
@@ -626,12 +644,21 @@ const PLAN_DEMO_DB = { plans: [{ id: 1, child: '児童B', term_no: 2, start_on: 
   staff: [{ child: '児童B', term: '第2期', text: '（見本）5/1〜10/14 の活動記録から：公園で鬼ごっこ…', source: '自動（簡易）' }] };
 PLAN_DEMO_DB.sends = [{ kind: 'mon', child: '児童C', term: '第5期', sent_at: '2026-10-03T10:00:00+09:00', via: 'ポータル' }, { kind: 'doui', child: '児童B', term: '第2期', plan_id: 1, doc: '原案', sent_at: '2026-10-05T10:00:00+09:00', via: 'ポータル' }, { kind: 'doui', child: '児童B', term: '第2期', plan_id: 1, doc: '原案', sent_at: '2026-10-11T10:00:00+09:00', via: 'ポータル' }];
 PLAN_DEMO_DB.clinks = [];
+// 管理表：ポータルの leo_plan_track（児童1行）を読む。空・取得失敗のときは従来の sheetRows('keikaku') に戻す（読み取りだけ。シートへは書き戻さない）
+const ymj = d => { const [y, m] = String(d).split('-'); return `${y}年${+m}月`; };
+const slashD = d => d ? String(d).replace(/-/g, '/') : '';
+const trackToRow = t => ({ 児童名: t.child, 現在の期: `${t.term_no}期`, 現在の計画期間: t.period_from && t.period_to ? `${ymj(t.period_from)}〜${ymj(t.period_to)}` : '', 次期開始月: t.next_start ? ymj(t.next_start) : '',
+  フォーム送付目安日: t.survey_due ? slashD(t.survey_due) : '至急', フォーム回答日: slashD(t.survey_answered_at), 計画書作成: t.plan_made ? '済' : '未', 原案署名: t.genan_consent_at ? '済' : '未', 本案署名: t.honan_consent_at ? '済' : '未', 備考: t.note || '', 根拠資料: t.source_ref || '', _track: t });
+async function trackRows() {
+  try { const t = await sb('leo_plan_track?order=next_start,child'); if (t.length) return t.map(trackToRow); } catch (e) { }
+  return sheetRows('keikaku');
+}
 let PLAN_OPEN = '';
 async function planData() {
   if (DEMO) return { rows: PLAN_DEMO_ROWS, ...PLAN_DEMO_DB };
-  const [rows, plans, links, ans, staff] = await Promise.all([sheetRows('keikaku'), sb('leo_plans?order=child,term_no'), sb('leo_mon_links?select=token,child,term').catch(() => []),
+  const [rows, plans, links, ans, staff] = await Promise.all([trackRows(), sb('leo_plans?order=child,term_no'), sb('leo_mon_links?select=token,child,term').catch(() => []),
     sb('leo_mon_answers?order=submitted_at.desc').catch(() => []), sb('leo_staff_mon').catch(() => [])]);
-  const [sends, clinks] = await Promise.all([sb('leo_link_sends?order=sent_at').catch(() => []), sb('leo_plan_consent_links?select=token,plan_id,doc').catch(() => [])]);
+  const [sends, clinks] = await Promise.all([sb('leo_link_sends?order=sent_at').catch(() => []), sb('leo_plan_consent_links?select=token,plan_id,doc,used_at,expires_at&order=link_id').catch(() => [])]);
   const L = Object.fromEntries(links.map(l => [l.token, l]));
   return { rows, plans, links, sends, clinks, staff, mon: ans.map(a => ({ ...L[a.token], answers: a.answers, submitted_at: a.submitted_at })) };
 }
@@ -651,17 +678,35 @@ LEO_VIEWS.plan = async function () {
     if (!mon && !r['フォーム回答日']) pend('保護者アンケート', S.filter(x => x.kind === 'mon' && x.term === term), 'mon');
     if (p && !p.genan_consent_at) pend('原案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '原案'), 'doui', '原案');
     if (p && p.genan_consent_at && !p.honan_consent_at) pend('本案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '本案'), 'doui', '本案');
-    const waitHtml = () => wait.map(w => `<p style="background:${w.days >= 7 ? '#fde8e8' : '#fff8db'};padding:8px;border-radius:6px;margin:6px 0"><small>⏳ <b>${w.label}</b>：送って <b>${w.days}日</b>・返事なし（${w.n}回送付、最後 ${md(new Date(w.last))}・${esc(w.via)}）</small></p>${mg ? btn('再送用にリンクをコピー（送った記録が残ります）', `planResend(${w.arg})`) : ''}`).join('');
+    const waitHtml = () => wait.map(w => `<p style="background:${w.days >= 7 ? '#fde8e8' : '#fff8db'};padding:8px;border-radius:6px;margin:6px 0"><small>⏳ <b>${w.label}</b>：送って <b>${w.days}日</b>・返事なし（${w.n}回送付、最後 ${md(new Date(w.last))}・${esc(w.via)}）</small></p>`).join('');
     const done = [!!mon || !!r['フォーム回答日'], !!sm, !!(p && p.genan && p.honan && p.assessment && p.kaigi), !!(p && p.plan_made), !!(p && p.genan_consent_at), !!(p && p.genan_consent_at && d && t >= d.kaigi), !!(p && p.honan_consent_at)];
     const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false), over = d && st < 7 && d.start < t, soon = d && st < 7 && !over && (d.start - t) / 864e5 <= 45;
     const key = N(name), open = PLAN_OPEN === key || (DEMO && /open=1/.test(location.search) && name === '児童B');
     const btn = (label, fn, dis) => `<button ${dis ? 'disabled' : ''} onclick="${fn}" style="display:block;width:100%;margin:6px 0;padding:12px;font-size:16px;border-radius:8px">${label}</button>`;
-    return { st, over, d, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<details class="card" ${open ? 'open' : ''} ontoggle="if(this.open)PLAN_OPEN='${key}'" style="border-left:6px solid ${st >= 7 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:0">
-      <summary style="padding:14px;cursor:pointer;font-size:17px;list-style:none"><b>${esc(name)}</b>　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜${d.end.getFullYear()}/${md(d.end)}）` : ''}</small> <span style="float:right">▼</span><br>
-        <small>${st >= 7 ? '本案の同意まで済み' : 'いま：' + PLAN_STEPS2[st]}${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</small>
-        <div style="display:flex;gap:2px;margin-top:6px">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div></summary>
-      <div style="padding:0 14px 14px">
-        ${waitHtml()}
+    const W = wait[0], ds = x => x ? md(x) : '';
+    const rb = (l, f, dis) => mg ? btn(l, f, dis) : '';
+    let act = '', ab = '';
+    if (st >= 7) act = '✅ 本案の同意まで済み。いまやることはありません';
+    else if (st === 0) { if (W) { act = `保護者アンケートの返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '保護者アンケートのリンクを送る'; ab = rb('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`); } }
+    else if (st === 1) { act = '職員モニタリングを作る'; ab = rb('活動記録から作る', `staffMon('${esc(name)}','${term}',${cur})`); }
+    else if (st === 2) { if (p) { act = '計画書の4書類を確認する'; ab = btn('書類を開いて直す', `planEdit(${p.id})`); } else { act = '計画書のひな形を作る'; ab = d ? rb('計画書を作る（ひな形）', `planNew('${esc(name)}',${n},${d.start.getFullYear()},${d.start.getMonth() + 1})`) : ''; } }
+    else if (st === 3) { act = '内容を確認して「計画書作成＝済」にする'; ab = rb('確認した（計画書作成＝済）', `planMade(${p.id})`, !(p.genan && p.honan)); }
+    else if (st === 4) { if (W) { act = `原案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '原案を保護者に送る'; ab = rb('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`); } }
+    else if (st === 5) { act = `担当者会議を行う${d ? '（' + ds(d.kaigi) + '）' : ''}。終わったら本案を送る`; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); }
+    else { if (W) { act = `本案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '本案を保護者に送る'; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); } }
+    const linkAct = /リンク|コピー/.test(ab) && !/^<button disabled/.test(ab);
+    const how = linkAct ? `<div style="background:#f4f7ff;border-radius:6px;padding:8px;margin:6px 0;font-size:15px">1. 下の青いボタンを押してコピー → 2. 公式LINEで<b>${esc(name)}</b>さんの保護者のトークに貼って送る</div>` : '';
+    const checks = PLAN_STEPS2.map((lb, i) => `<div style="color:${done[i] ? '#2a7a2a' : i === st ? '#c00' : '#999'}">${done[i] ? '✔' : i === st ? '▶' : '・'} ${lb}</div>`).join('');
+    const urgent = st < 7 && (over || soon || wait.length > 0);
+    return { st, over, d, urgent, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${st >= 7 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:14px">
+      <div style="font-size:17px"><b>${esc(name)}</b>　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</div>
+      <div style="display:flex;gap:2px;margin:8px 0">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div>
+      <div style="font-size:20px;font-weight:bold;margin:8px 0;color:${st >= 7 ? '#2a7a2a' : '#c00'}">${act}</div>
+      ${how}${ab}
+      <details style="margin-top:8px" ${open ? 'open' : ''} ontoggle="if(this.open)PLAN_OPEN='${key}'"><summary style="cursor:pointer;color:#36c">くわしく見る</summary>
+        <div style="margin-top:8px;font-size:14px">${checks}</div>
+        <div>${waitHtml()}
+        
         ${d ? `<p><small>書類に入れる日付（作成者 齊藤連）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : '<p class="note">管理表の「次期開始月」がありません。</p>'}
         <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '　✅ 確認済' : '　<span class="badge">未確認</span>'}</small></p>${now.note ? `<p><small>${esc(now.note)}</small></p>` : ''}${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
         <h4>1. 保護者アンケート</h4>${mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
@@ -675,11 +720,39 @@ LEO_VIEWS.plan = async function () {
           <p><small>原案：${p.genan_consent_at ? '✅ ' + new Date(p.genan_consent_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'まだ'}／本案：${p.honan_consent_at ? '✅ ' + new Date(p.honan_consent_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'まだ'}</small></p>
           ${mg ? btn('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`, !p.plan_made) + btn('本案の同意リンクを作る（原案の同意と会議のあと）', `planLink('doui','','',${p.id},'本案')`, !p.genan_consent_at) : ''}`
           : (mg && d ? btn(`第${n}期の計画書を作る（ひな形）`, `planNew('${esc(name)}',${n},${d.start.getFullYear()},${d.start.getMonth() + 1})`) : '<p class="note">まだありません。</p>')}
-        <div id="pm_${key}"></div></div></details>` };
+        <div id="pm_${key}"></div></div>
+      </details></div>` };
   }).sort((a, b) => (a.st >= 7) - (b.st >= 7) || b.over - a.over || (a.d?.start || 0) - (b.d?.start || 0));
-  return `<h3>個別支援計画</h3>${demoNote()}<p class="note">名前をタップすると開きます。上から順に進めます。保護者へのリンクはコピーして、公式LINEの1対1トークで送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。</p>
-    ${planWaitList(cards)}${cards.map(c => c.html).join('') || '<p>管理表の行がありません。</p>'}<div id="plan_editor"></div>`;
+  return `<h3>個別支援計画</h3>${demoNote()}<p class="note">各カードの赤い行と下のボタンだけ進めれば大丈夫です。細かい情報は「くわしく見る」にあります。保護者へのリンクはコピーして、公式LINEの1対1トークで送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。</p>
+    ${cards.filter(c => c.urgent).map(c => c.html).join('') || '<p class="note">いま急ぎの子はいません。</p>'}${cards.some(c => !c.urgent) ? `<details style="margin-top:10px" ${cards.some(c => !c.urgent && PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">いま急ぎではない子（${cards.filter(c => !c.urgent).length}人）</summary>${cards.filter(c => !c.urgent).map(c => c.html).join('')}</details>` : ''}${cards.length ? '' : '<p>管理表の行がありません。</p>'}<div id="plan_editor"></div>`;
 };
+// 管理表の行を直す（児発管・管理者・事務）。ポータルの表だけを直す。Googleの管理表へは書き戻さない
+function trackEditList(rows) {
+  const tr = rows.filter(r => r._track);
+  if (!tr.length) return '';
+  return `<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:bold">管理表の行を直す（${tr.length}人）</summary><p class="note">ここで直すのはポータルの管理表だけです。Googleの管理表は変わりません（11/1までは両方が動きます）。</p>
+    ${tr.map(r => `<p style="margin:6px 0"><button onclick="trackEdit('${esc(r.児童名)}')" style="padding:8px 12px">${esc(r.児童名)}</button> <small>${esc(r.現在の期)}・${esc(r.現在の計画期間)}</small></p>`).join('')}</details>`;
+}
+const TRACK_FIELDS = [['term_no', '現在の期（数字）', 'number'], ['period_from', '計画期間 開始', 'date'], ['period_to', '計画期間 終了', 'date'], ['next_start', '次期開始日（1日）', 'date'], ['survey_due', 'アンケート送付目安日（空＝至急）', 'date'],
+  ['survey_answered_at', 'アンケート回答日', 'date'], ['genan_date', '原案の予定日', 'date'], ['kaigi_date', '会議の予定日', 'date'], ['honan_date', '本案の予定日', 'date']];
+async function trackEdit(name) {
+  const t = (await sb(`leo_plan_track?child=eq.${encodeURIComponent(name)}`))[0]; if (!t) return;
+  $('plan_editor').innerHTML = `<div class="card"><h3>${esc(t.child)}　管理表の行</h3>
+    ${TRACK_FIELDS.map(([k, l, ty]) => `<label style="display:block;margin:6px 0"><small>${l}</small><br><input id="te_${k}" type="${ty}" value="${esc(t[k] ?? '')}" style="font-size:16px;padding:6px"></label>`).join('')}
+    <label style="display:block;margin:6px 0"><input id="te_plan_made" type="checkbox" ${t.plan_made ? 'checked' : ''}> 計画書作成＝済</label>
+    <p class="note">原案・本案の同意日は、保護者の同意ページから自動で入ります（ここでは直しません）。</p>
+    <label style="display:block;margin:6px 0"><small>備考</small><br><textarea id="te_note" rows="4" style="width:100%;box-sizing:border-box;font-size:15px">${esc(t.note || '')}</textarea></label>
+    <button onclick="trackSave('${esc(t.child)}')">保存</button><div id="te_msg"></div></div>`;
+  $('plan_editor').scrollIntoView();
+}
+async function trackSave(name) {
+  if (DEMO) { $('te_msg').textContent = '見本モードなので保存しません。'; return; }
+  const b = { plan_made: $('te_plan_made').checked, note: $('te_note').value.trim() || null };
+  for (const [k, , ty] of TRACK_FIELDS) { const v = $('te_' + k).value; b[k] = v === '' ? null : ty === 'number' ? +v : v; }
+  if (!b.term_no) { $('te_msg').textContent = '期を入れてください。'; return; }
+  if (b.next_start && !/-01$/.test(b.next_start)) { $('te_msg').textContent = '次期開始日は1日にしてください。'; return; }
+  try { await sb(`leo_plan_track?child=eq.${encodeURIComponent(name)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderLeoView('plan'); } catch (e) { $('te_msg').textContent = e.message; }
+}
 function planWaitList(cards) {
   const w = cards.flatMap(c => c.wait).sort((a, b) => b.days - a.days);
   if (!w.length) return '';
@@ -717,14 +790,34 @@ async function planPrint(id) {
   w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(p.child)} 第${p.term_no}期</title><style>body{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:11pt;line-height:1.7;margin:20mm}h2{font-size:15pt}.pb{page-break-before:always}</style>` +
     docs.filter(Boolean).map((t, i) => `<div class="${i ? 'pb' : ''}">${markupHtml(t)}</div>`).join('') + '<script>setTimeout(()=>print(),300)<\/script>'); w.document.close();
 }
+// リンクのコピー：結果をボタンのすぐ下に必ず表示（成功＝緑、失敗＝URL欄を出して手でコピー）
+async function copyUrl(url) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(url); return true; } } catch (e) { }
+  try { const ta = document.createElement('textarea'); ta.value = url; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; }
+}
+function copyBtnEl() { const e = window.event; return e && e.currentTarget && e.currentTarget.tagName === 'BUTTON' ? e.currentTarget : null; }
+function copyNote(b, html, child) {
+  if (!b) { pmsg(child || '', html); return; }
+  let m = b.nextElementSibling; if (!m || !m.classList.contains('copymsg')) { m = document.createElement('div'); m.className = 'copymsg'; b.insertAdjacentElement('afterend', m); }
+  m.innerHTML = html; m.scrollIntoView({ block: 'nearest' });
+}
+function copyResult(b, url, ok, child, extra) {
+  const e = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  if (b) { if (!b.dataset.orig) b.dataset.orig = b.textContent; b.textContent = ok ? 'コピーしました ✔' : b.dataset.orig; clearTimeout(b._t); if (ok) b._t = setTimeout(() => { b.textContent = b.dataset.orig; }, 5000); }
+  copyNote(b, ok ? `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">コピーしました。公式LINEの1対1トークに貼って送ってください。</p><p class="note">${extra || ''}</p>`
+    : `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">自動でコピーできませんでした。下のリンクを長押し（または選択）してコピーし、公式LINEの1対1トークに貼って送ってください。</p><input readonly value="${e(url)}" onfocus="this.select()" onclick="this.select()" style="width:100%;font-size:14px"><p class="note">${extra || ''}</p>`, child);
+}
+function copyError(b, msg, child) { copyNote(b, `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">失敗しました：${String(msg).replace(/[<&]/g, '')}</p>`, child); }
 async function planLink(kind, child, term, planId, doc) {
   if (DEMO) { pmsg(child || '児童B', `<p class="note">見本：${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&demo=1${doc ? '&doc=' + encodeURIComponent(doc) : ''}</p>`); return; }
+  const B = copyBtnEl(); if (B) B.disabled = true;
   try { const tok = await sb('rpc/leo_make_token_link', { method: 'POST', body: JSON.stringify({ p_kind: kind, p_child: child, p_term: term, p_plan: planId || null, p_doc: doc }) });
     const url = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&t=${tok}`;
-    try { await navigator.clipboard.writeText(url); } catch (e) { }
+    const ok = await copyUrl(url);
     await planLogSend(kind, child, term, planId, doc, tok, null);
-    $('plan_editor').innerHTML = `<div class="card"><b>リンク（コピーしました）</b><p style="word-break:break-all"><small>${esc(url)}</small></p><p class="note">公式LINEの1対1トークに貼って送ってください。ほかの家庭には送らないでください。</p></div>`; $('plan_editor').scrollIntoView(); }
-  catch (e) { alert(e.message); }
+    copyResult(B, url, ok, child, 'ほかの家庭には送らないでください。' + (kind === 'doui' ? 'リンクは30日で期限が切れ、同意が1回入ると使えなくなります。あとで本文を直したときは、リンクをもう一度作ってください。' : '')); }
+  catch (e) { copyError(B, e.message, child); }
+  finally { if (B) B.disabled = false; }
 }
 async function planLogSend(kind, child, term, planId, doc, tok, url, via) {
   try { if (!child && planId) { const p = await planGet(planId); child = p.child; term = `第${p.term_no}期`; }
@@ -732,26 +825,45 @@ async function planLogSend(kind, child, term, planId, doc, tok, url, via) {
 }
 // 再送：前と同じリンクをコピーし、送った記録を足す（ポータルからは送らない）
 async function planResend(kind, child, term, planId, doc) {
-  if (DEMO) { pmsg(child, '<p class="note">見本：リンクをコピーして、送った記録を1件足します。</p>'); return; }
+  const B = copyBtnEl();
+  if (DEMO) { copyNote(B, '<p class="note">見本：リンクをコピーして、送った記録を1件足します。</p>', child); return; }
+  try {
   const D0 = await planData(), N = s => String(s || '').replace(/\s/g, '');
   const prev = (D0.sends || []).filter(x => x.kind === kind && N(x.child) === N(child) && (kind === 'mon' ? x.term === term : x.plan_id === planId && x.doc === doc)).pop();
-  let tok = kind === 'mon' ? (D0.links.find(l => N(l.child) === N(child) && l.term === term) || {}).token : (D0.clinks.find(l => l.plan_id === planId && l.doc === doc) || {}).token;
+  let tok = kind === 'mon' ? (D0.links.find(l => N(l.child) === N(child) && l.term === term) || {}).token : (D0.clinks.filter(l => l.plan_id === planId && l.doc === doc && !l.used_at && new Date(l.expires_at) > new Date()).pop() || {}).token;
   let url = tok ? `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&t=${tok}` : prev && prev.url;
   if (!url) { await planLink(kind, kind === 'mon' ? child : '', kind === 'mon' ? term : '', planId, doc); return; }
-  try { await navigator.clipboard.writeText(url); } catch (e) { }
+  const ok = await copyUrl(url);
   await planLogSend(kind, child, term, planId, doc, tok || null, tok ? null : url, tok ? 'ポータル（再送）' : 'Google（再送）');
-  pmsg(child, `<div class="card"><b>再送用のリンク（コピーしました）</b><p style="word-break:break-all"><small>${esc(url)}</small></p><p class="note">${tok ? '' : 'これはGoogleフォームのリンクです（全員共通）。'}公式LINEの1対1トークに貼って送ってください。送った記録を1件足しました。</p></div>`);
+  copyResult(B, url, ok, child, (tok ? '' : 'これはGoogleフォームのリンクです（全員共通）。') + '送った記録を1件足しました。');
+  } catch (e) { copyError(B, e.message, child); }
 }
 // ④ 職員モニタリング：今の計画期間の活動記録（日誌Q列＋ポータルの下書き由来）を日付順にまとめる。ボットが文章に整える
 async function staffMon(name, term, cur) {
-  if (DEMO) { pmsg(name, '<p class="note">見本モードなので作りません。</p>'); return; }
-  try { const r = (await sheetRows('keikaku')).find(x => x['児童名'] === name) || {}, m = String(r['現在の計画期間'] || '').match(/(\d{4})年(\d{1,2})月/);
-    const from = m ? `${m[1]}-${String(m[2]).padStart(2, '0')}-01` : addDays(today(), -183), to = today();
-    const rows = (await sb(`leo_nikki_full?day=gte.${from}&day=lte.${to}&order=day&select=day,child,activity_text`)).filter(x => String(x.child).replace(/\s/g, '') === name.replace(/\s/g, '') && x.activity_text);
-    if (!rows.length) { pmsg(name, '<p class="note">この期間の活動記録がありません。</p>'); return; }
+  const B = copyBtnEl(), NN = x => String(x || '').replace(/[\s\u3000]/g, '');
+  const bad = h => copyNote(B, `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">${h}</p>`, name);
+  if (DEMO) { copyNote(B, '<p class="note">見本モードなので作りません。</p>', name); return; }
+  if (B) B.disabled = true;
+  try {
+    copyNote(B, '<p class="note">作っています…</p>', name);
+    const r = (await trackRows()).find(x => NN(x['児童名']) === NN(name)) || {}, tk = r._track || {};
+    const m = String(r['現在の計画期間'] || '').match(/(\d{4})年\s*(\d{1,2})月/);
+    let from = m ? `${m[1]}-${String(m[2]).padStart(2, '0')}-01` : (tk.period_from || null);
+    if (!from && tk.next_start) from = addDays(tk.next_start, -183);
+    if (!from) from = addDays(today(), -183);
+    const to = today();
+    const full = (await sb(`leo_nikki_full?day=gte.${from}&day=lte.${to}&order=day&select=day,child,activity_text`)).filter(x => NN(x.child) === NN(name) && x.activity_text && String(x.activity_text).trim());
+    // 日誌（DB）に行がない過去の日は、活動記録（leo_activity）から直接補う
+    const have = new Set(full.map(x => x.day));
+    const extra = (await sb(`leo_activity?day=gte.${from}&day=lte.${to}&order=day&select=day,child,text`)).filter(x => NN(x.child) === NN(name) && x.text && String(x.text).trim() && !have.has(x.day)).map(x => ({ day: x.day, child: x.child, activity_text: x.text }));
+    const rows = full.concat(extra).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+    if (!rows.length) { bad(`この期間（${from}〜${to}）の活動記録がありません。日誌に活動記録が入っていません`); return; }
     const text = `【${from}〜${to} の活動記録から（${rows.length}日分）】\n` + rows.map(x => `${fmtDay(x.day)}　${x.activity_text}`).join('\n');
     await sb('leo_staff_mon?on_conflict=child,term', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child: name, term, period_from: from, period_to: to, text: text.slice(0, 20000), source: '自動（簡易）' }) });
-    renderLeoView('plan'); } catch (e) { pmsg(name, esc(e.message)); }
+    copyNote(B, `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">作りました（${rows.length}日分）</p>`, name);
+    setTimeout(() => renderLeoView('plan'), 1500);
+  } catch (e) { bad('失敗しました：' + esc(e.message)); }
+  finally { if (B) B.disabled = false; }
 }
 // ===== 配置表・型表・管理表の入力（児発管・管理者・事務）＋ 送迎の配慮 =====
 const MASTER_LABEL = { kata: '送迎 型表', keikaku: '個別支援計画 管理表', haichi: '職員配置表', care: '送迎の配慮（児童ごと）' };
@@ -814,12 +926,12 @@ LEO_VIEWS.line = async function () {
     kids = [...new Set(n.map(x => x.child).filter(Boolean))]; drafts = d; act = a; }
   const A = Object.fromEntries(act.map(x => [x.child, x])), D = {}; drafts.forEach(x => (D[x.child] ||= x));
   const me = DEMO ? '職員X' : await myName();
-  return `<h3>LINE報告を書く</h3>${demoNote()}
+  return `<h3>LINE報告を書く</h3><a href="https://chat.line.biz/U09e93081492c29e963d2bba78499043f" target="_blank" rel="noopener" style="display:block;background:#06c755;color:#fff;text-align:center;font-size:20px;font-weight:bold;padding:14px;border-radius:10px;text-decoration:none;margin:6px 0 12px">💬 公式LINEを開く（新しいタブ）</a>${demoNote()}
     <p class="ptabs"><button onclick="LINE_DAY=addDays(LINE_DAY,-1);renderLeoView('line')">← 前の日</button> <b>${fmtDay(LINE_DAY)}</b> <button onclick="LINE_DAY=addDays(LINE_DAY,1);renderLeoView('line')">次の日 →</button></p>
     <p class="note">保護者さんへの報告文を、子どもごとに書きます。書けたら「LINE用にコピー」→ 公式LINEの1対1トークに貼って送ってください。日誌の活動記録（である調）は自動で作ります。</p>
     ${kids.map(k => { const d = D[k], a = A[k], id = 'ln_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
       return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${d ? (d.sent_line ? '✅ LINE送信済' : '✏️ 下書きあり') : '⬜ まだ'}${a ? '／日誌 ' + esc(a.source) : ''}</small></summary>
-        <div style="padding:0 14px 14px"><textarea id="${id}" rows="8" style="width:100%;font-size:16px;box-sizing:border-box" placeholder="本日もありがとうございました。…">${esc(d ? d.body : '')}</textarea>
+        <div style="padding:0 14px 14px"><textarea id="${id}" rows="30" style="width:100%;font-size:16px;box-sizing:border-box" placeholder="本日もありがとうございました。…">${esc(d ? d.body : '')}</textarea>
         <p class="note">最後の行に名前（${esc(me || '自分の名前')}）を入れてください。</p>
         <button onclick="saveLine('${esc(k)}','${id}',${d ? d.id : 'null'})">保存</button>
         <button onclick="copyLine('${id}','${esc(k)}',${d ? d.id : 'null'})">LINE用にコピー（送った印をつける）</button>
@@ -832,7 +944,15 @@ async function saveLine(child, id, did) {
     if (did) await sb(`leo_line_drafts?id=eq.${did}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ body, updated_at: new Date().toISOString() }) });
     else await sb('leo_line_drafts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ day: LINE_DAY, child, body, author_name: name }) });
     await sb('rpc/leo_activity_from_drafts', { method: 'POST', body: JSON.stringify({ p_day: LINE_DAY }) });
-    m.textContent = '保存しました。'; } catch (e) { m.textContent = e.message; }
+    try {
+      const [nk, ac] = await Promise.all([
+        sb(`leo_nikki?day=eq.${LINE_DAY}&child=eq.${encodeURIComponent(child)}&kind=eq.利用&select=row_no,activity`),
+        sb(`leo_activity?day=eq.${LINE_DAY}&child=eq.${encodeURIComponent(child)}&select=text`)]);
+      const row = nk[0], text = (ac[0] && ac[0].text || '').trim();
+      if (row && text && !String(row.activity || '').trim())
+        await sb('leo_edits', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify([{ target: 'nikki', day: LINE_DAY, row_key: String(row.row_no), field: 'activity', old_value: row.activity || '', new_value: text.slice(0, 4000) }]) });
+    } catch (e) { }
+    m.textContent = '保存し、日誌の活動記録へ転記しました。'; } catch (e) { m.textContent = e.message; }
 }
 async function copyLine(id, child, did) {
   const m = $(id + '_m'); try { await navigator.clipboard.writeText($(id).value); m.textContent = 'コピーしました。公式LINEのトークに貼って送ってください。'; } catch (e) { m.textContent = 'コピーできませんでした。長押しで選んでコピーしてください。'; }
@@ -843,23 +963,30 @@ async function copyLine(id, child, did) {
 let DIA_DAY = today();
 const DIA_DEMO = { rows: [{ child: '児童A', kind: '利用', start_time: '14:45', end_time: '17:00', pick_driver: '職員X', drop_driver: '職員Y', activity: '（見本）公園で鬼ごっこをした。' }], drafts: [{ child: '児童A', day: today(), body: '（見本）公園で鬼ごっこをしました。', author: '職員X' }] };
 LEO_VIEWS.diary = async function () {
-  let rows, drafts;
+  let rows, drafts, act = [];
   if (DEMO) ({ rows, drafts } = DIA_DEMO);
-  else { const [n, d] = await Promise.all([sb(`leo_nikki?day=eq.${DIA_DAY}&kind=in.(利用,欠席)&order=row_no`), sb(`leo_diary_draft?day=eq.${DIA_DAY}`).catch(() => null)]); rows = n; drafts = d; }
+  else {
+    const [n, d, a] = await Promise.all([
+      sb(`leo_nikki?day=eq.${DIA_DAY}&kind=in.(利用,欠席)&order=row_no`),
+      sb(`leo_diary_draft?day=eq.${DIA_DAY}`).catch(() => null),
+      sb(`leo_activity?day=eq.${DIA_DAY}`).catch(() => [])]);
+    rows = n; drafts = d; act = a || [];
+  }
   const noTable = drafts === null; drafts = drafts || [];
   const D = Object.fromEntries(drafts.map(x => [x.child, x]));
+  const A = Object.fromEntries(act.map(x => [ldNN(x.child), x]));
   const me = DEMO ? '職員X' : await myName();
   const idOf = k => 'dr_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
   return `<h3>日誌（児童ごと）</h3>${demoNote()}
     <p class="ptabs"><button onclick="DIA_DAY=addDays(DIA_DAY,-1);renderLeoView('diary')">← 前の日</button> <b>${fmtDay(DIA_DAY)}</b> <button onclick="DIA_DAY=addDays(DIA_DAY,1);renderLeoView('diary')">次の日 →</button></p>
-    <p class="note">上はGoogleの日誌から読み取った内容（見るだけ）。下の「下書き」は、です・ます調で書いて保存します。11/1までは、いまの日誌が正式です（ここへ書いても日誌には入りません）。</p>
+    <p class="note">活動記録は、Google日誌の内容に加え、LINE下書きから自動転記された分も表示します。下の「下書き」欄への保存だけでは日誌には入りません（トップの「LINEの下書き」から保存してください）。</p>
     ${noTable ? '<p style="color:#c00">下書きの保存場所がまだありません（管理者が準備中です）。</p>' : ''}
-    ${rows.map(r => { const k = r.child, d = D[k], id = idOf(k);
-      return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}</small></summary>
+    ${rows.map(r => { const k = r.child, d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
+      return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
         <div style="padding:0 14px 14px"><p class="note">迎え：${esc(r.pick_driver || '-')}　送り：${esc(r.drop_driver || '-')}</p>
-        ${r.activity ? `<p style="white-space:pre-wrap"><b>日誌の活動記録</b><br>${esc(r.activity)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
+        ${actText ? `<p style="white-space:pre-wrap"><b>日誌の活動記録${actSrc ? '（' + esc(actSrc) + '）' : ''}</b><br>${esc(actText)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
         <b>下書き（です・ます調）</b>${d ? `<small>　${esc(d.author || '')}</small>` : ''}
-        <textarea id="${id}" rows="6" style="width:100%;font-size:16px;box-sizing:border-box" ${noTable ? 'disabled' : ''}>${esc(d ? d.body : '')}</textarea>
+        <textarea id="${id}" rows="30" style="width:100%;font-size:16px;box-sizing:border-box" ${noTable ? 'disabled' : ''}>${esc(d ? d.body : '')}</textarea>
         <button ${noTable ? 'disabled' : ''} onclick="saveDiary('${esc(k)}','${id}')">保存</button><div id="${id}_m"></div></div></details>`; }).join('') || '<p>この日の日誌に利用の子がいません。</p>'}`;
 };
 async function saveDiary(child, id) {
@@ -868,4 +995,82 @@ async function saveDiary(child, id) {
   try { const author = await myName();
     await sb('leo_diary_draft?on_conflict=child,day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child, day: DIA_DAY, body, author, updated_at: new Date().toISOString() }) });
     m.textContent = '保存しました。'; } catch (e) { m.textContent = e.message; }
+}
+
+// ===== LINEの下書き（トップのタブ）：利用児童ごとに報告文を書く → leo_line_drafts ＋ 日誌の活動記録（leo_activity）へ自動転記 =====
+// 以前は leo_diary_draft だけに保存しており転記されなかった。表示は旧下書きも読む（初回保存で転記元へ移す）。
+let LD_DAY = today();
+const ldId = k => 'ld_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
+function ldMergeDrafts(lineDrafts, diaryDrafts) {
+  const D = {};
+  (diaryDrafts || []).forEach(x => { D[ldNN(x.child)] = { child: x.child, body: x.body, author: x.author || '', lineId: null }; });
+  (lineDrafts || []).forEach(x => {
+    const k = ldNN(x.child), cur = D[k];
+    if (!cur || !cur.lineId || (x.updated_at && (!cur.updated_at || x.updated_at >= cur.updated_at)))
+      D[k] = { child: x.child, body: x.body, author: x.author_name || x.author || '', lineId: x.id, updated_at: x.updated_at, sent_line: !!x.sent_line };
+  });
+  return D;
+}
+LEO_VIEWS.linedraft = async function () {
+  let kids, D = {}, act = [], noTable = false;
+  if (DEMO) {
+    kids = ['児童A', '児童B', '児童C'];
+    D = ldMergeDrafts([{ id: 1, child: '児童A', body: '（見本）本日もありがとうございました。公園で鬼ごっこをしました。\n職員X', author_name: '職員X', updated_at: '9' }], []);
+    act = [{ child: '児童A', text: '（見本）公園で鬼ごっこをした。', source: '自動（簡易）' }];
+  } else {
+    const [n, line, diary, a] = await Promise.all([
+      sb(`leo_nikki?day=eq.${LD_DAY}&kind=eq.利用&select=child,row_no&order=row_no`),
+      sb(`leo_line_drafts?day=eq.${LD_DAY}&order=updated_at.desc`).catch(() => null),
+      sb(`leo_diary_draft?day=eq.${LD_DAY}`).catch(() => []),
+      sb(`leo_activity?day=eq.${LD_DAY}`).catch(() => [])]);
+    if (line === null) noTable = true;
+    kids = [...new Set(n.map(x => x.child).filter(Boolean))];
+    D = ldMergeDrafts(line || [], diary || []);
+    act = a || [];
+  }
+  const A = Object.fromEntries(act.map(x => [ldNN(x.child), x]));
+  const done = kids.filter(k => D[ldNN(k)]).length;
+  return `<h3>✉️ LINEの下書き</h3><a href="https://chat.line.biz/U09e93081492c29e963d2bba78499043f" target="_blank" rel="noopener" style="display:block;background:#06c755;color:#fff;text-align:center;font-size:20px;font-weight:bold;padding:14px;border-radius:10px;text-decoration:none;margin:6px 0 12px">💬 公式LINEを開く（新しいタブ）</a>${demoNote()}
+    <p class="ptabs"><button onclick="LD_DAY=addDays(LD_DAY,-1);renderLeoView('linedraft')">← 前の日</button> <input type="date" value="${LD_DAY}" onchange="if(this.value){LD_DAY=this.value;renderLeoView('linedraft')}" style="font-size:16px"> <button onclick="LD_DAY=addDays(LD_DAY,1);renderLeoView('linedraft')">次の日 →</button> <button onclick="LD_DAY=today();renderLeoView('linedraft')">今日</button></p>
+    <p style="font-size:18px"><b>${fmtDay(LD_DAY)}：${done} / ${kids.length}人 書けました</b>${kids.length - done ? `（まだ：${kids.filter(k => !D[ldNN(k)]).map(esc).join('、')}）` : kids.length ? ' ✅ 全員書けました' : ''}</p>
+    <p class="note">です・ます調で書いて「保存」すると、日誌の活動記録にも自動で入ります。「コピー」して公式LINEの1対1トークに貼って送ってください。</p>
+    ${noTable ? '<p style="color:#c00">保存場所の準備ができていません（管理者が leo_line_drafts / leo_activity_from_drafts を用意してください）。</p>' : ''}
+    ${kids.map(k => { const d = D[ldNN(k)], a = A[ldNN(k)], id = ldId(k), did = d && d.lineId != null ? d.lineId : 'null';
+      return `<div class="card"><b style="font-size:17px">■${esc(k)}</b>　<span id="${id}_s">${d ? (d.sent_line ? '✅ LINE送信済' : '✅ 書いた') : '⬜ まだ'}</span>${d && d.author ? `<small>　${esc(d.author)}</small>` : ''}${a ? `　<small id="${id}_a">／日誌 ${esc(a.source)}</small>` : `<small id="${id}_a"></small>`}
+        <textarea id="${id}" rows="30" style="width:100%;font-size:16px;box-sizing:border-box;margin-top:6px" ${noTable ? 'disabled' : ''} oninput="ldDirty('${id}')">${esc(d ? d.body : '')}</textarea>
+        <button ${noTable ? 'disabled' : ''} onclick="ldSave('${esc(k)}','${id}',${did})">保存</button>
+        <button id="${id}_c" onclick="ldCopy('${id}',${did})">コピー</button> <span id="${id}_cm" style="color:#080"></span> <span id="${id}_m"></span>
+        ${a ? `<details style="margin-top:8px"><summary>日誌の活動記録（${esc(a.source)}）</summary><p style="white-space:pre-wrap">${esc(a.text)}</p></details>` : ''}</div>`; }).join('') || '<p>この日の利用の子がいません。</p>'}`;
+};
+function ldDirty(id) { const m = $(id + '_m'); m.style.color = '#c60'; m.textContent = '● 未保存'; }
+async function ldSave(child, id, did) {
+  const body = $(id).value.trim(), m = $(id + '_m'); if (!body) { m.style.color = '#c00'; m.textContent = '本文を書いてください。'; return; }
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try {
+    const author = await myName();
+    if (did) await sb(`leo_line_drafts?id=eq.${did}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ body, updated_at: new Date().toISOString() }) });
+    else await sb('leo_line_drafts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ day: LD_DAY, child, body, author_name: author }) });
+    // 旧画面・日誌（児童ごと）と共有するため diary_draft にも残す（無くても転記は進む）
+    try { await sb('leo_diary_draft?on_conflict=child,day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child, day: LD_DAY, body, author, updated_at: new Date().toISOString() }) }); } catch (e) { }
+    await sb('rpc/leo_activity_from_drafts', { method: 'POST', body: JSON.stringify({ p_day: LD_DAY }) });
+    // Google日誌のQ列が空なら、直し依頼として活動記録を送る（1分ほどで反映）
+    try {
+      const [nk, ac] = await Promise.all([
+        sb(`leo_nikki?day=eq.${LD_DAY}&child=eq.${encodeURIComponent(child)}&kind=eq.利用&select=row_no,activity`),
+        sb(`leo_activity?day=eq.${LD_DAY}&child=eq.${encodeURIComponent(child)}&select=text`)]);
+      const row = nk[0], text = (ac[0] && ac[0].text || '').trim();
+      if (row && text && !String(row.activity || '').trim())
+        await sb('leo_edits', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify([{ target: 'nikki', day: LD_DAY, row_key: String(row.row_no), field: 'activity', old_value: row.activity || '', new_value: text.slice(0, 4000) }]) });
+    } catch (e) { }
+    m.style.color = '#080'; m.textContent = '✔ 保存し、日誌の活動記録へ転記しました';
+    $(id + '_s').textContent = '✅ 書いた';
+    const aa = $(id + '_a'); if (aa) aa.textContent = '／日誌 自動（簡易）';
+  } catch (e) { m.style.color = '#c00'; m.textContent = '保存できません：' + e.message; }
+}
+async function ldCopy(id, did) {
+  const cm = $(id + '_cm'), b = $(id + '_c');
+  try { await navigator.clipboard.writeText($(id).value); cm.style.color = '#080'; cm.textContent = 'コピーしました'; b.textContent = 'コピーしました ✔'; }
+  catch (e) { cm.style.color = '#c00'; cm.textContent = 'コピーできません。文字を長押しで選んでコピーしてください'; return; }
+  if (!DEMO && did) try { await sb(`leo_line_drafts?id=eq.${did}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ sent_line: true }) }); $(id + '_s').textContent = '✅ LINE送信済'; } catch (e) { }
+  setTimeout(() => { cm.textContent = ''; b.textContent = 'コピー'; }, 5000);
 }

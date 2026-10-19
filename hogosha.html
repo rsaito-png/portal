@@ -41,12 +41,14 @@ async function load() {
   } else {
     document.getElementById('hd').textContent = `レオ　個別支援計画（${d.doc}）の同意`;
     const f = s => { const x = new Date(s + 'T00:00:00+09:00'); return `${x.getFullYear()}年${x.getMonth() + 1}月${x.getDate()}日`; };
-    $m().innerHTML = `<div class="card"><b>${esc(d.child)}</b> さん　第${d.term_no}期 個別支援計画（${esc(d.doc)}）<br><small>計画期間：${f(d.start)} 〜 ${f(d.end)}</small>
-      <div style="white-space:pre-wrap;margin-top:10px;font-size:15px;line-height:1.7">${esc(d.text || '（まだ本文がありません。レオにお問い合わせください）')}</div></div>
-      ${d.done ? `<p class="ok">${new Date(d.done).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })} に同意をいただいています。</p>` : ''}
-      <div class="card"><div class="ch"><label><input type="checkbox" id="ag"> この個別支援計画（${esc(d.doc)}）の内容を確認し、同意します。</label></div>
-      <label>保護者氏名</label><input type="text" id="pn" maxlength="60" autocomplete="name"><button onclick="sendDoui()">同意して送信する</button><p id="r"></p></div>
-      <p class="note">${d.doc === '原案' ? '原案に同意していただいたあと、担当者会議を経て、本案の同意をあらためてお願いします。' : ''}このページはご家庭ごとの専用リンクです。</p>`;
+    const dt = s => new Date(s).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    if (d.expired) { $m().innerHTML = '<div class="card">このリンクは期限が切れています。お手数ですがレオまでご連絡ください。</div>'; return; }
+    const mk = t => esc(t || '').split('\n').map(l => l.startsWith('#T ') ? `<h3 style="text-align:center">${l.slice(3)}</h3>` : l.startsWith('#R ') ? `<div style="text-align:right">${l.slice(3)}</div>` : `<div>${l || '&nbsp;'}</div>`).join('');
+    $m().innerHTML = `<div class="card"><b>${esc(d.child)}</b> さん　第${d.term_no}期 個別支援計画（${esc(d.doc)}）<br><small>計画期間：${f(d.start)} 〜 ${f(d.end)}${d.sent_at ? '／送付日：' + dt(d.sent_at) : ''}</small>
+      <div style="margin-top:10px;font-size:15px;line-height:1.7">${mk(d.text) || '計画書の準備中です'}</div></div>
+      ${d.done ? `<p class="ok">${dt(d.done)} に同意をいただきました。ありがとうございました。</p>`
+      : `<div class="card"><p>上の内容を確認しました。この個別支援計画（${esc(d.doc)}）に同意します。</p>${d.text ? '<button id="agb" onclick="sendDoui()">同意します</button>' : '<p class="note">計画書の準備ができるまで、同意はできません。</p>'}<p id="r"></p></div>
+      <p class="note">${d.doc === '原案' ? '原案に同意していただいたあと、担当者会議を経て、本案の同意をあらためてお願いします。' : ''}このページはご家庭ごとの専用リンクです。ほかの方には送らないでください。同意は1回だけ受け付けます。</p>`}`;
   }
 }
 async function sendMon() {
@@ -56,11 +58,12 @@ async function sendMon() {
   const r = await rpc('leo_mon_submit', { p_token: T, p_answers: a }); out.innerHTML = r.ok ? '<span class="ok">送信しました。ありがとうございました。</span>' : '<span class="err">送信できませんでした。時間をおいてもう一度お試しください。</span>';
 }
 async function sendDoui() {
-  const out = document.getElementById('r'), pn = document.getElementById('pn').value.trim();
-  if (!document.getElementById('ag').checked) { out.innerHTML = '<span class="err">確認のチェックを入れてください。</span>'; return; }
-  if (!pn) { out.innerHTML = '<span class="err">保護者氏名を入れてください。</span>'; return; }
+  const out = document.getElementById('r');
   if (DEMO) { out.innerHTML = '<span class="ok">見本なので送信しません。</span>'; return; }
-  const r = await rpc('leo_doui_submit', { p_token: T, p_parent: pn }); out.innerHTML = r.ok ? '<span class="ok">送信しました。ありがとうございました。</span>' : '<span class="err">送信できませんでした。時間をおいてもう一度お試しください。</span>';
+  if (!confirm('この計画に同意します。よろしいですか？')) return;
+  document.getElementById('agb').disabled = true;
+  const r = await rpc('leo_doui_submit', { p_token: T }); out.innerHTML = r.ok ? '<span class="ok">同意を受け付けました。ありがとうございました。</span>' : '<span class="err">送信できませんでした。すでに同意済みか、リンクの期限が切れている可能性があります。レオまでご連絡ください。</span>';
+  if (r.ok) document.getElementById('agb').style.display = 'none'; else document.getElementById('agb').disabled = false;
 }
 load();
 </script></body></html>

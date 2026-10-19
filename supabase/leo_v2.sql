@@ -175,6 +175,11 @@ create or replace function public.leo_activity_from_drafts(p_day date) returns i
 declare n int;
 begin
   if public.my_office() is distinct from 'レオ' then raise exception 'レオ職員のみ'; end if;
+  -- トップの「LINEの下書き」(leo_diary_draft) にだけある分も転記元へ
+  insert into leo_line_drafts (day, child, body, author_name)
+  select d.day, d.child, d.body, d.author from leo_diary_draft d
+  where d.day = p_day and coalesce(trim(d.body), '') <> ''
+    and not exists (select 1 from leo_line_drafts l where l.day = d.day and leo_norm(l.child) = leo_norm(d.child));
   insert into leo_activity (day, child, text, source, draft_id, made_by)
   select distinct on (d.child) d.day, d.child, leo_simple_activity(d.body), '自動（簡易）', d.id, auth.uid() from leo_line_drafts d where d.day = p_day order by d.child, d.updated_at desc
   on conflict (day, child) do update set text = excluded.text, draft_id = excluded.draft_id, made_at = now() where leo_activity.source = '自動（簡易）';

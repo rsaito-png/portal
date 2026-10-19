@@ -104,7 +104,7 @@ async function renderDocsAdmin() {
     const tabs = ['すべて', '未完了', '期限90日以内'].map(f => `<button class="${f === ES_FILTER ? 'on' : ''}" onclick="ES_FILTER='${f}';renderDocsAdmin()">${f}</button>`).join('');
     $('view').innerHTML = ES_PRINT_CSS + back + `<h3>書類管理（契約書・誓約書）</h3>${DEMO ? '<p class="note">見本データです（架空）</p>' : ''}
       <p class="note"><a href="esign-help.html">使い方</a>／職員を選ぶと、全文と署名の記録が1枚で出ます（印刷・PDF可）。紙で締結済みの分は、署名なしで日付と備考だけ登録します。</p>
-      <p class="ptabs">${tabs}</p><table><tr><th>氏名</th><th>契約書</th><th>契約終了日</th><th>誓約書</th></tr>
+      <div class="noprint">${esFormButtons(null)}</div><p class="ptabs">${tabs}</p><table><tr><th>氏名</th><th>契約書</th><th>契約終了日</th><th>誓約書</th></tr>
       ${rows.map(x => `<tr style="cursor:pointer;${need(x) ? 'background:#fff6e5' : ''}" onclick="ES_SEL='${esc(x.user_id)}';renderDocsAdmin()"><td>${esc(x.full_name || '（氏名未登録）')}<br><small>${esc(x.office)}</small></td>
       <td>${cell(x.contract_status, x.contract_method, x.contract_date, x.contract_version ? '・第' + x.contract_version + '版' : '')}</td>
       <td>${esDate(x.contract_end)}${soon(x) ? ' <span class="badge">近い</span>' : ''}</td><td>${cell(x.pledge_status, x.pledge_method, x.pledge_date)}</td></tr>`).join('')}</table>`;
@@ -129,7 +129,7 @@ async function esAdminDetail(x, back) {
     <h3>${esc(x.full_name || '')}（${esc(x.office)}）の契約書類${DEMO ? '（見本）' : ''}</h3>
     <p class="noprint"><button style="width:auto" onclick="window.print()">印刷／PDFにする</button></p>
     ${blocks.join('') || '<p>登録された書類はありません。</p>'}
-    <div class="noprint">${esPaperForm(x)}${esDraftForm(x)}</div><p class="note noprint">書類 ${hist} 件</p>`;
+    <div class="noprint">${esFormButtons(x.user_id)}</div><p class="note noprint">書類 ${hist} 件</p>`;
 }
 const esOpts = t => Object.entries(ES().docTypes || {}).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
 function esPaperForm(x) {
@@ -138,12 +138,13 @@ function esPaperForm(x) {
     <label class="note">紙で締結した日</label><input id="pgDate" type="date">
     <label class="note">雇用期間の終了日（契約書のみ・無期なら空）</label><input id="pgEnd" type="date">
     <input id="pgNote" placeholder="備考（例：原本はファイル棚）。個人情報は書かない">
-    <button onclick="esPaper('${esc(x.user_id)}')">「紙で締結済み」として登録</button><div id="pgMsg" style="color:#c00"></div></div>`;
+    <button onclick="esPaper($('fmUser').value)">「紙で締結済み」として登録</button><div id="pgMsg" style="color:#c00"></div></div>`;
 }
 async function esPaper(uid) {
+  if (!uid) { $('pgMsg').textContent = '職員を選んでください。'; return; }
   const date = $('pgDate').value; if (!date) { $('pgMsg').textContent = '締結日を入れてください。'; return; }
   if (DEMO) { alert('見本モードなので保存しません'); return; }
-  try { await esRpc('doc_register_paper', { p_user: uid, p_type: $('pgType').value, p_date: date, p_note: $('pgNote').value || null, p_start: null, p_end: $('pgEnd').value || null }); renderDocsAdmin(); }
+  try { await esRpc('doc_register_paper', { p_user: uid, p_type: $('pgType').value, p_date: date, p_note: $('pgNote').value || null, p_start: null, p_end: $('pgEnd').value || null }); ES_SEL = null; location.hash = '#clerk/docs'; renderDocsAdmin(); }
   catch (e) { $('pgMsg').textContent = e.message; }
 }
 // 新しい書類を作る（下書き）→ 発行。契約書は既定値入りの入力欄、誓約書は日付だけ
@@ -157,9 +158,10 @@ function esDraftForm(x) {
     <div id="dfFields">${ES_FIELDS.map(([k, l]) => `<label class="note">${l}</label><input id="df_${k}" value="${esc(D[k] || '')}">`).join('')}
     <label class="note">雇用期間の開始日・終了日（更新通知に使う。無期なら空）</label><input id="dfS" type="date"><input id="dfE" type="date"></div>
     <p class="note">マイナンバー・口座・生年月日・住所は入れません。</p>
-    <button onclick="esDraft('${esc(x.user_id)}')">下書きを作って発行（本人に通知）</button><div id="dfMsg" style="color:#c00"></div></div>`;
+    <button onclick="esDraft($('fmUser').value)">下書きを作って発行（本人に通知）</button><div id="dfMsg" style="color:#c00"></div></div>`;
 }
 async function esDraft(uid) {
+  if (!uid) { $('dfMsg').textContent = '職員を選んでください。'; return; }
   const type = $('dfType').value, E = ES();
   if (!$('dfDate').value.trim()) { $('dfMsg').textContent = '契約締結日を入れてください。'; return; }
   const terms = { sign_date: $('dfDate').value.trim(), employer_name: E.employer.name, employer_address: E.employer.address, employer_rep: E.employer.rep };
@@ -175,6 +177,27 @@ async function esDraft(uid) {
       period_start: $('dfS').value || null, period_end: $('dfE').value || null, prev_doc_id: prev[0]?.id || null, status: 'draft' }) });
     if (!resp.ok) throw new Error('下書きを作れませんでした（' + resp.status + '）');
     const r = await resp.json();
-    await esRpc('doc_issue', { p_doc: r[0].id }); renderDocsAdmin();
+    await esRpc('doc_issue', { p_doc: r[0].id }); ES_SEL = null; location.hash = '#clerk/docs'; renderDocsAdmin();
   } catch (e) { $('dfMsg').textContent = e.message; }
+}
+
+// ---- 事務：作成画面（個別ページとは別。#clerk/docs/new ＝電子署名の書類 ／ #clerk/docs/paper ＝紙で締結済み） ----
+let ES_FORM_UID = null;
+function esFormButtons(uid) {
+  return `<p><button style="width:auto" onclick="ES_FORM_UID=${uid ? "'" + esc(uid) + "'" : 'null'};location.hash='#clerk/docs/new'">✍️ 電子署名の書類を作る</button>
+    <button style="width:auto;background:#666" onclick="ES_FORM_UID=${uid ? "'" + esc(uid) + "'" : 'null'};location.hash='#clerk/docs/paper'">📄 紙で締結済みを登録</button></p>`;
+}
+async function renderDocsForm(kind) {
+  const back = `<button class="back" onclick="ES_SEL=null;location.hash='#clerk/docs'">← 書類管理へ戻る</button>`;
+  if (ROLE !== '事務') { $('view').innerHTML = back + '<p>事務の方だけが見られます。</p>'; return; }
+  $('view').innerHTML = ES_PRINT_CSS + back + '<p>読み込み中…</p>';
+  try {
+    const ov = DEMO ? ES_DEMO.overview : await sb('v_doc_overview?select=user_id,full_name,office&order=office,full_name');
+    const sel = ES_FORM_UID && ov.find(x => x.user_id === ES_FORM_UID) ? ES_FORM_UID : '';
+    const x = ov.find(o => o.user_id === sel) || ov[0] || { office: 'レオ' };
+    const pick = `<label class="note">対象の職員</label><select id="fmUser" style="width:100%;padding:10px" onchange="ES_FORM_UID=this.value">
+      <option value="">（職員を選んでください）</option>${ov.map(o => `<option value="${esc(o.user_id)}" ${o.user_id === sel ? 'selected' : ''}>${esc(o.full_name || '（氏名未登録）')}（${esc(o.office)}）</option>`).join('')}</select>`;
+    const form = kind === 'paper' ? esPaperForm(x) : esDraftForm(x);
+    $('view').innerHTML = ES_PRINT_CSS + back + `<h3>${kind === 'paper' ? '紙で締結済みを登録' : '電子署名の書類を作る'}</h3><div class="card">${pick}</div>${form}`;
+  } catch (e) { $('view').innerHTML = ES_PRINT_CSS + back + `<p>${esc(e.message)}</p>`; }
 }
