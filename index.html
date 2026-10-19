@@ -66,7 +66,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo_jippi.js?v=202610161900"></script>
 <script src="leo_jissekihyo.js?v=202610161710"></script>
 <script src="uketsuke.js?v=202610161430"></script>
-<script src="esign.js?v=202610161430"></script>
+<script src="esign.js?v=202610191410"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -160,7 +160,7 @@ function groupView(o, k) {
 // 画面切替は URL の #事業所id で行う（戻るボタン・ブラウザの戻るが両方効く）
 async function render() {
   if (typeof loadDuty === 'function') await loadDuty();
-  const [id, sub] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
+  const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'suishodama' && sub === 'ledger') { SUI.edit = null; return renderSuiLedger(); }
@@ -178,6 +178,7 @@ async function render() {
   if (id === 'mgr') return renderMgr();
   if (id === 'uketsuke') return renderUketsuke();
   if (id === 'sign' && typeof renderSign === 'function') return renderSign();
+  if (id === 'clerk' && sub === 'docs' && (sub2 === 'new' || sub2 === 'paper') && typeof renderDocsForm === 'function') return renderDocsForm(sub2);
   if (id === 'clerk' && sub === 'docs' && typeof renderDocsAdmin === 'function') return renderDocsAdmin();
   const o = C.offices.find(x => x.id === id);
   if (o) {
