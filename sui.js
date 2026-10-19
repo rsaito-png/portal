@@ -99,7 +99,7 @@ async function siEditor(u, id) {
   return `<div class="sui-big"><h3>${esc(p.doc_class ? p.doc_class + '：' : '')}${esc(p.plan_type)}　${esc(u.name)}　v${p.version}（${esc(p.kind)}）${lock ? '🔒確定' : '下書き'}</h3><div class="card sui-form"><h4>ヘッダー</h4>${hdr}${body}
   <p>${lock ? '<span class="note">確定した版は変更できません。続ける場合は「継続」で新しい版を作ります。</span>' : `<button onclick="siSavePlan(${p.id},false)">下書き保存</button> <button onclick="siSavePlan(${p.id},'ver')">新しい版として保存</button> <button onclick="siSavePlan(${p.id},true)">確定する</button>`}
   <button class="back" onclick="siPrint(${p.id})">🖨️ 印刷 / PDF</button> <button class="back" onclick="SUI.planId=null;renderSuiPlan()">一覧へ</button> <span id="sp_m"></span></p></div>
-  ${p.doc_class && lock ? `<div class="card"><h4>${esc(p.doc_class)}の署名・送付</h4>
+  ${p.doc_class && lock ? `<div class="card"><h4>${esc(p.doc_class)}の署名・送付 <button class="back" style="font-size:.8em" onclick="siSignHelp(event)">？署名の手順</button></h4>
    <p>署名：${p.signed_on ? `<b style="color:#2e6b4f">✅ ${esc(p.signed_on)}　${esc(p.signer_kind || '')}</b>` : '未'}　<button onclick="siOnsite(${p.id})">✍️ その場で署名（タブレットを利用者に渡す）</button> <button class="back" onclick="siLink(${p.id})">署名リンクを発行</button> <button class="back" onclick="siPaper(${p.id})">紙で署名済みを記録</button></p>
    ${p.doc_class === '計画案' ? `<p><button onclick="siDup(${p.id})">この計画案から「計画」を作る（同じ内容を複製）</button></p>` : ''}
    <p>市役所へ紙で送付した日 <input type="date" id="sp_sent" value="${esc(p.sent_on || '')}" style="width:auto"> <button onclick="siSent(${p.id})">保存</button> <span id="sp_sm"></span></p><div id="sp_link"></div></div>` : p.doc_class ? '<p class="note">確定すると、署名・送付の欄が出ます。</p>' : ''}</div>`;
@@ -211,3 +211,13 @@ async function siDraft(id, auto) {
   <p>${d.plan1 ? `<button onclick="siImport(${id},'計画1')">計画1の計画案として取り込む</button> ` : ''}${d.plan2 ? `<button onclick="siImport(${id},'計画2')">計画2の計画案として取り込む</button> ` : ''}${d.monitoring ? `<button onclick="siImport(${id},'モニタリング')">モニタリングとして取り込む</button>` : ''}</p></div>`;
 }
 async function siImport(id, t) { try { const r = (await sb(`sui_request?id=eq.${id}&select=draft,kind`))[0], u = (await sb(`sui_user?id=eq.${SUI.uid}&select=*`))[0], k = { '計画1': 'plan1', '計画2': 'plan2', 'モニタリング': 'monitoring' }[t], d = r.draft[k] || {}; d.header = Object.assign(siHdr(u), d.header || {}); await siNewPlan(t, r.kind, { body: d }); } catch (e) { alert(e.message); } }
+
+// 署名の手順ポップアップ（署名・送付の欄のボタンのすぐ近くに表示）
+function siSignHelp(ev) {
+  const old = document.getElementById('sui_help'); if (old) { old.remove(); return; }
+  const b = ev.currentTarget, r = b.getBoundingClientRect(), d = document.createElement('div');
+  d.id = 'sui_help';
+  d.style.cssText = 'position:absolute;z-index:9999;max-width:min(92vw,460px);background:#fffbe6;border:2px solid #c9a227;border-radius:10px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:15px;line-height:1.6;left:' + Math.max(8, Math.min(r.left + scrollX, scrollX + innerWidth - 480)) + 'px;top:' + (r.bottom + scrollY + 6) + 'px';
+  d.innerHTML = '<b>署名の手順</b><ol style="margin:6px 0 6px 1.2em;padding:0"><li>計画案を「確定」にします（署名できるのは確定した書類だけです）。</li><li>この欄の「✍️ その場で署名」を押し、タブレットを利用者に渡します。</li><li>署名の方法（本人／ご家族など代理／署名困難）を選び、枠に指で書いてもらい、「署名を確定する」を押します。</li><li>続けて、同じ内容の「計画」の署名画面になります。同じように署名してもらいます。</li><li>市役所へ紙で送ったら、「市役所へ紙で送付した日」を入れて保存します。</li></ol><div class="note">その場で署名できないときは「署名リンクを発行」か「紙で署名済みを記録」を使います。</div><div style="text-align:right"><button class="back" onclick="document.getElementById(\'sui_help\').remove()">閉じる</button></div>';
+  document.body.appendChild(d);
+}
