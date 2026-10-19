@@ -40,7 +40,7 @@ async function siSaveUser(id) {
 async function siDelUser(id) { if (!confirm('この利用者と、計画・依頼をすべて削除します。よろしいですか？')) return; try { await sb(`sui_user?id=eq.${id}`, { method: 'DELETE' }); SUI.edit = null; renderSuiLedger(); } catch (e) { alert(e.message); } }
 
 // ===== 計画 =====
-const siTypeLabel = t => t === '計画1' ? '計画1（サービス等利用計画）' : t === '計画2' ? '計画2（週間計画表）' : 'モニタリング報告書';
+const siTypeLabel = t => t === '計画1' ? 'サービス等利用計画' : t === '計画2' ? '週間計画表' : 'モニタリング報告書';
 function siStat(ps, t, c) { // 計画案/計画ごとの 作成・署名・送付 の状況（その様式の最新版）
   const p = ps.filter(x => x.plan_type === t && x.doc_class === c).sort((x, y) => y.version - x.version)[0];
   if (!p) return '<span style="color:#999">未作成</span>';
@@ -61,7 +61,7 @@ async function renderSuiPlan() {
     <div class="card"><h4>この利用者の状況（計画案・計画：作成／署名／送付）</h4><table class="tbl"><tr><th>様式</th><th>計画案</th><th>計画</th></tr>${types.map(t => `<tr><td>${siTypeLabel(t)}</td><td>${siStat(ps, t, '計画案')}</td><td>${siStat(ps, t, '計画')}</td></tr>`).join('')}</table>
     <p class="note">計画案と計画は別の書類です（内容は同じでよい）。それぞれ署名をもらい、市役所へ紙で送ります。</p></div>
     <div class="card"><h4>計画の作成・版管理</h4><p>${['計画1', '計画2'].map(t => `<button onclick="siNewPlan('${t}','新規')">＋${siTypeLabel(t)}の計画案を新規作成</button>`).join(' ')} <button onclick="siNewPlan('モニタリング','新規')">＋モニタリング報告書を新規作成</button></p>
-    ${ps.length ? `<table class="tbl"><tr><th>様式</th><th>区分</th><th>版</th><th>種別</th><th>状態</th><th>署名</th><th>送付</th><th></th></tr>${ps.map(p => `<tr><td>${esc(p.plan_type)}</td><td>${esc(p.doc_class || '')}</td><td>v${p.version}</td><td>${esc(p.kind)}${p.source_id ? '（計画案id' + p.source_id + 'から複製）' : p.prev_plan_id ? '（前回: id' + p.prev_plan_id + '）' : ''}</td><td>${p.status === '確定' ? '🔒確定' : '下書き'}</td><td>${p.doc_class ? (p.signed_on ? '✅' + esc(p.signed_on) + ' ' + esc(p.signer_kind || '') : '未') : '-'}</td><td>${p.doc_class ? (p.sent_on ? '✅' + esc(p.sent_on) : '未') : '-'}</td><td><button onclick="SUI.planId=${p.id};renderSuiPlan()">開く</button> <button class="back" onclick="siCont(${p.id})">継続（次の版）</button></td></tr>`).join('')}</table>` : '<p>まだ計画がありません。</p>'}</div>
+    ${ps.length ? `<table class="tbl"><tr><th>様式</th><th>区分</th><th>版</th><th>種別</th><th>状態</th><th>署名</th><th>送付</th><th></th></tr>${ps.map(p => `<tr><td>${siTypeLabel(p.plan_type)}</td><td>${esc(p.doc_class || '')}</td><td>v${p.version}</td><td>${esc(p.kind)}${p.source_id ? '（計画案id' + p.source_id + 'から複製）' : p.prev_plan_id ? '（前回: id' + p.prev_plan_id + '）' : ''}</td><td>${p.status === '確定' ? '🔒確定' : '下書き'}</td><td>${p.doc_class ? (p.signed_on ? '✅' + esc(p.signed_on) + ' ' + esc(p.signer_kind || '') : '未') : '-'}</td><td>${p.doc_class ? (p.sent_on ? '✅' + esc(p.sent_on) : '未') : '-'}</td><td><button onclick="SUI.planId=${p.id};renderSuiPlan()">開く</button> <button class="back" onclick="siCont(${p.id})">継続（次の版）</button></td></tr>`).join('')}</table>` : '<p>まだ計画がありません。</p>'}</div>
     ${siRecPanel(u, rq, pend)}
     <div class="card"><h4>AI下書き</h4><p style="color:#888">録音の依頼を送ると、文字起こしから下書きを自動で作ります（約1分）。状態が「作成済み」になると、下書きがここに自動で出ます。</p></div></div>`;
     siRestoreTx(u.id); siStartPoll(u.id, rq);
@@ -96,7 +96,7 @@ async function siEditor(u, id) {
   } else {
     body = SUI_MON.map(([t, fs]) => `<h4>${t}</h4><div class="g">${fs.map(([k, l, ty]) => ty === 'ta' ? `<label style="grid-column:1/-1">${l}<br><textarea id="sm_${k}" rows="3" ${dis}>${esc(b[k] ?? '')}</textarea></label>` : ty === 'sel' ? `<label>${l}<br><select id="sm_${k}" ${dis}><option value=""></option><option ${b[k] === '要' ? 'selected' : ''}>要</option><option ${b[k] === '不要' ? 'selected' : ''}>不要</option></select></label>` : `<label>${l}<br><input id="sm_${k}" type="${ty || 'text'}" value="${esc(b[k] ?? '')}" ${dis}></label>`).join('')}</div>`).join('');
   }
-  return `<div class="sui-big"><h3>${esc(p.doc_class ? p.doc_class + '：' : '')}${esc(p.plan_type)}　${esc(u.name)}　v${p.version}（${esc(p.kind)}）${lock ? '🔒確定' : '下書き'}</h3><div class="card sui-form"><h4>ヘッダー</h4>${hdr}${body}
+  return `<div class="sui-big"><h3>${esc(p.doc_class ? p.doc_class + '：' : '')}${siTypeLabel(p.plan_type)}　${esc(u.name)}　v${p.version}（${esc(p.kind)}）${lock ? '🔒確定' : '下書き'}</h3><div class="card sui-form"><h4>ヘッダー</h4>${hdr}${body}
   <p>${lock ? '<span class="note">確定した版は変更できません。続ける場合は「継続」で新しい版を作ります。</span>' : `<button onclick="siSavePlan(${p.id},false)">下書き保存</button> <button onclick="siSavePlan(${p.id},'ver')">新しい版として保存</button> <button onclick="siSavePlan(${p.id},true)">確定する</button>`}
   <button class="back" onclick="siPrint(${p.id})">🖨️ 印刷 / PDF</button> <button class="back" onclick="SUI.planId=null;renderSuiPlan()">一覧へ</button> <span id="sp_m"></span></p></div>
   ${p.doc_class && lock ? `<div class="card"><h4>${esc(p.doc_class)}の署名・送付 <button class="back" style="font-size:.8em" onclick="siSignHelp(event)">？署名の手順</button></h4>
@@ -208,7 +208,7 @@ function siStartPoll(uid, rq) {
 async function siDraft(id, auto) {
   const r = (await sb(`sui_request?id=eq.${id}&select=draft,kind`))[0], d = r.draft || {};
   $('sr_dr').innerHTML = `<div class="card" style="border:2px solid #2e6b4f"><b>${auto ? '✅ 下書きができました（依頼#' + id + '）' : '下書き（依頼#' + id + '）'}</b><pre style="white-space:pre-wrap;background:#f6f6f6;padding:8px;max-height:260px;overflow:auto">${esc(JSON.stringify(d, null, 1))}</pre>
-  <p>${d.plan1 ? `<button onclick="siImport(${id},'計画1')">計画1の計画案として取り込む</button> ` : ''}${d.plan2 ? `<button onclick="siImport(${id},'計画2')">計画2の計画案として取り込む</button> ` : ''}${d.monitoring ? `<button onclick="siImport(${id},'モニタリング')">モニタリングとして取り込む</button>` : ''}</p></div>`;
+  <p>${d.plan1 ? `<button onclick="siImport(${id},'計画1')">サービス等利用計画の計画案として取り込む</button> ` : ''}${d.plan2 ? `<button onclick="siImport(${id},'計画2')">週間計画表の計画案として取り込む</button> ` : ''}${d.monitoring ? `<button onclick="siImport(${id},'モニタリング')">モニタリングとして取り込む</button>` : ''}</p></div>`;
 }
 async function siImport(id, t) { try { const r = (await sb(`sui_request?id=eq.${id}&select=draft,kind`))[0], u = (await sb(`sui_user?id=eq.${SUI.uid}&select=*`))[0], k = { '計画1': 'plan1', '計画2': 'plan2', 'モニタリング': 'monitoring' }[t], d = r.draft[k] || {}; d.header = Object.assign(siHdr(u), d.header || {}); await siNewPlan(t, r.kind, { body: d }); } catch (e) { alert(e.message); } }
 
