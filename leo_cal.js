@@ -34,17 +34,17 @@ function calDay(d, evs, care) {
   const es = evs.filter(e => e.day === d), use = es.filter(e => e.kind === '利用'), off = es.filter(e => e.kind === '休み');
   const route = es.filter(e => e.kind === '迎え' || e.kind === '送り').sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
   const staff = es.filter(e => e.kind === '勤務' || e.kind === '不在'), other = es.filter(e => e.kind === '休所' || e.kind === 'その他');
-  const sideTxt = (lst, parent, word) => parent ? `保護者${word}` : lst.length ? lst.map(x => `${esc(x.staff)} ${esc(x.start_time)}`).join('・') + (lst.length > 1 ? ' ⚠複数' : '') : `<span style="color:#b33">${word}なし</span>`;
+  const sideTxt = (lst, parent, word, name) => parent ? `保護者${word}` : lst.length ? lst.map(x => `${x.staff ? esc(x.staff) : '<b style="color:#c00">担当なし</b>'} ${esc((x.kid_times && x.kid_times[name]) || x.start_time)}${x.kid_places && x.kid_places[name] && x.kid_places[name] !== '自宅' ? `<br><small>${esc(x.kid_places[name])}</small>` : ''}`).join('・') + (lst.length > 1 ? ' ⚠複数' : '') : `<span style="color:#b33">${word}なし</span>`;
   let h = other.map(e => `<p>${calTag(e.kind)} ${esc(e.title || e.note)}${calEd(e)}</p>`).join('');
   h += `<h4>利用 ${use.length}人${off.length ? `／休み ${off.length}人` : ''}</h4>`;
   h += use.length ? `<table><tr><th>児童</th><th>時間</th><th>迎え（☆）</th><th>送り（★）</th></tr>${use.map(e => {
     const t = calKid(es, e.child), c = care[nk(e.child)];
     return `<tr><td>${esc(e.child)}${c ? `<br><small style="color:#c60">⚠ ${esc(c)}</small>` : ''}${e.note ? `<br><small>${esc(e.note)}</small>` : ''}${calEd(e)}</td><td>${esc(e.start_time)}〜${esc(e.end_time)}</td>
-      <td>${sideTxt(t.pick, e.parent_drop, '送り')}</td><td>${sideTxt(t.drop, e.parent_pick, '迎え')}</td></tr>`;
+      <td>${sideTxt(t.pick, e.parent_drop, '送り', e.child)}</td><td>${sideTxt(t.drop, e.parent_pick, '迎え', e.child)}</td></tr>`;
   }).join('')}</table>` : '<p>利用の予定はありません。</p>';
   if (off.length) h += `<p>${calTag('休み')} ${off.map(e => esc(e.child) + calEd(e)).join('、')}</p>`;
   if (route.length) h += `<h4>送迎</h4><table><tr><th>時刻</th><th></th><th>運転</th><th>順番</th></tr>${route.map(e =>
-    `<tr><td>${esc(e.start_time)}〜${esc(e.end_time)}</td><td>${calTag(e.kind, e.kind === '迎え' ? '☆迎え' : '★送り')}</td><td>${esc(e.staff)}</td><td>${(e.kids || []).map(esc).join(' → ')}${e.place ? `<br><small>${esc(e.place)}</small>` : ''}${calEd(e)}</td></tr>`).join('')}</table>`;
+    `<tr><td>${esc(e.start_time)}〜${esc(e.end_time)}</td><td>${calTag(e.kind, e.kind === '迎え' ? '☆迎え' : '★送り')}</td><td>${e.staff ? esc(e.staff) : '<b style="color:#c00">担当なし</b>'}</td><td>${e.kid_times ? (e.kids || []).map((n, i) => `${i + 1}. ${esc(n)} ${esc(e.kid_times[n] || '')}${e.kid_places && e.kid_places[n] ? ` <small>＠${esc(e.kid_places[n])}</small>` : ''}`).join('<br>') : (e.kids || []).map(esc).join(' → ') + (e.place ? `<br><small>${esc(e.place)}</small>` : '')}${calEd(e)}</td></tr>`).join('')}</table>`;
   if (staff.length) h += `<h4>職員</h4>${staff.map(e => `<p>${calTag(e.kind)} ${esc(e.staff)} ${esc(e.title || e.note || '')}${calEd(e)}</p>`).join('')}`;
   return h;
 }

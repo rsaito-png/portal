@@ -16,14 +16,14 @@ create or replace function public.leo_sched_plan_core(p_month date) returns json
 declare ev jsonb := '[]'; warn jsonb := '[]'; closed date[]; last_day date := (p_month + interval '1 month - 1 day')::date;
   v record; g record; hol text;
 begin
-  select coalesce(array_agg(day), '{}') into closed from leo_events where kind = '休所' and day >= p_month and day <= last_day;
+  closed := leo_sched_closed(p_month);
   create temp table if not exists _lsv (day date, child text, dow text, ks text, ke text, ps text, pe text, pst text, dst text, pord int, dord int, par text, pplace text, dplace text, parent_drop bool, parent_pick bool) on commit drop;
   truncate _lsv;
   -- 1) 児童×日の「来る日」を決める
   insert into _lsv
   select d.day, k->>'児童名', d.dow, k->>'利用開始', k->>'利用終了', nullif(k->>'迎え開始', ''), nullif(k->>'送り終了', ''),
     leo_sched_staff(k->>'迎え担当'), leo_sched_staff(k->>'送り担当'), nullif(k->>'迎え順', '')::int, nullif(k->>'送り順', '')::int, coalesce(k->>'保護者送迎', ''),
-    coalesce(nullif(k->>'迎え場所', ''), '自宅'), coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'), false, false
+    coalesce(nullif(k->>'迎え場所', ''), case when nullif(k->>'迎え開始', '') is null then '自宅' else '（未登録）' end), coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'), false, false
   from (select d::date as day, (array['日','月','火','水','木','金','土'])[extract(dow from d)::int + 1] as dow from generate_series(p_month, last_day, interval '1 day') d) d
   join leo_sched_kata_all() k on k->>'曜日' = d.dow
   where d.day <> all(closed)
@@ -48,7 +48,7 @@ begin
       if not exists (select 1 from _lsv where child = v.child and day = v.day) and v.day <> all(closed) then
         insert into _lsv select v.day, v.child, d.dow, k->>'利用開始', k->>'利用終了', nullif(k->>'迎え開始', ''), nullif(k->>'送り終了', ''),
             leo_sched_staff(k->>'迎え担当'), leo_sched_staff(k->>'送り担当'), nullif(k->>'迎え順', '')::int, nullif(k->>'送り順', '')::int, coalesce(k->>'保護者送迎', ''),
-            coalesce(nullif(k->>'迎え場所', ''), '自宅'), coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'), false, false
+            coalesce(nullif(k->>'迎え場所', ''), case when nullif(k->>'迎え開始', '') is null then '自宅' else '（未登録）' end), coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'), false, false
           from (select (array['日','月','火','水','木','金','土'])[extract(dow from v.day)::int + 1] dow) d,
             lateral (select k from leo_sched_kata_all() k where k->>'児童名' = v.child order by (k->>'曜日' = d.dow) desc, k->>'曜日' limit 1) kk(k);
         if not found then warn := warn || jsonb_build_array(jsonb_build_object('child', v.child, 'msg', to_char(v.day, 'MM/DD') || ' 追加利用：型表に行がないため作れません')); end if;
@@ -74,7 +74,8 @@ begin
   end loop;
   -- 4) 利用
   select ev || coalesce(jsonb_agg(jsonb_build_object('day', day, 'kind', '利用', 'child', child, 'start_time', ks, 'end_time', ke, 'parent_drop', parent_drop, 'parent_pick', parent_pick,
-      'title', child || case when parent_drop then '（母の送り）' when parent_pick then '（母の迎え）' else '' end) order by day, ks), '[]') into ev from _lsv;
+      'title', child || case when parent_drop then '（母の送り）' when parent_pick then '（母の迎え）' else '' end,
+      'note', (select '⚠ 保護者の備考：' || string_agg(coalesce(e.memo, ''), ' / ') from leo_schedule_exception e where e.month = p_month and e.kind = '要確認' and e.child = _lsv.child)) order by day, ks), '[]') into ev from _lsv;
   -- 5) 迎え（担当ごと・乗る順）／送り
   for g in select day, pst staff, array_agg(child order by ps, pord nulls last) kids, min(ps) st, max(ks) en,
         jsonb_object_agg(child, pplace) kp, jsonb_object_agg(child, ps) kt
@@ -125,7 +126,7 @@ begin
   delete from leo_events where source = 'kata' and day >= p_month and day <= last_day and kind in ('利用','休み','迎え','送り');
   insert into leo_events (day, kind, child, kids, staff, start_time, end_time, parent_drop, parent_pick, place, note, title, source, kid_places, kid_times)
   select (x->>'day')::date, x->>'kind', x->>'child', coalesce(array(select jsonb_array_elements_text(x->'kids')), '{}'), x->>'staff', x->>'start_time', x->>'end_time',
-    coalesce((x->>'parent_drop')::bool, false), coalesce((x->>'parent_pick')::bool, false), x->>'place', null, x->>'title', 'kata', x->'kid_places', x->'kid_times'
+    coalesce((x->>'parent_drop')::bool, false), coalesce((x->>'parent_pick')::bool, false), x->>'place', x->>'note', x->>'title', 'kata', x->'kid_places', x->'kid_times'
   from jsonb_array_elements(p->'events') x;
   get diagnostics n = row_count;
   return jsonb_build_object('inserted', n, 'warnings', p->'warnings');

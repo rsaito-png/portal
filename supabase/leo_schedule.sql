@@ -73,6 +73,14 @@ create or replace function public.leo_sched_kata(p_child text) returns setof jso
   where data->>'児童名' = p_child $$;
 revoke all on function public.leo_sched_kata from public;
 
+-- 事業所のお休みの日＝「休所」の予定＋祝日（祝日はこれまでのGASと同じく予定を作らない。祝日に開ける日は職員が予定を直接入れる）
+create or replace function public.leo_sched_closed(p_month date) returns date[] language sql stable security definer set search_path = public as $$
+  select coalesce(array_agg(distinct d), '{}') from (
+    select day d from leo_events where kind = '休所' and day >= p_month and day < (p_month + interval '1 month')::date
+    union select h::date from unnest(array['2026-11-03','2026-11-23','2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22','2027-04-29','2027-05-03','2027-05-04','2027-05-05','2027-07-19','2027-08-11','2027-09-20','2027-09-23','2027-10-11','2027-11-03','2027-11-23']) h
+      where h::date >= p_month and h::date < (p_month + interval '1 month')::date) x $$;
+revoke all on function public.leo_sched_closed from public;
+
 -- 保護者ページ：その子の画面に必要なものだけ返す（他の児童の情報は出さない）
 create or replace function public.leo_sched_get(p_token text) returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare r record; reg jsonb; closed jsonb; prev jsonb;
@@ -83,7 +91,7 @@ begin
       'weekly', coalesce(k->>'利用週', '毎週') <> '不定期', 'parent', coalesce(k->>'保護者送迎', ''),
       'school_time', coalesce(nullif(k->>'学校お迎え時刻（基準）※空欄なら迎え開始', ''), nullif(k->>'迎え開始', '')), 'pick_place', nullif(k->>'迎え場所', ''), 'drop_place', coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'))
       order by position(k->>'曜日' in '月火水木金土')), '[]') into reg from leo_sched_kata(r.child) k;
-  select coalesce(jsonb_agg(day order by day), '[]') into closed from leo_events where kind = '休所' and day >= r.month and day < (r.month + interval '1 month')::date;
+  select coalesce(to_jsonb(leo_sched_closed(r.month)), '[]') into closed;
   select jsonb_build_object('month', a.month, 'answered_at', a.answered_at, 'same_month', a.month = r.month, 'answer', a.answer) into prev
     from leo_schedule_answer a where a.child = r.child and a.month <= r.month order by (a.month = r.month) desc, a.answered_at desc limit 1;
   return jsonb_build_object('child', r.child, 'month', to_char(r.month, 'YYYY-MM'), 'expired', r.expires_at <= now(), 'deadline', r.expires_at,
@@ -102,7 +110,7 @@ begin
   a_days := coalesce(p_answer->'days', '[]'); if jsonb_typeof(a_days) <> 'array' or jsonb_array_length(a_days) > 80 then raise exception '日ごとの連絡が多すぎます'; end if;
   if jsonb_typeof(coalesce(p_answer->'weekdays', '{}')) <> 'object' then raise exception '曜日の形が正しくありません'; end if;
   note := nullif(btrim(coalesce(p_answer->>'note', '')), ''); if char_length(coalesce(note, '')) > 500 then raise exception '備考は500字までです'; end if;
-  select coalesce(array_agg(day), '{}') into closed from leo_events where kind = '休所' and day >= r.month and day < (r.month + interval '1 month')::date;
+  closed := leo_sched_closed(r.month);
   -- 検証（先に全部確かめる）
   for d in select * from jsonb_array_elements(a_days) loop
     kd := d->>'kind'; if kd not in ('休み','母の送り','母の迎え','追加利用','時刻変更','送り場所変更') then raise exception '種類が正しくありません'; end if;
