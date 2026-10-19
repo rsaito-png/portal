@@ -128,7 +128,7 @@ async function renderRydeen(sub) {
     await RV[sub](sub);
   } catch (e) { ryShow(ryBack + `<div class="ry">${ryErrBox(e)}</div>`); }
 }
-const ryAdminFrame = (cur, html) => ryShow(`<div class="ry">${ryBack}<h3 style="color:#3a7bd5;font-size:20px">RYDEEN（B型）職員画面　<small>${ryEsc(RYD.me.name)}</small></h3>${ryNav(RY_ADMIN_NAV, cur)}<div id="ry_m"></div>${html}</div>`);
+const ryAdminFrame = (cur, html) => ryShow(`<div class="ry">${cur === 'home' ? ryBack : '<button class="back noprint" onclick="RYD.st.user=null;location.hash=\'rydeen/home\'">← RYDEENホームへ</button>'}<h3 style="color:#3a7bd5;font-size:20px">RYDEEN（B型）${cur === 'home' ? '職員画面' : ryEsc((RY_ADMIN_NAV.find(n => n[0] === cur) || [0, ''])[1])}　<small>${ryEsc(RYD.me.name)}</small></h3><div id="ry_m"></div>${html}</div>`);
 const ryWorkerFrame = (cur, html) => ryShow(`<div class="ry rw">${ryBack}<p class="big"><b>${ryEsc(RYD.me.name || 'あなた')}さん、こんにちは</b></p>${ryNav(RY_WORKER_NAV, cur)}<div id="ry_m"></div>${html}</div>`);
 
 // ---------- 職員: ホーム ----------
@@ -137,8 +137,7 @@ RV.home = async () => {
   const [w, r, k, j, u] = await Promise.all([rCount('bp_profiles', 'role=eq.worker'), rCount('bp_daily_reports', 'report_date=eq.' + t), rCount('bp_tasks', 'task_date=eq.' + t), rCount('bp_journal', `journal_date=eq.${t}&status=neq.`), rCount('bp_service_records', 'signed_at=is.null')]);
   const card = (n, l, h) => `<a class="tile" href="#rydeen/${h}"><span class="big">${n}</span>${l}</a>`;
   ryAdminFrame('home', `<h4>きょうの状況（${t}）</h4><div class="grid">${card(w, '利用者数', 'users')}${card(j, '本日の日誌 入力済み', 'journal')}${card(u, '署名待ちの実績記録票', 'records')}${card(r, '本日の日報', 'reports')}${card(k, '本日のタスク', 'tasks')}</div>
-    <h4>流れ</h4><p class="note">① 業務日誌を入力（職員の入力はここだけ）→ ② 実績記録票に自動で転記・集計 → ③ 利用者が電子署名 → ④ 国保連請求CSV</p>
-    <div class="grid">${RY_ADMIN_NAV.slice(1).map(([k2, l]) => `<a class="tile" href="#rydeen/${k2}">${l}</a>`).join('')}</div>`);
+    ${[['毎日やること', '職員が入力するのは、ここだけです', ['journal', 'reports', 'tasks']], ['月末にやること', '日誌から自動で転記・集計されます。確認して請求します', ['records', 'billing', 'staff']], ['利用者まわり', '', ['users', 'contracts', 'plans']], ['資料', '', ['manuals', 'notes']]].map(([t, n, ks]) => `<h4>${t}</h4>${n ? `<p class="note">${n}</p>` : ''}<div class="grid">${ks.map(k2 => `<a class="tile" href="#rydeen/${k2}">${(RY_ADMIN_NAV.find(x => x[0] === k2) || [0, k2])[1]}</a>`).join('')}</div>`).join('')}`);
 };
 
 // ---------- 職員: 利用者 ----------
