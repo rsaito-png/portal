@@ -221,3 +221,54 @@ function siSignHelp(ev) {
   d.innerHTML = '<b>署名の手順</b><ol style="margin:6px 0 6px 1.2em;padding:0"><li>計画案を「確定」にします（署名できるのは確定した書類だけです）。</li><li>この欄の「✍️ その場で署名」を押し、タブレットを利用者に渡します。</li><li>署名の方法（本人／ご家族など代理／署名困難）を選び、枠に指で書いてもらい、「署名を確定する」を押します。</li><li>続けて、同じ内容の「計画」の署名画面になります。同じように署名してもらいます。</li><li>市役所へ紙で送ったら、「市役所へ紙で送付した日」を入れて保存します。</li></ol><div class="note">その場で署名できないときは「署名リンクを発行」か「紙で署名済みを記録」を使います。</div><div style="text-align:right"><button class="back" onclick="document.getElementById(\'sui_help\').remove()">閉じる</button></div>';
   document.body.appendChild(d);
 }
+
+// ===== 月間利用実績（水晶玉トップ） =====
+// 加算：令和6年度報酬改定（R6.4.1時点）。出典：大分市「計画相談支援の加算について」、札幌市 給付費別冊R6、ヨシカワ福祉経営事務所まとめ
+const SUI_KASAN = [
+  ['shokai', '初回加算', '300/月'], ['nyuin1', '入院時情報連携加算（Ⅰ）', '300/月'], ['nyuin2', '入院時情報連携加算（Ⅱ）', '150/月'],
+  ['taiin', '退院・退所加算', '300/回・3回まで'], ['kyotaku', '居宅介護支援事業所等連携加算', '情報提供150/訪問・会議300'],
+  ['iryo', '医療・保育・教育機関等連携加算', '面談 計画月200・モニ月300/通院同行300/情報提供150'], ['tantou', 'サービス担当者会議実施加算', '100/月'],
+  ['teikyo', 'サービス提供時モニタリング加算', '100/月'], ['shuchu', '集中支援加算', '①〜④300/⑤150'],
+  ['shunin1', '主任相談支援専門員配置加算（Ⅰ）', '300/月'], ['shunin2', '主任相談支援専門員配置加算（Ⅱ）', '100/月'],
+  ['kodo', '行動障害支援体制加算', 'Ⅰ60/Ⅱ30'], ['iryoji', '要医療児者支援体制加算', 'Ⅰ60/Ⅱ30'], ['seishin', '精神障害者支援体制加算', 'Ⅰ60/Ⅱ30'],
+  ['koji', '高次脳機能障害支援体制加算', 'Ⅰ60/Ⅱ30'], ['peer', 'ピアサポート体制加算', '100/月'], ['kyoten', '地域生活支援拠点等相談強化加算', '700/回・月4回まで'],
+  ['jogen', '利用者負担上限額管理加算', '150/回・月1回']];
+SUI.ym = SUI.ym || new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7);
+async function siMonthly() {
+  const el = $('sui_month'); if (!el) return; if (DEMO) { el.innerHTML = ''; return; }
+  el.innerHTML = '<p>月間利用実績を読み込み中…</p>';
+  try {
+    const ym = SUI.ym, [us, ps, ks] = await Promise.all([sb('sui_user?select=id,name&order=name'), sb('sui_plan?select=id,user_id,plan_type,kind,doc_class,status,body,created_at,signed_on,sent_on&order=version.desc'), sb(`sui_kasan?ym=eq.${ym}&select=*`)]);
+    const day = p => (p.body && p.body.header && p.body.header.created_on) || (p.created_at || '').slice(0, 10);
+    const km = Object.fromEntries(ks.map(k => [k.user_id, k.items || []])), cnt = { 新規: 0, 継続: 0 }, kc = {};
+    const rows = us.map(u => {
+      const mine = ps.filter(p => p.user_id === u.id && day(p).slice(0, 7) === ym);
+      const plan = mine.filter(p => p.plan_type !== 'モニタリング'), mon = mine.filter(p => p.plan_type === 'モニタリング');
+      const it = km[u.id] || []; if (!mine.length && !it.length) return null;
+      let typ = '—', cls = '';
+      if (plan.length) { const nw = plan.some(p => p.kind === '新規'); typ = nw ? '新規（計画作成）' : '新規扱い（計画変更）'; cnt.新規++; cls = '#e8f3ec'; }
+      else if (mon.length) { typ = '継続（モニタリング）'; cnt.継続++; cls = '#eef1fb'; }
+      it.forEach(c => kc[c] = (kc[c] || 0) + 1);
+      const dates = [...new Set(mine.map(p => `${p.plan_type === 'モニタリング' ? 'モニ' : p.doc_class || p.plan_type} ${day(p)}`))].join('<br>');
+      const sig = mine.map(p => `${esc(p.doc_class || p.plan_type)}：${p.status === '確定' ? '確定' : '下書き'}・署名${p.signed_on ? '✅' : '未'}・送付${p.sent_on ? '✅' : '未'}`).join('<br>');
+      return `<tr style="background:${cls}"><td>${esc(u.name)}</td><td>${typ}</td><td>${dates || '—'}</td><td style="font-size:12px">${sig || '—'}</td><td>${it.length ? it.map(c => esc((SUI_KASAN.find(k => k[0] === c) || [c, c])[1])).join('、') : '<span style="color:#999">なし</span>'} <button onclick="siKasanEdit(${u.id})">加算</button></td></tr>`;
+    }).filter(Boolean);
+    const others = us.filter(u => !rows.some(r => r.includes(`siKasanEdit(${u.id})`)));
+    el.innerHTML = `<div class="card"><h3 style="margin-top:0">📊 月間利用実績 <input type="month" value="${ym}" onchange="SUI.ym=this.value;siMonthly()"></h3>
+      <p><b>新規 ${cnt.新規}件</b>（計画作成・計画変更）　<b>継続 ${cnt.継続}件</b>（モニタリング）　合計 ${cnt.新規 + cnt.継続}件</p>
+      <p style="font-size:13px">加算：${Object.keys(kc).length ? SUI_KASAN.filter(k => kc[k[0]]).map(k => `${esc(k[1])} ${kc[k[0]]}件`).join('／') : 'なし'}</p>
+      <div style="overflow-x:auto"><table class="grid8" style="border-collapse:collapse;width:100%;font-size:14px"><tr><th>利用者</th><th>請求種別</th><th>実施日</th><th>確定・署名・送付</th><th>加算</th></tr>${rows.join('') || '<tr><td colspan="5">この月の計画・モニタリングはまだありません</td></tr>'}</table></div>
+      ${others.length ? `<p style="font-size:13px">加算だけ付ける：<select id="sk_u">${others.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select> <button onclick="siKasanEdit(+$('sk_u').value)">加算</button></p>` : ''}
+      <p class="note">請求種別・実施日は計画/モニタリングの作成日（無ければ登録日）で月を判定します。加算は手でチェックします。</p><div id="sk_ed"></div></div>`;
+  } catch (e) { el.innerHTML = `<p>月間利用実績：${esc(e.message)}</p>`; }
+}
+async function siKasanEdit(uid) {
+  const k = (await sb(`sui_kasan?user_id=eq.${uid}&ym=eq.${SUI.ym}&select=items`))[0], it = (k && k.items) || [], u = (await sb(`sui_user?id=eq.${uid}&select=name`))[0];
+  $('sk_ed').innerHTML = `<div class="card" style="border:2px solid #8e5bb5"><b>${esc(u.name)}　${SUI.ym} の加算</b><div style="columns:2 260px;font-size:14px">${SUI_KASAN.map(x => `<label style="display:block"><input type="checkbox" class="skc" value="${x[0]}" ${it.includes(x[0]) ? 'checked' : ''}> ${esc(x[1])} <small style="color:#777">${esc(x[2])}</small></label>`).join('')}</div>
+    <button onclick="siKasanSave(${uid})">保存</button> <button class="back" onclick="$('sk_ed').innerHTML=''">閉じる</button></div>`;
+  $('sk_ed').scrollIntoView({ behavior: 'smooth' });
+}
+async function siKasanSave(uid) {
+  const items = [...document.querySelectorAll('.skc:checked')].map(c => c.value);
+  try { await sb('sui_kasan?on_conflict=user_id,ym', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: uid, ym: SUI.ym, items, updated_at: new Date().toISOString() }) }); siMonthly(); } catch (e) { alert(e.message); }
+}

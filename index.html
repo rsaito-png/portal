@@ -53,7 +53,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
 <script src="sui_render.js?v=202610170620"></script>
-<script src="sui.js?v=202610170630"></script>
+<script src="sui.js?v=202610191500"></script>
 <script src="kin_contract.js?v=202610162320"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
@@ -187,6 +187,7 @@ async function render() {
     $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
       <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
       ${officeBody(o)}`;
+    if (o.id === 'suishodama' && typeof siMonthly === 'function') { $('view').insertAdjacentHTML('beforeend', '<div id="sui_month"></div>'); siMonthly(); }
     if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
     if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
