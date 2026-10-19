@@ -92,6 +92,54 @@ try:
     api('POST', '/rest/v1/bp_journal', {'worker_id': wid, 'office': 'E2E-TEST', 'journal_date': pd, 'status': '通所', 'start_time': '10:00', 'end_time': '15:00', 'break_min': 60, 'work': '検証作業'})
     go(page, 'rydeen/plans'); wait_text(page, '新しい計画を作る'); page.click('text=作成して集計を取り込む'); wait_text(page, '支援記録の要約')
     check('利用は1日' in page.inner_text('#view'), '計画: 日誌から集計が自動挿入される')
+    # ---- AI下書き（依頼→collect→下書きJSON→apply→画面）。下書きJSONは E2E_BOT_DRAFT があればボットが書いたものを待つ。なければ決め打ちで代用 ----
+    import subprocess as _sp, glob as _g
+    def tool(*a): r = _sp.run(['node', os.path.join(os.path.dirname(__file__), '..', 'tools', 'draft-plans.js'), *a], capture_output=True, text=True); return r.returncode, r.stdout + r.stderr
+    page.click('button:has-text("AIで下書きを依頼")'); wait_text(page, '下書きを依頼しました')
+    rq = api('GET', f'/rest/v1/bp_plan_draft_requests?office=eq.{OFFICE}&select=*')
+    check(len(rq) == 1 and rq[0]['status'] == 'pending' and rq[0]['requested_by_name'] == 'E2E管理者', 'AI下書き: 依頼が1行(pending)追加された')
+    check(page.locator('button:has-text("AIで下書きを依頼")').is_disabled(), 'AI下書き: 依頼中は再依頼ボタンが押せない')
+    CF = '/tmp/ai-draft/e2e-collect.json'; DF = os.environ.get('E2E_BOT_DRAFT', '/tmp/ai-draft/e2e-draft.json')
+    rc, out = tool('collect', '--office', OFFICE, '--out', CF); check(rc == 0 and '"pending": 1' in out, 'AI下書き: collect が依頼を拾う')
+    col = json.load(open(CF)); r0 = col['requests'][0]
+    check(oct(os.stat(CF).st_mode & 0o777) == '0o600' and r0['worker_name'] == '検証 太郎' and any('検証作業' in j['work'] for j in r0['journal']), 'AI下書き: 材料に氏名と日誌があり、ファイルは0600')
+    leak = json.dumps(col, ensure_ascii=False); check('0000000001' not in leak and '242012' not in leak and 'recipient' not in leak, 'AI下書き: 受給者証番号などの個人情報は材料に含まれない')
+    if os.environ.get('E2E_BOT_DRAFT'):
+        print('WAITING_FOR_BOT_DRAFT', CF, DF, flush=True)
+        for _ in range(900):
+            if os.path.exists(DF): break
+            time.sleep(1)
+    else:
+        json.dump({'drafts': [{'request_id': r0['request_id'], 'plan_id': r0['plan_id'], 'sections': {'assessment': {'利用者概要': '（AI）概要の下書き', '本人の意向': '（AI）意向の下書き'}, 'monitoring': {'総括': '（AI）総括の下書き'}, 'plan': {'長期目標': '（AI）長期目標の下書き', '短期目標': '（AI）短期目標の下書き'}, 'meeting': {'検討事項': '書かれてはいけない'}}}]}, open(DF, 'w'), ensure_ascii=False)
+    rc, out = tool('apply', '--draft', DF, '--collect', CF); check(rc == 0 and 'done' in out, 'AI下書き: apply が書き込み完了 ' + out.strip().splitlines()[0][:80])
+    check(not os.path.exists(CF) and not os.path.exists(DF), 'AI下書き: 材料と下書きのファイルが処理後に削除された')
+    q1 = api('GET', f'/rest/v1/bp_plan_draft_requests?office=eq.{OFFICE}&select=status,done_at')[0]; check(q1['status'] == 'done' and q1['done_at'], 'AI下書き: 依頼が done になった')
+    page.evaluate("renderRydeen('plans')"); wait_text(page, '下書き済み'); shot(page, '10a-plan-ai-draft')
+    ai_n = page.locator('#view .aib').count()
+    check(ai_n >= 2 and page.locator('#view .aib:has-text("AI下書き・要確認")').count() >= 2, f'AI下書き: 画面に「下書き済み」と項目ごとの「AI下書き・要確認」({ai_n}箇所)')
+    check(page.input_value('#pf_assessment_0') != '' and page.input_value('#pf_assessment_1') != '', 'AI下書き: 計画の項目に下書きが入っている')
+    check(page.input_value('#pf_meeting_2') == '', 'AI下書き: 会議録(事実を知り得ない)には書かれない')
+    rv = api('GET', f'/rest/v1/bp_support_plan_revisions?office=eq.{OFFICE}&select=note,saved_by_name'); check(any('AI下書き' in (x['note'] or '') for x in rv), 'AI下書き: 版履歴に「AI下書きを反映」が残る')
+    # 要確認が残ったまま確定には進めない
+    for _ in range(2): page.click('#view >> text=へ進む >> nth=0'); page.wait_for_timeout(1500)
+    page.click('#view >> text=本案として確定する'); wait_text(page, '「AI下書き・要確認」の項目が残っています'); check(api('GET', f'/rest/v1/bp_support_plans?office=eq.{OFFICE}&select=stage')[0]['stage'] == 'meeting', 'AI下書き: 要確認が残っていると本案の確定に進めない(会議録の段階で止まる)')
+    # 職員が直す: 1項目は文面を直す、残りは「確認した」にチェック
+    page.fill('#pf_assessment_0', '（検証）利用者概要'); page.fill('#pf_plan_1', '（検証）長期目標')
+    for el in page.locator('input[id^=pf_ok_]').all():
+        if el.is_visible(): el.check()
+    page.click('text=保存（版履歴に追加）'); wait_text(page, '保存しました')
+    pl = api('GET', f'/rest/v1/bp_support_plans?office=eq.{OFFICE}&select=content')[0]['content']
+    check(len(pl['ai_draft']['fields']) == 0 and pl['assessment']['利用者概要'] == '（検証）利用者概要', 'AI下書き: 職員が直す/確認すると要確認の印が外れる')
+    # 職員が書いた項目は再依頼でも上書きされない
+    api('POST', '/rest/v1/bp_plan_draft_requests', {'office': OFFICE, 'plan_id': r0['plan_id'], 'requested_by_name': 'E2E管理者'})
+    rc, out = tool('collect', '--office', OFFICE, '--out', CF); r1 = json.load(open(CF))['requests'][0]
+    json.dump({'drafts': [{'request_id': r1['request_id'], 'plan_id': r1['plan_id'], 'sections': {'assessment': {'利用者概要': '上書きされてはいけない', '家族の意向': '（AI）家族の意向の下書き'}}}]}, open(DF, 'w'), ensure_ascii=False)
+    rc, out = tool('apply', '--draft', DF, '--collect', CF)
+    pl = api('GET', f'/rest/v1/bp_support_plans?office=eq.{OFFICE}&select=content')[0]['content']
+    check(pl['assessment']['利用者概要'] == '（検証）利用者概要' and pl['assessment']['家族の意向'] == '（AI）家族の意向の下書き' and 'assessment|家族の意向' in pl['ai_draft']['fields'], 'AI下書き: 職員入力済みは上書きせず、空欄だけに新しい下書きが入る')
+    page.evaluate("renderRydeen('plans')"); wait_text(page, '下書き済み')
+    for el in page.locator('input[id^=pf_ok_]').all(): el.check()
+    page.click('text=保存（版履歴に追加）'); wait_text(page, '保存しました')
     page.fill('#pf_assessment_0', '（検証）利用者概要'); page.fill('#pf_plan_1', '（検証）長期目標'); page.click('text=保存（版履歴に追加）'); wait_text(page, '保存しました')
     for _ in range(3): page.click('#view >> text=へ進む >> nth=0') if page.locator('text=へ進む').count() else None; page.wait_for_timeout(1200)
     page.click('text=本案として確定する'); wait_text(page, '利用者本人の確認と署名'); shot(page, '10-plan-final')
@@ -99,6 +147,11 @@ try:
     cv = page.locator('#ps_sig'); bb = cv.bounding_box(); page.mouse.move(bb['x'] + 20, bb['y'] + 60); page.mouse.down(); page.mouse.move(bb['x'] + 180, bb['y'] + 30, steps=8); page.mouse.up()
     page.click('text=同意して署名する'); wait_text(page, '同意の証跡'); shot(page, '11-plan-signed')
     check('確定時から変更なし' in page.inner_text('#view'), '計画: 署名・確定時ハッシュと一致')
+    before = api('GET', f'/rest/v1/bp_support_plans?office=eq.{OFFICE}&select=content')[0]['content']
+    api('POST', '/rest/v1/bp_plan_draft_requests', {'office': OFFICE, 'plan_id': r0['plan_id'], 'requested_by_name': 'E2E管理者'})
+    rc, out = tool('collect', '--office', OFFICE, '--out', CF); tool('clean')
+    q3 = api('GET', f'/rest/v1/bp_plan_draft_requests?office=eq.{OFFICE}&status=eq.error&select=result_note')
+    check(len(q3) == 1 and '確定・署名後' in q3[0]['result_note'] and api('GET', f'/rest/v1/bp_support_plans?office=eq.{OFFICE}&select=content')[0]['content'] == before, 'AI下書き: 確定・署名後の計画には下書きしない(errorで記録・内容は不変)')
     # ---- 職員勤務実績 ----
     go(page, 'rydeen/staff'); wait_text(page, '職員の勤務実績'); page.fill('#sm_name', '検証 職員'); page.select_option('#sm_job', '職業指導員'); page.click('text=職員を追加'); wait_text(page, '出退勤の入力')
     page.click('text=月内にまとめて入力'); page.click('text=にまとめて追加'); wait_text(page, '件を追加しました')
@@ -129,7 +182,7 @@ try:
         r = urllib.request.Request(URL + f'/rest/v1/{t}?select=*', headers={'apikey': anon, 'Authorization': 'Bearer ' + tok, 'User-Agent': 'curl/8'})
         try: return json.loads(urllib.request.urlopen(r).read().decode())
         except urllib.error.HTTPError as e: return f'HTTP{e.code}'
-    for t in ['bp_worker_private', 'bp_service_records', 'bp_journal', 'bp_contracts', 'bp_support_plans', 'bp_staff_notes', 'bp_files', 'bp_staff_members', 'bp_billing_settings', 'bp_contract_signatures']:
+    for t in ['bp_plan_draft_requests', 'bp_worker_private', 'bp_service_records', 'bp_journal', 'bp_contracts', 'bp_support_plans', 'bp_staff_notes', 'bp_files', 'bp_staff_members', 'bp_billing_settings', 'bp_contract_signatures']:
         v = rest_as_worker(t); check(v == [] or (isinstance(v, str)), f'worker(RLS): {t} は読めない ({v if isinstance(v, str) else "0件"})')
     tasks = rest_as_worker('bp_tasks'); check(isinstance(tasks, list) and len(tasks) == 1, 'worker(RLS): 本日の自分宛/全員宛タスクだけ読める')
     # 日報

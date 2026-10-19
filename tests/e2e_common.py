@@ -23,7 +23,7 @@ r=urllib.request.Request("https://api.supabase.com/v1/projects/zvrardoyxocmqhvyd
 try: print(urllib.request.urlopen(r).read().decode()[:2000])
 except urllib.error.HTTPError as e: print(e.code,e.read().decode()[:1500])
 ''', q], capture_output=True, text=True); return p.stdout.strip()
-TABLES = ['bp_support_plan_signatures','bp_support_plan_revisions','bp_support_plans','bp_contract_signatures','bp_contracts','bp_contract_templates','bp_journal','bp_service_records','bp_daily_reports','bp_tasks','bp_manuals','bp_staff_notes','bp_files','bp_staff_shifts','bp_staff_members','bp_billing_settings','bp_worker_private','bp_profiles']
+TABLES = ['bp_plan_draft_requests','bp_support_plan_signatures','bp_support_plan_revisions','bp_support_plans','bp_contract_signatures','bp_contracts','bp_contract_templates','bp_journal','bp_service_records','bp_daily_reports','bp_tasks','bp_manuals','bp_staff_notes','bp_files','bp_staff_shifts','bp_staff_members','bp_billing_settings','bp_worker_private','bp_profiles']
 def cleanup(user_ids):
     # 追記専用(署名)テーブルのトリガーは通常の操作では消せない。検証用の別事業所 E2E-TEST の行だけを、1トランザクション内でトリガー停止して削除する
     dels = ''.join(f"delete from public.{t} where office='{OFFICE}';" for t in TABLES)

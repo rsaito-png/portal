@@ -99,11 +99,15 @@ async function ryCreatePlan() { ryGo(async () => {
   const content = RydLib.emptyContent(start, end, await ryPlanData(wid));
   const row = (await rIns('bp_support_plans', { worker_id: wid, version: 1, stage: 'assessment', content, content_hash: null, supersedes_id: null, created_by: RYD.me.uid }, true))[0];
   await ryAddRevision(row, content, 'assessment', '新規作成(集計を自動挿入)'); RYD.st.plan = row.id; await renderRydeen('plans'); }); }
-const ryReadPlan = old => { const c = JSON.parse(JSON.stringify(old)); for (const sec of RydLib.SECTIONS) sec.fields.forEach((f, i) => { const e = ryP(`pf_${sec.key}_${i}`); if (e) c[sec.key][f] = e.value; });
+const ryAiFlags = c => (c.ai_draft && c.ai_draft.fields) || {};
+const ryReadPlan = old => { const c = JSON.parse(JSON.stringify(old)); for (const sec of RydLib.SECTIONS) sec.fields.forEach((f, i) => { const e = ryP(`pf_${sec.key}_${i}`); if (e) { const k = sec.key + '|' + f;
+  // AI下書きの項目は、職員が文面を直した、または「確認した」にチェックしたら要確認の印を外す
+  if (ryAiFlags(c)[k] && (e.value !== c[sec.key][f] || ryC(`pf_ok_${sec.key}_${i}`))) delete c.ai_draft.fields[k];
+  c[sec.key][f] = e.value; } });
   if (ryP('pf_start') && ryV('pf_start')) c.period.start = ryV('pf_start'); if (ryP('pf_end') && ryV('pf_end')) c.period.end = ryV('pf_end'); return c; };
 async function ryPlanPage(id) {
   const p = (await rb(`bp_support_plans?id=eq.${id}`))[0]; if (!p) { RYD.st.plan = null; return RV.plans('plans'); }
-  const [revs, sigs] = await Promise.all([rb(`bp_support_plan_revisions?plan_id=eq.${id}&select=rev_no,stage,note,saved_by_name,saved_at&order=rev_no.desc`), rb(`bp_support_plan_signatures?plan_id=eq.${id}&order=signed_at`)]);
+  const [revs, sigs, dreq] = await Promise.all([rb(`bp_support_plan_revisions?plan_id=eq.${id}&select=rev_no,stage,note,saved_by_name,saved_at&order=rev_no.desc`), rb(`bp_support_plan_signatures?plan_id=eq.${id}&order=signed_at`), rb(`bp_plan_draft_requests?plan_id=eq.${id}&select=*&order=requested_at.desc&limit=1`).catch(() => [])]);
   RYD.st.pcur = p; const self = sigs.find(x => x.signer_kind === 'self'), fam = sigs.find(x => x.signer_kind === 'family'), editable = RydLib.EDITABLE.includes(p.stage), c = p.content, sm = c.summary;
   const intact = p.content_hash ? (await RydLib.hashPlan(p.worker_id, p.version, c)) === p.content_hash : null;
   const nav = `<button class="back noprint" onclick="RYD.st.plan=null;RYD.st.pprint=false;renderRydeen('plans')">← 一覧</button>`;
@@ -111,12 +115,13 @@ async function ryPlanPage(id) {
   if (RYD.st.pprint) { const off = Object.fromEntries(RydLib.OFFICE_FIELDS);
     return ryShow(`<div class="ry">${nav}<button class="noprint" onclick="window.print()">印刷／PDFにする</button><button class="sec noprint" onclick="RYD.st.pprint=false;renderRydeen('plans')">戻る</button>
     <h3>個別支援計画（第${p.version}版）${p.stage === 'superseded' ? '【旧版】' : ''}${!['final', 'signed', 'superseded'].includes(p.stage) ? '【下書き】' : ''}</h3><p style="font-size:13px">事業所：${ryEsc(off['事業所名'])}（${ryEsc(off['事業所の種類'])}）／ サービス管理責任者：${ryEsc(off['サービス管理責任者'] || ryTBD)}<br>利用者：${ryEsc(RYD.wname[p.worker_id])} ／ 計画期間：${ryEsc(c.period.start)}〜${ryEsc(c.period.end)}</p>
-    ${sm ? `<h4>支援記録の要約（自動集計 ${sm.from}〜${sm.to}）</h4><p class="pre">${ryEsc(sm.text)}</p>` : ''}${RydLib.SECTIONS.map(sec => `<h4 style="border-bottom:1px solid #999">${sec.title}</h4>${sec.fields.map(f => `<p style="font-size:13px;margin:8px 0 0"><b>${f}</b></p><p class="pre">${ryEsc((c[sec.key][f] || '').trim() || ryTBD)}</p>`).join('')}`).join('')}<hr>
+    ${sm ? `<h4>支援記録の要約（自動集計 ${sm.from}〜${sm.to}）</h4><p class="pre">${ryEsc(sm.text)}</p>` : ''}${RydLib.SECTIONS.map(sec => `<h4 style="border-bottom:1px solid #999">${sec.title}</h4>${sec.fields.map(f => `<p style="font-size:13px;margin:8px 0 0"><b>${f}</b></p><p class="pre">${ryAiFlags(c)[sec.key + '|' + f] ? '【AI下書き・要確認】' : ''}${ryEsc((c[sec.key][f] || '').trim() || ryTBD)}</p>`).join('')}`).join('')}<hr>
     ${await Promise.all(sigs.map(async x => `<div style="font-size:13px"><p><b>電子署名の記録：${x.signer_kind === 'self' ? '利用者本人' : '家族・代理人 ' + ryEsc(x.signer_name) + '（' + ryEsc(x.relationship) + '）'}</b></p><p>署名日時：${ryDT(x.signed_at)} ／ 説明・立会：${ryEsc(x.explained_by_name)}（${ryEsc(x.explain_method)}）</p><img class="sg" src="${x.signature_data}" alt="署名"><p class="mono">ハッシュ(SHA-256)：${x.content_hash}（${(await RydLib.hashPlan(p.worker_id, p.version, c)) === x.content_hash ? '署名時から変更なし' : '不一致'}）</p></div>`)).then(a => a.join('')) || ''}${sigs.length ? '' : '<p style="color:#b00"><b>【未署名】</b></p>'}</div>`); }
   ryAdminFrame('plans', `${nav}<h3>個別支援計画（第${p.version}版）— ${ryEsc(RYD.wname[p.worker_id] || '')}</h3><p>段階：<b>${RydLib.STAGE_LABEL[p.stage]}</b> ／ <a href="#rydeen/plans" onclick="RYD.st.pprint=true;renderRydeen('plans');return false">印刷用ページ（PDF保存可）</a>${p.supersedes_id ? ` ／ <a href="#rydeen/plans" onclick="RYD.st.plan='${p.supersedes_id}';renderRydeen('plans');return false">前の版</a>（理由：${ryEsc(p.revision_reason)}）` : ''}</p>
     ${sm ? `<div class="card"><h4>支援記録の要約・モニタリング材料（自動集計: ${ryDT(sm.generated_at)}／${sm.from}〜${sm.to}）</h4><p>${ryEsc(sm.text)}</p><ul>${sm.material.map(m => `<li>${ryEsc(m)}</li>`).join('')}</ul>${editable ? `<button class="sec inl" onclick="ryRefreshSummary('${id}')">最新の記録で集計し直す</button>` : ''}</div>` : ''}
+    ${ryAiCard(p, dreq[0], editable)}
     <div class="card"><div class="row">${ryInp('pf_start', '計画期間 開始', c.period.start, 'date', editable ? '' : 'disabled')}${ryInp('pf_end', '終了', c.period.end, 'date', editable ? '' : 'disabled')}</div></div>
-    ${RydLib.SECTIONS.map(sec => `<div class="card"><h4>${sec.title}</h4>${sec.fields.map((f, i) => `<label class="l">${f}</label><textarea id="pf_${sec.key}_${i}" ${editable ? '' : 'disabled'} placeholder="未入力（空欄は印刷時に【要確認】）">${ryEsc(c[sec.key][f])}</textarea>`).join('')}</div>`).join('')}
+    ${RydLib.SECTIONS.map(sec => `<div class="card"><h4>${sec.title}</h4>${sec.fields.map((f, i) => { const ai = ryAiFlags(c)[sec.key + '|' + f]; return `<label class="l">${f}${ai ? ' <span class="aib">AI下書き・要確認</span>' : ''}</label><textarea id="pf_${sec.key}_${i}" ${editable ? '' : 'disabled'} ${ai ? 'style="border:2px solid #d98a00;background:#fffaf0"' : ''} placeholder="未入力（空欄は印刷時に【要確認】）">${ryEsc(c[sec.key][f])}</textarea>${ai && editable ? `<label style="display:block;font-size:13px;margin:2px 0 6px"><input type="checkbox" id="pf_ok_${sec.key}_${i}"> 内容を確認した（直さずにこのまま使う場合はチェックして保存）</label>` : ''}`; }).join('')}</div>`).join('')}
     ${editable ? `<div class="card">${ryInp('pf_note', '変更メモ（版履歴に残ります）', '')}<button onclick="rySavePlan('${id}')">保存（版履歴に追加）</button> <button class="sec" onclick="ryAdvancePlan('${id}')">${RY_NEXT[p.stage]}</button></div>` : ''}
     ${p.stage === 'final' && !self ? `<div class="card"><h4>利用者本人の確認と署名（端末を本人に渡してください）</h4><label class="l">説明の方法</label><select id="ps_m"><option>対面</option><option>オンライン</option></select>${consent}${ryPad('ps_sig')}<button onclick="ryPlanSign('${id}','self')">同意して署名する</button> <button class="sec inl" onclick="ryReopenPlan('${id}')">本案の確定を取り消して編集に戻す</button></div>` : ''}
     ${(p.stage === 'final' || p.stage === 'signed') && self && !fam ? `<div class="card"><h4>家族・代理人の署名（任意）</h4><div class="row">${ryInp('pg_n', '署名者の氏名', '')}${ryInp('pg_r', '続柄', '')}${ryInp('pg_x', '代筆・代理の場合の理由（任意）', '')}</div><label class="l">説明の方法</label><select id="ps_m"><option>対面</option><option>オンライン</option></select>${consent}${ryPad('ps_sig')}<button onclick="ryPlanSign('${id}','family')">家族として署名する</button></div>` : ''}
@@ -124,6 +129,18 @@ async function ryPlanPage(id) {
     ${p.stage === 'signed' ? `<div class="card"><h4>内容を変更する・次期計画を作る（新版を作成。会議→署名のやり直し）</h4><label class="l">変更理由（必須）</label><textarea id="pv_reason"></textarea><button class="sec" onclick="ryRevisePlan('${id}')">新版を作る</button></div>` : ''}
     <div class="card"><h4>版履歴（追記専用）</h4><table class="tbl"><tr><th>#</th><th>日時</th><th>段階</th><th>職員</th><th>内容</th></tr>${revs.map(r => `<tr><td>${r.rev_no}</td><td>${ryDT(r.saved_at)}</td><td>${RydLib.STAGE_LABEL[r.stage]}</td><td>${ryEsc(r.saved_by_name)}</td><td>${ryEsc(r.note)}</td></tr>`).join('')}</table></div>`);
 }
+// ---- AI下書き（外部AIには送らず、ボット自身が定期処理で下書きを入れる。docs/ai-draft.md）----
+function ryAiCard(p, rq, editable) {
+  const n = Object.keys(ryAiFlags(p.content)).length;
+  let st = '';
+  if (rq) st = rq.status === 'pending' ? `<p><b>依頼中</b>（${ryDT(rq.requested_at)} に依頼）。下書きができるまで少し待って、この画面を開き直してください。</p>`
+    : rq.status === 'done' ? `<p><b>下書き済み</b>（${ryDT(rq.done_at)}）${rq.result_note ? ' ／ ' + ryEsc(rq.result_note) : ''}</p>` : `<p style="color:#b00"><b>下書きできませんでした</b>（${ryDT(rq.done_at)}）：${ryEsc(rq.result_note || '')}</p>`;
+  return `<div class="card" style="border-left:4px solid #d98a00"><h4>AIで下書きを依頼</h4><p class="note">業務日誌・日報・自動集計をもとに、アセスメント・前期の評価・計画の各項目の下書きを、このポータル専用のAI（外部のAIには送りません）が作ります。<b>職員が必ず確認・修正して確定してください。</b>すでに書いた項目は上書きしません。確定・署名後は下書きできません。</p>${st}
+    ${n ? `<p><span class="aib">AI下書き・要確認</span> が ${n} 項目あります。確認するまで「本案として確定」には進めません。</p>` : ''}
+    ${editable ? `<button class="sec" ${rq && rq.status === 'pending' ? 'disabled' : ''} onclick="ryReqDraft('${p.id}')">AIで下書きを依頼</button>` : ''}</div>`;
+}
+async function ryReqDraft(id) { ryGo(async () => { const p = await ryPlanLoad(id); if (!RydLib.EDITABLE.includes(p.stage)) throw new Error('確定後の計画には下書きできません');
+  await rIns('bp_plan_draft_requests', { plan_id: id, requested_by_name: RYD.me.name }); await renderRydeen('plans'); ryMsg('下書きを依頼しました。できあがると、この画面に「下書き済み」と出ます。', true); }); }
 const ryPlanLoad = async id => (await rb(`bp_support_plans?id=eq.${id}`))[0];
 async function rySavePlan(id) { ryGo(async () => { const p = await ryPlanLoad(id); if (!RydLib.EDITABLE.includes(p.stage)) throw new Error('この状態では編集できません');
   const content = ryReadPlan(p.content); await rUpd('bp_support_plans', 'id=eq.' + id, { content, updated_at: await ryNow() }); await ryAddRevision(p, content, p.stage, ryV('pf_note').trim() || '編集'); await renderRydeen('plans'); ryMsg('保存しました（版履歴に追加）。', true); }); }
@@ -131,7 +148,7 @@ async function ryRefreshSummary(id) { ryGo(async () => { const p = await ryPlanL
   const content = { ...ryReadPlan(p.content), summary: await ryPlanData(p.worker_id) }; await rUpd('bp_support_plans', 'id=eq.' + id, { content, updated_at: await ryNow() }); await ryAddRevision(p, content, p.stage, '集計を再実行'); await renderRydeen('plans'); }); }
 // 段階を進める: assessment→draft→meeting→final。final で内容を固定しハッシュを保存
 async function ryAdvancePlan(id) { ryGo(async () => { const p = await ryPlanLoad(id), next = { assessment: 'draft', draft: 'meeting', meeting: 'final' }[p.stage]; if (!next) throw new Error('次の段階がありません');
-  const content = ryReadPlan(p.content), patch = { stage: next, content, updated_at: await ryNow() }; if (next === 'final') patch.content_hash = await RydLib.hashPlan(p.worker_id, p.version, content);
+  const content = ryReadPlan(p.content); if (next === 'final' && Object.keys(ryAiFlags(content)).length) throw new Error('「AI下書き・要確認」の項目が残っています。内容を確認して直すか、「確認した」にチェックしてください'); const patch = { stage: next, content, updated_at: await ryNow() }; if (next === 'final') patch.content_hash = await RydLib.hashPlan(p.worker_id, p.version, content);
   await rUpd('bp_support_plans', 'id=eq.' + id, patch); await ryAddRevision(p, content, next, next === 'final' ? '本案として確定(内容固定・ハッシュ保存)' : `${next} へ進める`); await renderRydeen('plans'); }); }
 async function ryReopenPlan(id) { ryGo(async () => { const p = await ryPlanLoad(id); if (p.stage !== 'final') throw new Error('署名前の本案のみ戻せます');
   const sg = await rb(`bp_support_plan_signatures?plan_id=eq.${id}&select=id`); if (sg.length) throw new Error('署名済みのため戻せません');
