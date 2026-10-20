@@ -57,7 +57,6 @@ const LB_RANKS = [['大老', '将軍を補佐する最高職（常設ではな�
 const LB_WORDS = [['注進（ちゅうしん）', '起きたことを急いで上に知らせること。ここでは日々の報告'], ['伺い（うかがい）', '上の人に判断を求めること。ここでは齊藤さんに決めてほしいこと'], ['評定所（ひょうじょうしょ）', '幕府の重職が集まって相談・裁定した場所。ここでは役職のある人と会長の連絡の場']];
 async function lbHelp() {
   let who = []; try { const s = JSON.parse(localStorage.getItem('sess') || '{}'); const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/rank_list', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' }); if (r.ok) who = await r.json(); } catch (e) {}
-  if (!who.some(w => w.rank === '総務奉行')) who.push({ rank: '総務奉行', name: '宮本（アカウント準備中）' });
   const names = k => who.filter(w => w.rank === k || w.rank.endsWith(k) && k === '奉行' && w.rank !== '監査奉行').map(w => (w.rank === k ? '' : w.rank + ' ') + w.name).join('、') || '不在';
   const box = document.getElementById('lbHelp'); if (!box) return;
   box.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50" onclick="this.remove()"><div class="card" style="max-width:640px;margin:40px auto;max-height:85vh;overflow:auto" onclick="event.stopPropagation()">
