@@ -34,8 +34,8 @@ async function renderLeaderBoard() {
 }
 function lbCard(p) {
   const row = (k, v) => v ? `<p style="margin:4px 0;white-space:pre-wrap"><b>${k}</b> ${esc(v)}</p>` : '';
-  const rep = p.replied_at ? `<div style="background:#fff8e1;padding:6px;border-radius:6px">${p.reaction ? `<span style="font-size:22px">${esc(p.reaction)}</span> ` : ''}${esc(p.reply || '')}<small> 会長より</small></div>` : '<span class="badge">未返信</span>';
-  const form = LB.chair ? `<div style="margin-top:6px">${['👍', '🙏', '✅', '👀'].map(r => `<button style="width:auto" onclick="lbReply(${p.id},'${r}')">${r}</button>`).join(' ')}
+  const rep = p.replied_at ? `<div style="background:#fff8e1;padding:6px;border-radius:6px">${p.reaction ? `<span style="font-size:${p.reaction.length > 2 ? 16 : 22}px;font-weight:bold;color:${p.reaction === 'まかりならん' ? '#c00' : 'inherit'}">${esc(p.reaction)}</span> ` : ''}${esc(p.reply || '')}<small> 会長より</small></div>` : '<span class="badge">未返信</span>';
+  const form = LB.chair ? `<div style="margin-top:6px">${['👍', '🙏', '✅', '👀', 'よきにはからえ', 'まかりならん'].map(r => `<button style="width:auto" onclick="lbReply(${p.id},'${r}')">${r}</button>`).join(' ')}
     <input id="lbr${p.id}" placeholder="短い返信" style="width:60%" value="${esc(p.reply || '')}"><button style="width:auto" onclick="lbReply(${p.id})">返信</button></div>` : '';
   return `<div class="card" style="border-left:6px solid ${p.replied_at ? '#9c9' : '#e88'}"><small><a href="#" onclick="lbHelp();return false">${esc(p.author_name || '')}</a>・${esc(p.office || '')}・${lbT(p.created_at)}</small>
     ${row('①', p.today)}${row('②', p.trouble)}${row('③お伺い', p.ask)}${rep}${form}</div>`;
