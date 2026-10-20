@@ -28,9 +28,9 @@ LEO_VIEWS.jissekihyo = async function () {
   const [yy, mm] = JH_MONTH.split('-').map(Number);
   return `<h3>サービス提供実績記録表</h3>${demoNote()}
     <p class="note">保護者に実績を確認してもらう流れの一覧です。今は Google 側のフォームも動いています（並行運転・そちらは変更しません）。ポータルからは保護者に自動送信しません。</p>
-    <p><a href="https://docs.google.com/forms/d/1UqoIx6WFAYh2IJgl9FDdD40WsOG58qiaG1Gld3_PKkk/edit" target="_blank" rel="noopener">📝 確認フォーム（Google）</a>
-     ／ <a href="https://docs.google.com/spreadsheets/d/1_6OuwQUxxdtM3m1ZbGu_2UJacayKiZxk9LjuxT-HeQA/edit" target="_blank" rel="noopener">📊 回答シート（Google）</a>
-     ／ <a href="https://docs.google.com/document/d/19rIG027Rdn7vCDmA1othPImI7QnzEGCkc20d8kt_5MU/edit" target="_blank" rel="noopener">📖 運用マニュアル</a></p>
+    <p><a href="gl:g20" target="_blank" rel="noopener">📝 確認フォーム（Google）</a>
+     ／ <a href="gl:g21" target="_blank" rel="noopener">📊 回答シート（Google）</a>
+     ／ <a href="gl:g22" target="_blank" rel="noopener">📖 運用マニュアル</a></p>
     <p class="ptabs"><button onclick="JH_MONTH=jhMk(-1);renderLeoView('jissekihyo')">← 前の月</button> <b>${yy}年${mm}月分</b> <button onclick="JH_MONTH=jhMk(1);renderLeoView('jissekihyo')">次の月 →</button></p>
     <p>確認済み <b>${cnt.ok}</b>・相違あり <b style="color:#d33">${cnt.diff}</b>・送った（返事待ち） ${cnt.sent}・未 ${cnt.no} ／ ${children.length}人</p>
     ${children.length ? `<table class="tbl" style="width:100%;border-collapse:collapse"><tr><th>児童</th><th>実績の日数</th><th>状況</th><th>リンク</th><th>送った</th></tr>

@@ -1,4 +1,4 @@
-// レオ 利用料実費請求（#leo/jippi）：お昼代・おやつ代を児童ごとに。LINE文面をコピー→宮本さんが公式LINEで手動送信。保護者への自動送信はしない
+// レオ 利用料実費請求（#leo/jippi）：お昼代・おやつ代を児童ごとに。LINE文面をコピー→担当者が公式LINEで手動送信。保護者への自動送信はしない
 // 金額：実績記録「一覧」タブから取り込み（tools/jippi_import.py）。Squareリンクは既存ルーティンが作ったものを貼る／取り込む（トークンは扱わない）
 let JI_MONTH = (() => { const t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; })();
 let JI_ROWS = [];
@@ -6,7 +6,7 @@ const jiMk = d => { const [y, m] = JI_MONTH.split('-').map(Number), n = new Date
 const jiYen = n => Number(n).toLocaleString('ja-JP') + '円';
 function jiText(r) {
   const m = +JI_MONTH.slice(5), name = String(r.child).replace(/\s/g, '');
-  return `${r.guardian ? r.guardian + '様\n' : ''}レオ（齊藤）です。${m}月分の実費のご案内です。\n\n${name}さん\n・お昼代 ${jiYen(r.lunch)}\n・おやつ代 ${jiYen(r.snack)}\n・合計 ${jiYen(r.lunch + r.snack)}\n\nお支払いはこちらからお願いします。\n${r.pay_link || '（支払いリンク未作成）'}\n\nよろしくお願いします。\nレオ 齊藤`;
+  return `${r.guardian ? r.guardian + '様\n' : ''}レオ（${gl('name:leo_contact','担当')}）です。${m}月分の実費のご案内です。\n\n${name}さん\n・お昼代 ${jiYen(r.lunch)}\n・おやつ代 ${jiYen(r.snack)}\n・合計 ${jiYen(r.lunch + r.snack)}\n\nお支払いはこちらからお願いします。\n${r.pay_link || '（支払いリンク未作成）'}\n\nよろしくお願いします。\nレオ ${gl('name:leo_contact','')}`;
 }
 LEO_VIEWS.jippi = async function () {
   if (!canManage()) return '<p>この画面は児発管・管理者・事務の方だけが使えます。</p>';

@@ -81,7 +81,7 @@ end $$;
 revoke all on function public.leo_sync from public;
 grant execute on function public.leo_sync to anon, authenticated;
 
--- 最初の職員（齊藤さん）をレオ・事務として登録（ログイン作成後に再実行してもOK）
+-- 最初の職員をレオ・事務として登録（ログイン作成後に再実行してもOK）
 insert into public.staff_profiles (user_id, office, role, nikki_name)
-  select id, 'レオ', '事務', '齊藤　連' from auth.users where email = 'rsaito@psr-seishinkai.org'
+  select id, 'レオ', '事務', '<職員氏名>' from auth.users where email = '<メールアドレス>'
   on conflict (user_id) do nothing;

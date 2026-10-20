@@ -48,7 +48,7 @@ function leoSimpleActivity(b) {
   assert(t === '公園で鬼ごっこをしました。', 'strip greeting and signature: ' + JSON.stringify(t));
 }
 {
-  const t = leoSimpleActivity('今日もありがとうございました！\nおやつ完食。\n中村');
+  const t = leoSimpleActivity('今日もありがとうございました！\nおやつ完食。\n佐藤');
   assert(t === 'おやつ完食。', 'variant greeting: ' + JSON.stringify(t));
 }
 

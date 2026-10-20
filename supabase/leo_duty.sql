@@ -6,8 +6,8 @@ as $$ select duty from public.staff_profiles where user_id = auth.uid() $$;
 -- 管理・確認ができる人：事務（role）・管理者・児発管
 create or replace function public.can_manage() returns boolean language sql stable security definer set search_path = public
 as $$ select coalesce(public.my_role() = '事務' or public.my_duty() in ('管理者','児発管'), false) $$;
-update public.staff_profiles set duty = '管理者' where nikki_name = '齊藤　連';
-update public.staff_profiles set duty = '児発管' where nikki_name = '中村　友香';
+-- （実名を含む役職の初期設定は公開リポジトリから削除。DBで設定済み）
+-- （実名を含む役職の初期設定は公開リポジトリから削除。DBで設定済み）
 -- ヒヤリハットの確認・保護者の実績確認は児発管もできる
 drop policy if exists hy_check on public.hiyari;
 create policy hy_check on public.hiyari for update to authenticated using (public.can_manage() and (office = public.my_office() or public.my_role() = '事務')) with check (public.can_manage());

@@ -56,11 +56,11 @@ alter table public.leo_staff_mon enable row level security;
 drop policy if exists lsm_read on public.leo_staff_mon; create policy lsm_read on public.leo_staff_mon for select to authenticated using (public.my_office() = 'レオ' or public.can_bill());
 drop policy if exists lsm_write on public.leo_staff_mon; create policy lsm_write on public.leo_staff_mon for all to authenticated using (public.can_manage()) with check (public.can_manage());
 
--- ⑤ 個別支援計画（1期＝1行。4書類の本文と日付。作成者は齊藤連）
+-- ⑤ 個別支援計画（1期＝1行。4書類の本文と日付。作成者は児発管）
 create table if not exists public.leo_plans (
   id bigint generated always as identity primary key, child text not null, term_no int not null check (term_no between 1 and 40),
   start_on date not null check (extract(day from start_on) = 1), end_on date not null,
-  assess_on date, genan_on date, kaigi_on date, honan_on date, author text not null default '齊藤連',
+  assess_on date, genan_on date, kaigi_on date, honan_on date, author text not null default '',
   assessment text, genan text, kaigi text, honan text,
   plan_made boolean not null default false, genan_consent_at timestamptz, honan_consent_at timestamptz,
   imported_from text, verified boolean not null default true, note text,

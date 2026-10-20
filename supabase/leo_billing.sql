@@ -34,6 +34,6 @@ alter table public.leo_children add column if not exists guardian_kana text;
 alter table public.leo_children add column if not exists first_date date;
 alter table public.leo_children add column if not exists kinyu_no int check (kinyu_no between 1 and 99);
 alter table public.leo_children add column if not exists gensan text[] not null default '{}' check (gensan <@ array['未計画','未計画2']);
--- 2026-10-15 齊藤指示：児童マスタ（受給者証）は児発管（中村友香）も入力する。現場支援員は不可のまま
+-- 2026-10-15 管理者指示：児童マスタ（受給者証）は児発管も入力する。現場支援員は不可のまま
 drop policy if exists lch_bill on public.leo_children;
 create policy lch_bill on public.leo_children for all to authenticated using (public.can_manage()) with check (public.can_manage());

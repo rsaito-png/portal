@@ -16,14 +16,22 @@ Deno.serve(async (req) => {
     const names: string[] = cfg.buckets || [], J = '会長が判断', G = 'Grok Botがやる', L = 'あとで', all = [...names, J, G, L];
     const fb: any[] = await (await rest('chair_idea_feedback?order=created_at.desc&limit=15&select=text,fixed_bucket')).json();
     let bucket = L, note = '';
+    // 仮名化：担当者名を「担当A」等に、利用者名（読める台帳から）を「利用者◯」に置き換えてから送る
+    const pairs: [string, string][] = names.map((n, i) => [n, '担当' + String.fromCharCode(65 + i)]);
+    for (const t of ['sui_user', 'kin_user']) {
+      try { const rows: any[] = await (await rest(`${t}?select=name`)).json(); if (Array.isArray(rows)) rows.forEach((x, i) => x?.name && x.name.length >= 2 && pairs.push([x.name, `利用者${t[0].toUpperCase()}${i + 1}`])); } catch (_) { /* 読めなければ飛ばす */ }
+    }
+    pairs.sort((a, b) => b[0].length - a[0].length);
+    const mk = (t: string) => pairs.reduce((s, [r, f]) => s.split(r).join(f), String(t ?? '')).replace(/0\d{1,4}-?\d{1,4}-?\d{3,4}/g, '［電話］');
+    const um = (t: string) => [...pairs].sort((a, b) => b[1].length - a[1].length).reduce((s, [r, f]) => s.split(f).join(r), String(t ?? ''));
     if (AI) {
       try {
-        const sys = `会長の思いつきメモ1行を次のどれか1つに分類。担当別:${names.join('/')}（その人宛・その人の仕事なら）、${J}（会長だけが決められること）、${G}（システム構築・技術・ポータル・スクリプト・データ・調べもの等、Grok Botが自分で進められる作業。会長の判断や入力が要るなら${J}）、${L}（迷う・急ぎでない）。過去に会長が直した例:\n` +
-          fb.map((f) => `「${f.text}」→${f.fixed_bucket}`).join('\n') + `\nJSONのみ出力: {"bucket":"…","note":"15字以内の理由"}`;
+        const sys = `会長の思いつきメモ1行を次のどれか1つに分類。担当別:${names.map(mk).join('/')}（その人宛・その人の仕事なら）、${J}（会長だけが決められること）、${G}（システム構築・技術・ポータル・スクリプト・データ・調べもの等、Grok Botが自分で進められる作業。会長の判断や入力が要るなら${J}）、${L}（迷う・急ぎでない）。過去に会長が直した例:\n` +
+          fb.map((f) => `「${mk(f.text)}」→${mk(f.fixed_bucket)}`).join('\n') + `\nJSONのみ出力: {"bucket":"…","note":"15字以内の理由"}`;
         const r = await fetch('https://api.x.ai/v1/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer ' + AI, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: Deno.env.get('AI_MODEL') || 'grok-4-fast-non-reasoning', max_tokens: 80, temperature: 0, messages: [{ role: 'system', content: sys }, { role: 'user', content: idea.text }] }) });
+          body: JSON.stringify({ model: Deno.env.get('AI_MODEL') || 'grok-4-fast-non-reasoning', max_tokens: 80, temperature: 0, messages: [{ role: 'system', content: sys }, { role: 'user', content: mk(idea.text) }] }) });
         const j = JSON.parse((await r.json()).choices[0].message.content.replace(/```json|```/g, ''));
-        if (all.includes(j.bucket)) { bucket = j.bucket; note = String(j.note || '').slice(0, 40); }
+        const jb = um(String(j.bucket || '')); if (all.includes(jb)) { bucket = jb; note = um(String(j.note || '')).slice(0, 40); }
       } catch (_) { /* 失敗したら下の簡易判定 */ }
     }
     if (bucket === L && !note && /システム|構築|ポータル|スクリプト|データ|調べ|調査|実装|修正|バグ|作って|画面|API|DB|SQL|自動化|連携|移行/i.test(idea.text) && !/(決め|判断|どうする|どっち|確認して)/.test(idea.text)) { bucket = G; note = '作業・調べもの'; }

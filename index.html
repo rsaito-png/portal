@@ -45,8 +45,9 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=202610192140"></script>
-<script src="leo.js?v=202610162300"></script>
+<script src="config.js?v=202610201000"></script>
+<script src="gl.js?v=202610201000"></script>
+<script src="leo.js?v=202610201000"></script>
 <script src="kin.js?v=202610161430"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=202610162300"></script>
@@ -63,8 +64,8 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610161430"></script>
 <script src="leo_cal.js?v=202610161430"></script>
-<script src="leo_jippi.js?v=202610161900"></script>
-<script src="leo_jissekihyo.js?v=202610161710"></script>
+<script src="leo_jippi.js?v=202610201000"></script>
+<script src="leo_jissekihyo.js?v=202610201000"></script>
 <script src="uketsuke.js?v=202610161430"></script>
 <script src="esign.js?v=202610191410"></script>
 <script src="rydeen.js?v=202610191440"></script>
@@ -88,7 +89,7 @@ async function login() {
   });
   const j = await r.json();
   if (!r.ok) { $('msg').textContent = 'ログインできませんでした。メールとパスワードを確認してください。'; return; }
-  localStorage.setItem('sess', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email, role: (j.user.app_metadata || {}).role || C.defaultRole, exp: Date.now() + j.expires_in * 1000 }));
+  localStorage.setItem('sess', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email, role: (j.user.app_metadata || {}).role || C.defaultRole, exp: Date.now() + j.expires_in * 1000 })); if (window.loadGL) loadGL();
   show();
 }
 

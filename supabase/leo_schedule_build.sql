@@ -4,9 +4,7 @@
 alter table public.leo_events add column if not exists kid_places jsonb;   -- 迎え・送り：児童ごとの場所
 alter table public.leo_events add column if not exists kid_times jsonb;    -- 迎え・送り：児童ごとの目安時刻
 
-create or replace function public.leo_sched_staff(p text) returns text language sql immutable as $$
-  select case when p like '友香%' then '中村　友香' when p like '文%' then '中村　文' when p like '宮本%' or p like '祥%' then '宮本　幸子'
-    when p like '齊藤%' or p like '連%' then '齊藤　連' else nullif(p, '') end $$;
+-- leo_sched_staff(p)：職員の呼び名→氏名の対応表。実名を含むため公開リポジトリから削除（定義はDB上にある）
 create or replace function public.leo_sched_kata_all() returns setof jsonb language sql stable security definer set search_path = public as $$
   select data from leo_master where kind = 'kata' union all select data from leo_sheet where kind = 'kata' and not exists (select 1 from leo_master where kind = 'kata') $$;
 revoke all on function public.leo_sched_kata_all, public.leo_sched_staff from public;

@@ -21,6 +21,37 @@ monitoring（kind=継続のときのみ出力）: {interview_date, place, interv
 - 継続の場合は、前回の確定済み計画の目標とサービスを引き継ぎ、今回の文字起こしの内容で達成状況や変更を反映する。
 - 新規は plan1 と plan2 のみ、継続は plan1・plan2・monitoring の3つ全て。header は出力しない。`;
 
+// ---- 仮名化：xAIへ送る前に個人を特定できる値を置き換え、返ってきた文章で元に戻す ----
+type Pair = [string, string]; // [本物, 仮の値]
+function buildPairs(u: Record<string, unknown>): Pair[] {
+  const pairs: Pair[] = [];
+  const add = (v: unknown, tag: string) => {
+    const s = String(v ?? "").trim(); if (s.length < 2) return;
+    pairs.push([s, tag]);
+    const parts = s.split(/[\s　]+/).filter((x) => x.length >= 2); // 姓・名だけで呼ばれる場合
+    if (parts.length > 1) parts.forEach((x, i) => pairs.push([x, `${tag}${i === 0 ? "（姓）" : "（名）"}`]));
+  };
+  add(u.name, "利用者A"); add(u.name_kana, "リヨウシャA"); add(u.guardian_name, "保護者A");
+  add(u.address, "［住所］"); add(u.phone, "［電話］");
+  for (const k of ["jukyusha_fukushi", "jukyusha_chiiki", "jukyusha_jido"]) add(u[k], "［受給者証番号］");
+  if (u.birth) { const b = String(u.birth); add(b, "［生年月日］"); const [y, m, d] = b.split("-").map(Number); if (y) add(`${y}年${m}月${d}日`, "［生年月日］"); }
+  return pairs.sort((a, b) => b[0].length - a[0].length); // 長いものから置換
+}
+const mask = (t: string, pairs: Pair[]) => pairs.reduce((s, [real, fake]) => s.split(real).join(fake), t)
+  .replace(/0\d{1,4}-?\d{1,4}-?\d{3,4}/g, "［電話］");
+function unmask(v: unknown, pairs: Pair[]): unknown {
+  // 姓・名の置換は戻さず、フルネームの仮名だけ戻す（「利用者A（姓）」等は本人表記に戻す）
+  const back = pairs.filter(([, f]) => !f.startsWith("［")).map(([r, f]) => [f, r] as Pair).sort((a, b) => b[0].length - a[0].length);
+  if (typeof v === "string") return back.reduce((s, [f, r]) => s.split(f).join(r), v);
+  if (Array.isArray(v)) return v.map((x) => unmask(x, pairs));
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, unmask(x, pairs)]));
+  return v;
+}
+function ageBand(birth: unknown): string {
+  if (!birth) return ""; const b = new Date(String(birth)); if (isNaN(+b)) return "";
+  const a = Math.floor((Date.now() - +b) / 31557600000); return a < 18 ? `${a}歳` : `${Math.floor(a / 10) * 10}代`;
+}
+
 async function fail(id: number, msg: string) {
   console.error("sui-draft failed", id, msg.slice(0, 300));
   await db.from("sui_request").update({ error: msg.slice(0, 1000) }).eq("id", id);
@@ -42,9 +73,12 @@ Deno.serve(async (req) => {
       const { data: p } = await db.from("sui_plan").select("plan_type, body, created_at").eq("user_id", r.user_id).eq("status", "確定").order("created_at", { ascending: false }).limit(6);
       prev = p ?? [];
     }
-    const { header: _h, ...uinfo } = (u ?? {}) as Record<string, unknown>;
-    const msg = `kind: ${r.kind}\n\n【利用者台帳】\n${JSON.stringify(uinfo)}\n\n` +
-      (r.kind === "継続" ? `【前回の確定済み計画】\n${JSON.stringify(prev)}\n\n` : "") + `【今回の文字起こし】\n${r.transcript ?? ""}`;
+    const uu = (u ?? {}) as Record<string, unknown>;
+    const pairs = buildPairs(uu);
+    // 下書きに必要な項目だけ送る（氏名・住所・電話・生年月日・受給者証番号・保護者名は送らない）
+    const uinfo = { 呼び方: "利用者A", 年齢: ageBand(uu.birth), 計画の種類: uu.kind, 障害支援区分: uu.shien_kubun, 保護者の続柄: uu.guardian_relation, モニタリング期間: uu.monitoring_period };
+    const msg = mask(`kind: ${r.kind}\n\n【利用者情報】\n${JSON.stringify(uinfo)}\n\n` +
+      (r.kind === "継続" ? `【前回の確定済み計画】\n${JSON.stringify(prev)}\n\n` : "") + `【今回の文字起こし】\n${r.transcript ?? ""}`, pairs);
     const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 150000);
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST", signal: ctl.signal,
@@ -55,7 +89,7 @@ Deno.serve(async (req) => {
     clearTimeout(to);
     if (!res.ok) return fail(id, `xAI ${res.status}: ${(await res.text()).replace(/xai-[A-Za-z0-9]+/g, "***").slice(0, 300)}`);
     const text = (await res.json()).choices?.[0]?.message?.content ?? "";
-    const draft = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+    const draft = unmask(JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")), pairs) as Record<string, any>;
     if (!draft.plan1 || !draft.plan2) return fail(id, "draftにplan1/plan2がありません");
     if (r.kind !== "継続") delete draft.monitoring;
     else if (!draft.monitoring) return fail(id, "継続なのにmonitoringがありません");

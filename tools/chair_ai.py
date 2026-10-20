@@ -2,7 +2,7 @@
 """会長ページのAI整理（1日1回・朝8時以降）。AIの判断は「1回のまとめ処理」だけ。
   export            : 整理対象を JSON で出力（AIがこれを読む）
   apply FILE.json   : AIの判断を書き込む。形式:
-      {"ideas":[{"id":1,"bucket":"安藤","ai_note":"..","priority":1-5,"due":"YYYY-MM-DD"|null,"stale":false}],
+      {"ideas":[{"id":1,"bucket":"担当A","ai_note":"..","priority":1-5,"due":"YYYY-MM-DD"|null,"stale":false}],
        "today":[id,id,id]}   today は「あとで」「会長が判断」の未完了から最大3つ（「Grok Botがやる」は含めない。会長の入力が要るものは「会長が判断」へ移す）。システム・技術・ポータル・スクリプト・データ・調べものは「Grok Botがやる」
   fallback          : AIが使えない日の代替（日数・重要度で機械的に3つ選ぶ）
 service_role キーは /home/box/tools/supabase/service_role_key（表示しない）。夜間(8時前)は何もしない。"""

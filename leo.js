@@ -577,13 +577,13 @@ async function makeCsv() {
 }
 
 // ===== 個別支援計画：レオの実際の流れ（作成マニュアル 2026年10月版・レオ個別支援計画ボットの手順）に合わせた「いまどこ？」画面 =====
-// 正は Google の「レオ 個別支援計画 管理表」。この画面は見るだけ（書き換えない）。保護者への送付は齊藤がLINE 1対1で行う。
+// 正は Google の「レオ 個別支援計画 管理表」。この画面は見るだけ（書き換えない）。保護者への送付は児発管がLINE 1対1で行う。
 const PLAN_LINKS = {
-  管理表: 'https://docs.google.com/spreadsheets/d/1xJDYdWF1BvZKndQ6FA3OLrMTYPDaQPcYQGrBakcaT7o/edit',
-  アンケート: 'https://docs.google.com/forms/d/1GHayxueTza8GrcPJDC17SGMXEgybxvFyvaLbpzWoRyo/viewform',
-  同意リンク一覧: 'https://docs.google.com/spreadsheets/d/1NK4rdf6QuYEEuZByRMGFK5BETBY9ZHoaEte7H-BndL4/edit',
-  計画フォルダ: 'https://drive.google.com/drive/folders/1BCGuiFmFZocXZU1r361dMtgnWL9icnL7',
-  記録フォルダ: 'https://drive.google.com/drive/folders/1OZ5I8qcG3D-sO5i3VelZTB5XFtVJ5rvu',
+  管理表: 'gl:g15',
+  アンケート: 'gl:g16',
+  同意リンク一覧: 'gl:g17',
+  計画フォルダ: 'gl:g18',
+  記録フォルダ: 'gl:g19',
 };
 const JP_HOLIDAYS = new Set(['2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23',
   '2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22','2027-04-29','2027-05-03','2027-05-04','2027-05-05','2027-07-19','2027-08-11','2027-09-20','2027-09-23','2027-10-11','2027-11-03','2027-11-23']);
@@ -600,13 +600,13 @@ const md = d => `${d.getMonth() + 1}/${d.getDate()}（${'日月火水木金土'[
 // 管理表の列 → 10ステップのどこまで来たか
 const PLAN_FLOW = [
   ['① 一覧メール', '自動', '毎月15日・28日 朝8時に、翌月に計画が始まる子の一覧が届く'],
-  ['② LINEで2つ送る', '齊藤', 'アンケート（共通リンク）＋その子のモニタリング記録PDF をLINE 1対1で', ['アンケート', '記録フォルダ']],
+  ['② LINEで2つ送る', '児発管', 'アンケート（共通リンク）＋その子のモニタリング記録PDF をLINE 1対1で', ['アンケート', '記録フォルダ']],
   ['③ 保護者が回答', '保護者', '回答日は管理表に自動で入る'],
   ['④ 下書きができる', '自動', 'ボットが 前回計画＋今期のモニタリング記録＋回答 から、アセスメント・原案・会議録・本案の4つを1つのドキュメントに', ['計画フォルダ']],
-  ['⑤ 確認・修正 →「計画書作成」＝済', '齊藤', '済は手で（ここだけ自動ではない）', ['計画フォルダ', '管理表']],
-  ['⑥ 原案の同意', '齊藤→保護者', '原案用の同意リンクをLINE 1対1で。届くと「原案署名」が自動で済', ['同意リンク一覧']],
-  ['⑦ 担当者会議', '会議', '原案の同意のあと。齊藤・中村友香・中村文、場所レオ。内容は下書きの会議録で直す'],
-  ['⑧ 本案の同意', '齊藤→保護者', '本案用の同意リンクをLINE 1対1で。届くと「本案署名」が自動で済、次の期の行ができる', ['同意リンク一覧']],
+  ['⑤ 確認・修正 →「計画書作成」＝済', '児発管', '済は手で（ここだけ自動ではない）', ['計画フォルダ', '管理表']],
+  ['⑥ 原案の同意', '児発管→保護者', '原案用の同意リンクをLINE 1対1で。届くと「原案署名」が自動で済', ['同意リンク一覧']],
+  ['⑦ 担当者会議', '会議', '原案の同意のあと。児発管・保育士、場所レオ。内容は下書きの会議録で直す'],
+  ['⑧ 本案の同意', '児発管→保護者', '本案用の同意リンクをLINE 1対1で。届くと「本案署名」が自動で済、次の期の行ができる', ['同意リンク一覧']],
   ['⑨ 計画スタート', '自動', '計画期間6か月。業務日誌Q列「活動記録」が次のモニタリング記録のもと'],
 ];
 function planStage(r) {
@@ -630,10 +630,10 @@ function planSkeleton(name, n, d) {
   const [sei, mei] = String(name).split(/\s+/), nm = `${sei}　${mei || ''}`, per = `${reiwa(d.start)} 〜 ${reiwa(d.end)}`;
   const five = big => ['1.健康・生活', '2.運動・感覚', '3.認知・行動', '4.言語・コミュニケーション', '5.人間関係・社会性'].map(x => `${x}\n目標：\n支援：`).join('\n\n');
   return {
-    assessment: `#T アセスメントシート\n#R 作成日：${reiwa(d.assess)}\n#R 【利用者名】${nm}\n#R 【作成者】児童発達支援管理責任者 齊藤連\n\n【基本情報・背景】\n\n【現在の状況と課題】\n・健康・生活\n\n・運動・感覚\n\n・認知・行動\n\n・言語・コミュニケーション\n\n・人間関係・社会性\n\n【保護者の意向】\n・`,
-    genan: `#T 個別支援計画書（原案）\n#R 【利用者名】${nm}\n#R 【作成日】${reiwa(d.genan)}\n#R 【計画期間】${per}\n#R 【作成者】児童発達支援管理責任者 齊藤連\n\n【 総合的な援助の方針 】\n\n【長期目標】\n\n【短期目標と支援内容】\n${five()}\n\n\n#R 同意フォームにて同意（${reiwa(d.genan)}）`,
-    kaigi: `#T 個別支援計画策定に係る担当者会議録\n#R 【利用者名】${nm}\n#R 開催日：${reiwa(d.kaigi)}\n#R 場所：レオ\n#R 参加者：齊藤連（児発管）、中村友香（保育士）、中村文（保育士）\n\n【会議の要旨】\n齊藤より、\n中村（友）より、\n中村（文）より、\n結論として、`,
-    honan: `#T 個別支援計画書（第${n}期）\n#R 【利用者名】${nm}\n#R 【作成日】${reiwa(d.honan)}\n#R 【計画期間】${per}\n#R 【作成者】児童発達支援管理責任者 齊藤連\n\n【 総合的な援助の方針 】\n\n【長期目標】\n\n【短期目標と支援内容】\n${five()}\n\n\n#R 同意フォームにて同意（${reiwa(d.honan)}）` };
+    assessment: `#T アセスメントシート\n#R 作成日：${reiwa(d.assess)}\n#R 【利用者名】${nm}\n#R 【作成者】児童発達支援管理責任者 ${gl('name:jihatsukan','【児発管氏名】')}\n\n【基本情報・背景】\n\n【現在の状況と課題】\n・健康・生活\n\n・運動・感覚\n\n・認知・行動\n\n・言語・コミュニケーション\n\n・人間関係・社会性\n\n【保護者の意向】\n・`,
+    genan: `#T 個別支援計画書（原案）\n#R 【利用者名】${nm}\n#R 【作成日】${reiwa(d.genan)}\n#R 【計画期間】${per}\n#R 【作成者】児童発達支援管理責任者 ${gl('name:jihatsukan','【児発管氏名】')}\n\n【 総合的な援助の方針 】\n\n【長期目標】\n\n【短期目標と支援内容】\n${five()}\n\n\n#R 同意フォームにて同意（${reiwa(d.genan)}）`,
+    kaigi: `#T 個別支援計画策定に係る担当者会議録\n#R 【利用者名】${nm}\n#R 開催日：${reiwa(d.kaigi)}\n#R 場所：レオ\n#R 参加者：${gl('name:jihatsukan','【児発管氏名】')}（児発管）、${gl('name:hoiku1','【保育士氏名】')}（保育士）、${gl('name:hoiku2','【保育士氏名】')}（保育士）\n\n【会議の要旨】\n児発管より、\n保育士より、\n保育士より、\n結論として、`,
+    honan: `#T 個別支援計画書（第${n}期）\n#R 【利用者名】${nm}\n#R 【作成日】${reiwa(d.honan)}\n#R 【計画期間】${per}\n#R 【作成者】児童発達支援管理責任者 ${gl('name:jihatsukan','【児発管氏名】')}\n\n【 総合的な援助の方針 】\n\n【長期目標】\n\n【短期目標と支援内容】\n${five()}\n\n\n#R 同意フォームにて同意（${reiwa(d.honan)}）` };
 }
 const markupHtml = t => esc(t || '').split('\n').map(l => l.startsWith('#T ') ? `<h2 style="text-align:center">${l.slice(3)}</h2>` : l.startsWith('#R ') ? `<div style="text-align:right">${l.slice(3)}</div>` : `<div>${l || '&nbsp;'}</div>`).join('');
 const plainText = t => String(t || '').replace(/^#[TR] /gm, '');
@@ -707,7 +707,7 @@ LEO_VIEWS.plan = async function () {
         <div style="margin-top:8px;font-size:14px">${checks}</div>
         <div>${waitHtml()}
         
-        ${d ? `<p><small>書類に入れる日付（作成者 齊藤連）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : '<p class="note">管理表の「次期開始月」がありません。</p>'}
+        ${d ? `<p><small>書類に入れる日付（作成者 ${gl('name:jihatsukan','【児発管氏名】')}）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : '<p class="note">管理表の「次期開始月」がありません。</p>'}
         <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '　✅ 確認済' : '　<span class="badge">未確認</span>'}</small></p>${now.note ? `<p><small>${esc(now.note)}</small></p>` : ''}${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
         <h4>1. 保護者アンケート</h4>${mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
         ${mg ? btn('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`) : ''}

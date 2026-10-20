@@ -13,17 +13,17 @@ window.PORTAL_CONFIG = {
   clerk: { name: '総務', role: '事務', groups: [
     { name: '国保連請求', tiles: [
       ['💴', 'レオ 請求CSVを作る', '#leo/seikyu', '請求CSV（送信はしない）'],
-      ['💴', '茶夢 請求データ管理', 'https://drive.google.com/open?id=1a-Jm3-37o7BCKB-5_7LoACxtxQnpkK38QpFO8bCa0lU', 'GAS＋手動・要確認'],
+      ['💴', '茶夢 請求データ管理', 'gl:g1', 'GAS＋手動・要確認'],
       ['🔧', 'レオ 直した所', '#leo/edits', '修正の反映状況・衝突の確認'],
       ['✍️', 'レオ 請求の印（欠席時対応・子育てサポート）', '#leo/shirushi', 'その日のうちに付ける'],
-      ['📊', 'レオ 実績記録（請求元）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から自動転記'] ] },
+      ['📊', 'レオ 実績記録（請求元）', 'gl:g2', '日誌から自動転記'] ] },
     { name: '人事労務', tiles: [
       ['🌅', 'リーダー報告（朝の確認）', '#report/admin', '報告がない人・動いていないToDo・困りごと（管理者のみ）'],
       ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
     { name: '補助金・助成金', tiles: [
       ['💰', '補助金・助成金', '', '準備中'] ] },
     { name: '税務', tiles: [
-      ['🧾', '税務カレンダー', 'https://drive.google.com/open?id=1ewil4khMk6KqTwEYAV4zYE2WQ2GbWChuhjpUPgD8Hj8', 'GAS'] ] },
+      ['🧾', '税務カレンダー', 'gl:g3', 'GAS'] ] },
     { name: 'その他', tiles: [
       ['📁', 'その他', '', '準備中'] ] } ] },
 
@@ -55,12 +55,12 @@ window.PORTAL_CONFIG = {
       ['🧒', '今日の利用児童', '#leo/kids', '日誌より表示', 'main', ['児童A', '児童B', '児童C', '児童D']],
       ['📔', '日誌（児童ごと）', '#leo/diary', '児童ごと・日ごと＋職員の下書き（11/1まで並行運転）'],
       ['📓', '日誌（見る・直す）', '#leo/nikki', '直したらすぐ日誌に反映'],
-      ['📄', '日誌の元シート', 'https://drive.google.com/open?id=1DAC9ncJfUa1lvI88su-tJnUvV4thu2xC8gPXpbyYDWs', '業務日誌2026.10（Google）'],
+      ['📄', '日誌の元シート', 'gl:g4', '業務日誌2026.10（Google）'],
       ['✅', '実績記録（見るだけ）', '#leo/jisseki', '日誌から毎晩自動転記・直すのは日誌で'],
       ['🗓️', '送迎 型表', '#leo/kata', '曜日ごとの迎え・送り（見るだけ）'],
       ['📅', '来月の利用予定（保護者に聞く）', '#leo/yotei', 'リンクをまとめてコピー・回答状況・予定を作る'],
       ['📝', '個別支援計画 管理表', '#leo/keikaku', '期限が近い順（見るだけ）'],
-      ['🔍', 'アセスメント（フォーム）', 'https://drive.google.com/open?id=1kspL8oAWVxTwzaqeQZQe684eiUAj9PpcvdpbrqF-gEc', '手入力'],
+      ['🔍', 'アセスメント（フォーム）', 'gl:g5', '手入力'],
       ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ）'],
       ['🖊️', '保護者の実績確認', '#leo/kakunin', '児童ごとのリンク作成・確認済みの一覧', '', null, '児発管'],
       ['💬', 'LINE報告を書く', '#leo/line', '保護者への報告文→LINE・日誌の活動記録に', 'main'],
@@ -76,19 +76,19 @@ window.PORTAL_CONFIG = {
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f', tiles: [
-      ['📋', '日報システム', 'https://docs.google.com/forms/d/e/1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g/viewform', 'Googleフォーム'],
-      ['📓', '日誌 Registro Diário', 'https://drive.google.com/open?id=1-v3KYrjbyMuRqIoF8xUG4mEskMUHSMKjDIQkJxBdgw0', 'フォーム回答（手入力）'],
-      ['🍱', '献立報告', 'https://drive.google.com/open?id=1v6o0V93U2xi-2ruwqV5VhEBk04rxMQuqs5rAddy1Sb4', '手入力・要確認'],
-      ['⚠️', 'ヒヤリハット週報', 'https://drive.google.com/open?id=18dCSBTXlw2_YS-niadV8UCqjCottsVzI6i3uJDbpvpM', 'Bot依頼で作成'],
+      ['📋', '日報システム', 'gl:g6', 'Googleフォーム'],
+      ['📓', '日誌 Registro Diário', 'gl:g7', 'フォーム回答（手入力）'],
+      ['🍱', '献立報告', 'gl:g8', '手入力・要確認'],
+      ['⚠️', 'ヒヤリハット週報', 'gl:g9', 'Bot依頼で作成'],
       ['📝', '個別支援計画', '', '未整備'],
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227', tiles: [
-      ['🏯', '金斗雲システム', 'https://script.google.com/a/macros/psr-seishinkai.org/s/AKfycby5I92_qF1j0YqAYhsUvIAS8WHpRczQDY8pxUD4aaYEV1ftIAAQqKre0vb1Fvia0XrYvg/exec', '@psr-seishinkai.org のアカウントで開く'],
-      ['✅', '実績記録一覧', 'https://drive.google.com/open?id=1kDBy-Jubfg8FXpFwvypxVL-SEaFZmqSntzUpjNCFVhY', 'GAS Webアプリから入力'],
-      ['⏰', '出退勤記録', 'https://drive.google.com/open?id=19cjW6X2ryxKP91Ea37Eh8RJjRE-I3-zF1YEctr8lrcU', 'GAS＋手動'],
+      ['🏯', '金斗雲システム', 'gl:g10', '@psr-seishinkai.org のアカウントで開く'],
+      ['✅', '実績記録一覧', 'gl:g11', 'GAS Webアプリから入力'],
+      ['⏰', '出退勤記録', 'gl:g12', 'GAS＋手動'],
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
-      ['⚠️', 'ヒヤリハット週報', 'https://drive.google.com/open?id=1urelD2ecz7HEu7ZQ1busmKXkH0J-T_WAGpljx5AY3lY', 'Bot依頼で作成'],
+      ['⚠️', 'ヒヤリハット週報', 'gl:g13', 'Bot依頼で作成'],
       ['📒', '台帳', '#kintoun/ledger', '利用者・支給と利用・事業所設定・書類履歴'],
       ['📝', '訪問記録', '#kintoun/visit', '訪問ごとの記録（一覧・追加・編集）'],
       ['📄', '利用契約書・重要事項説明書', '#kintoun/contract', '契約書・重要事項説明書・計画書の署名状況／署名リンク発行'],
@@ -122,7 +122,7 @@ window.PORTAL_CONFIG = {
     ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
     ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
-    ['📝', '法定研修 受講確認フォーム', 'https://docs.google.com/forms/d/e/1FAIpQLSehMPxXuuCXdyA9MTmR8WR6YEaullRPG10MIkx7q9pNrUclbA/viewform', '研修を受けたら職員が回答'],
+    ['📝', '法定研修 受講確認フォーム', 'gl:g14', '研修を受けたら職員が回答'],
     ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
     ['⏰', '出退勤（新・テスト）', 'https://rsaito-png.github.io/kintai/', 'テスト版'] ] },
   // 電子サイン（労働契約書・誓約書）。他法人は employer と defaults を書き換える。文面（テンプレート）はDBに登録

@@ -20,7 +20,7 @@ async function post(aud: string, text: string) {
 Deno.serve(async (req) => {
   if (!SECRET || req.headers.get("x-notify-secret") !== SECRET) return new Response("unauthorized", { status: 401 });
   const body = await req.json().catch(() => ({}));
-  // 接続テスト：{"test":"mgr"} → 管理職用スペース（齊藤・中村のみ）に1件だけ送る。待ち行列は使わない。
+  // 接続テスト：{"test":"mgr"} → 管理職用スペース（管理職のみ）に1件だけ送る。待ち行列は使わない。
   if (body.test) {
     const aud = body.test === "all" ? "all" : "mgr";
     if (!HOOK[aud]) return Response.json({ skipped: `CHAT_WEBHOOK_${aud.toUpperCase()} 未設定` });
