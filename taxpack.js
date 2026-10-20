@@ -103,7 +103,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}td.ln
   }
   function b5(ctx) {
     const { c, d } = ctx, hj = c.hj, fs = c.fs, so = fs.bs.L.find(r => r.name === '未払法人税等'), taxOpen = so?.open ?? 0, taxClose = so?.bal ?? 0, retO = fs.bs.retainedOpen, retC = fs.eq.re.close, o5 = d.b5 || [];
-    const r5 = [['繰越損益金（損は赤）', retO, retO, retC, retC], ['納税充当金', taxOpen, taxOpen, taxClose, taxClose], ['減価償却超過額', 0, 0, hj.depExcess, hj.depExcess], ...o5.map(r => [r.label, +r.open || 0, +r.dec || 0, +r.inc || 0, (+r.open || 0) - (+r.dec || 0) + (+r.inc || 0)])];
+    const r5 = [['繰越損益金（損は赤）', retO, retO, retC, retC], ['納税充当金', taxOpen, taxOpen, taxClose, taxClose], ['減価償却超過額', hj.depOpen, hj.depNin, hj.depExcess, hj.depOpen - hj.depNin + hj.depExcess], ...o5.map(r => [r.label, +r.open || 0, +r.dec || 0, +r.inc || 0, (+r.open || 0) - (+r.dec || 0) + (+r.inc || 0)])];
     const tot = [1, 2, 3, 4].map(i => r5.reduce((s, r) => s + r[i], 0));
     const capRows = fs.bs.E.filter(r => /資本金|資本準備金|その他資本剰余金|新株式申込証拠金/.test(r.category) && (r.bal || r.open)).map(r => [r.name, r.open, 0, r.bal - r.open, r.bal]);
     const ct = [1, 2, 3, 4].map(i => capRows.reduce((s, r) => s + r[i], 0));
@@ -123,7 +123,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}td.ln
   function b15_16(ctx) {
     const { c, d } = ctx, e = c.hj.ent, dep = d.dep || [];
     let h = page(head('別表十五', '交際費等の損金算入に関する明細書', ctx, TAXOFFICE) + (e.total || e.small || e.meal ? tbl([row('', '支出交際費等の額', e.total), row('', '1人5,000円以下の飲食費', e.small), row('', '交際費等の額（対象）', e.target), row('', '定額控除限度額（800万円×月数/12）', e.lim1), row('', '損金不算入額', e.disallow, 't')]) : `<p>交際費の支出はありません。<b>別表十五は不要</b>（損金不算入額0円）です。</p>`));
-    h += page(head('別表十六', '減価償却資産の償却額の計算に関する明細書（集計）', ctx, TAXOFFICE) + (dep.length ? tbl2(['資産', '取得価額', '償却費計上額', '償却限度額', '償却超過額'], dep.map(r => [r.name || '', +r.cost || 0, +r.dep || 0, +r.limit || 0, Math.max(0, (+r.dep || 0) - (+r.limit || 0))])) : '<p>入力なし（減価償却資産の入力が必要な場合は申告タブで入力してください）。</p>') +
+    h += page(head('別表十六', '減価償却資産の償却額の計算に関する明細書（集計）', ctx, TAXOFFICE) + (dep.length ? tbl2(['資産', '取得価額', '償却費計上額', '償却限度額', '償却超過額', '認容額'], dep.map(r => [r.name || '', +r.cost || 0, +r.dep || 0, +r.limit || 0, r.add != null ? +r.add || 0 : Math.max(0, (+r.dep || 0) - (+r.limit || 0)), +r.nin || 0])) : '<p>入力なし（減価償却資産の入力が必要な場合は申告タブで入力してください）。</p>') +
       `<p class="note">公式様式（別表十六(一)定額法・(二)定率法 等）は資産ごとの耐用年数・償却率が必要です。この集計は別表四・五(一)へ繋ぐ数字だけです。<b>未対応: 償却限度額の計算過程</b>。</p>`);
     return h;
   }

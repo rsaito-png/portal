@@ -95,13 +95,13 @@
   // inp: {preTax, taxBooked, adds:[{label,amount,kind}], subs:[...], loss, capital, emp50, months, fyStart, ...}
   function hojin(inp, fs, fyStart) {
     const months = inp.months || 12;
-    const ent = entertain(inp, fs, months), dep = inp.dep || [], depExcess = dep.reduce((s, r) => s + Math.max(0, (+r.dep || 0) - (+r.limit || 0)), 0);
+    const ent = entertain(inp, fs, months), dep = inp.dep || [], depExcess = dep.reduce((s, r) => s + (r.add != null ? +r.add || 0 : Math.max(0, (+r.dep || 0) - (+r.limit || 0))), 0), depNin = dep.reduce((s, r) => s + (+r.nin || 0), 0), depOpen = dep.reduce((s, r) => s + (+r.open || 0), 0);
     const cr0 = +inp.credit || 0;
     const autoAdds = [{ label: '損金経理をした納税充当金（帳簿の法人税等から所得税額控除分を除く）', amount: fs.pl.tax - cr0, kind: '留保', auto: true }];
     if (cr0) autoAdds.push({ label: '法人税額から控除される所得税額（別表四 29・別表六）', amount: cr0, kind: '社外流出', auto: true });
     if (ent.disallow) autoAdds.push({ label: '交際費等の損金不算入額（別表十五）', amount: ent.disallow, kind: '社外流出', auto: true });
     if (depExcess) autoAdds.push({ label: '減価償却の償却超過額（別表十六）', amount: depExcess, kind: '留保', auto: true });
-    const adds = [...autoAdds, ...(inp.adds || [])], subs = inp.subs || [];
+    const adds = [...autoAdds, ...(inp.adds || [])], subs = [...(depNin ? [{ label: '減価償却超過額の当期認容額（別表十六）', amount: depNin, kind: '留保', auto: true }] : []), ...(inp.subs || [])];
     const sA = adds.reduce((s, r) => s + (+r.amount || 0), 0), sS = subs.reduce((s, r) => s + (+r.amount || 0), 0);
     const preTax = fs.pl.net; // 当期純利益（税等控除後）
     const sub1 = preTax + sA - sS, loss = +inp.loss || 0, income0 = sub1 - loss, income = Math.max(0, fK(income0));
@@ -117,7 +117,7 @@
     const total = hzNet + fH(chihou) + boei + kPref + kCity + zHzPref + zHzCity + biz + spBiz;
     // 別表一 の中間納付・税額控除
     const credit = +inp.credit || 0, interim = +inp.interim || 0;
-    return { months, ent, depExcess, adds, subs, sA, sS, preTax, sub1, loss, income0, income, hz, chihou, boei, boeiOn, kPref, kCity, zHzPref, zHzCity, biz, spBiz, total, credit, interim,
+    return { months, ent, depExcess, depNin, depOpen, adds, subs, sA, sS, preTax, sub1, loss, income0, income, hz, chihou, boei, boeiOn, kPref, kCity, zHzPref, zHzCity, biz, spBiz, total, credit, interim,
       kintoPref, kintoCity, hzNet, final: Math.max(0, hzNet - interim) };
   }
   function entertain(inp, fs, months) {

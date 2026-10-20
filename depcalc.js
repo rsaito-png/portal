@@ -139,19 +139,58 @@
     for (const k of Object.keys(cr).sort((x, y) => x - y)) lines.push({ side: 'C', account_id: +k, amount: cr[k], dept_id: null });
     return { entry: { entry_date: date, kind: 'manual', memo: `[決算整理] 減価償却（固定資産台帳から自動計算）第${fy - 2020}期${date < end ? '（年額の見込み）' : ''}`, freee_key: `dep:${fy}`, is_test: false }, lines, R };
   }
-  // 法人税 別表十六: 償却限度額は台帳の償却計算（tax_*列は未導入のため帳簿と同じ年数・方法）。税法上、償却の対象にならないとした資産は a.tax_nondep=true で限度額0
-  function taxDep(a, fyTo) { const s = schedule(a, fyTo), out = {}; for (const f in s) out[f] = a.tax_nondep ? 0 : s[f].dep; return { byFy: out, bv: s[fyTo] ? s[fyTo].close : a.cost }; }
-  function b16(assets, fy, bookDepByAcc, accName) { // bookDepByAcc: {account_id: 当期の帳簿償却費}（生成済み仕訳の貸方）
-    const groups = new Map(), detail = [];
-    for (const a of assets) {
-      if (a.is_adjust || a.dep_method === '償却しない' || SPECIAL.includes(a.dep_method) || a.dep_calc === false) continue;
-      const sc = schedule(a, fy)[fy]; if (!sc || (!sc.dep && !(a.acquired_on <= `${fy + 1}-05-31` && (!a.disposed_on || a.disposed_on >= `${fy}-06-01`)))) continue;
-      const lim = a.tax_nondep ? 0 : sc.dep, key = a.book_account_id ?? 0; detail.push({ a, limit: lim });
-      const g = groups.get(key) || { key, name: key ? accName(key) : '（帳簿の科目が未設定）', cost: 0, limit: 0, n: 0 }; g.cost += a.cost; g.limit += lim; g.n++; groups.set(key, g);
+  // ---- 法人税 別表十六: 税法上の償却限度額・償却超過額（帳簿の償却は変えない）----
+  // 資産ごとに税法上の方法を持てる: tax_dep_method / tax_life_years（null=帳簿と同じ）。tax_nondep=true は限度額0。
+  // tax_adj_from_fy: 税法上の計算を申告に反映し始めた期。その期に過年度分の差をまとめて加算する（堤会計 第5期: 城山テナント）。
+  //   tax_adj_rule='xlsx' は会計士の「償却超過.xlsx」の計算（各期の簿価差[累計]を、さらに期ごとに合計した額=H列）で加算額を出す。
+  // tax_parts（一括償却資産の内訳）: [{name,cost,fy0,limit:{fy:額},book:{fy:額},resolved:[fy]}]。resolved の期は帳簿の遅れ分（税務は損金算入済み）として別表から除く。
+  function taxSchedule(a, upto) {
+    const m = a.tax_dep_method, n = a.tax_life_years || a.life_years;
+    if (!m || (m === a.dep_method && n === a.life_years)) { const s = schedule(a, upto), o = {}; for (const f in s) o[f] = { limit: a.tax_nondep ? 0 : s[f].dep, close: s[f].close }; return o; }
+    return Object.fromEntries(Object.entries(schedule({ ...a, dep_method: m, life_years: n, dep_override: null }, upto)).map(([f, v]) => [f, { limit: a.tax_nondep ? 0 : v.dep, close: v.close }]));
+  }
+  // 期ごとの {book, limit, add(超過額=別表四加算), nin(認容=別表四減算), open, close(別表五(一)の超過額残高), bookBv, taxBv}
+  function excessTrack(a, upto) {
+    const bs = schedule(a, upto), ts = taxSchedule(a, upto), from = a.tax_adj_from_fy ?? -1, out = {}; let bal = 0, cumB = 0, cumT = 0, sumGap = 0;
+    for (const f of Object.keys(bs).map(Number).sort((x, y) => x - y)) {
+      const book = bs[f].dep, limit = ts[f] ? ts[f].limit : 0; cumB += book; cumT += limit;
+      const gap = cumB - cumT; sumGap += gap; // gap=当期末の簿価差（税法簿価−帳簿簿価）
+      const open = bal; let add = 0, nin = 0;
+      if (f < from) { /* 反映前の期は申告に出ていない */ }
+      else if (f === from) { add = Math.max(0, a.tax_adj_rule === 'xlsx' ? sumGap : gap); }
+      else if (book > limit) add = book - limit; else nin = Math.min(limit - book, bal);
+      bal = open + add - nin; out[f] = { book, limit, add, nin, open, close: bal, gap, bookBv: bs[f].close, taxBv: ts[f] ? ts[f].close : null };
     }
-    for (const a of assets) if (a.is_adjust && (a.dep_override || {})[fy] != null) { const key = a.book_account_id, g = groups.get(key); if (g) g.limit += +a.dep_override[fy]; } // 差額調整は限度額にも同額（超過を生まない）
-    const rows = [...groups.values()].map(g => { const book = g.key ? (bookDepByAcc[g.key] ?? g.limit) : g.limit; return { ...g, dep: book, excess: Math.max(0, book - g.limit) }; });
-    return { rows, detail, totalLimit: rows.reduce((s, r) => s + r.limit, 0), totalDep: rows.reduce((s, r) => s + r.dep, 0), totalExcess: rows.reduce((s, r) => s + r.excess, 0) };
+    return out;
+  }
+  function taxDep(a, fyTo) { const s = taxSchedule(a, fyTo), out = {}; for (const f in s) out[f] = s[f].limit; return { byFy: out, bv: s[fyTo] ? s[fyTo].close : a.cost }; }
+  function b16(assets, fy, bookDepByAcc, accName) {
+    const groups = new Map(), detail = [], ikkatsu = [];
+    for (const a of assets) {
+      if (a.is_adjust || a.dep_method === '償却しない' || a.dep_calc === false) continue;
+      if (a.dep_method === '一括償却(3年均等)') { // 別表十六(六)
+        const book = (schedule(a, fy)[fy] || {}).dep || 0;
+        if (Array.isArray(a.tax_parts) && a.tax_parts.length) { for (const p of a.tax_parts) { const bk = +(p.book || {})[fy] || 0, lim = +(p.limit || {})[fy] || 0, res = (p.resolved || []).includes(fy); if (!bk && !lim) continue; ikkatsu.push({ a, name: p.name, cost: p.cost, fy0: p.fy0, book: res ? 0 : bk, limit: res ? 0 : lim, lagBook: res ? bk : 0, note: p.note || '' }); } }
+        else if (book) ikkatsu.push({ a, name: a.name, cost: a.cost, fy0: fyOfDate(a.dep_start || a.acquired_on), book, limit: fy - fyOfDate(a.dep_start || a.acquired_on) < 3 ? Math.floor(a.cost / 3) : 0, lagBook: 0 });
+        continue;
+      }
+      if (SPECIAL.includes(a.dep_method)) continue;
+      const tr = excessTrack(a, fy)[fy]; if (!tr || (!tr.book && !tr.limit && !tr.open && !(a.acquired_on <= `${fy + 1}-05-31` && (!a.disposed_on || a.disposed_on >= `${fy}-06-01`)))) continue;
+      const key = a.book_account_id ?? 0; detail.push({ a, ...tr, method: a.tax_dep_method || a.dep_method, life: a.tax_life_years || a.life_years });
+      const g = groups.get(key) || { key, name: key ? accName(key) : '（帳簿の科目が未設定）', cost: 0, limit: 0, dep: 0, add: 0, nin: 0, open: 0, close: 0, n: 0 };
+      g.cost += a.cost; g.limit += tr.limit; g.dep += tr.book; g.add += tr.add; g.nin += tr.nin; g.open += tr.open; g.close += tr.close; g.n++; groups.set(key, g);
+    }
+    for (const x of ikkatsu) { const add = Math.max(0, x.book - x.limit); x.add = add; }
+    const rows = [...groups.values()].map(g => ({ ...g, excess: g.add }));
+    const sum = k => rows.reduce((s, r) => s + r[k], 0) + (k === 'add' || k === 'excess' ? ikkatsu.reduce((s, x) => s + x.add, 0) : 0);
+    return { rows, detail, ikkatsu, totalLimit: sum('limit'), totalDep: sum('dep'), totalExcess: sum('add'), totalNin: sum('nin'), excessOpen: sum('open'), excessClose: sum('close') + ikkatsu.reduce((s, x) => s + x.add, 0) };
+  }
+  // 申告タブ（acc_tax_inputs.data.dep）用の行: {name,cost,dep,limit,add,nin,open}
+  function taxRows(assets, fy, accName) {
+    const B = b16(assets, fy, {}, accName || (k => '科目' + k)), r = [];
+    for (const d of B.detail) if (d.book || d.limit || d.add || d.nin || d.open) r.push({ name: d.a.name, cost: d.a.cost, dep: d.book, limit: d.limit, add: d.add, nin: d.nin, open: d.open, auto: true });
+    for (const x of B.ikkatsu) r.push({ name: '一括償却資産 ' + x.name, cost: x.cost, dep: x.book, limit: x.limit, add: x.add, nin: 0, open: 0, auto: true });
+    return r;
   }
 
   // ---- 印刷用HTML ----
@@ -242,6 +281,6 @@ td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}td.c{
       <h3>この書類でできていない・手書きが必要なこと</h3><ul class="note"><li>公式用紙への重ね書き（自作レイアウトです）／eLTAX送信</li><li>代表者名・資本金（基金）・事業開始年月・応答者・税理士名・8〜14の○・15〜17の記入</li><li>資産コード（市付番）・増加事由（新品／中古）・課税標準の特例</li><li>耐用年数・償却方法・取得日・取得価額の「要確認」資産の確定（税理士・固定資産台帳で確認）</li></ul>`);
     return { html: `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>償却資産申告書 ${era(Y).replace('年', '年度')}</title><style>${CSS}</style></head><body>${cover + check + form26 + ns + decPage + calc + ex + src}</body></html>`, R, warnings: warn };
   }
-  const api = { schedule, depForYear, depEntry, deptParts, DBX, classify, evalAsset, assess, rateOf, firstYear, menzeiten, dueDate, taxDep, b16, build, SOURCES, TARGET_CLASSES, ENT, trunc3, era, eraDate, RT };
+  const api = { taxSchedule, excessTrack, taxRows, schedule, depForYear, depEntry, deptParts, DBX, classify, evalAsset, assess, rateOf, firstYear, menzeiten, dueDate, taxDep, b16, build, SOURCES, TARGET_CLASSES, ENT, trunc3, era, eraDate, RT };
   if (typeof module !== 'undefined') module.exports = api; else root.DEP = api;
 })(typeof window !== 'undefined' ? window : globalThis);

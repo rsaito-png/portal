@@ -55,7 +55,7 @@ const ACT5 = { b4: { net: 2222843, nouzei: 868200, depEx: 232383, addSub: 110058
   b1: { income: 3309672, hz: 496350, credit: 346, diff: 496000, interim: 0, final: 496000, chihouBase: 496000, chihou: 51088, chihouFinal: 51000 },
   b5: { ret: [-114403, -114403, 2108440, 2108440], nouzeiJ: [167500, 167500, 868200, 868200], hojin: [-48900, -48900, -547000, -547000], ken: [-22400, -22400, -26900, -26900], shi: [-82100, -82100, -135700, -135700], total: [-100303, -100303, 2499423, 2499423] },
   ken: 26900, shi: 135700, jigyoTotal: 158600 /* 868,200−547,000−26,900−135,700（別表五から逆算。事業税＋特別法人事業税） */, paid: 868200, fixedDate: '2026-07-28' };
-const SEED5 = { subs: [{ label: '納税充当金から支出した事業税等の金額（前期事業税の認容・別表四13）', amount: 14100 }], credit: 346, interim: 0, dep: [{ name: '償却超過額（申告書 別表四10・別表五(一)3 より）', cost: '', dep: 232383, limit: 0 }], kintoCityOv: 100000,
+const SEED5 = { subs: [{ label: '納税充当金から支出した事業税等の金額（前期事業税の認容・別表四13）', amount: 14100 }], credit: 346, interim: 0, kintoCityOv: 100000,
   b5: [{ label: '未納法人税（未納地方法人税を含む）', open: -48900, dec: -48900, inc: -547000 }, { label: '未納道府県民税（均等割を含む）', open: -22400, dec: -22400, inc: -26900 }, { label: '未納市町村民税（均等割を含む）', open: -82100, dec: -82100, inc: -135700 }] };
 const pName = id => +id ? (TXS.partners.get(+id) || '取引先' + id) : '(取引先未設定)';
 
@@ -68,6 +68,7 @@ async function vTax(sp) {
   if (!TXS.partners) { const pr = await fetchAll('acc_partners?select=id,name,is_personal'); TXS.partners = new Map(pr.map(p => [p.id, p.name])); TXS.pers = new Set(pr.filter(p => p.is_personal).map(p => p.id)); }
   if (!TXS.cache || TXS.cache.to !== fy.to || sp.get('reload')) TXS.cache = { to: fy.to, lines: await fetchAll(`acc_lines?select=id,side,amount,account_id,tax_code,entry_id,acc_entries!inner(entry_date,kind,partner_id,memo)&acc_entries.entry_date=lte.${fy.to}`) };
   if (change || sp.get('reload')) { const r = await sb(`acc_tax_inputs?select=data&fy_start=eq.${fy.from}`); TXS.data = r[0]?.data || {}; TXS.seeded = false; if (y === 2025 && !r[0]) { TXS.data = JSON.parse(JSON.stringify(SEED5)); TXS.seeded = true; } }
+  if (!TXS.data.dep_manual && typeof DEP !== 'undefined') { try { const fa = await sb('acc_fixed_assets?select=*&order=id&limit=2000'); TXS.data.dep = DEP.taxRows(fa, y, id => (M.accounts.find(a => a.id === id) || {}).name || ''); } catch (e) {} }
   txCalc(); TXCSV.length = 0;
   const body = await ({ fs: txFs, ns: txNs, hj: txHj, sh: txSh, vf: txVf })[TXS.sub]();
   const fyOpts = [2024, 2025, 2026].map(v => `<option value="${v}"${v === y ? ' selected' : ''}>${fyOf(v).label}</option>`).join('');
@@ -151,7 +152,7 @@ function txHj() {
   const r5 = [
     ['繰越損益金（損は赤）', retO, retO, retClose, retClose],
     ['納税充当金（未払法人税等）', taxOpen, taxOpen, taxClose, taxClose],
-    ['減価償却超過額（別表十六 入力分）', 0, 0, depEx, depEx],
+    ['減価償却超過額（別表十六）', hj.depOpen, hj.depNin, depEx, hj.depOpen - hj.depNin + depEx],
     ...o5.map(r => [r.label, +r.open || 0, +r.dec || 0, +r.inc || 0, (+r.open || 0) - (+r.dec || 0) + (+r.inc || 0)]),
   ];
   const r5tot = [0, 1, 2, 3].map(i => r5.reduce((s, r) => s + r[i + 1], 0));
@@ -159,7 +160,7 @@ function txHj() {
   const capTot = [0, 1, 2, 3].map(i => capRows.reduce((s, r) => s + r[i + 1], 0));
   // 別表十五 / 十六
   const b15 = [['支出交際費等の額（交際費勘定。会議費は含まない）', e.total], ['うち1人5,000円以下の飲食費（別表十五で除外・入力）', e.small], ['交際費等の額（対象）', e.target], ['① 定額控除限度額（800万円×月数/12）', e.lim1], ['① による損金不算入額', e.d1], ['② 接待飲食費の50%（接待飲食費 入力）', e.meal * 0.5], ['② による損金不算入額', e.meal > 0 ? e.d2 : '（未入力）'], { r: ['損金不算入額（有利な方を採用: ' + e.method + '）', e.disallow], c: 'tot' }];
-  const dep = (d.dep || []), b16 = dep.map(r => [r.name || '', +r.cost || 0, +r.dep || 0, +r.limit || 0, Math.max(0, (+r.dep || 0) - (+r.limit || 0))]);
+  const dep = (d.dep || []), b16 = dep.map(r => [r.name || '', +r.cost || 0, +r.dep || 0, +r.limit || 0, r.add != null ? +r.add || 0 : Math.max(0, (+r.dep || 0) - (+r.limit || 0)), +r.nin || 0]);
   const book = fs.pl.sgaRows.find(r => r.name === '減価償却費')?.bal ?? 0;
   const ratesTbl = [['法人税（中小法人）', '年800万円以下 15% / 超 23.2%', 'https://www.nta.go.jp/taxes/shiraberu/taxanswer/hojin/5759.htm'], ['地方法人税', '法人税額×10.3%', 'https://www.nta.go.jp/taxes/shiraberu/taxanswer/hojin/5759.htm'],
     ['防衛特別法人税', '(基準法人税額−500万円)×4%（令和8年4月1日以後開始事業年度〜）', 'https://www.nta.go.jp/publication/pamph/pdf/0025004-109_1.pdf'], ['三重県 法人事業税', '所得 400万以下 3.5% / 400〜800万 5.3% / 超 7.0%', 'https://www.pref.mie.lg.jp/ZEIMU/HP/16336017880.htm'],
@@ -186,13 +187,13 @@ function txHj() {
     <h4>別表五(一) その他の利益積立金（期首／減／増の入力）</h4>${iRows('b5', [['label', '項目', 's', '200px'], ['open', '期首現在', 'n'], ['dec', '当期減', 'n'], ['inc', '当期増', 'n']], 2)}
     <h4>別表二 同族会社の判定（社員・株主ごと）</h4>${iRows('dz', [['name', '氏名', 's'], ['votes', '議決権数（持株数）', 'n'], ['group', '同族グループ番号', 's']], 3)}
     <button onclick="txSave()">💾 入力を保存して再計算</button></div>
-    ${y.y === 2025 ? tSec('実際の申告書（第5期・税理士作成・電子申告済・令和8.7.28決算確定）と本システムの計算の比較', ['項目', '本システム', '実際の申告書', '結果'], cmpRows, { num: true, note: '申告書の値は別表一・四・五(一)の写真から転記して保存したものです（コード内 ACT5）。「入力」欄の初期値（前期事業税の認容14,100・所得税額控除346・償却超過232,383・市民税均等割100,000・別表五の未納税額）も申告書から設定しています。' + (TXS.seeded ? ' <b>まだDBに保存されていません。「入力を保存して再計算」を押すと確定します。</b>' : '') }) : ''}
+    ${y.y === 2025 ? tSec('実際の申告書（第5期・税理士作成・電子申告済・令和8.7.28決算確定）と本システムの計算の比較', ['項目', '本システム', '実際の申告書', '結果'], cmpRows, { num: true, note: '申告書の値は別表一・四・五(一)の写真から転記して保存したものです（コード内 ACT5）。「入力」欄の初期値（前期事業税の認容14,100・所得税額控除346・市民税均等割100,000・別表五の未納税額）も申告書から設定しています。' + (TXS.seeded ? ' <b>まだDBに保存されていません。「入力を保存して再計算」を押すと確定します。</b>' : '') }) : ''}
     ${tSec('別表一（各事業年度の所得に係る法人税額の計算）の概算', ['項目', '金額（円）'], b1)}
     ${tSec('別表四（所得の金額の計算に関する明細書）', ['区分', '金額（円）', '処分'], b4, { num: false, note: '自動加算: 納税充当金繰入（帳簿の法人税等の全額）、交際費不算入、償却超過額。<b>前期分の事業税の認容など減算は未入力のままです。</b>' })}
     ${tSec('別表五(一) 利益積立金額の計算に関する明細書（簡易）', ['区分', '期首現在', '当期減', '当期増', '差引翌期首'], [...r5, { r: ['差引合計額（利益積立金額）', ...r5tot], c: 'tot' }], { note: '繰越損益金は帳簿の期首・期末の繰越利益剰余金。未納法人税等の行は確定税額が決まったら「その他」に入力してください。' })}
     ${tSec('別表五(一)Ⅱ 資本金等の額の計算に関する明細書', ['区分', '期首現在', '当期減', '当期増', '差引翌期首'], [...capRows, { r: ['差引合計額（資本金等の額）', ...capTot], c: 'tot' }])}
     ${tSec('別表十五 交際費等の損金算入に関する明細書（中小法人）', ['項目', '金額（円）'], b15)}
-    ${tSec('別表十六 減価償却資産の償却額の計算に関する明細書（入力集計）', ['資産', '取得価額', '償却費計上額', '償却限度額', '償却超過額'], b16.length ? b16 : [['（未入力）', 0, 0, 0, 0]])}
+    ${tSec('別表十六 減価償却資産の償却額の計算に関する明細書（入力集計）', ['資産', '取得価額', '償却費計上額', '償却限度額', '償却超過額', '認容額'], b16.length ? b16 : [['（未入力）', 0, 0, 0, 0, 0]], { num: true, note: '台帳（#dep）から自動計算（税法上の償却方法・償却超過の繰越・認容）。城山テナント2階洋室改修工事は税法上定額法（10年・0.100）。第5期の償却超過232,383円は堤会計「償却超過.xlsx」（2026-10-17）の計算と一致。別表五(一)期首の超過額: ' + (hj.depOpen || 0).toLocaleString() + '円。' })}
     ${tSec('別表二 同族会社等の判定に関する明細書', ['区分', '議決権数', '割合'], [...dz.groups.map(([g, v]) => ['グループ ' + g, v, dz.total ? pct(v / dz.total, 1) : '']), { r: ['合計', dz.total, ''], c: 'tot' }, { r: ['最大グループの割合', '', pct(dz.topShare, 1)], c: '' }, { r: ['判定（50%超で同族会社）', '', dz.total ? (dz.isDoozoku ? '同族会社' : '同族会社に該当しない') : '（未入力）'], c: 'tot' }], { note: '一般社団法人は社員1人1議決権が原則です。判定は法人税法2条10号に基づく簡易判定（特定同族会社・留保金課税は対象外）。' })}
     ${tSec('法人税・地方税の概算（三重県四日市市・資本金等・従業者数による）', ['税目', '概算額（円）'], est)}
     <div class="card"><h3>使用した税率・根拠</h3><table>${ratesTbl.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td class="note noprint"><a href="${r[2]}" target="_blank" rel="noopener">根拠</a></td></tr>`).join('')}</table>

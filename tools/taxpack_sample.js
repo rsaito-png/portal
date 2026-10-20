@@ -10,6 +10,7 @@ const get = async (p) => { const out = []; for (let o = 0; ; o += 1000) { const 
   const SEED5 = grab('SEED5'), ACT5 = grab('ACT5');
   const saved = await get(`acc_tax_inputs?select=data&fy_start=eq.${fy.from}`);
   const d = saved[0]?.data || (y === 2025 ? JSON.parse(JSON.stringify(SEED5)) : {}); if (!saved[0]) d.savedFlag = false;
+  if (!d.dep_manual) d.dep = require('../depcalc.js').taxRows(await get('acc_fixed_assets?select=*&order=id'), y);
   const accs = await get('acc_accounts?select=id,name,type,category,sort');
   const partners = await get('acc_partners?select=id,name,is_personal');
   const pm = new Map(partners.map(p => [p.id, p]));
