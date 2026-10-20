@@ -56,7 +56,7 @@ async function renderChair() {
       ${flag.length ? `<h3 class="nx">⚠️ 放置・期限切れ（AI判定 ${flag.length}件）</h3>${flag.slice(0, 8).map(i => item(i)).join('')}` : ''}
       <h3 class="nx">📣 会長からの一言（職員に表示）</h3><div class="card"><div id="ch_cur"></div><textarea id="ch_msg" rows="2" maxlength="500" style="font-size:18px;width:100%" placeholder="職員への一言"></textarea>
         <button style="margin-top:6px" onclick="chairMsgSend()">表示する</button> <button class="back" onclick="chairMsgOff()">一言を消す</button> <span id="ch_mm" class="note"></span></div>
-      <h3 class="nx">🌅 リーダー報告</h3><div id="ch_rep" class="card">読み込み中…</div>
+      <h3 class="nx">🌅 注進</h3><div id="ch_rep" class="card">読み込み中…</div>
 `;
     chairList(); chairCur(); chairReport();
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
@@ -100,7 +100,7 @@ async function chairMsgSend() {
     await sb('chair_message', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ body: t }) }); $('ch_msg').value = ''; m.textContent = '表示しました'; chairCur(); } catch (e) { m.textContent = e.message; }
 }
 async function chairMsgOff() { try { await sb('chair_message?active=eq.true', { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ active: false }) }); chairCur(); } catch (e) { alert(e.message); } }
-// リーダー報告（未報告の人・職員ごとのToDo）。詳細は #report/admin
+// 注進（未報告の人・職員ごとのToDo）。詳細は #report/admin
 async function chairReport() {
   const el = $('ch_rep'); if (!el) return;
   try {
@@ -108,7 +108,7 @@ async function chairReport() {
     const [ros, reps, todos] = await Promise.all([srRpc('staff_roster'), sb(`staff_report?day=gte.${since}&order=day.desc`), sb('staff_todo?status=neq.done&order=due.asc.nullslast,updated_at')]);
     const nm = Object.fromEntries(ros.map(r => [r.user_id, r.name])), targets = ros.filter(r => r.daily_report), have = new Set(reps.filter(r => r.day === day).map(r => r.staff));
     const miss = targets.filter(r => !have.has(r.user_id)), by = {}; todos.forEach(x => (by[x.assignee] = by[x.assignee] || []).push(x));
-    el.innerHTML = `<p style="font-size:18px">📭 今日まだ報告がない人（${miss.length}／${targets.length}）：<b>${miss.map(r => esc(r.name)).join('、') || 'なし'}</b></p>
+    el.innerHTML = `<p style="font-size:18px">📭 今日まだ注進がない人（${miss.length}／${targets.length}）：<b>${miss.map(r => esc(r.name)).join('、') || 'なし'}</b></p>
       <div class="card"><h4>➕ 指示を出す</h4><p><select id="ta_who" style="font-size:16px">${ros.map(r => `<option value="${r.user_id}">${esc(r.name)}</option>`).join('')}</select>
       <input id="ta_t" maxlength="300" placeholder="指示の内容" style="width:100%;font-size:16px"> 期限 <input id="ta_d" type="date" style="width:auto"> <button onclick="srAdd()">出す</button> <span id="ta_m" class="note"></span></p></div>
       ${Object.keys(by).length ? Object.entries(by).map(([id, xs]) => `<p><b>${esc(nm[id] || '？')}</b>（ToDo ${xs.length}）<br>${xs.map(x => `<small>・${esc(x.title)}（${srST[x.status]}${x.note ? '：' + esc(x.note) : ''}）${x.due ? '　期限 ' + esc(x.due) : ''}${x.due && x.due < day ? ' ⚠️期限切れ' : ''}</small> <a href="javascript:void 0" style="font-size:12px" onclick="srDel(${x.id})">消す</a>`).join('<br>')}</p>`).join('') : '<p class="note">未完了のToDoはありません。</p>'}

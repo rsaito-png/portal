@@ -45,7 +45,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=202610201000"></script>
+<script src="config.js?v=202610201005"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo.js?v=202610201000"></script>
 <script src="kin.js?v=202610161430"></script>
@@ -58,9 +58,9 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_contract.js?v=202610162320"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
-<script src="report.js?v=202610161720"></script>
+<script src="report.js?v=202610200935"></script>
 <script src="ht.js?v=202610161540"></script>
-<script src="chair.js?v=202610171155"></script>
+<script src="chair.js?v=202610200935"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610161430"></script>
 <script src="leo_cal.js?v=202610161430"></script>
@@ -69,6 +69,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="uketsuke.js?v=202610161430"></script>
 <script src="esign.js?v=202610191410"></script>
 <script src="rydeen.js?v=202610191440"></script>
+<script src="leaderboard.js?v=202610200935"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -178,6 +179,7 @@ async function render() {
   if (id === 'report') return sub === 'admin' ? renderReportAdmin() : renderReport();
   if (id === 'ht') return renderHt();
   if (id === 'chair') return renderChair();
+  if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
   if (id === 'mgr') return renderMgr();
   if (id === 'uketsuke') return renderUketsuke();
   if (id === 'sign' && typeof renderSign === 'function') return renderSign();
@@ -193,7 +195,7 @@ async function render() {
     if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
   }
-  const topT = [['📣', 'リーダー報告', '#report', '1行か「問題なし」で送る・ToDoを見る', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
+  const topT = [['📣', '注進（ちゅうしん）', '#report', '1行か「問題なし」で送る・ToDoを見る', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
     <h3>事業所</h3>
@@ -204,7 +206,7 @@ async function render() {
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof todoBadge === 'function') todoBadge();
-  chairTile(); chairMsgShow(); accTile();
+  chairTile(); chairMsgShow(); accTile(); if (typeof leaderTile === 'function') leaderTile();
 }
 // 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
 async function accTile() {
