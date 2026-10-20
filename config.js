@@ -18,7 +18,7 @@ window.PORTAL_CONFIG = {
       ['✍️', 'レオ 請求の印（欠席時対応・子育てサポート）', '#leo/shirushi', 'その日のうちに付ける'],
       ['📊', 'レオ 実績記録（請求元）', 'https://drive.google.com/open?id=1-ehRqwEQ4E5ggrouAHA6XDKMeSHEXzoa8LSk8nlOtB4', '日誌から自動転記'] ] },
     { name: '人事労務', tiles: [
-      ['🌅', '奉行報告（朝の確認）', '#report/admin', '報告がない人・動いていないToDo・困りごと（管理者のみ）'],
+      ['🌅', '注進（朝の確認）', '#report/admin', '注進がない人・動いていないToDo・困りごと（管理者のみ）'],
       ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'] ] },
     { name: '補助金・助成金', tiles: [
       ['💰', '補助金・助成金', '', '準備中'] ] },
