@@ -68,6 +68,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="uketsuke.js?v=202610161430"></script>
 <script src="esign.js?v=202610191410"></script>
 <script src="rydeen.js?v=202610191440"></script>
+<script src="leaderboard.js?v=202610200915"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -177,6 +178,7 @@ async function render() {
   if (id === 'report') return sub === 'admin' ? renderReportAdmin() : renderReport();
   if (id === 'ht') return renderHt();
   if (id === 'chair') return renderChair();
+  if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
   if (id === 'mgr') return renderMgr();
   if (id === 'uketsuke') return renderUketsuke();
   if (id === 'sign' && typeof renderSign === 'function') return renderSign();
@@ -203,7 +205,7 @@ async function render() {
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof todoBadge === 'function') todoBadge();
-  chairTile(); chairMsgShow(); accTile();
+  chairTile(); chairMsgShow(); accTile(); if (typeof leaderTile === 'function') leaderTile();
 }
 // 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
 async function accTile() {
