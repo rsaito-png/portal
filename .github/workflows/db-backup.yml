@@ -1,0 +1,45 @@
+# 毎日 03:30 JST に Supabase DB を pg_dump → AES256 で暗号化 → 非公開の保存先へ。
+# 必要な Secrets（Settings → Secrets and variables → Actions）：
+#   SUPABASE_DB_URL     … Supabase の接続文字列（Session pooler, postgresql://...）
+#   BACKUP_PASSPHRASE   … 暗号化の合言葉（紙で別保管。無くすと復元できない）
+#   BACKUP_REPO_TOKEN   … 非公開リポジトリ rsaito-png/portal-backup に書けるトークン（fine-grained, Contents: Read and write）
+# Secrets が無い間は何もせずに終わる（失敗にしない）。ログに秘密を出さない。
+name: db-backup
+on:
+  schedule: [{ cron: '30 18 * * *' }]
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check secrets
+        id: chk
+        env: { DB: '${{ secrets.SUPABASE_DB_URL }}', PW: '${{ secrets.BACKUP_PASSPHRASE }}', TK: '${{ secrets.BACKUP_REPO_TOKEN }}' }
+        run: |
+          if [ -n "$DB" ] && [ -n "$PW" ] && [ -n "$TK" ]; then echo ok=1 >> "$GITHUB_OUTPUT"; else echo "Secrets 未設定のためスキップ"; fi
+      - name: install pg_dump 17
+        if: steps.chk.outputs.ok == '1'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+      - name: dump and encrypt
+        if: steps.chk.outputs.ok == '1'
+        env: { DB: '${{ secrets.SUPABASE_DB_URL }}', PW: '${{ secrets.BACKUP_PASSPHRASE }}' }
+        run: |
+          set -euo pipefail
+          f="db-$(TZ=Asia/Tokyo date +%Y%m%d).dump"
+          /usr/lib/postgresql/17/bin/pg_dump "$DB" -Fc --no-owner --schema=public --schema=auth --schema=storage -f "$f"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PW" --symmetric --cipher-algo AES256 -o "$f.gpg" "$f"
+          shred -u "$f"; ls -l "$f.gpg"; echo "F=$f.gpg" >> "$GITHUB_ENV"
+      - name: push to private repo
+        if: steps.chk.outputs.ok == '1'
+        env: { TK: '${{ secrets.BACKUP_REPO_TOKEN }}' }
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 "https://x-access-token:${TK}@github.com/rsaito-png/portal-backup.git" bk
+          mkdir -p bk/daily && mv "$F" bk/daily/
+          cd bk && ls -1t daily/*.gpg | tail -n +31 | xargs -r git rm -q   # 30日分だけ残す
+          git add daily && git -c user.name=backup-bot -c user.email=backup@invalid commit -qm "backup $F" && git push -q

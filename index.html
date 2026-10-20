@@ -1,0 +1,272 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>星心会 職員ポータル</title>
+<style>
+:root{--main:#2e6b4f}
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222}
+header{background:var(--main);color:#fff;padding:14px 16px;font-size:18px;display:flex;justify-content:space-between;align-items:center}
+main{max-width:640px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 3px #0002}
+input,button{font-size:17px;width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #bbb}
+button{background:var(--main);color:#fff;border:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{background:#fff;border-radius:12px;padding:22px 10px;text-align:center;text-decoration:none;color:#222;box-shadow:0 1px 3px #0002;font-size:18px}
+.office{border-left:6px solid var(--c);text-align:left;padding:18px 14px}
+.office small{display:inline;margin-left:6px}
+.office{display:flex;align-items:center;gap:10px;min-height:56px}.office .lg{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;background:#fff}.office .tx{min-width:0}.office .lg.ct{object-fit:contain;border-radius:6px}
+.tile.main{grid-column:1/-1;padding:30px 10px;font-size:22px}
+.sample{text-align:left;font-size:25px;margin:8px 0 0;padding-left:22px}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:24px}td,th{border-bottom:1px solid #eee;padding:6px 4px;text-align:left}
+.note{color:#888;font-size:23px}.rec{margin:10px 0}.rec label{display:block;font-size:23px;color:#555}.rec textarea{width:100%;box-sizing:border-box;font-size:26px;padding:8px;border:1px solid #bbb;border-radius:8px;margin:2px 0 6px}.rec input{margin:2px 0 6px;padding:8px}
+.ptabs button{width:auto;margin-right:6px;padding:8px 16px;background:#fff;color:#333;border:1px solid #bbb}.ptabs .on{background:var(--main);color:#fff}
+h4{margin:14px 0 6px;font-size:25px}.kk.over{border-left:6px solid #d33}.kk.soon{border-left:6px solid #e6b800}.kk.ok{opacity:.6}.badge{background:#d33;color:#fff;border-radius:6px;padding:1px 6px;font-size:22px}.kk.soon .badge{background:#e6b800}.kk.ok .badge{background:#888}
+.back{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:8px 14px}
+h3{font-size:25px;color:#555;margin:20px 0 8px}
+.tile span{display:block;font-size:44px}.tile small{display:block;color:#888;font-size:22px;margin-top:4px}
+#out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:24px}
+#msg{color:#c00;min-height:1em}
+.tile .badge{display:inline-block;font-size:23px;margin-bottom:4px}
+h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.tile{min-width:0}.nxc{display:block;overflow:hidden;min-width:0;background:#fff;border-radius:14px;padding:20px 16px;text-decoration:none;color:#222;box-shadow:0 1px 4px #0003}.nxc span{font-size:30px;margin-right:10px}.nxc b{font-size:22px}.nxc small{display:block;color:#777;font-size:14px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile.big{padding:30px 10px;font-size:20px;font-weight:bold}.tile small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style></head><body>
+<header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
+<main>
+<div id="login" class="card"><p>メールアドレスとパスワードでログインしてください。</p>
+<input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
+<input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
+<button onclick="login()">ログイン</button>
+<button onclick="$('login').hidden=true;$('forgot').hidden=false" style="background:#fff;color:var(--main);border:1px solid var(--main)">はじめての方／パスワードを忘れた方</button>
+<button onclick="location.search='?demo=1'" style="background:#fff;color:var(--main);border:1px solid var(--main)">見本を見る</button><div id="msg"></div></div>
+<div id="forgot" class="card" hidden><p>登録されているメールアドレスを入れてください。パスワードを決めるためのメールが届きます。</p>
+<input id="fem" type="email" placeholder="メールアドレス" autocomplete="username">
+<button onclick="sendReset()">メールを送る</button>
+<button onclick="$('forgot').hidden=true;$('login').hidden=false" style="background:#fff;color:#333;border:1px solid #bbb">もどる</button><div id="fmsg"></div></div>
+<div id="setpw" class="card" hidden><p>新しいパスワードを決めてください（8文字以上）。</p>
+<input id="npw" type="password" placeholder="新しいパスワード" autocomplete="new-password">
+<button onclick="setPassword()">パスワードを決める</button><div id="pmsg"></div></div>
+<div id="home" hidden><p id="hi"></p><div id="view"></div>
+<p id="help" style="color:#888;font-size:13px"></p></div>
+</main>
+<script src="config.js?v=202610201005"></script>
+<script src="gl.js?v=202610201000"></script>
+<script src="leo.js?v=202610201000"></script>
+<script src="kin.js?v=202610161430"></script>
+<script src="kin_ledger.js?v=202610162320"></script>
+<script src="kin_visit.js?v=202610162300"></script>
+<script src="kin_check.js?v=202610171730"></script>
+<script src="signpad.js?v=202610170620"></script>
+<script src="sui_render.js?v=202610170620"></script>
+<script src="sui.js?v=202610192150"></script>
+<script src="kin_contract.js?v=202610162320"></script>
+<script src="kin_print.js?v=202610162340"></script>
+<script src="kin_jisseki.js?v=202610162340"></script>
+<script src="report.js?v=202610200935"></script>
+<script src="ht.js?v=202610161540"></script>
+<script src="chair.js?v=202610200935"></script>
+<script src="mgr.js?v=202610161458"></script>
+<script src="leo_yotei.js?v=202610161430"></script>
+<script src="leo_cal.js?v=202610161430"></script>
+<script src="leo_jippi.js?v=202610201000"></script>
+<script src="leo_jissekihyo.js?v=202610201000"></script>
+<script src="uketsuke.js?v=202610161430"></script>
+<script src="esign.js?v=202610191410"></script>
+<script src="rydeen.js?v=202610191440"></script>
+<script src="leaderboard.js?v=202610200935"></script>
+<script>
+const C = window.PORTAL_CONFIG;
+// 見本モード（?demo=1）: ログイン不要・見本データのみ
+const DEMO = new URLSearchParams(location.search).get('demo') === '1';
+const $ = id => document.getElementById(id);
+document.title = C.title;
+$('ttl').textContent = C.title;
+$('help').textContent = C.helpText;
+document.documentElement.style.setProperty('--main', C.themeColor);
+
+// Supabase Auth（メール＋パスワード）でログイン
+async function login() {
+  $('msg').textContent = '';
+  const r = await fetch(C.supabaseUrl + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: $('em').value.trim(), password: $('pw').value }),
+  });
+  const j = await r.json();
+  if (!r.ok) { $('msg').textContent = 'ログインできませんでした。メールとパスワードを確認してください。'; return; }
+  localStorage.setItem('sess', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email, role: (j.user.app_metadata || {}).role || C.defaultRole, exp: Date.now() + j.expires_in * 1000 })); if (window.loadGL) loadGL();
+  show();
+}
+
+function logout() { localStorage.removeItem('sess'); location.reload(); }
+
+function tileHtml([icon, name, url, note, size, sample], color) {
+  const list = DEMO && sample ? `<ul class="sample">${sample.map(x => `<li>${x}</li>`).join('')}</ul><small>（見本データ）</small>` : `<small>${note}</small>`;
+  const link = url.startsWith('#') || url.endsWith('.html') ? `href="${url}"` : url ? `href="${url}" target="_blank"` : `href="#" onclick="alert('準備中です');return false"`;
+  const accent = color ? `style="border-top:4px solid ${color}"` : '';
+  return `<a class="tile${size === 'main' ? ' main' : ''}" ${link} ${accent}><span>${icon}</span>${name}${list}</a>`;
+}
+
+
+// 事業所画面の本体。o.groups があれば「次にやること＋大ボタン（最大6〜8）」、無ければ従来のタイル一覧
+const visTiles = o => o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()));
+const shortName = (o, n) => (o.short || {})[n] || n;
+const myDuty = () => DUTY === '管理者' ? '管理者' : DUTY === '児発管' ? '児発管' : ROLE === '事務' ? '事務' : '現場支援員';
+function groupList(o) {
+  const vis = visTiles(o), used = new Set(); o.groups.forEach(g => g[2].forEach(n => used.add(n)));
+  const rest = vis.filter(t => !used.has(t[1]));
+  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(i === o.groups.length - 1 ? rest : []) })).filter(g => g.tiles.length);
+}
+const tl = (t, name, cls, color) => { const link = t[2] ? `href="${t[2]}"${/^https?:/.test(t[2]) ? ' target="_blank" rel="noopener"' : ''}` : 'style="opacity:.5"';
+  return `<a class="tile ${cls}" ${link} style="border-top:4px solid ${color}"><span>${t[0]}</span>${name}<small>${t[3]}</small></a>`; };
+function leoHomeBody(o) {
+  const vis = visTiles(o), col = o.color;
+  const mine = ((o.mine || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
+  const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
+  const g = groupList(o).map(x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`).join('');
+  const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
+  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`).join('')}</div>` : '';
+  return `<h3 class="nx">毎日やる</h3><div class="grid">
+    ${big('#leo/sougeiall', '🚐', '今日の送迎', 'hs_today', "PERIOD='today'")}
+    ${big('#leo/sougeiall', '🚐', '明日の送迎', 'hs_tomorrow', "PERIOD='tomorrow'")}
+    ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
+    ${big('#leo/linedraft', '✉️', 'LINEの下書き', '', '')}
+    ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}</div>
+    <h3 class="nx">${myDuty() === '事務' ? '情報' : myDuty() + 'の仕事'}</h3><div class="grid">${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}</div>
+    ${rt}`;
+}
+async function leoHomeStatus() {
+  try { if (DEMO || typeof sb !== 'function') return;
+    const t = today(), tm = addDays(t, 1), rows = await sb(`leo_nikki?day=gte.${t}&day=lte.${tm}&kind=eq.利用&select=day,pick_driver,pick_car,drop_driver,drop_car,child`);
+    const f = (id, d) => { const rs = rows.filter(r => r.day === d), bad = rs.reduce((n, r) => n + (!r.pick_driver || !r.pick_car ? 1 : 0) + (!r.drop_driver || !r.drop_car ? 1 : 0), 0), el = document.getElementById(id); if (!el) return;
+      el.innerHTML = !rs.length ? '日誌なし' : bad ? `<b style="color:#c00">未確定 ${bad}件</b>（${rs.length}人）` : `${rs.length}人・確定`; };
+    f('hs_today', t); f('hs_tomorrow', tm);
+    const k = document.getElementById('hs_kids'); if (k) k.textContent = rows.filter(r => r.day === t).length + '人';
+  } catch (e) { }
+}
+function officeBody(o) {
+  if (o.home && o.groups) { setTimeout(leoHomeStatus, 0); return leoHomeBody(o); }
+  if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(t, o.color)).join('')}</div>`;
+  const vis = visTiles(o);
+  const nx = ((o.next || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
+  const next = `<h3 class="nx">次にやること</h3><div class="nxl">${nx.map(t => `<a class="nxc" href="${t[2]}" style="border-left:8px solid ${o.color}"><span>${t[0]}</span><b>${shortName(o, t[1])}</b><small>${t[3]}</small></a>`).join('')}</div>`;
+  const gs = groupList(o);
+  const btns = gs.map(g => g.tiles.length === 1 && g.tiles[0][2] ? `<a class="tile big" href="${g.tiles[0][2]}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`
+    : `<a class="tile big" href="#${o.id}/g${g.k}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`).join('');
+  return `${next}<h3 class="nx">メニュー</h3><div class="grid">${btns}</div>`;
+}
+// 大ボタンの先（1階層）。#leo/g0 など
+function groupView(o, k) {
+  const g = groupList(o).find(x => String(x.k) === k); if (!g) return false;
+  $('view').innerHTML = `<button class="back" onclick="location.hash='${o.id}'">← ${o.name}へ</button>
+    <h3 style="color:${o.color};font-size:20px">${g.icon} ${g.label}</h3><div class="grid">${g.tiles.map(t => tl(t, shortName(o, t[1]), '', o.color)).join('')}</div>`;
+  if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
+  return true;
+}
+
+// 画面切替は URL の #事業所id で行う（戻るボタン・ブラウザの戻るが両方効く）
+async function render() {
+  if (typeof loadDuty === 'function') await loadDuty();
+  const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
+  if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
+  { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
+  if (id === 'suishodama' && sub === 'ledger') { SUI.edit = null; return renderSuiLedger(); }
+  if (id === 'suishodama' && sub === 'plan') { SUI.planId = null; return renderSuiPlan(); }
+  if (id === 'kintoun' && sub === 'ledger') return renderKinLedger();
+  if (id === 'kintoun' && sub === 'contract') return renderKinContract();
+  if (id === 'kintoun' && sub === 'print') return renderKinPrint();
+  if (id === 'kintoun' && sub === 'jisseki') return renderKinJisseki();
+  if (id === 'kintoun' && sub === 'check') return renderKinCheck();
+  if (id === 'kintoun' && sub === 'visit') { KV.id = null; return renderKinVisit(); }
+  if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
+  if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
+  if (id === 'report') return sub === 'admin' ? renderReportAdmin() : renderReport();
+  if (id === 'ht') return renderHt();
+  if (id === 'chair') return renderChair();
+  if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
+  if (id === 'mgr') return renderMgr();
+  if (id === 'uketsuke') return renderUketsuke();
+  if (id === 'sign' && typeof renderSign === 'function') return renderSign();
+  if (id === 'clerk' && sub === 'docs' && (sub2 === 'new' || sub2 === 'paper') && typeof renderDocsForm === 'function') return renderDocsForm(sub2);
+  if (id === 'clerk' && sub === 'docs' && typeof renderDocsAdmin === 'function') return renderDocsAdmin();
+  const o = C.offices.find(x => x.id === id);
+  if (o) {
+    $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
+      <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
+      ${officeBody(o)}`;
+    if (o.id === 'suishodama' && typeof siMonthly === 'function') { $('view').insertAdjacentHTML('beforeend', '<div id="sui_month"></div>'); siMonthly(); }
+    if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
+    if (typeof chairMsgShow === 'function') chairMsgShow();
+    return;
+  }
+  const topT = [['📣', '注進（ちゅうしん）', '#report', '1行か「問題なし」で送る・ToDoを見る', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
+  const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
+  $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
+    <h3>事業所</h3>
+    <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
+    ${ROLE === C.clerk.role ? `<div id="sumu_sec"><h3>総務（事務の方のみ表示）</h3>
+    ${(C.clerk.groups || []).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}</div>` : ''}
+    <h3 id="misc_h">未整理</h3>
+    <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
+  if (typeof esignBadge === 'function') esignBadge();
+  if (typeof todoBadge === 'function') todoBadge();
+  chairTile(); chairMsgShow(); accTile(); if (typeof leaderTile === 'function') leaderTile();
+}
+// 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
+async function accTile() {
+  if (DEMO || typeof sb !== 'function') return;
+  try { const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (!s) return;
+    const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/acc_is_admin', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' });
+    if (!r.ok || (await r.json()) !== true) return;
+    if (document.getElementById('acc_tile')) return;
+    let sec = document.getElementById('sumu_sec');
+    if (!sec) { const mh = document.getElementById('misc_h'); if (!mh) return; mh.insertAdjacentHTML('beforebegin', '<div id="sumu_sec"><h3>総務（管理者）</h3></div>'); sec = document.getElementById('sumu_sec'); }
+    sec.insertAdjacentHTML('beforeend', '<h4>会計</h4><div class="grid"><a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a></div>'); } catch (e) {}
+}
+window.addEventListener('hashchange', render);
+let ROLE = C.defaultRole;
+
+// 見本モードだけ: 職員／事務 の見え方を切り替え
+function roleToggle() {
+  return '<p>見え方：' + C.roles.map(r => `<label><input type="radio" name="role" value="${r}" ${r === ROLE ? 'checked' : ''} style="width:auto"> ${r}</label>`).join(' ') + '</p>';
+}
+
+function show() {
+  const s = DEMO ? { email: '見本（デモ）', exp: Infinity, role: new URLSearchParams(location.search).get('role') || C.defaultRole } : JSON.parse(localStorage.getItem('sess') || 'null');
+  if (!s || s.exp < Date.now()) { localStorage.removeItem('sess'); return; }
+  $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
+  $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
+  if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
+  ROLE = s.role || C.defaultRole;
+  if (DEMO) {
+    $('hi').insertAdjacentHTML('afterend', roleToggle());
+    document.querySelectorAll('input[name=role]').forEach(r => r.onchange = () => { ROLE = r.value; render(); });
+  }
+  render();
+}
+
+// はじめての方／パスワードを忘れた方：Supabase がパスワード設定メールを送る
+// 登録のないアドレスでも同じ表示にする（アカウントの有無を知られないため）
+async function sendReset() {
+  const email = $('fem').value.trim();
+  if (!email.includes('@')) { $('fmsg').textContent = 'メールアドレスを入れてください。'; return; }
+  const r = await fetch(C.supabaseUrl + '/auth/v1/recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname), {
+    method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+  $('fmsg').textContent = r.status === 429
+    ? 'いま混み合っています。しばらくしてからもう一度お試しください。'
+    : '登録されているアドレスなら、パスワード設定のメールを送りました。メールのボタンを押してパスワードを決めてください（24時間有効）。届かないときは管理者に連絡してください。';
+}
+
+// パスワード設定リンク（#access_token=...&type=recovery|invite）から来たとき
+const AUTH_HASH = new URLSearchParams(location.hash.slice(1));
+async function setPassword() {
+  const pw = $('npw').value;
+  if (pw.length < 8) { $('pmsg').textContent = '8文字以上にしてください。'; return; }
+  const r = await fetch(C.supabaseUrl + '/auth/v1/user', { method: 'PUT',
+    headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + AUTH_HASH.get('access_token'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw }) });
+  if (!r.ok) { $('pmsg').textContent = 'リンクの期限が切れているかもしれません。管理者に新しいリンクをもらってください。'; return; }
+  history.replaceState(null, '', location.pathname);
+  $('setpw').hidden = true; $('login').hidden = false; $('msg').textContent = 'パスワードを決めました。ログインしてください。';
+}
+if (AUTH_HASH.get('access_token') && ['recovery', 'invite'].includes(AUTH_HASH.get('type'))) { $('login').hidden = true; $('setpw').hidden = false; }
+
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+show();
+</script></body></html>
