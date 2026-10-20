@@ -256,38 +256,24 @@ async function saveManual() {
 
 /* ---- 銀行・カードCSV ---- */
 function decodeCsv(buf) { try { return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^\uFEFF/, ''); } catch (e) { return new TextDecoder('shift_jis').decode(buf); } }
-function parseCsvText(text) {
-  const rows = []; let row = [], cur = '', q = false;
-  for (let i = 0; i < text.length; i++) { const c = text[i];
-    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
-    else if (c === '"') q = true; else if (c === ',') { row.push(cur); cur = ''; }
-    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); if (row.some(x => x.trim())) rows.push(row); row = []; cur = ''; }
-    else cur += c; }
-  row.push(cur); if (row.some(x => x.trim())) rows.push(row); return rows;
-}
-const numOf = s => { const t = (s ?? '').replace(/[,\s円¥]/g, ''); return t && /^-?\d+$/.test(t) ? parseInt(t, 10) : null; };
-function normDate(s) {
-  let m = s.trim().match(/^(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = s.trim().match(/^R?(\d{1,2})[\/.](\d{1,2})[\/.](\d{1,2})$/); if (m) return `${2018 + +m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`; return null;
-}
 async function sha256(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+/* 形式判定と読み取りは csvfmt.js（住信SBI・三十三・JCB法人カード・freee Mastercard・汎用） */
 async function parseBankCsv(text, walletId) {
-  const all = parseCsvText(text), errors = [];
-  const hi = all.findIndex(r => r.some(c => /日付|取引日|年月日|日　付/.test(c)) && r.some(c => /残高|金額|出金|入金|支払|預入|引出/.test(c)));
-  if (hi < 0) return { rows: [], errors: ['ヘッダ行（日付・金額/出金/入金・残高）が見つかりません'] };
-  const h = all[hi].map(c => c.trim()), f = re => h.findIndex(c => re.test(c));
-  const iD = f(/日付|取引日|年月日/), iT = f(/摘要|内容|取引内容|お取引|振込人|備考/), iO = f(/出金|支払|引出|お支払/), iI = f(/入金|預入|お預|お預入/), iA = f(/^金額|取引金額/), iB = f(/残高/);
-  const seen = new Map(), rows = [];
-  for (const r of all.slice(hi + 1)) {
-    const date = normDate(r[iD] ?? ''); if (!date) { if (r.join('').trim()) errors.push(`日付を読めない行: ${r.join(',').slice(0, 60)}`); continue; }
-    let amount = null;
-    if (iO >= 0 || iI >= 0) { const o = numOf(r[iO]), i = numOf(r[iI]); if (o || i) amount = (i ?? 0) - (o ?? 0); } else if (iA >= 0) amount = numOf(r[iA]);
-    if (amount === null || amount === 0) { errors.push(`金額を読めない行: ${r.join(',').slice(0, 60)}`); continue; }
-    const descr = (iT >= 0 ? r[iT] : r.filter((_, k) => k !== iD).join(' ')).trim(), balance = iB >= 0 ? numOf(r[iB]) : null;
-    const base = [walletId, date, amount, descr, balance ?? ''].join('|'), n = (seen.get(base) ?? 0) + 1; seen.set(base, n);
-    rows.push({ date, descr, amount, balance, hash: await sha256(base + '|' + n) });
-  }
-  return { rows, errors };
+  const st = parseStatement(text), seen = new Map();
+  for (const r of st.rows) { const base = [walletId, r.date, r.amount, r.descr, r.balance ?? ''].join('|'), n = (seen.get(base) ?? 0) + 1; seen.set(base, n); r.hash = await sha256(base + '|' + n); }
+  return st;
+}
+/* 登録済みの仕訳（freee移行分を含む）・既存明細と 日付・金額・口座 で照合 */
+async function dupCheck(wid, rows) {
+  if (!rows.length) return rows;
+  const w = M.wallets.find(x => x.id === wid), ds = rows.map(r => r.date).sort(), from = ds[0], to = ds[ds.length - 1];
+  const [ls, bs] = await Promise.all([
+    sb(`acc_lines?select=side,amount,entry_id,acc_entries!inner(entry_date)&account_id=eq.${w.account_id}&acc_entries.entry_date=gte.${from}&acc_entries.entry_date=lte.${to}&limit=5000`),
+    sb(`acc_bank_rows?select=row_date,amount&wallet_id=eq.${wid}&row_date=gte.${from}&row_date=lte.${to}&limit=5000`)]);
+  const ent = new Map(); for (const l of ls) { const e = ent.get(l.entry_id) ?? { d: l.acc_entries.entry_date, a: 0 }; e.a += l.side === 'D' ? l.amount : -l.amount; ent.set(l.entry_id, e); }
+  const pool = new Map(), add = k => pool.set(k, (pool.get(k) ?? 0) + 1);
+  ent.forEach(e => add(e.d + '|' + e.a)); bs.forEach(b => add(b.row_date + '|' + b.amount));
+  return rows.filter(r => { const k = r.date + '|' + r.amount, c = pool.get(k) ?? 0; if (c > 0) { pool.set(k, c - 1); return false; } return true; });
 }
 async function vBank() {
   if (!M.accounts) await loadMasters();
@@ -295,7 +281,7 @@ async function vBank() {
   $('view').innerHTML = done() + `<h2>銀行・カードCSV取り込みと未処理明細</h2><div class="card"><h3>CSVを取り込む</h3><div class="g">
     <div><label>口座・カード</label><select id="b_w">${opts(M.wallets)}</select></div><div><label>CSVファイル（Shift_JIS/UTF-8）</label><input type="file" id="b_f" accept=".csv,text/csv"></div>
     <button onclick="importBank()">取り込む</button></div><div id="b_msg"></div>
-    <p class="note">日付・摘要・出金/入金（または金額）・残高の列を見出しから自動判定します。同じ内容を再度取り込んでも重複しません。</p></div>
+    <p class="note">住信SBI・三十三銀行・JCB法人カード（百五JCB/ANA JCB）・freee Mastercardの明細CSVは形式を自動判定します（その他は見出しから判定）。登録済みの取引と日付・金額が同じ明細は取り込みません。残高列があれば帳簿残高と照合します。</p></div>
     <div class="card"><h3>未処理の明細（${rows.length}件${rows.length >= 100 ? '以上・先頭100件' : ''}）</h3>
     ${rows.map(r => `<div class="ln" id="br_${r.id}" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))"><div><b>${r.row_date}</b> ${esc(r.acc_wallets.name)}<br>${esc(r.descr)}</div>
     <div class="r" style="color:${r.amount < 0 ? '#b00' : '#176b2f'};font-weight:bold">${yen(r.amount)}</div>
@@ -310,13 +296,21 @@ async function importBank() {
   const m = $('b_msg'), wid = +$('b_w').value, f = $('b_f').files[0]; if (!wid || !f) { m.innerHTML = '<p class="ng">口座とCSVファイルを選んでください</p>'; return; }
   m.textContent = '取り込み中…';
   try {
-    const { rows, errors } = await parseBankCsv(decodeCsv(await f.arrayBuffer()), wid);
-    const rules = await sb('acc_rules?select=*');
-    const recs = rows.map(r => { const rule = rules.find(x => r.descr.includes(x.keyword));
+    const st = await parseBankCsv(decodeCsv(await f.arrayBuffer()), wid), { rows, errors } = st, w = M.wallets.find(x => x.id === wid);
+    if (st.kind && w.kind && st.kind !== (w.kind === 'card' ? 'card' : 'bank') && !confirm(`このCSVは「${st.format}」形式ですが、選んだのは「${w.name}」です。続けますか？`)) { m.textContent = ''; return; }
+    const fresh = await dupCheck(wid, rows), rules = await sb('acc_rules?select=*');
+    const recs = fresh.map(r => { const rule = rules.find(x => r.descr.includes(x.keyword));
       return { wallet_id: wid, row_date: r.date, descr: r.descr, amount: r.amount, balance: r.balance, hash: r.hash, sug_account_id: rule?.account_id ?? null, sug_tax_code: rule?.tax_code ?? null, sug_dept_id: rule?.dept_id ?? null }; });
     let added = 0;
     for (let i = 0; i < recs.length; i += 200) { const d = await sb('acc_bank_rows?on_conflict=wallet_id,hash&select=id', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(recs.slice(i, i + 200)) }); added += d.length; }
-    flash(`${rows.length}行を読み取り: 新規 ${added}件 / 重複スキップ ${rows.length - added}件` + (errors.length ? ` / 読めない行 ${errors.length}件（${errors[0]}）` : ''), errors.length && !rows.length ? 'ng' : 'ok'); route();
+    let chk = '';
+    if (st.finalBalance != null) { const last = rows.reduce((a, r) => (r.date >= a ? r.date : a), '');
+      const t = await sb('rpc/acc_trial_balance', { method: 'POST', body: JSON.stringify({ p_from: '1900-01-01', p_to: last, p_dept: null }) });
+      const tb = t.find(x => x.account_id === w.account_id || x.id === w.account_id), led = tb ? tb.debit - tb.credit : 0;
+      const pend = (await sb(`acc_bank_rows?select=amount&wallet_id=eq.${wid}&status=eq.pending&row_date=lte.${last}`)).reduce((s, r) => s + r.amount, 0);
+      chk = ` / 残高照合(${last}): CSV ${yen(st.finalBalance)} ・ 帳簿${yen(led)}＋未処理${yen(pend)}＝${yen(led + pend)} ${led + pend === st.finalBalance ? '一致' : '不一致'}`; }
+    if (st.payTotal != null) chk += ` / 今回請求 ${yen(st.payTotal)}（支払日 ${st.payDate}）・明細合計 ${yen(-rows.reduce((s, r) => s + r.amount, 0))}`;
+    flash(`【${st.format}】${rows.length}行を読み取り: 新規 ${added}件 / 登録済みと重複スキップ ${rows.length - added}件` + chk + (errors.length ? ` / 読めない行 ${errors.length}件（${errors[0]}）` : ''), errors.length && !rows.length ? 'ng' : 'ok'); route();
   } catch (e) { m.innerHTML = `<p class="ng">取込エラー: ${esc(e.message)}</p>`; }
 }
 async function regRow(id) {
