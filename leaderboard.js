@@ -1,26 +1,26 @@
-// リーダー掲示板（試作）。見られるのはリーダーと会長だけ（supabase/leader_board.sql の RLS）
+// 評定所（試作）。見られるのは役職名のある人と会長だけ（supabase/leader_board.sql の RLS）
 const LB = { ok: null, chair: false, office: '' };
 async function lbRpc(fn) { const s = JSON.parse(localStorage.getItem('sess') || '{}'); const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' }); return r.ok && (await r.json()) === true; }
 async function lbCheck() { if (DEMO) return false; if (LB.ok === null) { try { [LB.ok, LB.chair] = await Promise.all([lbRpc('is_leader'), lbRpc('is_chair')]); } catch (e) { LB.ok = false; } } return LB.ok; }
-// 総合トップの「リーダー報告」のすぐ後ろにタイルを出す（リーダーと会長だけ）
+// 総合トップの「奉行報告」のすぐ後ろにタイルを出す（役職のある人と会長だけ）
 async function leaderTile() {
   if (!(await lbCheck())) return;
   const a = document.querySelector('#view .grid a[href="#report"]'); if (!a || document.getElementById('lb_tile')) return;
   let n = 0; if (LB.chair) { try { n = (await sb('leader_post?select=id&replied_at=is.null')).length; } catch (e) {} }
-  a.insertAdjacentHTML('afterend', `<a id="lb_tile" class="tile main" href="#leaderboard"><span>🗒️</span>${n ? `<span class="badge">未返信 ${n}</span>` : ''}リーダー掲示板<small>リーダーと会長だけが見られます</small></a>`);
+  a.insertAdjacentHTML('afterend', `<a id="lb_tile" class="tile main" href="#leaderboard"><span>🗒️</span>${n ? `<span class="badge">未返信 ${n}</span>` : ''}評定所<small>大老・若年寄・奉行と会長の連絡の場</small></a>`);
 }
 const lbT = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 async function renderLeaderBoard() {
   const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
-  if (DEMO) return $('view').innerHTML = back + '<h3>リーダー掲示板</h3><p>見本モードでは表示しません。</p>';
+  if (DEMO) return $('view').innerHTML = back + '<h3>評定所</h3><p>見本モードでは表示しません。</p>';
   $('view').innerHTML = '<p>読み込み中…</p>';
-  if (!(await lbCheck())) return $('view').innerHTML = back + '<h3>リーダー掲示板</h3><p>この掲示板は、リーダーと会長だけが見られます。</p>';
+  if (!(await lbCheck())) return $('view').innerHTML = back + '<h3>評定所</h3><p>評定所は、大老・若年寄・奉行と会長だけが見られます。</p>';
   try {
     const all = await sb('leader_post?order=created_at.desc&limit=200');
     const offs = [...new Set(all.map(p => p.office).filter(Boolean))];
     const list = LB.office ? all.filter(p => p.office === LB.office) : all;
     const un = all.filter(p => !p.replied_at).length;
-    $('view').innerHTML = back + `<h3>🗒️ リーダー掲示板</h3>
+    $('view').innerHTML = back + `<h3>🗒️ 評定所</h3><p>大老・若年寄・奉行と会長の連絡の場です。</p>
       <p style="color:#a33">人事評価や苦情などの個別の話はここに書かず、今までどおり一対一で扱います。</p>
       ${LB.chair ? '' : `<div class="card"><b>きょうの報告</b>
         <label>① 今日あったこと<textarea id="lb1" rows="2"></textarea></label>
