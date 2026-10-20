@@ -11,7 +11,7 @@ async function leaderTile() {
 }
 const lbT = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 async function renderLeaderBoard() {
-  const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
+  const back = `<button class="back" onclick="location.hash='#chushin'">← 注進・評定所へ</button>`;
   if (DEMO) return $('view').innerHTML = back + '<h3>評定所</h3><p>見本モードでは表示しません。</p>';
   $('view').innerHTML = '<p>読み込み中…</p>';
   if (!(await lbCheck())) return $('view').innerHTML = back + '<h3>評定所</h3><p>評定所は、大老・奉行と会長だけが見られます。</p>';
@@ -63,4 +63,12 @@ async function lbHelp() {
     <b>役職とは？</b>${LB_RANKS.map(([k, e, m]) => `<p style="margin:8px 0"><b>${k}</b><br>江戸：${e}<br>星心会：${m}<br>いまの担当：${esc(names(k))}</p>`).join('')}
     <hr>${LB_WORDS.map(([k, m]) => `<p style="margin:6px 0"><b>${k}</b>：${m}</p>`).join('')}
     <button onclick="this.closest('[style*=fixed]').remove()">閉じる</button></div></div>`;
+}
+
+// 総合トップの「注進・評定所」の中身。評定所は役職のある人と会長だけに出す
+async function renderChushin() {
+  $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button><h3>注進・評定所</h3><div class="grid" id="cs_grid"><a class="tile main" href="#report"><span>📣</span>注進（ちゅうしん）<small>1行か「問題なし」で送る・ToDoを見る</small></a></div>`;
+  if (!(await lbCheck())) return;
+  let n = 0; if (LB.chair) { try { n = (await sb('leader_post?select=id&replied_at=is.null')).length; } catch (e) {} }
+  const g = document.getElementById('cs_grid'); if (g) g.insertAdjacentHTML('beforeend', `<a class="tile main" href="#leaderboard"><span>🗒️</span>${n ? `<span class="badge">未返信 ${n}</span>` : ''}評定所<small>大老・奉行と会長の連絡の場</small></a>`);
 }
