@@ -12,9 +12,14 @@ LEO_VIEWS.yotei = async function () {
     { id: 2, child: '児童B', answered_at: null, answers: 0, sent_at: '2026-11-16T01:00:00Z', send_count: 1, remind_count: 1, last_reminded_at: '2026-11-20T01:00:00Z', expires_at: '2026-11-24T15:00:00Z' },
     { id: 3, child: '児童C', answered_at: '2026-11-16T05:00:00Z', answers: 2, usual: true, sent_at: null, send_count: 0, remind_count: 0, expires_at: '2026-11-24T15:00:00Z' }];
   else YT_ROWS = await sb('rpc/leo_sched_status', { method: 'POST', body: JSON.stringify({ p_month: YT_MONTH }) });
+  const LEFT = await loadLeftIndex();
+  const skipped = YT_ROWS.filter(r => leftBefore(LEFT, r.child, YT_MONTH));
+  YT_ROWS = YT_ROWS.filter(r => !leftBefore(LEFT, r.child, YT_MONTH));
   const done = YT_ROWS.filter(r => r.answered_at), left = YT_ROWS.filter(r => !r.answered_at);
+  const leftNote = r => { const d = leftOnOf(LEFT, r.child); return d && d >= YT_MONTH ? `<br><small style="color:#c60">退所日 ${esc(d.replace(/-/g, '/'))} まで。翌日以降はこの月の予定に入れません。</small>` : ''; };
   const row = r => `<div class="card"><b style="font-size:17px">■${esc(r.child)}</b>　${r.answered_at ? `<span style="color:#080">✅ 回答済み ${ytDT(r.answered_at)}</span> <small>${r.usual ? 'いつもどおり' : '個別の連絡あり'}${r.answers > 1 ? `（${r.answers}回目）` : ''}</small>` : '<span style="color:#c60">⬜ まだ</span>'}
     <br><small>${r.sent_at ? `リンクを送った：${ytDT(r.sent_at)}${r.remind_count ? `／催促${r.remind_count}回（最後 ${ytDT(r.last_reminded_at)}）` : ''}` : 'まだリンクを送っていません'}　回答期限：${ytDT(r.expires_at)}</small>
+    ${leftNote(r)}
     <div style="margin-top:6px">${mgr ? `<button onclick="ytCopy(${r.id},'${esc(r.child)}','send')">${r.sent_at ? 'リンクをもう一度コピー' : 'リンクをコピー'}</button>
       ${r.answered_at ? '' : `<button onclick="ytCopy(${r.id},'${esc(r.child)}','remind')">催促の文をコピー</button>`}` : ''}
       ${r.answers ? `<button onclick="ytShow(${r.id},'${esc(r.child)}')">回答を見る</button>` : ''}</div><div id="yt_${r.id}"></div></div>`;
@@ -22,9 +27,10 @@ LEO_VIEWS.yotei = async function () {
     <p class="ptabs"><button onclick="ytAddMonth(-1)">← 前の月</button> <b style="font-size:18px">${YT_MONTH.slice(0, 4)}年${mn}月分</b> <button onclick="ytAddMonth(1)">次の月 →</button></p>
     <p class="note">保護者の画面（ログイン不要・児童ごとの専用リンク）で、曜日ごとの学校お迎え時刻、お休み、保護者が送る・迎えに来る日、追加利用、送り先が違う日を聞きます。前回・型表の内容が最初から入っています。
     <b>やること：①下の「全員分まとめてコピー」→ 公式LINEに児童ごとに貼って送る　②回答がそろったら「予定を作る」で確認して確定</b></p>
-    ${!YT_ROWS.length ? `<div class="card"><p>${mn}月分の依頼はまだありません。</p>${mgr ? `<button onclick="ytOpen()">${mn}月分のリンクを作る（型表の児童全員。作るだけで、誰にも送りません）</button><span id="yt_om"></span>` : ''}</div>`
+    ${!YT_ROWS.length ? `<div class="card"><p>${mn}月分の依頼はまだありません。</p>${mgr ? `<button onclick="ytOpen()">${mn}月分のリンクを作る（型表の児童。退所日がこの月より前の子は除く。作るだけで、誰にも送りません）</button><span id="yt_om"></span>` : ''}</div>`
     : `<p style="font-size:18px"><b>${done.length} / ${YT_ROWS.length}人 回答済み</b>${left.length ? `（まだ：${left.map(r => esc(r.child)).join('、')}）` : ' ✅ 全員そろいました'}</p>${mgr ? `<div class="card"><button onclick="ytCopyAll('send')">全員分まとめてコピー（児童ごとのLINE文面つき）</button> <button onclick="ytCopyAll('remind')">まだの人だけ催促の文をまとめてコピー</button><br><small>児童ごとに「■名前」の見出しで区切ります。見出しごとに分けて、それぞれのご家庭にだけ送ってください（リンクは家庭ごとに別です）。</small><div id="yt_all"></div></div>` : ''}${left.map(row).join('')}${done.map(row).join('')}
-      ${mgr ? `<div class="card"><h3>${mn}月分の予定を作る</h3><p class="note">回答（未回答は型表どおり）＋お休み・母の送迎から、${mn}月の 利用・迎え・送り を作ります。まず確認だけ（何も書き込みません）。</p><button onclick="ytPlan()">${mn}月分の予定を作る（確認してから確定）</button><div id="yt_plan"></div></div>` : ''}`}
+      ${mgr ? `<div class="card"><h3>${mn}月分の予定を作る</h3><p class="note">回答（未回答は型表どおり）＋お休み・母の送迎から、${mn}月の 利用・迎え・送り を作ります。退所日の翌日以降の児童は入れません。型表は変更しません。まず確認だけ（何も書き込みません）。</p><button onclick="ytPlan()">${mn}月分の予定を作る（確認してから確定）</button><div id="yt_plan"></div></div>` : ''}`}
+    ${skipped.length ? `<details style="margin-top:8px"><summary>退所のため、この月の予定に入れていない児童（${skipped.length}人）</summary><p class="note">${skipped.map(r => esc(r.child)).join('、')}。依頼の記録は消していません。型表も変更していません。</p></details>` : ''}
     <p class="note" style="margin-top:12px"><a href="yotei.html?demo=1&m=${YT_MONTH.slice(0, 7)}" target="_blank">保護者の画面の見本（架空データ・送信されません）</a></p>`;
 };
 window.ytAddMonth = ytAddMonth;
@@ -92,8 +98,9 @@ window.ytCopyAll = ytCopyAll; window.ytPlan = ytPlan; window.ytCommit = ytCommit
   LEO_VIEWS.sougei = async function () {
     if (DEMO) return old.call(this);
     const [a, b] = range(), me = await myName();
-    const [ev, cc] = await Promise.all([sb(`leo_events?kind=in.(迎え,送り)&day=gte.${a}&day=lte.${b}&order=day,start_time`), sb('leo_child_care').catch(() => [])]);
-    if (!ev.length) return old.call(this);
+    const [ev0, cc, LEFT] = await Promise.all([sb(`leo_events?kind=in.(迎え,送り)&day=gte.${a}&day=lte.${b}&order=day,start_time`), sb('leo_child_care').catch(() => []), loadLeftIndex()]);
+    if (!ev0.length) return old.call(this);
+    const ev = filterEventsByLeft(ev0, LEFT);
     const CARE = Object.fromEntries(cc.filter(x => x.note).map(x => [x.child, x.note])), mine = ev.filter(e => same(e.staff, me)), days = {};
     mine.forEach(e => (days[e.day] = days[e.day] || []).push(e));
     const card = e => { const pl = e.kid_places || {}, kt = e.kid_times || {};

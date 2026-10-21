@@ -1,3 +1,4 @@
+-- 退所日で枠の材料（leo_frame_input）から児童を外す処理は supabase/leo_left.sql。このファイルを再実行したあとは leo_left.sql をもう一度実行する。
 -- レオ 予定（利用予定・送迎・職員の勤務/不在）。11/1からはこれが正（Googleカレンダーは11/1まで取り込むだけ、書き戻さない）
 -- 読む：レオ職員・事務。書く：児発管・管理者・事務（can_manage）。Google取り込み分は box の同期だけが入れ替える
 create table if not exists public.leo_events (

@@ -43,13 +43,15 @@ async function load() {
   render();
 }
 const mm = D => +D.month.split('-')[1];
+const monthStart = () => (String(D.month).length === 7 ? D.month : String(D.month).slice(0, 7)) + '-01';
 function render() {
   const dl = fmtDL(D.deadline), done = D.answered_at ? `<p class="ok">${fmtDL(D.answered_at)} にご回答いただいています。直すときは、このまま直して、もう一度送ってください。</p>` : '';
+  if (D.left_on && D.left_on < monthStart()) { M.innerHTML = `<div class="card"><b>${esc(D.child)}</b> さん<br>退所日（${esc(D.left_on)}）の翌日以降のため、${mm(D)}月のご利用予定の確認はありません。</div>`; return; }
   if (D.expired) { M.innerHTML = `<div class="card"><b>${esc(D.child)}</b> さん<br>このリンクの回答期限（${dl}）が過ぎました。お手数ですがレオまでご連絡ください。</div>`; return; }
   $('hd').textContent = `レオ　${mm(D)}月のご利用予定`;
   const wds = Object.keys(S.wd);
   M.innerHTML = `${DEMO ? '<div class="card err">見本です（架空のデータ。送信されません）</div>' : ''}
-  <div class="card"><b style="font-size:18px">${esc(D.child)}</b> さん　${mm(D)}月のご利用予定<p class="note">回答期限：${dl} まで（期限までは何度でも送り直せます。いちばん新しい回答が使われます）。いつもどおりなら、確認して「送信する」だけで大丈夫です。</p>${done}</div>
+  <div class="card"><b style="font-size:18px">${esc(D.child)}</b> さん　${mm(D)}月のご利用予定<p class="note">回答期限：${dl} まで（期限までは何度でも送り直せます。いちばん新しい回答が使われます）。いつもどおりなら、確認して「送信する」だけで大丈夫です。</p>${D.left_on ? `<p class="note">退所日は ${esc(D.left_on)} です。この日の翌日以降は予定に入りません。</p>` : ''}${done}</div>
   <div class="card"><h3>① いつもの曜日</h3><p class="note">ご利用する曜日にチェックして、学校（園）へのお迎え時刻（いつもの下校・降園時刻）を入れてください。</p>
   ${wds.map(w => { const s = S.wd[w], pd = s.parent === '母の送り';
     return `<div class="wd"><b>${w}</b><label><input type="checkbox" ${s.use ? 'checked' : ''} onchange="S.wd['${w}'].use=this.checked;renderDays()"> 利用する</label>${s.irregular ? '<span class="note">（不定期）</span>' : ''}
@@ -64,7 +66,7 @@ function render() {
 }
 function renderDays() {
   const cl = new Set(D.closed || []), out = [];
-  for (const x of monthDays()) { if (cl.has(x.iso)) continue;
+  for (const x of monthDays()) { if (cl.has(x.iso)) continue; if (D.left_on && x.iso > D.left_on) continue;
     const reg = S.wd[x.w] && S.wd[x.w].use, e = S.days[x.iso] || {}, kinds = reg ? KINDS : [['追加利用', '追加で利用したい']], off = !!e['休み'];
     const chips = kinds.map(([k, l]) => `<button type="button" class="chip ${e[k] ? 'on' : ''}" onclick="tog('${x.iso}','${k}')">${l}</button>`).join('');
     const subs = Object.keys(e).filter(k => e[k] && k !== '休み').map(k => k === '母の送り' ? '' :
@@ -78,7 +80,7 @@ function tog(iso, k) { const e = S.days[iso] = S.days[iso] || {}; if (e[k]) dele
 function build() {
   const weekdays = {}, days = [];
   for (const [w, s] of Object.entries(S.wd)) weekdays[w] = { use: s.use, school_time: s.use && s.parent !== '母の送り' ? s.school_time : '', pick_place: s.pick_place, drop_place: s.drop_place };
-  for (const x of monthDays()) { const e = S.days[x.iso]; if (!e) continue; for (const [k, v] of Object.entries(e)) days.push({ day: x.iso, kind: k, time: v.time || '', place: v.place || '' }); }
+  for (const x of monthDays()) { if (D.left_on && x.iso > D.left_on) continue; const e = S.days[x.iso]; if (!e) continue; for (const [k, v] of Object.entries(e)) days.push({ day: x.iso, kind: k, time: v.time || '', place: v.place || '' }); }
   return { weekdays, days, note: S.note.trim() };
 }
 function check(a) {
