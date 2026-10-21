@@ -101,7 +101,8 @@ window.calDel = async () => { if (!confirm('この予定を削除しますか？
 
 LEO_VIEWS.cal = async function () {
   CAL.d = CAL.d || today();
-  const [evs, cc, ch] = await Promise.all([calLoad(), DEMO ? [] : sb('leo_child_care?select=child,note').catch(() => []), canManage() && !DEMO ? sb('leo_children?select=name').catch(() => []) : []]);
+  const [evs0, cc, ch, LEFT] = await Promise.all([calLoad(), DEMO ? [] : sb('leo_child_care?select=child,note').catch(() => []), canManage() && !DEMO ? sb('leo_children?select=name').catch(() => []) : [], loadLeftIndex()]);
+  const evs = filterEventsByLeft(evs0, LEFT);
   const care = Object.fromEntries(cc.filter(x => x.note).map(x => [nk(x.child), x.note]));
   const [a, b] = calRange(), btn = (m, l) => `<button onclick="calMode('${m}')"${CAL.mode === m ? ' style="font-weight:bold;background:#06c;color:#fff"' : ''}>${l}</button>`;
   let h = `<h3>児童の利用・送迎予定</h3>${demoNote()}<p class="calbar"><style>.calbar button{width:auto !important;display:inline-block !important;padding:6px 12px !important;margin:2px !important}</style>${btn('day', '日')}${btn('week', '週')}${btn('month', '月')}
@@ -114,6 +115,7 @@ LEO_VIEWS.cal = async function () {
   }
   h += CAL.mode === 'day' ? calDay(a, evs, care) : CAL.mode === 'week' ? calWeek(evs) : calMonth(evs);
   h += `<p style="margin-top:12px;font-size:13px">関連：<a href="#leo/sougei">自分の送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/userinfo">利用者情報</a>' : ''}</p>
+    <p class="note">退所日の翌日以降の児童は、この画面には出しません（予定の記録は消していません。型表の保存も不要です）。</p>
     <p class="note">11/1まではGoogleカレンダーの予定を毎時取り込んでいます（Google側は変えません）。ポータルで直した予定はそのまま残ります。</p>`;
   return h;
 };

@@ -1,5 +1,6 @@
 -- 保護者への「来月の利用予定」確認（Googleフォーム＋型表＋25日のカレンダー作成 の置き換え。11/25までは並行・実保護者には送らない）
 -- 保護者は ログインなし・児童×月ごとのリンク（hogosha と同じ48桁トークン）。公開は SECURITY DEFINER の RPC 2つ（get / submit）だけ
+-- 退所日の除外（leo_sched_open / leo_sched_get / leo_sched_submit）は supabase/leo_left.sql。このファイルを再実行したあとは leo_left.sql をもう一度実行する。
 -- 回答は leo_schedule_answer に書き換え不可で積み上げ、最新の回答を leo_schedule_weekday / leo_schedule_exception に展開（25日の作成スクリプトが読む。列の意味は 型表・例外シートと同じ。型表そのものは変えない）
 
 create table if not exists public.leo_schedule_request (

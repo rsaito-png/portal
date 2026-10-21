@@ -1,3 +1,4 @@
+-- 退所日の除外は supabase/leo_left.sql がこのファイルの関数を置き換える。このファイルを再実行したあとは leo_left.sql をもう一度実行する。
 -- 利用予定の作成（25日に実行）：保護者の回答（leo_schedule_weekday / exception）＋型表 → leo_events（利用・休み・迎え・送り）
 -- 意味は Google の GAS と同じ：利用＝来る時間／迎え☆＝担当ごとにまとめて乗る順／送り★／母の送り＝迎えなし／母の迎え＝送りなし
 -- source='kata' が「この処理で作った行」。作り直すときはこの行だけ消して入れ直す（職員が直した source='portal' 行・Google取込 source='google' 行は触らない）
