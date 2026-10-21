@@ -24,9 +24,9 @@ async function renderLeaderBoard() {
     const un = all.filter(p => !p.replied_at).length;
     $('view').innerHTML = back + `<h3>🏯 評定所 <button style="width:auto;font-size:16px" onclick="lbHelp()">役職とは？</button></h3><p>職員みんなと会長の報連相（報告・連絡・相談）の場です。だれでも書けて、だれでも返信できます。</p><div id="lbHelp"></div>
       <p style="color:#a33">人事評価や苦情などの個別の話はここに書かず、<a href="#banto">番頭さん</a>（個別の窓口）や<a href="#soudan">人事労務の相談所</a>へ。</p>
-      <div class="card"><b>書く</b>　<select id="lbk" style="width:auto">${['報告', '連絡', '相談'].map(k => `<option>${k}</option>`).join('')}</select>
-        <textarea id="lb1" rows="3" placeholder="みんなに伝えたいこと・相談したいこと"></textarea>
-        <button onclick="lbPost()">送る</button></div>
+      <div class="card"><div><b>書く</b>　種別：<select id="lbk" style="width:auto">${['報告', '連絡', '相談'].map(k => `<option>${k}</option>`).join('')}</select></div>
+        <textarea id="lb1" rows="6" style="display:block;width:100%;box-sizing:border-box;font-size:16px;resize:vertical;margin:6px 0" placeholder="みんなに伝えたいこと・相談したいこと"></textarea>
+        <button style="display:block" onclick="lbPost()">送る</button></div>
       <p>${LB.chair ? `会長がまだ返していない投稿：<b>${un}件</b>　` : ''}
         種別：<select style="width:auto" onchange="LB.kind=this.value;renderLeaderBoard()"><option value="">すべて</option>${['報告', '連絡', '相談'].map(k => `<option ${k === LB.kind ? 'selected' : ''}>${k}</option>`).join('')}</select>
         事業所：<select id="lbOff" style="width:auto" onchange="LB.office=this.value;renderLeaderBoard()"><option value="">すべて</option>${offs.map(o => `<option ${o === LB.office ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></p>
@@ -42,7 +42,7 @@ function lbCard(p) {
   const rs = (LB.reps[p.id] || []).map(r => `<div style="border-top:1px dashed #ccc;padding:4px 0;font-size:15px"><small>${esc(r.author_name || '')}・${lbT(r.created_at)}</small><div style="white-space:pre-wrap">${esc(r.body)}</div></div>`).join('');
   return `<div class="card" style="border-left:6px solid ${LB_KC[k]}"><span class="badge" style="background:${LB_KC[k]}">${k}</span> <small><a href="#" onclick="lbHelp();return false">${esc(p.author_name || '')}</a>・${esc(p.office || '')}・${lbT(p.created_at)}</small>
     ${row('', p.today)}${row('困りごと：', p.trouble)}${row('判断してほしいこと：', p.ask)}${rep}${rs}
-    <div style="margin-top:6px"><input id="lbc${p.id}" placeholder="返信を書く" style="width:70%"><button style="width:auto" onclick="lbComment(${p.id})">返信</button></div>${form}</div>`;
+    <div style="margin-top:6px"><textarea id="lbc${p.id}" rows="3" placeholder="返信を書く" style="display:block;width:100%;box-sizing:border-box;font-size:16px;resize:vertical;margin:6px 0"></textarea><button style="width:auto" onclick="lbComment(${p.id})">返信</button></div>${form}</div>`;
 }
 async function lbPost() {
   const t = $('lb1').value.trim(); if (!t) return alert('中身を書いてください');

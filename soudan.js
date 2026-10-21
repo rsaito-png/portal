@@ -12,10 +12,10 @@ async function renderSoudan() {
     <div style="font-size:12px;color:#666">${hsT(r.created_at)}${boss ? '　' + hsE(r.name) : ''}${r.topic ? '　【' + hsE(r.topic) + '】' : ''}${r.reply ? '' : '　<b style="color:#c00">未回答</b>'}</div>
     <div style="white-space:pre-wrap;margin:6px 0">${hsE(r.body)}</div>
     ${r.reply ? `<div style="white-space:pre-wrap;background:#f3f7ff;padding:8px;border-radius:6px">💬 総務奉行より（${hsT(r.replied_at)}）<br>${hsE(r.reply)}</div>` : ''}
-    ${boss ? `<textarea id="hs_r${r.id}" rows="3" style="width:100%" placeholder="答えを書く">${hsE(r.reply || '')}</textarea><button onclick="hsReply(${r.id})">答えを送る</button>` : ''}</div>`;
+    ${boss ? `<textarea id="hs_r${r.id}" rows="4" style="display:block;width:100%;box-sizing:border-box;font-size:16px;resize:vertical;margin:6px 0" placeholder="答えを書く">${hsE(r.reply || '')}</textarea><button onclick="hsReply(${r.id})">答えを送る</button>` : ''}</div>`;
   const form = `<div style="margin:10px 0"><select id="hs_t"><option value="">（分類なし）</option>${['休み・勤務時間', '給料・手当', '社会保険・税金', '働き方・仕事内容', '人間関係', '体調・家庭の事情', 'その他'].map(t => `<option>${t}</option>`).join('')}</select>
     <input id="hs_n" placeholder="名前" style="margin:6px 0;width:100%">
-    <textarea id="hs_b" rows="5" style="width:100%" placeholder="相談したいことを書いてください"></textarea><button onclick="hsSend()">相談を送る</button></div>`;
+    <textarea id="hs_b" rows="6" style="display:block;width:100%;box-sizing:border-box;font-size:16px;resize:vertical;margin:6px 0" placeholder="相談したいことを書いてください"></textarea><button onclick="hsSend()">相談を送る</button></div>`;
   const open = rows.filter(r => !r.reply).length;
   $('view').innerHTML = back + `<h3>人事労務の相談所</h3><p style="font-size:13px">休み、給料、働き方、人間関係などの相談を受け付けます。読むのは総務奉行（宮本さん）だけで、会長やほかの職員には見えません。</p>`
     + (boss ? `<h4>届いた相談${open ? `（未回答 ${open}件）` : ''}</h4>${rows.map(card).join('') || '<p>まだありません。</p>'}<details><summary>自分も相談を書く</summary>${form}</details>`

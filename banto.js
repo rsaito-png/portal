@@ -10,7 +10,7 @@ function bnCard(r, chair) {
     ${r.ai_answer ? `<div style="white-space:pre-wrap;background:#f6f1e6;padding:8px;border-radius:6px">🧑‍💼 番頭さん<br>${bnE(r.ai_answer)}</div>` : ''}
     ${chair && r.ai_summary ? `<div style="font-size:14px;margin-top:6px">📝 要約：${bnE(r.ai_summary)}<br>💡 番頭の意見：${bnE(r.ai_opinion || '')}</div>` : ''}
     ${r.chair_reply ? `<div style="white-space:pre-wrap;background:#fff7d6;padding:8px;border-radius:6px;margin-top:6px">👑 会長より（${bnT(r.chair_replied_at)}）<br>${bnE(r.chair_reply)}</div>` : ''}
-    ${chair && r.status === 'escalated' ? `<textarea id="bn_r${r.id}" rows="3" style="width:100%;margin-top:6px" placeholder="職員への返事"></textarea><button onclick="bnReply(${r.id})">返事を送る</button>` : ''}</div>`;
+    ${chair && r.status === 'escalated' ? `<textarea id="bn_r${r.id}" rows="4" style="display:block;width:100%;box-sizing:border-box;font-size:16px;resize:vertical;margin:6px 0" placeholder="職員への返事"></textarea><button onclick="bnReply(${r.id})">返事を送る</button>` : ''}</div>`;
 }
 async function renderBanto() {
   const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
@@ -21,9 +21,9 @@ async function renderBanto() {
   let rows = []; try { rows = await sb('banto_msg?select=*&user_id=eq.' + encodeURIComponent(me) + '&order=created_at.desc&limit=50'); } catch (e) { }
   $('view').innerHTML = back + `<h3>🧑‍💼 番頭さん</h3>
     <p style="font-size:13px">報告・連絡・相談はこちらへどうぞ。番頭さん（AI）がすぐにお返事し、会長の判断が要るものは会長に取り次ぎます。休み・給料・働き方など人事労務の個人的な相談は<a href="#soudan">人事労務の相談所</a>へ。</p>
-    <div class="card"><select id="bn_k">${['報告', '連絡', '相談'].map(k => `<option${k === '相談' ? ' selected' : ''}>${k}</option>`).join('')}</select>
+    <div class="card"><div>種別：<select id="bn_k" style="width:auto">${['報告', '連絡', '相談'].map(k => `<option${k === '相談' ? ' selected' : ''}>${k}</option>`).join('')}</select></div>
     <input id="bn_n" placeholder="名前" style="margin:6px 0;width:100%">
-    <textarea id="bn_b" rows="5" maxlength="4000" style="width:100%" placeholder="書いて送ってください"></textarea><button id="bn_go" onclick="bnSend()">番頭さんに送る</button></div>
+    <textarea id="bn_b" rows="6" maxlength="4000" style="display:block;width:100%;box-sizing:border-box;font-size:16px;resize:vertical;margin:6px 0" placeholder="書いて送ってください"></textarea><button id="bn_go" onclick="bnSend()">番頭さんに送る</button></div>
     <h4>自分のやり取り</h4><div id="bn_list">${rows.map(r => bnCard(r)).join('') || '<p>まだありません。</p>'}</div>`;
   $('bn_n').value = s.email || '';
   if (rows.some(r => r.status === 'pending')) setTimeout(() => { if (location.hash === '#banto') renderBanto(); }, 5000);
