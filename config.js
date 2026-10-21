@@ -5,7 +5,7 @@ window.PORTAL_CONFIG = {
   themeColor: '#2e6b4f',
   supabaseUrl: 'https://zvrardoyxocmqhvyddnf.supabase.co',
   supabaseKey: 'sb_publishable_C3S0K18If_cNj6gpgIct9w_3NFMdnCT', // 公開用キー（ブラウザに出してよい種類）
-  helpText: '分からないことは、ポータルの「受付」から送ってください。',
+  helpText: '分からないことは、このページの「分からないことを送る」から受付へ送れます。',
   // 役割。ログインユーザーの役割は Supabase の app_metadata.role（未設定なら defaultRole）
   roles: ['職員', '事務'],
   defaultRole: '職員',

@@ -45,7 +45,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=202610211310"></script>
+<script src="config.js?v=202610211600"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo.js?v=202610201000"></script>
 <script src="kin.js?v=202610161430"></script>
@@ -66,7 +66,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo_cal.js?v=202610161430"></script>
 <script src="leo_jippi.js?v=202610201000"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
-<script src="uketsuke.js?v=202610161430"></script>
+<script src="uketsuke.js?v=202610211600"></script>
 <script src="esign.js?v=202610191410"></script>
 <script src="rydeen.js?v=202610191440"></script>
 <script src="soudan.js?v=202610201140"></script>
@@ -237,6 +237,7 @@ function show() {
   $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
   if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
   ROLE = s.role || C.defaultRole;
+  if (typeof ukInstallAsk === 'function') ukInstallAsk();
   if (DEMO) {
     $('hi').insertAdjacentHTML('afterend', roleToggle());
     document.querySelectorAll('input[name=role]').forEach(r => r.onchange = () => { ROLE = r.value; render(); });
