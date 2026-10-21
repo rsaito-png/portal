@@ -45,7 +45,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=202610211740"></script>
+<script src="config.js?v=202610211555"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo.js?v=202610211700"></script>
@@ -114,7 +114,7 @@ const myDuty = () => DUTY === '管理者' ? '管理者' : DUTY === '児発管' ?
 function groupList(o) {
   const vis = visTiles(o), used = new Set(); o.groups.forEach(g => g[2].forEach(n => used.add(n)));
   const rest = vis.filter(t => !used.has(t[1]));
-  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(i === o.groups.length - 1 ? rest : []) })).filter(g => g.tiles.length);
+  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(g[1] === 'その他' || (i === o.groups.length - 1 && !o.groups.some(x => x[1] === 'その他')) ? rest : []) })).filter(g => g.tiles.length);
 }
 const tl = (t, name, cls, color) => { const link = t[2] ? `href="${t[2]}"${/^https?:/.test(t[2]) ? ' target="_blank" rel="noopener"' : ''}` : 'style="opacity:.5"';
   return `<a class="tile ${cls}" ${link} style="border-top:4px solid ${color}"><span>${t[0]}</span>${name}<small>${t[3]}</small></a>`; };
