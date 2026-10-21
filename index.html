@@ -60,7 +60,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_jisseki.js?v=202610162340"></script>
 <script src="report.js?v=202610200935"></script>
 <script src="ht.js?v=202610161540"></script>
-<script src="chair.js?v=202610200935"></script>
+<script src="chair.js?v=202610211300"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610161430"></script>
 <script src="leo_cal.js?v=202610161430"></script>
@@ -70,6 +70,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="esign.js?v=202610191410"></script>
 <script src="rydeen.js?v=202610191440"></script>
 <script src="soudan.js?v=202610201140"></script>
+<script src="banto.js?v=202610211300"></script>
 <script src="leaderboard.js?v=202610201220"></script>
 <script>
 const C = window.PORTAL_CONFIG;
@@ -180,6 +181,7 @@ async function render() {
   if (id === 'report') return sub === 'admin' ? renderReportAdmin() : renderReport();
   if (id === 'ht') return renderHt();
   if (id === 'chair') return renderChair();
+  if (id === 'banto' && typeof renderBanto === 'function') return renderBanto();
   if (id === 'soudan' && typeof renderSoudan === 'function') return renderSoudan();
   if (id === 'chushin' && typeof renderChushin === 'function') return renderChushin();
   if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
@@ -198,7 +200,7 @@ async function render() {
     if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
   }
-  const topT = [['📣', '注進・評定所', '#chushin', '毎日の注進とToDo・評定所（役職のある人）', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
+  const topT = [['📣', '注進・評定所', '#chushin', '毎日の注進とToDo・評定所（役職のある人）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
     <h3>事業所</h3>
@@ -209,7 +211,7 @@ async function render() {
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof todoBadge === 'function') todoBadge();
-  chairTile(); chairMsgShow(); accTile(); 
+  chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); 
 }
 // 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
 async function accTile() {

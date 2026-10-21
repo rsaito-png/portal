@@ -47,6 +47,7 @@ async function renderChair() {
     $('view').innerHTML = back + `<h3 class="nx" style="font-size:22px">👑 会長ページ</h3>
       <div class="card"><input id="ch_in" maxlength="1000" placeholder="思いついたことを一行で" style="font-size:20px;padding:14px"
         onkeydown="if(event.key==='Enter')chairSend()"><button style="font-size:22px;padding:14px;margin-top:8px" onclick="chairSend()">送る</button><div id="ch_m" style="font-size:20px;color:#2e6b4f;min-height:1.4em;margin-top:6px"></div></div>
+      <h3 class="nx" id="bn_chair_h">🧑‍💼 番頭さんからの取り次ぎ</h3><div id="bn_chair">読み込み中…</div>
       <h3 class="nx">🎯 今日やる3つ</h3>${td.length ? td.map(i => item(i)).join('') : `<div class="card"><p style="font-size:18px">${today.length ? '🎉 今日の3つは終わりました（' + doneToday + '件）' : '朝8時すぎのAI整理のあとに出ます。'}</p></div>`}
       <h3 class="nx">📋 タスク一覧</h3>
       <div id="ch_list"></div>
@@ -58,7 +59,7 @@ async function renderChair() {
         <button style="margin-top:6px" onclick="chairMsgSend()">表示する</button> <button class="back" onclick="chairMsgOff()">一言を消す</button> <span id="ch_mm" class="note"></span></div>
       <h3 class="nx">🌅 注進</h3><div id="ch_rep" class="card">読み込み中…</div>
 `;
-    chairList(); chairCur(); chairReport();
+    chairList(); chairCur(); chairReport(); if (typeof bnChair === 'function') bnChair();
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }
 // 手で書き足すToDo。各担当セクションの一番下から入れる。そのセクションの担当で固定（ai_at を入れて朝のAI整理の振り分けで上書きされない）
