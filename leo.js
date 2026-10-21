@@ -677,10 +677,10 @@ function planStage(r) {
   return 1;                                 // アンケート送付・回答 待ち
 }
 const PLAN_DEMO_ROWS = [
-  { 児童名: '児童A', 現在の期: '2期', 現在の計画期間: '2026年5月〜2026年10月', 次期開始月: '2026年11月', フォーム送付目安日: '2026/10/15', フォーム回答日: '', 計画書作成: '未', 原案署名: '未', 本案署名: '未', 備考: '' },
-  { 児童名: '児童B', 現在の期: '1期', 現在の計画期間: '2026年5月〜2026年10月', 次期開始月: '2026年11月', フォーム送付目安日: '2026/10/15', フォーム回答日: '2026/10/12', 計画書作成: '済', 原案署名: '未', 本案署名: '未', 備考: '' },
-  { 児童名: '児童C', 現在の期: '3期', 現在の計画期間: '2026年4月〜2026年9月', 次期開始月: '2026年10月', フォーム送付目安日: '至急', フォーム回答日: '2026/09/20', 計画書作成: '済', 原案署名: '済', 本案署名: '未', 備考: '（見本）会議日の調整中' },
-  { 児童名: '児童D', 現在の期: '1期', 現在の計画期間: '2026年10月〜2027年3月', 次期開始月: '2027年4月', フォーム送付目安日: '2027/03/15', フォーム回答日: '2026/09/18', 計画書作成: '済', 原案署名: '済', 本案署名: '済', 備考: '' },
+  { 児童名: '児童A', 現在の期: '2期', 現在の計画期間: '2026年5月〜2026年10月', 次期開始月: '2026年11月', フォーム送付目安日: '2026/10/15', フォーム回答日: '', 計画書作成: '未', 原案署名: '未', 本案署名: '未', 備考: '', _track: { child: '児童A', term_no: 2, period_from: '2026-05-01', period_to: '2026-10-31', next_start: '2026-11-01' } },
+  { 児童名: '児童B', 現在の期: '1期', 現在の計画期間: '2026年5月〜2026年10月', 次期開始月: '2026年11月', フォーム送付目安日: '2026/10/15', フォーム回答日: '2026/10/12', 計画書作成: '済', 原案署名: '未', 本案署名: '未', 備考: '', _track: { child: '児童B', term_no: 1, period_from: '2026-05-01', period_to: '2026-10-31', next_start: '2026-11-01' } },
+  { 児童名: '児童C', 現在の期: '3期', 現在の計画期間: '2026年4月〜2026年9月', 次期開始月: '2026年10月', フォーム送付目安日: '至急', フォーム回答日: '2026/09/20', 計画書作成: '済', 原案署名: '済', 本案署名: '未', 備考: '（見本）会議日の調整中', _track: { child: '児童C', term_no: 3, period_from: '2026-04-01', period_to: '2026-09-30', next_start: '2026-10-01' } },
+  { 児童名: '児童D', 現在の期: '1期', 現在の計画期間: '2026年10月〜2027年3月', 次期開始月: '2027年4月', フォーム送付目安日: '2027/03/15', フォーム回答日: '2026/09/18', 計画書作成: '済', 原案署名: '済', 本案署名: '済', 備考: '', _track: { child: '児童D', term_no: 1, period_from: '2026-10-01', period_to: '2027-03-31', next_start: '2027-04-01' } },
 ];
 // ===== ⑤ 個別支援計画（ポータル内で作る）：保護者アンケート → 職員モニタリング → 4書類（アセスメント・原案・会議録・本案）→ 同意（原案→会議→本案） =====
 const PLAN_STEPS2 = ['保護者アンケート', '職員モニタリング', '下書き（4書類）', '確認・計画書作成＝済', '原案の同意', '担当者会議', '本案の同意'];
@@ -714,6 +714,37 @@ async function trackRows() {
   return sheetRows('keikaku');
 }
 let PLAN_OPEN = '';
+/* plan-cycle:start */
+function planNormName(s) { return String(s || '').replace(/[\s\u3000]/g, ''); }
+function planTermNo(term) {
+  const s = String(term || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  const m = s.match(/(\d+)\s*期/);
+  return m ? +m[1] : null;
+}
+// カードに出している期と、同じ期の記録だけを使う。ひとつ前の期の回答は借りない（期の数字が先に進んだときは、管理表の現在の期を戻す）。
+function planExactTerm(list, name, term) {
+  const norm = planNormName(name), want = planTermNo(term);
+  if (want == null) return null;
+  const hit = (list || []).filter(x => x && planNormName(x.child) === norm && planTermNo(x.term) === want);
+  hit.sort((a, b) => String(b.submitted_at || '').localeCompare(String(a.submitted_at || '')));
+  return hit[0] || null;
+}
+function planPeriodPast(periodTo, today) {
+  if (!periodTo || !today) return false;
+  const end = new Date(String(periodTo).slice(0, 10) + 'T00:00:00+09:00');
+  return !isNaN(end.getTime()) && end < today;
+}
+// 急ぎの欄に出すか。期の数字はここでは足さない。
+function planCardFlags({ st, start, periodTo, today, waiting, answered, active }) {
+  const on = active !== false && st < 7;
+  const startPast = !!(on && start && start < today);
+  const periodPast = !!(on && planPeriodPast(periodTo, today));
+  const over = startPast || periodPast;
+  const soon = !!(on && start && !over && (start - today) / 864e5 <= 45);
+  const urgent = !!(on && (over || soon || waiting || answered));
+  return { startPast, periodPast, over, soon, urgent };
+}
+/* plan-cycle:end */
 async function planData() {
   if (DEMO) return { rows: PLAN_DEMO_ROWS, ...PLAN_DEMO_DB };
   const [rows, plans, links, ans, staff] = await Promise.all([trackRows(), sb('leo_plans?order=child,term_no'), sb('leo_mon_links?select=token,child,term').catch(() => []),
@@ -729,9 +760,11 @@ LEO_VIEWS.plan = async function () {
     const name = r['児童名'], m = String(r['次期開始月'] || '').match(/(\d{4})年(\d{1,2})月/), d = m ? planDates(+m[1], +m[2]) : null;
     const gone = leftDone(LEFT, name, tday), ldate = leftOnOf(LEFT, name);
     const nextIso = d ? isoD(d.start) : '', leavingBeforeNext = !!(ldate && nextIso && nextIso > ldate);
+    // カードの期は「いま作っている次の期」＝現在の期+1。次期開始月が過ぎても、ここでは期を足さない。
     const cur = parseInt(String(r['現在の期']).replace(/\D/g, '')) || 0, n = cur + 1, term = `第${n}期`;
     const p = D0.plans.find(x => N(x.child) === N(name) && x.term_no === n), now = D0.plans.find(x => N(x.child) === N(name) && x.term_no === cur);
-    const mon = D0.mon.find(x => N(x.child) === N(name) && x.term === term), sm = D0.staff.find(x => N(x.child) === N(name) && x.term === term);
+    const mon = planExactTerm(D0.mon, name, term);
+    const sm = planExactTerm(D0.staff, name, term);
     const ago = x => Math.floor((t - new Date(new Date(x).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) + 'T00:00:00+09:00')) / 864e5);
     const wait = [];
     const pend = (label, list, kind, doc) => { if (!list.length) return; const f = list[0], l = list[list.length - 1];
@@ -742,7 +775,10 @@ LEO_VIEWS.plan = async function () {
     if (p && p.genan_consent_at && !p.honan_consent_at) pend('本案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '本案'), 'doui', '本案');
     const waitHtml = () => wait.map(w => `<p style="background:${w.days >= 7 ? '#fde8e8' : '#fff8db'};padding:8px;border-radius:6px;margin:6px 0"><small>⏳ <b>${w.label}</b>：送って <b>${w.days}日</b>・返事なし（${w.n}回送付、最後 ${md(new Date(w.last))}・${esc(w.via)}）</small></p>`).join('');
     const done = [!!mon || !!r['フォーム回答日'], !!sm, !!(p && p.genan && p.honan && p.assessment && p.kaigi), !!(p && p.plan_made), !!(p && p.genan_consent_at), !!(p && p.genan_consent_at && d && t >= d.kaigi), !!(p && p.honan_consent_at)];
-    const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false), over = !gone && !leavingBeforeNext && d && st < 7 && d.start < t, soon = !gone && !leavingBeforeNext && d && st < 7 && !over && (d.start - t) / 864e5 <= 45;
+    const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false);
+    const answered = !!(mon || r['フォーム回答日']);
+    const flags = planCardFlags({ st, start: d && d.start, periodTo: r._track && r._track.period_to, today: t, waiting: wait.length > 0, answered, active: !gone && !leavingBeforeNext });
+    const over = flags.over, soon = flags.soon;
     const key = N(name), open = PLAN_OPEN === key || (DEMO && /open=1/.test(location.search) && name === '児童B');
     const btn = (label, fn, dis) => `<button ${dis ? 'disabled' : ''} onclick="${fn}" style="display:block;width:100%;margin:6px 0;padding:12px;font-size:16px;border-radius:8px">${label}</button>`;
     const W = wait[0], ds = x => x ? md(x) : '';
@@ -761,9 +797,10 @@ LEO_VIEWS.plan = async function () {
     const linkAct = /リンク|コピー/.test(ab) && !/^<button disabled/.test(ab);
     const how = linkAct ? `<div style="background:#f4f7ff;border-radius:6px;padding:8px;margin:6px 0;font-size:15px">1. 下の青いボタンを押してコピー → 2. 公式LINEで<b>${esc(name)}</b>さんの保護者のトークに貼って送る</div>` : '';
     const checks = PLAN_STEPS2.map((lb, i) => `<div style="color:${done[i] ? '#2a7a2a' : i === st ? '#c00' : '#999'}">${done[i] ? '✔' : i === st ? '▶' : '・'} ${lb}</div>`).join('');
-    const urgent = !gone && !leavingBeforeNext && st < 7 && (over || soon || wait.length > 0);
-    return { st, over, d, urgent, gone, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${gone ? '#888' : st >= 7 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:14px">
-      <div style="font-size:17px"><b>${esc(name)}</b>${leftMark(LEFT, name, tday)}　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</div>
+    const urgent = flags.urgent;
+    const lateBadge = flags.startPast ? '　<span class="badge">開始月を過ぎています</span>' : flags.periodPast ? '　<span class="badge">今の計画期間を過ぎています</span>' : '';
+    return { st, over, d, urgent, gone, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${gone ? '#888' : st >= 7 ? '#3a3' : over ? '#d33' : urgent ? '#e6b800' : '#ccc'};padding:14px">
+      <div style="font-size:17px"><b>${esc(name)}</b>${leftMark(LEFT, name, tday)}　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${lateBadge}</div>
       <div style="display:flex;gap:2px;margin:8px 0">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div>
       <div style="font-size:20px;font-weight:bold;margin:8px 0;color:${st >= 7 ? '#2a7a2a' : '#c00'}">${act}</div>
       ${how}${ab}
@@ -789,18 +826,19 @@ LEO_VIEWS.plan = async function () {
   }).sort((a, b) => (a.st >= 7) - (b.st >= 7) || b.over - a.over || (a.d?.start || 0) - (b.d?.start || 0));
   const live = cards.filter(c => !c.gone), leftCards = cards.filter(c => c.gone);
   return `<h3>個別支援計画</h3>${demoNote()}<p class="note">各カードの赤い行と下のボタンだけ進めれば大丈夫です。細かい情報は「くわしく見る」にあります。保護者へのリンクはコピーして、公式LINEの1対1トークで送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。退所日を過ぎた児童は下に分けています（記録は残しています）。</p>
-    ${live.filter(c => c.urgent).map(c => c.html).join('') || '<p class="note">いま急ぎの子はいません。</p>'}${live.some(c => !c.urgent) ? `<details style="margin-top:10px" ${live.some(c => !c.urgent && PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">いま急ぎではない子（${live.filter(c => !c.urgent).length}人）</summary>${live.filter(c => !c.urgent).map(c => c.html).join('')}</details>` : ''}${leftCards.length ? `<details style="margin-top:10px" ${leftCards.some(c => PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">退所した児童（${leftCards.length}人・記録は残しています）</summary>${leftCards.map(c => c.html).join('')}</details>` : ''}${cards.length ? '' : '<p>管理表の行がありません。</p>'}<div id="plan_editor"></div>`;
+    ${live.filter(c => c.urgent).map(c => c.html).join('') || '<p class="note">いま急ぎの子はいません。</p>'}${live.some(c => !c.urgent) ? `<details style="margin-top:10px" ${live.some(c => !c.urgent && PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">いま急ぎではない子（${live.filter(c => !c.urgent).length}人）</summary>${live.filter(c => !c.urgent).map(c => c.html).join('')}</details>` : ''}${leftCards.length ? `<details style="margin-top:10px" ${leftCards.some(c => PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">退所した児童（${leftCards.length}人・記録は残しています）</summary>${leftCards.map(c => c.html).join('')}</details>` : ''}${cards.length ? '' : '<p>管理表の行がありません。</p>'}${mg ? trackEditList(rows) : ''}<div id="plan_editor"></div>`;
 };
 // 管理表の行を直す（児発管・管理者・事務）。ポータルの表だけを直す。Googleの管理表へは書き戻さない
 function trackEditList(rows) {
   const tr = rows.filter(r => r._track);
   if (!tr.length) return '';
-  return `<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:bold">管理表の行を直す（${tr.length}人）</summary><p class="note">ここで直すのはポータルの管理表だけです。Googleの管理表は変わりません（11/1までは両方が動きます）。</p>
+  return `<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:bold">管理表の行を直す（${tr.length}人）</summary><p class="note">ここで直すのはポータルの管理表だけです。Googleの管理表は変わりません（11/1までは両方が動きます）。カードに出る期は、ここの「現在の期」のひとつ先です。次期開始日が、カードの開始日です。日付が過ぎただけでは期は進みません。</p>
     ${tr.map(r => `<p style="margin:6px 0"><button onclick="trackEdit('${esc(r.児童名)}')" style="padding:8px 12px">${esc(r.児童名)}</button> <small>${esc(r.現在の期)}・${esc(r.現在の計画期間)}</small></p>`).join('')}</details>`;
 }
 const TRACK_FIELDS = [['term_no', '現在の期（数字）', 'number'], ['period_from', '計画期間 開始', 'date'], ['period_to', '計画期間 終了', 'date'], ['next_start', '次期開始日（1日）', 'date'], ['survey_due', 'アンケート送付目安日（空＝至急）', 'date'],
   ['survey_answered_at', 'アンケート回答日', 'date'], ['genan_date', '原案の予定日', 'date'], ['kaigi_date', '会議の予定日', 'date'], ['honan_date', '本案の予定日', 'date']];
 async function trackEdit(name) {
+  if (DEMO) { $('plan_editor').innerHTML = '<div class="card"><p class="note">見本モードなので保存しません。本番では、この欄で「現在の期」と「次期開始日」を直せます。</p></div>'; $('plan_editor').scrollIntoView(); return; }
   const t = (await sb(`leo_plan_track?child=eq.${encodeURIComponent(name)}`))[0]; if (!t) return;
   $('plan_editor').innerHTML = `<div class="card"><h3>${esc(t.child)}　管理表の行</h3>
     ${TRACK_FIELDS.map(([k, l, ty]) => `<label style="display:block;margin:6px 0"><small>${l}</small><br><input id="te_${k}" type="${ty}" value="${esc(t[k] ?? '')}" style="font-size:16px;padding:6px"></label>`).join('')}
