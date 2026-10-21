@@ -1,85 +1,73 @@
-// 個別支援計画の期・回答の紐づけ（node tools/leo_plan_cycle_test.js）
+// 個別支援計画の期・急ぎ判定（node tools/leo_plan_cycle_test.js）
 const fs = require('fs');
 const path = require('path');
 const assert = (c, m) => { if (!c) throw new Error(m || 'assert'); };
 const src = fs.readFileSync(path.join(__dirname, '..', 'leo.js'), 'utf8');
 const block = src.match(/\/\* plan-cycle:start \*\/([\s\S]*?)\/\* plan-cycle:end \*\//);
 if (!block) throw new Error('plan-cycle block missing');
-const api = new Function(block[1] + '\nreturn { planTermNo, planSameTerm, planCycleItem, planCycleStaff, planPeriodPast, planCardFlags };')();
-const { planTermNo, planSameTerm, planCycleItem, planCycleStaff, planPeriodPast, planCardFlags } = api;
+const api = new Function(block[1] + '\nreturn { planTermNo, planExactTerm, planPeriodPast, planCardFlags };')();
+const { planTermNo, planExactTerm, planPeriodPast, planCardFlags } = api;
 
 const today = new Date('2026-10-21T00:00:00+09:00');
 const jan2027 = new Date(2027, 0, 1);
+const jul2026 = new Date(2026, 6, 1);
 
 assert(planTermNo('第4期') === 4, 'term 4');
 assert(planTermNo('第３期') === 3, 'fullwidth');
-assert(planSameTerm('第3期', '第３期'), 'same term');
+assert(!src.includes('function planCycleItem') && !src.includes('function planCycleStaff'), 'previous-term answer reuse is gone');
 
-// 湯上さん: カードは第4期（2027/1/1）。回答は第3期のリンクに届いている。今の計画の同意は回答より前。
+// カードの期は「現在の期+1」。日付が過去でも、この足し算は1のまま。
 {
-  const plans = [{ child: '湯上 奏輔', term_no: 3, honan_consent_at: '2026-06-01T00:00:00+09:00' }];
-  const mons = [{ child: '湯上　奏輔', term: '第3期', submitted_at: '2026-10-15T01:00:00+09:00', answers: { wish: '友だちと遊びたい' } }];
-  const mon = planCycleItem(mons, '湯上 奏輔', '第4期', 3, plans, 'submitted_at');
-  assert(mon && mon.term === '第3期', 'previous term answer is used');
-  assert(mon.answers.wish === '友だちと遊びたい', 'answer text kept');
-  const st = 1; // アンケート済み・職員モニタリング未
-  const flags = planCardFlags({ st, start: jan2027, periodTo: '2026-12-31', today, waiting: false, answered: true, active: true });
-  assert(flags.urgent, 'answered child is urgent');
-  assert(!flags.startPast, '2027/1/1 is not overdue');
-  assert(!flags.periodPast, 'current period still open');
+  const cur = 2, n = cur + 1;
+  assert(`第${n}期` === '第3期', 'making term 3 means stored current term is 2');
+  assert(jul2026 < today, 'July 2026 start is already past');
+  const jumped = 3;
+  assert(jumped + 1 === 4, 'a card labeled term 4 means stored current term is 3');
 }
 
-// 第4期の回答があれば、そちらを優先する
+// 同じ期の回答だけを使う。第3期の回答を第4期のカードには付けない。
+{
+  const mons = [{ child: '児童E　', term: '第3期', submitted_at: '2026-10-15T01:00:00+09:00', answers: { wish: '友だちと遊びたい' } }];
+  assert(planExactTerm(mons, '児童E', '第4期') === null, 'previous term answer is not reused');
+  const mon = planExactTerm(mons, '児童E', '第３期');
+  assert(mon && mon.answers.wish === '友だちと遊びたい', 'same term matches across spaces and fullwidth digits');
+  const flags = planCardFlags({ st: 1, start: jul2026, periodTo: '2026-12-31', today, waiting: false, answered: true, active: true });
+  assert(flags.urgent && flags.startPast, 'answered and overdue is urgent');
+}
+
+// 第4期の回答があっても、第3期のカードは第3期を見る。
 {
   const mons = [
-    { child: '湯上 奏輔', term: '第3期', submitted_at: '2026-10-18T00:00:00+09:00' },
-    { child: '湯上 奏輔', term: '第4期', submitted_at: '2026-10-10T00:00:00+09:00', answers: { wish: '今期' } },
+    { child: '児童E', term: '第3期', submitted_at: '2026-10-18T00:00:00+09:00', answers: { wish: '今作っている期' } },
+    { child: '児童E', term: '第4期', submitted_at: '2026-10-19T00:00:00+09:00', answers: { wish: '次' } },
   ];
-  const mon = planCycleItem(mons, '湯上奏輔', '第4期', 3, [], 'submitted_at');
-  assert(mon.term === '第4期', 'exact term wins');
+  assert(planExactTerm(mons, '児童E', '第3期').answers.wish === '今作っている期', 'exact term wins');
+  assert(planExactTerm(mons, '児童E', '第4期').answers.wish === '次', 'later term stays separate');
 }
 
-// 前の期の本案同意より前の回答は、その期で使い終わったもの。第4期には付けない。
+// 2027/1/1 は 2026/10/21 から45日より先。回答も期限超過も無ければ急ぎではない。
 {
-  const plans = [{ child: '湯上 奏輔', term_no: 3, honan_consent_at: '2026-10-20T00:00:00+09:00' }];
-  const mons = [{ child: '湯上 奏輔', term: '第3期', submitted_at: '2026-10-01T00:00:00+09:00' }];
-  assert(planCycleItem(mons, '湯上 奏輔', '第4期', 3, plans, 'submitted_at') === null, 'consumed answer stays with the old term');
   const flags = planCardFlags({ st: 0, start: jan2027, periodTo: '2026-12-31', today, waiting: false, answered: false, active: true });
-  assert(!flags.urgent, 'no answer and not due stays quiet');
+  assert(!flags.startPast && !flags.periodPast && !flags.urgent, 'future start without an answer stays quiet');
+  assert((jan2027 - today) / 864e5 > 45, '2027-01-01 is outside 45 days');
 }
 
-// 期の数字は「現在の期+1」だけ。日付が過去でも、ここでは期を足さない。
+// 回答が届いている、開始月を過ぎている、今の計画期間が終わっている、のいずれかなら急ぎ。
 {
-  const cur = 3, n = cur + 1;
-  assert(n === 4 && `第${n}期` === '第4期', 'card term is current+1');
-  assert(jan2027 > today, 'displayed start is still in the future');
-  const passed = new Date(2026, 6, 1);
-  const flags = planCardFlags({ st: 0, start: passed, periodTo: '2026-12-31', today, waiting: false, answered: false, active: true });
-  assert(flags.startPast && flags.urgent && flags.over, 'past start is overdue and urgent');
+  assert(planCardFlags({ st: 1, start: jan2027, periodTo: '2026-12-31', today, waiting: false, answered: true, active: true }).urgent, 'answered is urgent even if the start is far');
+  const passed = planCardFlags({ st: 0, start: jul2026, periodTo: '2026-12-31', today, waiting: false, answered: false, active: true });
+  assert(passed.startPast && passed.urgent && passed.over, 'past start is overdue and urgent');
+  const lapsed = planCardFlags({ st: 2, start: jan2027, periodTo: '2026-06-30', today, waiting: false, answered: false, active: true });
+  assert(lapsed.periodPast && !lapsed.startPast && lapsed.urgent, 'lapsed current period is urgent');
 }
 
-// 今の計画期間が終わっているのに次の開始月だけ先だと、期限切れとして急ぎに出す
+// 退所・完了は急ぎにしない。
 {
-  const flags = planCardFlags({ st: 2, start: jan2027, periodTo: '2026-06-30', today, waiting: false, answered: false, active: true });
-  assert(flags.periodPast && !flags.startPast && flags.urgent, 'lapsed current period is urgent');
-}
-
-// 退所・完了は急ぎにしない
-{
-  assert(!planCardFlags({ st: 1, start: jan2027, periodTo: '2026-06-30', today, waiting: false, answered: true, active: false }).urgent, 'inactive stays quiet');
+  assert(!planCardFlags({ st: 1, start: jul2026, periodTo: '2026-06-30', today, waiting: false, answered: true, active: false }).urgent, 'inactive stays quiet');
   assert(!planCardFlags({ st: 7, start: new Date(2026, 0, 1), periodTo: '2025-12-31', today, waiting: false, answered: true, active: true }).urgent, 'finished stays quiet');
-}
-
-// 職員モニタリングも、回答と同じ前の期ならこの周期に使う。第4期のものが別にあればそちら。
-{
-  const mon = { child: '湯上 奏輔', term: '第3期' };
-  const staff = [{ child: '湯上 奏輔', term: '第3期', text: '記録' }, { child: '別の子', term: '第4期', text: '他人' }];
-  assert(planCycleStaff(staff, '湯上　奏輔', '第4期', mon).text === '記録', 'staff follows the answer term');
-  const both = staff.concat([{ child: '湯上 奏輔', term: '第4期', text: '今期' }]);
-  assert(planCycleStaff(both, '湯上 奏輔', '第4期', mon).text === '今期', 'exact staff wins');
-  assert(planCycleStaff(staff, '湯上 奏輔', '第4期', { term: '第4期' }) === null, 'do not reuse old staff for a new questionnaire');
 }
 
 assert(planPeriodPast('2026-10-21', today) === false, 'period ending today is not past');
 assert(planPeriodPast('', today) === false, 'blank period');
+assert(src.includes('trackEditList(rows)'), 'managers can open the track editor from the plan page');
 console.log('leo_plan_cycle_test ok');
