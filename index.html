@@ -45,7 +45,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=202610211605"></script>
+<script src="config.js?v=202610211610"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo.js?v=202610211700"></script>
@@ -182,6 +182,7 @@ async function render() {
   if (id === 'ht') return renderHt();
   if (id === 'chair') return renderChair();
   if (id === 'banto' && typeof renderBanto === 'function') return renderBanto();
+  if (id === 'soumu') return renderSoumu();
   if (id === 'soudan' && typeof renderSoudan === 'function') return renderSoudan();
   if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
   if (id === 'mgr') return renderMgr();
@@ -204,8 +205,7 @@ async function render() {
   $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
     <h3>事業所</h3>
     <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
-    ${ROLE === C.clerk.role ? `<div id="sumu_sec"><h3>総務（事務の方のみ表示）</h3>
-    ${(C.clerk.groups || []).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('')}</div>` : ''}
+    <div id="soumu_slot">${ROLE === C.clerk.role ? soumuTile() : ''}</div>
     <h3 id="misc_h">未整理</h3>
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
@@ -213,17 +213,30 @@ async function render() {
   chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); 
 }
 // 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
-async function accTile() {
-  if (DEMO || typeof sb !== 'function') return;
-  try { const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (!s) return;
+async function accAdmin() {
+  if (DEMO || typeof sb !== 'function') return false;
+  try { const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (!s) return false;
     const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/acc_is_admin', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' });
-    if (!r.ok || (await r.json()) !== true) return;
-    if (document.getElementById('acc_tile')) return;
-    let sec = document.getElementById('sumu_sec');
-    if (!sec) { const mh = document.getElementById('misc_h'); if (!mh) return; mh.insertAdjacentHTML('beforebegin', '<div id="sumu_sec"><h3>総務（管理者）</h3></div>'); sec = document.getElementById('sumu_sec'); }
+    return r.ok && (await r.json()) === true; } catch (e) { return false; }
+}
+// 総合トップの「総務」タイル。事務の方には常に、法人管理者には会計（簡易）があるので出す
+const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>人事労務・補助金・助成金・経理など（事務の方のみ）</small></a></div>`;
+async function accTile() {
+  if (ROLE === C.clerk.role || document.getElementById('soumu_tile')) return;
+  if (!(await accAdmin())) return;
+  const sl = document.getElementById('soumu_slot'); if (sl && !document.getElementById('soumu_tile')) sl.innerHTML = soumuTile();
+}
+// #soumu：総務の見出しとタイル（事務の方は全部、法人管理者は会計（簡易）を経理の中に）
+async function renderSoumu() {
+  const back = `<button class="back" onclick="location.hash=''">← トップへ</button>`;
+  const clerk = ROLE === C.clerk.role;
+  $('view').innerHTML = back + `<h3>🗂️ 総務</h3><div id="sumu_sec">${clerk ? (C.clerk.groups || []).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('') : ''}</div>`;
+  const sec = document.getElementById('sumu_sec');
+  if (await accAdmin()) {
     const t = '<a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a>';
     const kh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '経理'), kg = kh && kh.nextElementSibling;
-    if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + t + '</div>'); } catch (e) {}
+    if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + t + '</div>');
+  } else if (!clerk) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
 }
 window.addEventListener('hashchange', render);
 let ROLE = C.defaultRole;
