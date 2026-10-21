@@ -382,6 +382,7 @@ async function boot() {
   $('boot').hidden = false; $('login').hidden = $('app').hidden = $('deny').hidden = true;
   const s = sess();
   if (!s || (s.exp < Date.now() && !(await refreshSess()))) { localStorage.removeItem('sess'); $('boot').hidden = true; $('login').hidden = false; return; }
+  if (typeof ukInstallAsk === 'function') ukInstallAsk();
   let ok = false;
   try { const r = await api('/rest/v1/rpc/acc_is_admin', { method: 'POST', body: '{}' }); ok = r.ok && (await r.json()) === true; } catch (e) {}
   $('boot').hidden = true;
