@@ -714,6 +714,60 @@ async function trackRows() {
   return sheetRows('keikaku');
 }
 let PLAN_OPEN = '';
+/* plan-cycle:start */
+function planNormName(s) { return String(s || '').replace(/[\s\u3000]/g, ''); }
+function planTermNo(term) {
+  const s = String(term || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  const m = s.match(/(\d+)\s*期/);
+  return m ? +m[1] : null;
+}
+function planSameTerm(a, b) {
+  if (String(a || '') === String(b || '')) return true;
+  const na = planTermNo(a), nb = planTermNo(b);
+  return na != null && na === nb;
+}
+// 作成中の期（第n期）の記録を優先。無ければひとつ前の期を使う。
+// 前の期の本案同意より前の記録は、その期で使い終わったものなので使わない（期が先に進んでも、届いた回答を取りこぼさない）。
+function planCycleItem(list, name, draftTerm, cur, plans, timeKey) {
+  const norm = planNormName(name);
+  const mine = (list || []).filter(x => x && planNormName(x.child) === norm);
+  const byTime = (a, b) => String(b[timeKey] || '').localeCompare(String(a[timeKey] || ''));
+  const exact = mine.filter(x => planSameTerm(x.term, draftTerm)).sort(byTime);
+  if (exact.length) return exact[0];
+  const n = planTermNo(draftTerm);
+  const prevs = mine.filter(x => {
+    const tn = planTermNo(x.term);
+    return tn != null && (tn === cur || (n != null && tn === n - 1));
+  }).sort(byTime);
+  for (const a of prevs) {
+    const usedBy = (plans || []).find(x => planNormName(x.child) === norm && x.term_no === planTermNo(a.term));
+    if (usedBy && usedBy.honan_consent_at && String(a[timeKey] || '') <= String(usedBy.honan_consent_at)) continue;
+    return a;
+  }
+  return null;
+}
+function planCycleStaff(staff, name, draftTerm, mon) {
+  const norm = planNormName(name);
+  const exact = (staff || []).find(x => x && planNormName(x.child) === norm && planSameTerm(x.term, draftTerm));
+  if (exact) return exact;
+  if (mon && !planSameTerm(mon.term, draftTerm)) return (staff || []).find(x => x && planNormName(x.child) === norm && planSameTerm(x.term, mon.term)) || null;
+  return null;
+}
+function planPeriodPast(periodTo, today) {
+  if (!periodTo || !today) return false;
+  const end = new Date(String(periodTo).slice(0, 10) + 'T00:00:00+09:00');
+  return !isNaN(end.getTime()) && end < today;
+}
+function planCardFlags({ st, start, periodTo, today, waiting, answered, active }) {
+  const on = active !== false && st < 7;
+  const startPast = !!(on && start && start < today);
+  const periodPast = !!(on && planPeriodPast(periodTo, today));
+  const over = startPast || periodPast;
+  const soon = !!(on && start && !over && (start - today) / 864e5 <= 45);
+  const urgent = !!(on && (over || soon || waiting || answered));
+  return { startPast, periodPast, over, soon, urgent };
+}
+/* plan-cycle:end */
 async function planData() {
   if (DEMO) return { rows: PLAN_DEMO_ROWS, ...PLAN_DEMO_DB };
   const [rows, plans, links, ans, staff] = await Promise.all([trackRows(), sb('leo_plans?order=child,term_no'), sb('leo_mon_links?select=token,child,term').catch(() => []),
@@ -731,7 +785,8 @@ LEO_VIEWS.plan = async function () {
     const nextIso = d ? isoD(d.start) : '', leavingBeforeNext = !!(ldate && nextIso && nextIso > ldate);
     const cur = parseInt(String(r['現在の期']).replace(/\D/g, '')) || 0, n = cur + 1, term = `第${n}期`;
     const p = D0.plans.find(x => N(x.child) === N(name) && x.term_no === n), now = D0.plans.find(x => N(x.child) === N(name) && x.term_no === cur);
-    const mon = D0.mon.find(x => N(x.child) === N(name) && x.term === term), sm = D0.staff.find(x => N(x.child) === N(name) && x.term === term);
+    const mon = planCycleItem(D0.mon, name, term, cur, D0.plans, 'submitted_at');
+    const sm = planCycleStaff(D0.staff, name, term, mon);
     const ago = x => Math.floor((t - new Date(new Date(x).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) + 'T00:00:00+09:00')) / 864e5);
     const wait = [];
     const pend = (label, list, kind, doc) => { if (!list.length) return; const f = list[0], l = list[list.length - 1];
@@ -742,7 +797,10 @@ LEO_VIEWS.plan = async function () {
     if (p && p.genan_consent_at && !p.honan_consent_at) pend('本案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '本案'), 'doui', '本案');
     const waitHtml = () => wait.map(w => `<p style="background:${w.days >= 7 ? '#fde8e8' : '#fff8db'};padding:8px;border-radius:6px;margin:6px 0"><small>⏳ <b>${w.label}</b>：送って <b>${w.days}日</b>・返事なし（${w.n}回送付、最後 ${md(new Date(w.last))}・${esc(w.via)}）</small></p>`).join('');
     const done = [!!mon || !!r['フォーム回答日'], !!sm, !!(p && p.genan && p.honan && p.assessment && p.kaigi), !!(p && p.plan_made), !!(p && p.genan_consent_at), !!(p && p.genan_consent_at && d && t >= d.kaigi), !!(p && p.honan_consent_at)];
-    const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false), over = !gone && !leavingBeforeNext && d && st < 7 && d.start < t, soon = !gone && !leavingBeforeNext && d && st < 7 && !over && (d.start - t) / 864e5 <= 45;
+    const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false);
+    const answered = !!(mon || r['フォーム回答日']);
+    const flags = planCardFlags({ st, start: d && d.start, periodTo: r._track && r._track.period_to, today: t, waiting: wait.length > 0, answered, active: !gone && !leavingBeforeNext });
+    const over = flags.over, soon = flags.soon;
     const key = N(name), open = PLAN_OPEN === key || (DEMO && /open=1/.test(location.search) && name === '児童B');
     const btn = (label, fn, dis) => `<button ${dis ? 'disabled' : ''} onclick="${fn}" style="display:block;width:100%;margin:6px 0;padding:12px;font-size:16px;border-radius:8px">${label}</button>`;
     const W = wait[0], ds = x => x ? md(x) : '';
@@ -761,19 +819,23 @@ LEO_VIEWS.plan = async function () {
     const linkAct = /リンク|コピー/.test(ab) && !/^<button disabled/.test(ab);
     const how = linkAct ? `<div style="background:#f4f7ff;border-radius:6px;padding:8px;margin:6px 0;font-size:15px">1. 下の青いボタンを押してコピー → 2. 公式LINEで<b>${esc(name)}</b>さんの保護者のトークに貼って送る</div>` : '';
     const checks = PLAN_STEPS2.map((lb, i) => `<div style="color:${done[i] ? '#2a7a2a' : i === st ? '#c00' : '#999'}">${done[i] ? '✔' : i === st ? '▶' : '・'} ${lb}</div>`).join('');
-    const urgent = !gone && !leavingBeforeNext && st < 7 && (over || soon || wait.length > 0);
-    return { st, over, d, urgent, gone, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${gone ? '#888' : st >= 7 ? '#3a3' : over ? '#d33' : soon ? '#e6b800' : '#ccc'};padding:14px">
-      <div style="font-size:17px"><b>${esc(name)}</b>${leftMark(LEFT, name, tday)}　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${over ? '　<span class="badge">開始月を過ぎています</span>' : ''}</div>
+    const urgent = flags.urgent;
+    const carried = !!(mon && !planSameTerm(mon.term, term));
+    const monText = mon && mon.answers ? Object.entries(mon.answers).filter(([, v]) => typeof v === 'string' && v).map(([, v]) => v).join('／') : '';
+    const carryNote = carried ? `<p class="note" style="margin:6px 0">保護者の回答は届いています（${esc(mon.term)}のリンクに紐づいています）。この周期の回答として使います。次は職員モニタリング、その次に計画の下書きです。</p>${monText ? `<p style="background:#f4f7ff;padding:8px;border-radius:6px"><small>${esc(monText).slice(0, 180)}</small></p>` : ''}` : '';
+    const lateBadge = flags.startPast ? '　<span class="badge">開始月を過ぎています</span>' : flags.periodPast ? '　<span class="badge">今の計画期間を過ぎています</span>' : '';
+    return { st, over, d, urgent, gone, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${gone ? '#888' : st >= 7 ? '#3a3' : over ? '#d33' : urgent ? '#e6b800' : '#ccc'};padding:14px">
+      <div style="font-size:17px"><b>${esc(name)}</b>${leftMark(LEFT, name, tday)}　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${lateBadge}</div>
       <div style="display:flex;gap:2px;margin:8px 0">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div>
       <div style="font-size:20px;font-weight:bold;margin:8px 0;color:${st >= 7 ? '#2a7a2a' : '#c00'}">${act}</div>
-      ${how}${ab}
+      ${carryNote}${how}${ab}
       <details style="margin-top:8px" ${open ? 'open' : ''} ontoggle="if(this.open)PLAN_OPEN='${key}'"><summary style="cursor:pointer;color:#36c">くわしく見る</summary>
         <div style="margin-top:8px;font-size:14px">${checks}</div>
         <div>${waitHtml()}
         
         ${d ? `<p><small>書類に入れる日付（作成者 ${gl('name:jihatsukan','【児発管氏名】')}）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : '<p class="note">管理表の「次期開始月」がありません。</p>'}
         <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '　✅ 確認済' : '　<span class="badge">未確認</span>'}</small></p>${now.note ? `<p><small>${esc(now.note)}</small></p>` : ''}${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
-        <h4>1. 保護者アンケート</h4>${mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
+        <h4>1. 保護者アンケート</h4>${mon ? `${carried ? `<p class="note">${esc(mon.term)}のリンクへの回答を、${esc(term)}の計画づくりに使います。</p>` : ''}<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
         ${mg ? btn('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`) : ''}
         <h4>2. 職員モニタリング</h4>${sm ? `<details><summary>${esc(sm.source)}（タップで読む）</summary><p style="white-space:pre-wrap"><small>${esc(sm.text)}</small></p></details>` : '<p class="note">まだありません。</p>'}
         ${mg ? btn('活動記録から作る（今の計画期間）', `staffMon('${esc(name)}','${term}',${cur})`) : ''}
