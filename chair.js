@@ -57,9 +57,8 @@ async function renderChair() {
       ${flag.length ? `<h3 class="nx">⚠️ 放置・期限切れ（AI判定 ${flag.length}件）</h3>${flag.slice(0, 8).map(i => item(i)).join('')}` : ''}
       <h3 class="nx">📣 会長からの一言（職員に表示）</h3><div class="card"><div id="ch_cur"></div><textarea id="ch_msg" rows="2" maxlength="500" style="font-size:18px;width:100%" placeholder="職員への一言"></textarea>
         <button style="margin-top:6px" onclick="chairMsgSend()">表示する</button> <button class="back" onclick="chairMsgOff()">一言を消す</button> <span id="ch_mm" class="note"></span></div>
-      <h3 class="nx">🌅 注進</h3><div id="ch_rep" class="card">読み込み中…</div>
 `;
-    chairList(); chairCur(); chairReport(); if (typeof bnChair === 'function') bnChair();
+    chairList(); chairCur(); if (typeof bnChair === 'function') bnChair();
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }
 // 手で書き足すToDo。各担当セクションの一番下から入れる。そのセクションの担当で固定（ai_at を入れて朝のAI整理の振り分けで上書きされない）
