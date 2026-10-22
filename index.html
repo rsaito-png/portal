@@ -16,6 +16,14 @@ button{background:var(--main);color:#fff;border:0}
 .tile.main{grid-column:1/-1;padding:30px 10px;font-size:22px}
 .sample{text-align:left;font-size:25px;margin:8px 0 0;padding-left:22px}
 table{width:100%;border-collapse:collapse;background:#fff;font-size:24px}td,th{border-bottom:1px solid #eee;padding:6px 4px;text-align:left}
+body.wide-sheet main{max-width:1280px}
+.sheet-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+table.msheet{width:max-content;min-width:100%;font-size:16px}
+table.msheet th,table.msheet td{white-space:nowrap;vertical-align:middle;padding:4px 3px}
+table.msheet th{font-size:14px;font-weight:700;line-height:1.3}
+table.msheet input{field-sizing:content;width:auto;min-width:4.5em;max-width:none;margin:0;padding:6px 8px;font-size:16px;box-sizing:border-box;display:inline-block}
+table.kata-view{width:max-content;min-width:100%;font-size:18px}
+table.kata-view th,table.kata-view td{white-space:nowrap;vertical-align:top}
 .note{color:#888;font-size:23px}.rec{margin:10px 0}.rec label{display:block;font-size:23px;color:#555}.rec textarea{width:100%;box-sizing:border-box;font-size:26px;padding:8px;border:1px solid #bbb;border-radius:8px;margin:2px 0 6px}.rec input{margin:2px 0 6px;padding:8px}
 .ptabs button{width:auto;margin-right:6px;padding:8px 16px;background:#fff;color:#333;border:1px solid #bbb}.ptabs .on{background:var(--main);color:#fff}
 h4{margin:14px 0 6px;font-size:25px}.kk.over{border-left:6px solid #d33}.kk.soon{border-left:6px solid #e6b800}.kk.ok{opacity:.6}.badge{background:#d33;color:#fff;border-radius:6px;padding:1px 6px;font-size:22px}.kk.soon .badge{background:#e6b800}.kk.ok .badge{background:#888}
@@ -48,7 +56,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="config.js?v=202610211610"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_left.js?v=202610211700"></script>
-<script src="leo.js?v=202610212200"></script>
+<script src="leo.js?v=202610221000"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=202610162300"></script>
@@ -168,6 +176,7 @@ function groupView(o, k) {
 async function render() {
   if (typeof loadDuty === 'function') await loadDuty();
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
+  if (!(id === 'leo' && (sub === 'kata' || sub === 'master'))) document.body.classList.remove('wide-sheet');
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'suishodama' && sub === 'ledger') { SUI.edit = null; return renderSuiLedger(); }

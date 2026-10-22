@@ -14,9 +14,10 @@ const DEMO_DATA = {
     { day: '(昨日)', child: '児童C', status: '送付済み', start_time: '10:00', end_time: '13:00', source: '日誌' },
   ],
   kata: [
-    { 児童名: '児童A', 曜日: '月', 利用開始: '14:45', 利用終了: '17:00', 迎え担当: '職員X', 迎え開始: '14:30', 送り担当: '職員Y', 送り終了: '17:15', 迎え場所: '〇〇小学校', '送り場所（空欄なら自宅）': '' },
-    { 児童名: '児童B', 曜日: '月', 利用開始: '15:00', 利用終了: '17:30', 迎え担当: '職員Y', 迎え開始: '14:40', 送り担当: '職員X', 送り終了: '17:40', 迎え場所: '△△小学校', '送り場所（空欄なら自宅）': '〇〇園' },
-    { 児童名: '児童C', 曜日: '火', 利用開始: '10:00', 利用終了: '13:00', 保護者送迎: '○' },
+    // 列の並びと長さは本番の型表に合わせた見本（児童名は架空）。短い入力幅だと「毎週」「下野小学校」が切れる
+    { 曜日: '月', 児童名: '児童A', 利用週: '毎週', 迎え順: '1', 送り順: '1', 利用終了: '17:00', 利用開始: '14:45', 迎え場所: '下野小学校', 迎え担当: '職員X', 迎え開始: '14:30', 送り担当: '職員Y', 送り終了: '17:15', 保護者送迎: '', '送り場所（空欄なら自宅）': '自宅' },
+    { 曜日: '月', 児童名: '児童B', 利用週: '毎週', 迎え順: '2', 送り順: '2', 利用終了: '17:30', 利用開始: '15:00', 迎え場所: '西日野にじ学園', 迎え担当: '職員Y', 迎え開始: '14:40', 送り担当: '職員X', 送り終了: '17:40', 保護者送迎: '', '送り場所（空欄なら自宅）': '〇〇園' },
+    { 曜日: '火', 児童名: '児童C', 利用週: '毎週', 迎え順: '', 送り順: '', 利用終了: '13:00', 利用開始: '10:00', 迎え場所: '', 迎え担当: '', 迎え開始: '', 送り担当: '', 送り終了: '', 保護者送迎: '○', '送り場所（空欄なら自宅）': '' },
   ],
   keikaku: [
     { 児童名: '児童A', 現在の期: '2期', 現在の計画期間: '2026年5月〜2026年10月', 次期開始月: '2026年11月', フォーム送付目安日: '2026/10/15', 計画書作成: '未', 原案署名: '未', 本案署名: '未' },
@@ -164,9 +165,9 @@ const LEO_VIEWS = {
     const cell = r => `${esc(r['児童名'])}${leftMark(LEFT, r['児童名'], tday)}`;
     const leftNames = [...new Set(rows.filter(r => leftDone(LEFT, r['児童名'], tday)).map(r => r['児童名']).filter(Boolean))];
     return `<h3>送迎 型表（曜日ごと・見るだけ）</h3>${demoNote()}<p class="note">いつもの予定です。その日の変更は日誌・カレンダーが正です。退所した児童は下に分けて表示しています（型表の行は残したまま、保存はしていません）。</p>` + dows.map(w =>
-      `<h4>${w}曜日</h4><table><tr><th>児童</th><th>迎え</th><th>送り</th></tr>${active.filter(r => r['曜日'] === w).map(r => r['保護者送迎']
+      `<h4>${w}曜日</h4><div class="sheet-scroll"><table class="kata-view"><tr><th>児童</th><th>迎え</th><th>送り</th></tr>${active.filter(r => r['曜日'] === w).map(r => r['保護者送迎']
         ? `<tr><td>${cell(r)}</td><td colspan="2">保護者送迎（${esc(r['利用開始'])}〜${esc(r['利用終了'])}）</td></tr>`
-        : `<tr><td>${cell(r)}</td><td>${esc(r['迎え開始'])} ${esc(r['迎え担当'])}<br><small>${esc(r['迎え場所'])}</small></td><td>${esc(r['送り終了'])} ${esc(r['送り担当'])}<br><small>${esc(r['送り場所（空欄なら自宅）']) || '自宅'}</small></td></tr>`).join('')}</table>`).join('')
+        : `<tr><td>${cell(r)}</td><td>${esc(r['迎え開始'])} ${esc(r['迎え担当'])}<br><small>${esc(r['迎え場所'])}</small></td><td>${esc(r['送り終了'])} ${esc(r['送り担当'])}<br><small>${esc(r['送り場所（空欄なら自宅）']) || '自宅'}</small></td></tr>`).join('')}</table></div>`).join('')
       + (leftNames.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:bold">退所した児童（${leftNames.length}人）</summary><p class="note">型表には残しています。退所日の翌日以降の利用予定・カレンダー・送迎には出しません。</p><ul>${leftNames.map(n => `<li>${esc(n)}${leftMark(LEFT, n, tday)}</li>`).join('')}</ul></details>` : '');
   },
   async keikaku() {
@@ -381,9 +382,13 @@ async function saveNikki() {
 }
 
 async function renderLeoView(name) {
+  document.body.classList.toggle('wide-sheet', name === 'kata' || name === 'master');
   $('view').innerHTML = '<p>読み込み中…</p>';
   await loadDuty();
-  try { $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button>` + await LEO_VIEWS[name](); }
+  try {
+    $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button>` + await LEO_VIEWS[name]();
+    if (name === 'master') fitMasterSheet();
+  }
   catch (e) { $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button><p>${esc(e.message)}</p>`; }
 }
 
@@ -983,11 +988,50 @@ LEO_VIEWS.master = async function () {
   const own = DEMO ? [] : await sb(`leo_master?kind=eq.${MASTER_KIND}&order=row_no`), g = DEMO ? DEMO_DATA[MASTER_KIND] : (await sb(`leo_sheet?kind=eq.${MASTER_KIND}&order=row_no`)).map(r => r.data);
   const rows = own.length ? own.map(r => r.data) : g, cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
   return `<h3>${MASTER_LABEL[MASTER_KIND]}の入力</h3>${demoNote()}${tabs}
-    <p class="note">${own.length ? 'ポータルで入力した内容です（ポータルの画面はこちらを使います）。' : 'まだポータルで入力していません。下はGoogleの表の写しです。「保存」するとポータルの表になります（Googleの表は変わりません）。'}11/1まではGoogleの表も今まで通り使ってください。</p>
-    <div style="overflow-x:auto"><table class="tbl"><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" size="8"></td>`).join('')}</tr>`).join('')}</table></div>
+    <p class="note">${own.length ? 'ポータルで入力した内容です（ポータルの画面はこちらを使います）。' : 'まだポータルで入力していません。下はGoogleの表の写しです。「保存」するとポータルの表になります（Googleの表は変わりません）。'}11/1まではGoogleの表も今まで通り使ってください。文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
+    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)"></td>`).join('')}</tr>`).join('')}</table></div>
     <button onclick="renderLeoView('master').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
 };
-function addMasterRow() { const t = document.querySelector('tr.mrow:last-child'); t.parentNode.appendChild(t.cloneNode(true)).querySelectorAll('input').forEach(i => i.value = ''); }
+// 型表などの入力欄を、見出しと入力中の文字が切れない幅にする（保存する中身は変えない）
+function masterTextPx(text, font) {
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;';
+  probe.style.font = font;
+  probe.textContent = text || '';
+  document.body.appendChild(probe);
+  const w = probe.getBoundingClientRect().width;
+  probe.remove();
+  return w;
+}
+function fitMasterSheet() {
+  const table = document.querySelector('table.msheet');
+  if (!table) return;
+  const sample = table.querySelector('input');
+  if (!sample) return;
+  const cs = getComputedStyle(sample);
+  const extra = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0) + 16;
+  const byCol = {};
+  table.querySelectorAll('input').forEach(inp => {
+    const col = inp.dataset.c || '';
+    const w = Math.ceil(Math.max(masterTextPx(inp.value, cs.font), masterTextPx(col, cs.font)) + extra);
+    byCol[col] = Math.max(byCol[col] || 0, w, 56);
+  });
+  table.querySelectorAll('input').forEach(inp => { inp.style.width = byCol[inp.dataset.c] + 'px'; });
+}
+function fitMasterInput(el) {
+  if (!el) return;
+  const cs = getComputedStyle(el);
+  const extra = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0) + 16;
+  const need = Math.ceil(Math.max(masterTextPx(el.value, cs.font), masterTextPx(el.dataset.c || '', cs.font)) + extra);
+  if (need > el.getBoundingClientRect().width) el.style.width = need + 'px';
+}
+function addMasterRow() {
+  const t = document.querySelector('tr.mrow:last-child');
+  const row = t.cloneNode(true);
+  row.querySelectorAll('input').forEach(i => { i.value = ''; });
+  t.parentNode.appendChild(row);
+  fitMasterSheet();
+}
 async function saveMaster() {
   const rows = [...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length);
   const m = $('ms_msg'); if (DEMO) { m.textContent = `見本モードなので保存しません（${rows.length}行）。`; return; }
