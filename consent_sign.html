@@ -1,0 +1,92 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>居宅介護計画の確認と署名｜金斗雲</title>
+<style>
+html,body{overscroll-behavior:none}
+#ov,#prev,#cv{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222;-webkit-text-size-adjust:100%}
+header{background:#2e6b4f;color:#fff;padding:14px 16px;font-size:18px}
+main{max-width:560px;margin:auto;padding:16px}.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin:12px 0}
+.pages img{width:100%;display:block;border:1px solid #ddd;margin:6px 0}.v{border-bottom:1px solid #eee;padding:10px 0}.v:last-child{border:0}.v label{display:flex;gap:10px;font-size:17px;align-items:flex-start}.v input{width:24px;height:24px;flex:none}
+.sm{color:#666;font-size:14px;margin:2px 0 0 34px;white-space:pre-wrap}
+#prev{border:2px dashed #888;border-radius:8px;min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;background:#fff;padding:8px}
+.mt{display:block;font-size:17px;margin:8px 0}.mt input{width:22px;height:22px;vertical-align:middle;margin-right:8px}
+body.lock{overflow:hidden;position:fixed;width:100%;touch-action:none}
+#ov{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;background:#fff;z-index:9;touch-action:none;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}#ov[hidden]{display:none}#cvw{flex:1;min-height:0;position:relative}#cv{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none}
+#dlg{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;background:#0007;z-index:20;display:flex;align-items:center;justify-content:center}#dlg[hidden]{display:none}#dlg div{background:#fff;border-radius:12px;padding:22px;max-width:80%;text-align:center;font-size:18px;box-sizing:border-box}#dlg b{display:block;font-size:22px;margin-bottom:8px;color:#2e6b4f}#dlg button{margin-top:14px}
+#ovb{flex:none;padding:8px 10px;background:#fff;display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #ccc}#ovb span{color:#888;font-size:14px}#ovb button{margin:0}.ok2{width:auto;padding:10px 18px;font-size:16px;margin:0}
+input[type=text],textarea{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #bbb;border-radius:8px;margin-top:4px}
+button{font-size:18px;width:100%;padding:14px;border:0;border-radius:8px;background:#2e6b4f;color:#fff;margin-top:14px}button:disabled{background:#999}
+.sub{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:6px 14px;font-size:14px;margin:6px 0}
+.note{color:#777;font-size:13px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00}
+</style></head><body><header>金斗雲　居宅介護計画の確認と署名</header><main id="m"><p>読み込み中…</p></main>
+<script src="config.js"></script>
+<script src="signpad.js"></script>
+<script>
+// 本人向け：ログインなし。リンクのトークンで、その方の最新の居宅介護計画を表示し、手書きで同意。1回限り・期限1週間。
+const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search), T = q.get('t') || '', DEMO = q.get('demo') === '1';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const $m = () => document.getElementById('m'), $ = id => document.getElementById(id);
+const DEMO_DATA = { name: '利用者A（見本）', explainer: '職員A', version: 1, term: '1期', period: '', body: '（見本）【長期目標】自宅で安心して暮らす。', expires_at: new Date(Date.now() + 6048e5).toISOString() };
+let D = null;
+const bad = () => $m().innerHTML = '<div class="card">リンクが正しくないか、期限が切れている・すでに使われています。お手数ですが金斗雲までご連絡ください。</div>';
+async function load() {
+  if (DEMO) D = DEMO_DATA;
+  else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); const r = await rpc('kin_consent_get', { p_token: T }); D = r.ok ? await r.json() : null; if (!D || !D.name) return bad(); }
+  $m().innerHTML = `<div class="card"><b>${esc(D.name)}</b> さんの居宅介護計画<p class="note">${esc(D.term || '')} ${esc(D.period || '')}（版 ${esc(D.version)}）／説明職員：${esc(D.explainer)}</p></div>
+  <div class="card" style="white-space:pre-wrap;font-size:17px;line-height:1.7">${esc(D.body || '（本文なし）')}</div>
+  <div class="card"><label class="mt"><input type="checkbox" id="okc"> 説明を受け、理解し、同意します</label>
+   <b>記入者</b>
+   <label class="mt"><input type="radio" name="mt" value="本人" checked onchange="mtc()"> 本人</label>
+   <label class="mt"><input type="radio" name="mt" value="代理人" onchange="mtc()"> 代理人（ご家族など）</label>
+   <div id="rel" hidden><label>代理人の氏名（必須）<input type="text" id="agv" maxlength="100"></label><label>本人との続柄（必須）<input type="text" id="relv" maxlength="50" placeholder="例：母"></label></div>
+   <p>署名（下の枠をタップすると、画面いっぱいで書けます）</p><div id="prev" onclick="openPad()">タップして署名を書く</div>
+   <button id="go" onclick="send()">同意して送信する</button><p id="r"></p></div>
+  <p class="note">このページはご本人専用のリンクで、署名が済むと使えなくなります（期限：${esc(new Date(D.expires_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }))}まで）。ほかの方には送らないでください。</p>
+  <div id="ov" hidden><div id="cvw"><canvas id="cv"></canvas></div><div id="ovb"><span>指で書いてください</span><button class="sub" onclick="padClr()">書き直す</button><button class="sub" onclick="padClose(false)">閉じる</button><button class="ok2" onclick="padClose(true)">これでよい</button></div></div>`;
+}
+const meth = () => document.querySelector('input[name=mt]:checked').value;
+function mtc() { $('rel').hidden = meth() !== '代理人'; }
+// 全画面の署名パッド：記録ボット作の署名欄部品（signpad.js）を全画面の canvas で使い、画面全体で指の動きを拾う
+let pad = null, sigData = null;
+let scrollY0 = 0;
+function lockBody() { if (document.body.classList.contains('lock')) return; scrollY0 = window.scrollY; document.body.style.top = (-scrollY0) + 'px'; document.body.classList.add('lock'); }
+function unlockBody() { if (!document.body.classList.contains('lock')) return; document.body.classList.remove('lock'); document.body.style.top = ''; window.scrollTo(0, scrollY0); }
+function padRemeasure() { if (pad && !$('ov').hidden) pad.remeasure(); }
+function openPad() {
+  lockBody(); $('ov').hidden = false;
+  if (!pad) pad = createSignPad($('cv')); pad.clear(); pad.remeasure();
+  requestAnimationFrame(padRemeasure);
+}
+window.addEventListener('resize', padRemeasure);
+window.addEventListener('orientationchange', () => { padRemeasure(); setTimeout(padRemeasure, 300); });
+function showDlg(t, m) { $('dlgt').textContent = t; $('dlgm').textContent = m || ''; $('dlg').hidden = false; }
+function padClr() { pad.clear(); sigData = null; }
+function padClose(ok) {
+  unlockBody(); $('ov').hidden = true;
+  if (ok && pad.isDrawn()) { // 書いた範囲だけを切り出し、幅600pxまでに縮小してPNG化（白背景）
+    const cv = $('cv'), g0 = cv.getContext('2d'), W = cv.width, H = cv.height, d = g0.getImageData(0, 0, W, H).data;
+    let x0 = W, y0 = H, x1 = 0, y1 = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (d[i] < 200) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+    if (x1 < x0) { sigData = null; $('prev').textContent = 'タップして署名を書く'; return; }
+    const p = 16, sx = Math.max(0, x0 - p), sy = Math.max(0, y0 - p), sw = Math.min(W - sx, x1 - x0 + 2 * p), sh = Math.min(H - sy, y1 - y0 + 2 * p), sc = Math.min(1, 600 / sw);
+    const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(sw * sc)); t.height = Math.max(1, Math.round(sh * sc)); const g = t.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, t.width, t.height); g.drawImage(cv, sx, sy, sw, sh, 0, 0, t.width, t.height);
+    sigData = t.toDataURL('image/png'); $('prev').innerHTML = `<img src="${sigData}" alt="署名" style="max-width:100%;max-height:120px"><div class="note">タップして書き直し</div>`;
+  } else if (!sigData) $('prev').textContent = 'タップして署名を書く';
+}
+async function send() {
+  const out = $('r'), m = meth(), pr = $('relv').value.trim(), pn = $('agv').value.trim();
+  if (!$('okc').checked) { out.innerHTML = '<span class="err">「同意します」にチェックを入れてください。</span>'; return; }
+  if (!sigData) { out.innerHTML = '<span class="err">署名を書いてください。</span>'; return; }
+  if (m === '代理人' && (!pn || !pr)) { out.innerHTML = '<span class="err">代理人の氏名と続柄を入れてください。</span>'; return; }
+  if (DEMO) { out.innerHTML = '<span class="ok">見本なので送信しません。</span>'; return; }
+  $('go').disabled = true;
+  try { const r = await rpc('kin_consent_submit', { p_token: T, p_writer: m, p_proxy_name: m === '代理人' ? pn : null, p_proxy_relation: m === '代理人' ? pr : null, p_signature: sigData });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || '送信できませんでした');
+    $m().innerHTML = '<div class="card"><p class="ok" style="font-size:20px">✅ 同意を受け付けました。ありがとうございました。</p></div>';
+  } catch (e) { $('go').disabled = false; out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+</script>
+<div id="dlg" hidden><div><b id="dlgt"></b><span id="dlgm"></span><br><button onclick="$('dlg').hidden=true">OK</button></div></div>
+<script>load();</script></body></html>

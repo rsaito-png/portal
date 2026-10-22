@@ -32,7 +32,8 @@ function kinForm(p, cons) {
       <div id="kc_px" hidden><p>代理人氏名 <input id="kc_pn" maxlength="100"></p><p>続柄 <input id="kc_pr" maxlength="50" placeholder="例：母"></p></div>
       <p>手書きサイン（任意）</p><canvas id="kc_cv" width="600" height="200" style="border:1px solid #888;background:#fff;width:100%;max-width:600px;touch-action:none"></canvas>
       <p><button class="back" onclick="kinClear()">書き直す</button></p>
-      <button onclick="kinSave('${esc(p.user_name).replace(/'/g, '')}',${p.version})" style="font-size:18px;padding:12px 28px">同意する</button> <button class="back" onclick="KIN.name=null;renderKin()">やめる</button> <div id="kc_m"></div></div>`}` + kinInit();
+      <button onclick="kinSave('${esc(p.user_name).replace(/'/g, '')}',${p.version})" style="font-size:18px;padding:12px 28px">同意する</button> <button class="back" onclick="KIN.name=null;renderKin()">やめる</button> <div id="kc_m"></div></div>
+      <div class="card"><p>ご本人のスマホで署名してもらう場合（1週間・1回限り）</p><button class="back" onclick="kinIssue('${esc(p.user_name).replace(/'/g, '')}')">署名リンク発行</button><div id="kc_link"></div></div>`}` + kinInit();
 }
 function kinInit() { setTimeout(() => { const cv = $('kc_cv'); if (!cv) return; const g = cv.getContext('2d'); g.lineWidth = 3; g.lineCap = 'round'; let dn = false;
   const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
@@ -50,4 +51,13 @@ async function kinSave(user_name, version) {
     await sb('kin_consent', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_name, version, writer: w, proxy_name: w === '代理人' ? pn : null, proxy_relation: w === '代理人' ? pr : null, explained_by_name, signature }) });
     KIN.name = null; $('view').innerHTML = `<p style="font-size:20px">✅ 同意を記録しました。ありがとうございました。タブレットを職員にお返しください。</p><button onclick="renderKin()">一覧へ</button>`;
   } catch (e) { m.textContent = e.message + '（すでに同意済みか、権限がありません）'; }
+}
+
+const KIN_URL = t => location.origin + location.pathname.replace(/[^/]*$/, '') + 'consent_sign.html?t=' + t;
+async function kinIssue(user_name) {
+  try { const us = await sb(`kin_user?select=id&name=eq.${encodeURIComponent(user_name)}`); if (!us.length) return alert('利用者台帳に見つかりません');
+    const ex = prompt('説明した職員の氏名', '宮本'); if (!ex) return;
+    const t = await sb('rpc/kin_consent_issue', { method: 'POST', body: JSON.stringify({ p_user_id: us[0].id, p_explainer: ex }) }), u = KIN_URL(t);
+    $('kc_link').innerHTML = `<p style="word-break:break-all"><a href="${esc(u)}" target="_blank">${esc(u)}</a></p><button class="back" onclick="navigator.clipboard.writeText('${esc(u)}')">コピー</button> <a href="${esc(u)}" target="_blank">この端末で署名画面を開く</a>`;
+  } catch (e) { alert(e.message); }
 }
