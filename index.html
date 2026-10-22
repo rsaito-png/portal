@@ -72,6 +72,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="rydeen.js?v=202610191440"></script>
 <script src="soudan.js?v=202610211550"></script>
 <script src="banto.js?v=202610211550"></script>
+<script src="sns.js?v=202610221409"></script>
 <script src="leaderboard.js?v=202610211550"></script>
 <script>
 const C = window.PORTAL_CONFIG;
@@ -182,6 +183,7 @@ async function render() {
   if (id === 'ht') return renderHt();
   if (id === 'chair') return renderChair();
   if (id === 'banto' && typeof renderBanto === 'function') return renderBanto();
+  if (id === 'sns' && typeof renderSns === 'function') return renderSns();
   if (id === 'soumu') return renderSoumu();
   if (id === 'soudan' && typeof renderSoudan === 'function') return renderSoudan();
   if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
@@ -200,7 +202,7 @@ async function render() {
     if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
   }
-  const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
+  const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
     <h3>事業所</h3>
