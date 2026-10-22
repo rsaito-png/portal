@@ -52,3 +52,7 @@ begin
 end $$;
 drop trigger if exists sns_material_kick on public.sns_material;
 create trigger sns_material_kick after insert on public.sns_material for each row execute function public.sns_material_kick();
+
+-- 茶夢はGoogleマップ掲載なし
+alter table public.sns_material drop constraint if exists sns_material_chamu_no_gmap;
+alter table public.sns_material add constraint sns_material_chamu_no_gmap check (not (office='茶夢' and purpose='Googleマップ'));
