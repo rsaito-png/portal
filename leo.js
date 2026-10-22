@@ -35,7 +35,8 @@ const DEMO_DATA = {
 };
 // 日誌で「直せる」項目。直すと1分ほどで Google の日誌に反映（box の apply_edits.py）
 // activity＝日誌Q列（活動記録・LINEからスパークが書く児童の様子）。食事・おやつは料金に関わるので日誌で直接直す。
-// 算定加算＝日誌P列。空欄・未設定は「なし」（入っている値は置き換えない）。
+// 算定加算＝日誌P列。空欄・未設定は画面では「なし」（入っている値は置き換えない。表示だけの「なし」は保存しない）。
+// シートのP列を埋める処理はポータルには無い。名前がある行の空欄だけ朝のGASで入れる（tools/leo_nikki_kasan_gas.js）。
 const NIKKI_KASAN_DEFAULT = 'なし';
 const NIKKI_KASAN_OPTIONS = ['なし', '子育てサポート', '家族支援', '関係機関連携', '事業所間連携'];
 function nikkiKasanValue(raw) {
