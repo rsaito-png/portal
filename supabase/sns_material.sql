@@ -56,3 +56,28 @@ create trigger sns_material_kick after insert on public.sns_material for each ro
 -- 茶夢はGoogleマップ掲載なし
 alter table public.sns_material drop constraint if exists sns_material_chamu_no_gmap;
 alter table public.sns_material add constraint sns_material_chamu_no_gmap check (not (office='茶夢' and purpose='Googleマップ'));
+
+-- 職員会議（文字起こし）の入稿（原文は個人情報：本人と会長のみ閲覧。RLSは既存 sm_sel のまま）
+alter table public.sns_material add column if not exists kind text not null default '写真';
+alter table public.sns_material add column if not exists transcript text;
+alter table public.sns_material drop constraint if exists sns_material_kind_chk;
+alter table public.sns_material add constraint sns_material_kind_chk check (kind in ('写真','職員会議（文字起こし）'));
+alter table public.sns_material drop constraint if exists sns_material_transcript_chk;
+alter table public.sns_material add constraint sns_material_transcript_chk check (
+  (kind='写真' and transcript is null) or
+  (kind='職員会議（文字起こし）' and length(trim(coalesce(transcript,'')))>0 and length(transcript)<=200000));
+grant insert (kind, transcript) on public.sns_material to authenticated;
+create or replace function public.sns_material_kick() returns trigger language plpgsql security definer set search_path=public, extensions as $$
+declare u text; s text;
+begin
+  select v into u from private_config where k='sns_material_webhook_url';
+  if coalesce(trim(u),'')='' then return new; end if;
+  select v into s from private_config where k='sns_material_webhook_secret';
+  begin
+    perform net.http_post(url := u,
+      headers := jsonb_build_object('Content-Type','application/json','x-sns-secret',coalesce(s,'')),
+      body := jsonb_build_object('id',new.id,'kind',new.kind,'office',new.office,'purpose',new.purpose,'memo',new.memo,'shot_on',new.shot_on,'bucket','sns-material','photos',to_jsonb(new.photos),'transcript',new.transcript),
+      timeout_milliseconds := 10000);
+  exception when others then null; end;
+  return new;
+end $$;

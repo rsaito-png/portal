@@ -18,13 +18,16 @@ async function renderSns() {
     <p style="font-size:13px;color:#b00">⚠️ 児童・利用者さんの顔や名前（名札・作品の署名など）が写らないようにしてください。</p>
     <div class="card">
       <label>事業所<select id="sn_o" style="${inp}">${offs.map(o => `<option>${snE(o.name)}</option>`).join('')}</select></label>
+      <label>種類<select id="sn_k" style="${inp}"><option>写真</option><option>職員会議（文字起こし）</option></select></label>
       <label>用途<select id="sn_p" style="${inp}"><option>Instagram</option><option>Googleマップ</option></select></label>
-      <label>写真（複数可・カメラからも選べます）<input id="sn_f" type="file" accept="image/*" multiple style="${inp}"></label>
+      <div id="sn_tw" style="display:none"><label>文字起こしテキスト（長文OK・貼り付け）<textarea id="sn_t" rows="14" maxlength="200000" style="${inp};resize:vertical" placeholder="職員会議の文字起こしをそのまま貼り付けてください"></textarea></label><p style="font-size:12px;color:#666">原文は会長と送った本人だけが読めます。投稿前に個人が分かる情報は消します。</p></div>
+      <label id="sn_fw">写真（複数可・カメラからも選べます）<input id="sn_f" type="file" accept="image/*" multiple style="${inp}"></label>
       <label>ひとことメモ<textarea id="sn_m" rows="3" maxlength="1000" style="${inp};resize:vertical" placeholder="例）みんなでクッキーを焼きました"></textarea></label>
       <label>撮影日<input id="sn_d" type="date" value="${td}" style="${inp}"></label>
       <button id="sn_go" onclick="snSend()" style="width:100%;font-size:16px;padding:10px">送る</button></div>
-    <h4>自分が送った分</h4><div id="sn_list">${rows.map(r => `<div class="card" style="margin:8px 0;padding:10px"><div style="font-size:12px;color:#666">${snE(r.shot_on || '')}　${snE(r.office)}／${snE(r.purpose)}　📷${(r.photos || []).length}枚　<b>${snE(r.status)}</b></div><div style="white-space:pre-wrap">${snE(r.memo || '')}</div><div id="sn_th${r.id}"></div></div>`).join('') || '<p>まだありません。</p>'}</div>`;
+    <h4>自分が送った分</h4><div id="sn_list">${rows.map(r => `<div class="card" style="margin:8px 0;padding:10px"><div style="font-size:12px;color:#666">${snE(r.shot_on || '')}　${snE(r.office)}／${snE(r.purpose)}　${r.kind === '職員会議（文字起こし）' ? '📝文字起こし ' + (r.transcript || '').length + '字' : '📷' + (r.photos || []).length + '枚'}　<b>${snE(r.status)}</b></div><div style="white-space:pre-wrap">${snE(r.memo || '')}</div><div id="sn_th${r.id}"></div></div>`).join('') || '<p>まだありません。</p>'}</div>`;
   rows.forEach(r => snThumbs(r));
+  $('sn_k').onchange = () => { const t = $('sn_k').value !== '写真'; $('sn_tw').style.display = t ? '' : 'none'; $('sn_fw').style.display = t ? 'none' : ''; };
   if ($('sn_p') && $('sn_o')) { const snSync = () => { const o = $('sn_o').value, g = $('sn_p').querySelector('option[value="Googleマップ"],option:nth-child(2)'); const cha = o === '茶夢'; if (g) { g.disabled = cha; g.hidden = cha; } if (cha && $('sn_p').value === 'Googleマップ') $('sn_p').value = 'Instagram'; else if (o === 'レオ') $('sn_p').value = 'Googleマップ'; }; $('sn_o').onchange = snSync; snSync(); }
 }
 async function snThumbs(r) {
@@ -36,7 +39,8 @@ async function snThumbs(r) {
   } catch (e) { }
 }
 async function snSend() {
-  const fs = [...$('sn_f').files]; if (!fs.length) return alert('写真を選んでください');
+  const tr = $('sn_k').value !== '写真', tx = $('sn_t').value.trim();
+  const fs = tr ? [] : [...$('sn_f').files]; if (tr ? !tx : !fs.length) return alert(tr ? '文字起こしを貼り付けてください' : '写真を選んでください');
   const btn = $('sn_go'); btn.disabled = true; btn.textContent = '送っています…';
   try {
     const me = snMe(), paths = [];
@@ -47,7 +51,7 @@ async function snSend() {
       if (!r.ok) throw new Error('写真を保存できませんでした（' + r.status + '）');
       paths.push(p);
     }
-    await sb('sns_material', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ office: $('sn_o').value, purpose: $('sn_p').value, photos: paths, memo: $('sn_m').value.trim() || null, shot_on: $('sn_d').value || null }) });
+    await sb('sns_material', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ kind: $('sn_k').value, transcript: tr ? tx : null, office: $('sn_o').value, purpose: $('sn_p').value, photos: paths, memo: $('sn_m').value.trim() || null, shot_on: $('sn_d').value || null }) });
     alert('送りました。ありがとうございます'); renderSns();
   } catch (e) { alert('送れませんでした: ' + e.message); btn.disabled = false; btn.textContent = '送る'; }
 }
