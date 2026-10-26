@@ -55,12 +55,12 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261026calwho"></script>
+<script src="config.js?v=20261026caltile"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261026"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261026b"></script>
-<script src="leo.js?v=20261026ksch"></script>
+<script src="leo.js?v=20261026calov"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=20261026sched"></script>
@@ -79,9 +79,9 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="sct.js?v=20261026ops"></script>
 <script src="chair.js?v=20261026top"></script>
 <script src="mgr.js?v=202610161458"></script>
-<script src="leo_yotei.js?v=202610262130"></script>
-<script src="leo_cal.js?v=202610261800"></script>
-<script src="leo_home_cal.js?v=20261026nouse"></script>
+<script src="leo_yotei.js?v=20261026calov"></script>
+<script src="leo_cal.js?v=20261026calov"></script>
+<script src="leo_home_cal.js?v=20261026calov"></script>
 <script src="leo_jippi.js?v=202610201000"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
 <script src="uketsuke.js?v=202610211600"></script>
@@ -160,7 +160,7 @@ async function leoHomeStatus() {
     const t = today(), tm = addDays(t, 1);
     const [rows, evs0, LEFT] = await Promise.all([
       sb(`leo_nikki?day=gte.${t}&day=lte.${tm}&select=day,kind,pick_driver,pick_car,drop_driver,drop_car,child`),
-      sb(`leo_events?day=gte.${t}&day=lte.${tm}&kind=in.(利用,迎え,送り)&select=day,kind,child,kids,staff,start_time,place,kid_places,kid_times`).catch(() => []),
+      sb(`leo_events?day=gte.${t}&day=lte.${tm}&kind=in.(利用,迎え,送り,休み)&select=day,kind,child,kids,staff,start_time,end_time,place,kid_places,kid_times,source,updated_at,title,note`).catch(() => []),
       loadLeftIndex().catch(() => ({})),
     ]);
     const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(evs0 || [], LEFT) : (evs0 || []);
@@ -194,6 +194,8 @@ function groupView(o, k) {
 async function render() {
   if (typeof loadDuty === 'function') await loadDuty();
   if (typeof ncCleanup === 'function') ncCleanup();
+  const route = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
+  if (!(route[0] === 'leo' && route[1] === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(route[2] || '')) && typeof sgClearEdit === 'function') sgClearEdit();
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (!(id === 'leo' && (sub === 'kata' || sub === 'master'))) document.body.classList.remove('wide-sheet');
   if (id === 'leo' && sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '') && typeof renderSgDay === 'function') return renderSgDay(sub2);

@@ -157,8 +157,34 @@ assert.ok(index.includes('leoTileStatus'));
 assert.ok(index.includes('leoKidTile'));
 assert.ok(!index.includes('select=day,kind,child,kids,staff,start_time,place,kid_places,kid_times,car'));
 assert.ok(yotei.includes('LEO_PLAN_NOTE'));
-assert.ok(yotei.includes("if (DEMO) return old.call(this)"));
+assert.ok(!yotei.includes('if (DEMO) return old.call(this)'));
+assert.ok(yotei.includes('leoSougeiMineHtml'));
 assert.ok(yotei.includes('same(e.staff, me)'));
+assert.ok(leo.includes('120000') && leo.includes('visibilitychange') && leo.includes('SG_EDIT'));
+const leoMergeNikki = grab('leoMergeNikki');
+const portalPick = [{ day, kind: '迎え', kids: ['児童A'], staff: '職員X', start_time: '14:50', place: '見本公園', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z', kid_times: { '児童A': '14:50' }, kid_places: { '児童A': '見本公園' } }];
+const picked = leoMergeNikki(nikki, portalPick);
+assert.strictEqual(picked[0].pick_time, '14:50');
+assert.strictEqual(picked[0].pick_place, '見本公園');
+assert.strictEqual(picked[0].pick_driver, '職員X');
+assert.strictEqual(picked[0].pick_car, '2号車', '日誌の車は残す');
+assert.strictEqual(nikki[0].pick_time, '14:35', '日誌の行は変えない');
+const overHtml = leoSougeiAllHtml(nikki, portalPick, {});
+assert.ok(overHtml.includes('カレンダーで変更') && overHtml.includes('14:50') && overHtml.includes('2号車') && overHtml.includes('全て確定'));
+const googlePick = [{ day, kind: '迎え', kids: ['児童A'], staff: '職員X', start_time: '09:00', place: '旧公園', source: 'google', updated_at: '2099-06-01T00:00:00.000Z' }];
+assert.strictEqual(leoMergeNikki(nikki, googlePick)[0].pick_time, '14:35');
+const tomb = [{ day, kind: '迎え', kids: ['児童A'], staff: '連先生', source: 'portal', title: 'カレンダーで削除', note: 'カレンダーで削除', updated_at: '2099-01-01T00:00:00.000Z' }];
+const dropped = leoMergeNikki(nikki, tomb)[0];
+assert.strictEqual(dropped._calPick, 'del');
+const dropHtml = leoSougeiAllHtml(nikki, tomb, {});
+assert.ok(dropHtml.includes('カレンダーで変更') && dropHtml.includes('全て確定') && !dropHtml.includes('14:35') && dropHtml.includes('17:15'));
+const absEv = [{ day, kind: '休み', child: '児童A', title: '欠席（欠席時対応加算）', note: '連絡日:2026-10-24\n区分:欠席（欠席時対応加算）', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z' }];
+const absRow = leoMergeNikki(nikki, absEv).find(r => r.child === '児童A');
+assert.strictEqual(absRow._abs, '欠席（欠席時対応加算）');
+assert.strictEqual(absRow._absContact, '2026-10-24');
+assert.strictEqual(leoKidTile(nikki, absEv, day), '0人');
+const cancelEv = [{ day, kind: '休み', child: '児童A', title: 'キャンセル', note: '連絡日:2026-10-01\n区分:キャンセル', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z' }];
+assert.strictEqual(leoMergeNikki(nikki, cancelEv).find(r => r.child === '児童A')._abs, 'キャンセル');
 
 vm.runInContext(`
 (async () => {
@@ -173,8 +199,8 @@ vm.runInContext(`
     const p = String(path);
     if (p.startsWith('staff_profiles')) return [{ nikki_name: '連先生' }];
     if (p.includes('leo_nikki')) return [];
-    if (p.includes('kind=in.(迎え,送り)')) return ev.filter(e => e.kind !== '利用');
-    if (p.includes('kind=eq.利用')) return ev.filter(e => e.kind === '利用');
+    if (p.includes('leo_events') && p.includes('kind=eq.利用')) return ev.filter(e => e.kind === '利用');
+    if (p.includes('leo_events')) return ev.filter(e => e.kind !== '利用' || p.includes('利用'));
     return [];
   };
   const all = await LEO_VIEWS.sougeiall();
@@ -215,7 +241,7 @@ vm.runInContext(`
     const p = String(path);
     if (p.startsWith('staff_profiles')) return [{ nikki_name: '連先生' }];
     if (p.includes('leo_nikki')) return [{ day: t, kind: '利用', child: '児童B', service: '放デイ', pick_driver: '連先生', pick_car: '2号車', drop_driver: '友香先生', drop_car: '2号車', pick_time: '14:40', drop_time: '17:20', pick_place: '見本小学校', drop_place: '自宅', start_time: '15:00', end_time: '17:30' }];
-    if (p.includes('kind=in.(迎え,送り)')) return ev.filter(e => e.kind !== '利用');
+    if (p.includes('leo_events')) return ev.filter(e => e.kind !== '利用');
     return [];
   };
   const logged = await LEO_VIEWS.sougeiall();
@@ -223,7 +249,8 @@ vm.runInContext(`
   if (!logged.includes('2号車') || !logged.includes('全て確定')) throw new Error('nikki table');
   const mineLogged = await LEO_VIEWS.sougei();
   if (mineLogged.includes('予定表から表示（日誌取り込み前）')) throw new Error('sougei note while nikki exists');
-  if (!mineLogged.includes('児童A')) throw new Error('sougei still uses the schedule when it exists');
+  if (!mineLogged.includes('児童B')) throw new Error('sougei keeps nikki when the schedule was not edited in the portal');
+  if (mineLogged.includes('児童A')) throw new Error('non-portal schedule must not replace nikki');
   sb = async (path) => {
     const p = String(path);
     if (p.includes('leo_nikki')) return [{ day: t, kind: '利用', child: '児童B', service: '放デイ', pick_driver: '連先生', pick_car: '2号車', drop_driver: '友香先生', drop_car: '2号車', pick_time: '14:40', drop_time: '17:20', pick_place: '見本小学校', drop_place: '自宅', start_time: '15:00', end_time: '17:30' }];
@@ -236,5 +263,14 @@ vm.runInContext(`
   if (loggedKids.includes('予定表から表示')) throw new Error('nikki kids stays off the schedule');
   if (!loggedKids.includes('個別支援計画（1期　見本期間）を読む') || !loggedKids.includes('日誌側の本文')) throw new Error('nikki plan helper');
   if (!loggedKids.includes('送迎の配慮：（見本）チャイルドシート') || !loggedKids.includes('メモ：（見本）メモです')) throw new Error('nikki warn helper');
+  sb = async (path) => {
+    const p = String(path);
+    if (p.includes('leo_nikki')) return [{ day: t, kind: '利用', child: '児童A', service: '放デイ', pick_driver: '職員X', pick_car: '1号車', drop_driver: '職員Y', drop_car: '2号車', pick_time: '14:30', drop_time: '17:15', pick_place: '〇〇小学校', drop_place: '自宅', start_time: '14:45', end_time: '17:00' }];
+    if (p.includes('leo_events')) return [{ day: t, kind: '休み', child: '児童A', title: '欠席（欠席時対応加算）', note: '連絡日:' + t + '\\n区分:欠席（欠席時対応加算）', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z' }];
+    return [];
+  };
+  const absentKids = await LEO_VIEWS.kids();
+  if (!absentKids.includes('欠席：') || !absentKids.includes('欠席（欠席時対応加算）') || !absentKids.includes('連絡 ' + t)) throw new Error('kids lists calendar absence');
+  if (absentKids.includes('class="card"')) throw new Error('absent child is not listed as attending');
 })()
 `, sandbox).then(() => console.log('leo_sougei_plan_test ok')).catch(err => { console.error(err); process.exit(1); });

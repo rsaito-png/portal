@@ -242,6 +242,7 @@ function sgLines(e) {
   }
   if (e.kind === '利用' || e.kind === '休み') {
     const bits = [sgName(e.child)];
+    if (e.title === '欠席（欠席時対応加算）' || e.title === 'キャンセル') bits.push(e.title);
     if (e.parent_drop) bits.push('保護者が送る');
     if (e.parent_pick) bits.push('保護者が迎える');
     return [bits.filter(Boolean).join('　')];
@@ -288,8 +289,11 @@ function sgCss() {
 .sg-gut span{position:absolute;right:4px;transform:translateY(-50%);font-size:10px;color:#70757a;background:#fff}
 .sg-scroll{flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .sg-canvas{position:relative}
-.sg-line{position:absolute;left:0;right:0;border-top:1px solid #eee}
-.sg-half{position:absolute;left:0;right:0;border-top:1px dashed #f3f3f3}
+.sg-line{position:absolute;left:0;right:0;border-top:1px solid #eee;pointer-events:none}
+.sg-half{position:absolute;left:0;right:0;border-top:1px dashed #f3f3f3;pointer-events:none}
+.sg-add{margin:0 0 8px}
+.sg-add button{display:block;width:100%;min-height:44px;padding:8px 12px;font-size:16px;font-weight:700;border:1px solid #e8833a;background:#fff4e4;color:#222;border-radius:8px}
+.sg-ev[onclick],.sg-chip[onclick]{cursor:pointer}
 .sg-ev{position:absolute;box-sizing:border-box;border-radius:6px;padding:2px 4px;overflow:hidden;line-height:1.25;z-index:1;box-shadow:0 1px 1px #0002}
 .sg-ev .k{font-size:11px;font-weight:800}
 .sg-ev.drop .k{text-decoration:underline;text-underline-offset:2px}
@@ -363,12 +367,14 @@ function sgDayHtml(day, evs, care, opt) {
     const p = sgStaffPaint(s.raw, { demo });
     return `<span><i style="background:${p.hex}"></i>${sgEsc(s.show)}${p.mapped ? '' : ' <span class="other">その他</span>'}</span>`;
   }).join('') + (mineOn ? '' : `<span><i style="background:${SG_USE_HEX}"></i>利用児童</span>`) + `<span>☆迎え　<u>★送り</u>（色は担当）</span>`;
+  const canEdit = !!(opt && opt.canEdit);
+  const openAttr = id => (canEdit && id != null && id !== '') ? ` onclick="event.stopPropagation();sgEvOpen(${typeof id === 'number' ? id : "'" + String(id).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"})"` : '';
   const chips = allDay.map(e => {
     const p = sgEventPaint(e, { demo });
     const style = p ? ` style="background:${p.hex};color:${p.ink}"` : '';
     const who = (e.kind === '迎え' || e.kind === '送り') && !e.staff ? ' 未定' : '';
     const text = `${sgKind(e)} ${sgLines(e).filter(Boolean).join('、')}${who}`;
-    return `<span class="sg-chip${p ? '' : ' neutral'}"${style}>${sgEsc(text)}</span>`;
+    return `<span class="sg-chip${p ? '' : ' neutral'}"${style}${openAttr(e.id)}>${sgEsc(text)}</span>`;
   }).join('');
   const lines = [];
   for (let t = start; t <= end; t += 60) lines.push(`<span class="sg-line" style="top:${(t - start) / 60 * PX}px"></span>`);
@@ -391,14 +397,16 @@ function sgDayHtml(day, evs, care, opt) {
     const careLine = (ev.kind === '利用' || ev.kind === '休み') && care && care[sgNk(ev.child)] ? `⚠ ${care[sgNk(ev.child)]}` : '';
     const body = sgLines(ev).concat(careLine ? [careLine] : []).map(sgEsc).join('\n');
     const tip = `${sgKind(ev)} ${when} ${sgLines(ev).join(' / ')} ${shown}`.trim();
-    return `<div class="${cls}" style="${style}" title="${sgEsc(tip)}"><div class="k">${sgEsc(sgKind(ev))} ${when}${who ? '　' + who : ''}</div><div class="nm">${body}</div></div>`;
+    return `<div class="${cls}" style="${style}"${openAttr(ev.id)} title="${sgEsc(tip)}"><div class="k">${sgEsc(sgKind(ev))} ${when}${who ? '　' + who : ''}</div><div class="nm">${body}</div></div>`;
   }).join('');
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';
   const [, mm, dd] = day.split('-');
   const todayArg = typeof today === 'function' ? today() : day;
+  const addBtn = canEdit ? `<p class="sg-add"><button type="button" onclick="sgEditNew('${day}')">＋ 予定を追加</button></p>` : '';
+  const slot = canEdit ? ` data-start="${start}" data-px="${PX}" onclick="sgEditSlot('${day}', event)"` : '';
   return `<div class="sg-page">${sgCss()}<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${todayArg}')">今日</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" class="sg-mine${mineOn ? ' sg-on' : ''}" aria-pressed="${mineOn ? 'true' : 'false'}" onclick="sgToggleMine()">自分の担当</button></div>
-    ${mineNote}<div class="sg-leg">${legend}</div>
-    <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px;min-width:${Math.max(240, maxCols * 132)}px">${lines.join('')}${blocks}${nowEl}</div></div></div></div>
+    ${addBtn}${mineNote}<div class="sg-leg">${legend}</div>
+    <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px;min-width:${Math.max(240, maxCols * 132)}px"${slot}>${lines.join('')}${blocks}${nowEl}</div></div></div></div>
     <p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>
     <p class="sg-foot">利用児童は山吹色、送迎の色は担当ごとです。一覧に無い担当は赤です。☆は迎え、下線の★は送りです。</p></div>`;
 }
@@ -417,6 +425,7 @@ async function sgLoad(a, b, mode, anchor) {
   }
   const LEFT = typeof loadLeftIndex === 'function' ? await loadLeftIndex() : {};
   evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(evs || [], LEFT) : (evs || []);
+  evs = evs.filter(e => typeof leoCalHidden !== 'function' || !leoCalHidden(e));
   return evs.filter(e => e.day >= a && e.day <= b);
 }
 async function leoHomeCal() {
@@ -444,7 +453,25 @@ async function renderSgDay(day) {
       } catch (e) { /* 配慮が読めなくても予定は出す */ }
     }
     const me = typeof myName === 'function' ? await myName().catch(() => '') : '';
-    $('view').innerHTML = back + sgDayHtml(day, evs, care, { me: me || '', mine: SG_MINE });
+    const canEdit = sgCanEditCal(me);
+    if (!canEdit || (SG_EDIT && SG_EDIT.day !== day)) sgClearEdit();
+    let form = '';
+    if (canEdit && SG_EDIT && SG_EDIT.day === day && typeof calForm === 'function') {
+      const row = SG_EDIT.id === 'new'
+        ? { day, kind: '利用', kids: [], start_time: SG_EDIT.start || '' }
+        : (evs.find(x => String(x.id) === String(SG_EDIT.id)) || { day, kind: '利用', kids: [] });
+      if (typeof CAL !== 'undefined') { CAL.edit = SG_EDIT.id; CAL.d = day; CAL.row = row.id ? row : null; }
+      window.sgCalReturn = () => {
+        const backDay = (typeof CAL !== 'undefined' && CAL.d) || day;
+        sgClearEdit();
+        renderSgDay(backDay);
+      };
+      const names = evs.flatMap(e => [e.child, ...(e.kids || [])]).filter(Boolean);
+      const staffs = evs.map(e => e.staff).filter(Boolean);
+      form = calForm(row, [...new Set(names)].sort(), [...new Set(staffs)].sort());
+    }
+    $('view').innerHTML = back + form + sgDayHtml(day, evs, care, { me: me || '', mine: SG_MINE, canEdit });
+    if (form) { const box = document.querySelector('#cf_day'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'start' }); }
     sgArmNow();
   } catch (e) { $('view').innerHTML = back + `<p>${sgEsc(e.message)}</p>`; }
 }
@@ -482,7 +509,55 @@ window.sgToggleMine = () => {
   const m = decodeURIComponent(location.hash || '').match(/leo\/day\/(\d{4}-\d{2}-\d{2})/);
   if (m) renderSgDay(m[1]);
 };
-window.sgOpenCal = d => { if (typeof CAL !== 'undefined') { CAL.d = d; CAL.mode = 'day'; } location.hash = 'leo/cal'; };
+function sgCanEditCal(me) {
+  const role = typeof ROLE !== 'undefined' ? ROLE : '';
+  const duty = typeof DUTY !== 'undefined' ? DUTY : '';
+  if (role === '事務' || duty === '児発管' || duty === '管理者') return true;
+  let key = '';
+  try { key = String(me || '').normalize('NFKC'); } catch (err) { key = String(me || ''); }
+  return key.replace(/[\s\u3000]/g, '') === '中村友香';
+}
+let SG_EDIT = null;
+function sgClearEdit() {
+  SG_EDIT = null;
+  window.SG_EDIT = null;
+  if (window.sgCalReturn) {
+    window.sgCalReturn = null;
+    if (typeof CAL !== 'undefined' && CAL) { CAL.edit = null; CAL.row = null; }
+  }
+}
+function sgStartEdit(day, id, start) {
+  SG_EDIT = { day, id, start: start || '' };
+  window.SG_EDIT = SG_EDIT;
+  renderSgDay(day);
+}
+window.sgEditNew = day => { if (/^\d{4}-\d{2}-\d{2}$/.test(day)) sgStartEdit(day, 'new', ''); };
+window.sgEvOpen = id => {
+  const m = decodeURIComponent(location.hash || '').match(/leo\/day\/(\d{4}-\d{2}-\d{2})/);
+  if (!m || id == null || id === '') return;
+  sgStartEdit(m[1], id, '');
+};
+window.sgEditSlot = (day, ev) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  const t = ev && ev.target;
+  if (t && t.closest && t.closest('.sg-ev, .sg-chip')) return;
+  const canvas = ev && ev.currentTarget;
+  const startMin = canvas && canvas.dataset.start != null ? +canvas.dataset.start : 9 * 60;
+  const px = canvas && canvas.dataset.px ? +canvas.dataset.px : 72;
+  const y = ev && ev.offsetY != null ? ev.offsetY : 0;
+  let mins = startMin + Math.round((y / (px || 72)) * 60 / 5) * 5;
+  if (mins < 0) mins = 0;
+  if (mins > 23 * 60 + 55) mins = 23 * 60 + 55;
+  const pad = n => String(n).padStart(2, '0');
+  sgStartEdit(day, 'new', pad(Math.floor(mins / 60)) + ':' + pad(mins % 60));
+};
+window.sgOpenCal = d => {
+  sgClearEdit();
+  if (typeof CAL !== 'undefined') { CAL.d = d; CAL.mode = 'day'; CAL.edit = null; CAL.row = null; }
+  location.hash = 'leo/cal';
+};
+window.sgCanEditCal = sgCanEditCal;
+window.sgClearEdit = sgClearEdit;
 window.leoHomeCal = leoHomeCal;
 window.renderSgDay = renderSgDay;
 window.sgMonthHtml = sgMonthHtml;

@@ -208,7 +208,7 @@ function calRoster(d, es, care, win) {
 function calOff(es) {
   const off = es.filter(e => e.kind === '休み');
   if (!off.length) return '';
-  return `<div class="calv-off">${off.map(e => `<span class="calv-chip">${calTag('休み')} ${esc(e.child)}${calEd(e)}</span>`).join('')}</div>`;
+  return `<div class="calv-off">${off.map(e => `<span class="calv-chip">${calTag('休み')} ${esc(e.child)}${e.title === '欠席（欠席時対応加算）' || e.title === 'キャンセル' ? ' ' + esc(e.title) : ''}${calEd(e)}</span>`).join('')}</div>`;
 }
 function calBanners(es) {
   return es.filter(e => e.kind === '休所' || e.kind === 'その他').map(e => `<p class="calv-banner">${calTag(e.kind)} ${esc(e.title || e.note || '')}${calEd(e)}</p>`).join('');
@@ -341,20 +341,91 @@ function calCss() {
 }
 function calWrap(inner) { return `<div class="calv">${calCss()}${inner}</div>`; }
 
+function leoBizOpen(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return false;
+  const [y, m, d] = String(iso).split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  if (dow === 0) return false;
+  const hol = typeof JP_HOLIDAYS !== 'undefined' && JP_HOLIDAYS && typeof JP_HOLIDAYS.has === 'function' && JP_HOLIDAYS.has(iso);
+  if (hol) return false;
+  if (typeof JP_HOLIDAYS === 'undefined') return dow >= 1 && dow <= 5;
+  return dow >= 1 && dow <= 6;
+}
+function leoAbsentAuto(useDay, contact) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(useDay || '')) || !/^\d{4}-\d{2}-\d{2}$/.test(String(contact || ''))) return 'キャンセル';
+  if (contact > useDay) return 'キャンセル';
+  if (contact === useDay) return '欠席';
+  let prev = useDay, b2 = '', found = 0;
+  for (let i = 0; i < 21 && found < 2; i++) {
+    prev = calAdd(prev, -1);
+    if (leoBizOpen(prev)) { found++; if (found === 2) b2 = prev; }
+  }
+  if (!b2) return 'キャンセル';
+  return contact >= b2 ? '欠席' : 'キャンセル';
+}
+function leoAbsSplit(e) {
+  const lines = String((e && e.note) || '').split('\n');
+  let contact = '', cls = '', rest = [];
+  for (const line of lines) {
+    const c = line.match(/^連絡日[:：]\s*(\d{4}-\d{2}-\d{2})\s*$/);
+    const k = line.match(/^区分[:：]\s*(.+?)\s*$/);
+    if (c) contact = c[1];
+    else if (k) cls = k[1];
+    else if (line.trim()) rest.push(line);
+  }
+  if (!cls && e && (e.title === '欠席（欠席時対応加算）' || e.title === 'キャンセル')) cls = e.title;
+  return { contact, cls, memo: rest.join('\n') };
+}
+function calAbsBox(e) {
+  const abs = leoAbsSplit(e);
+  const contact = abs.contact || (typeof today === 'function' ? today() : '');
+  const auto = leoAbsentAuto(e.day || '', contact);
+  const stored = abs.cls === '欠席（欠席時対応加算）' ? '欠席' : abs.cls === 'キャンセル' ? 'キャンセル' : '';
+  const pick = !stored || (stored === '欠席' && auto === '欠席') || (stored === 'キャンセル' && auto === 'キャンセル') ? 'auto' : (stored === '欠席' ? 'kesseki' : 'cancel');
+  const autoLabel = auto === '欠席' ? '欠席（欠席時対応加算）' : 'キャンセル';
+  return `<div id="cf_abs_box"${e.kind === '休み' ? '' : ' hidden'}><p>連絡日 <input type="date" id="cf_contact" value="${esc(contact)}" onchange="calAbsSync()"></p>
+  <p>区分<br>
+  <label><input type="radio" name="cf_abs" value="auto"${pick === 'auto' ? ' checked' : ''} onchange="calAbsSync()"> 自動（<span id="cf_abs_auto">${esc(autoLabel)}</span>）</label><br>
+  <label><input type="radio" name="cf_abs" value="kesseki"${pick === 'kesseki' ? ' checked' : ''}> 欠席（欠席時対応加算）</label><br>
+  <label><input type="radio" name="cf_abs" value="cancel"${pick === 'cancel' ? ' checked' : ''}> キャンセル</label></p>
+  <p class="note">営業日は月〜土から日本の祝日を除いた日です（レオの営業日カレンダーは無いため。日曜は数えません）。連絡日が利用日の当日・1営業日前・2営業日前なら欠席時対応、それより前はキャンセルです。欠席時対応は休みとしてカレンダーに残します。キャンセルは利用と、その子の迎え・送りを予定から外します。日誌・実績記録・請求の印には書きません。</p></div>`;
+}
+window.calAbsSync = () => {
+  const day = document.getElementById('cf_day'), contact = document.getElementById('cf_contact'), el = document.getElementById('cf_abs_auto');
+  if (!day || !contact || !el) return;
+  const auto = leoAbsentAuto(day.value, contact.value);
+  el.textContent = auto === '欠席' ? '欠席（欠席時対応加算）' : 'キャンセル';
+};
+window.calKindChange = () => {
+  const box = document.getElementById('cf_abs_box'), kind = document.getElementById('cf_kind');
+  if (box && kind) box.hidden = kind.value !== '休み';
+  if (typeof calAbsSync === 'function') calAbsSync();
+};
 function calForm(e, kids, staffs) {
   const v = k => esc(e[k] ?? ''), opt = (l, cur) => l.map(x => `<option${x === cur ? ' selected' : ''}>${esc(x)}</option>`).join('');
+  const memo = leoAbsSplit(e).memo;
   return `<div style="border:2px solid #06c;border-radius:8px;padding:8px;margin:8px 0"><b>${e.id ? '予定を直す' : '予定を追加'}</b>
   <datalist id="calkids">${kids.map(k => `<option value="${esc(k)}">`).join('')}</datalist><datalist id="calstaff">${staffs.map(k => `<option value="${esc(k)}">`).join('')}</datalist>
-  <p>日付 <input type="date" id="cf_day" value="${v('day')}"> 種類 <select id="cf_kind">${opt(['利用', '休み', '迎え', '送り', '勤務', '不在', '休所', 'その他'], e.kind)}</select></p>
+  <p>日付 <input type="date" id="cf_day" value="${v('day')}" onchange="calAbsSync()"> 種類 <select id="cf_kind" onchange="calKindChange()">${opt(['利用', '休み', '迎え', '送り', '勤務', '不在', '休所', 'その他'], e.kind)}</select></p>
   <p>児童（利用・休み） <input id="cf_child" list="calkids" value="${v('child')}"></p>
   <p>乗る順（迎え・送り、「→」区切り） <input id="cf_kids" list="calkids" value="${esc((e.kids || []).join(' → '))}" style="width:95%"></p>
   <p>職員・運転 <input id="cf_staff" list="calstaff" value="${v('staff')}"></p>
   <p>時刻 <input type="time" id="cf_st" value="${v('start_time')}">〜<input type="time" id="cf_en" value="${v('end_time')}"></p>
   <p><label><input type="checkbox" id="cf_pd"${e.parent_drop ? ' checked' : ''}> 保護者が送ってくる（☆なし）</label><br><label><input type="checkbox" id="cf_pp"${e.parent_pick ? ' checked' : ''}> 保護者が迎えに来る（★なし）</label></p>
-  <p>場所 <input id="cf_place" value="${v('place')}" style="width:95%"></p><p>メモ <input id="cf_note" value="${v('note')}" style="width:95%"></p>
+  <p>場所 <input id="cf_place" value="${v('place')}" style="width:95%"></p><p>メモ <input id="cf_note" value="${esc(memo)}" style="width:95%"></p>
+  ${calAbsBox(e)}
   ${e.source === 'google' ? '<p class="note">Googleカレンダーから取り込んだ予定です。ここで直すとポータルの予定になり、以後Google側の変更では上書きされません。</p>' : ''}
-  <button onclick="calSave()">保存</button> <button onclick="CAL.edit=null;renderLeoView('cal')">やめる</button>${e.id ? ` <button onclick="calDel()" style="color:#b33">削除</button>` : ''}</div>`;
+  <button onclick="calSave()">保存</button> <button onclick="calCancel()">やめる</button>${e.id ? ` <button onclick="calDel()" style="color:#b33">削除</button>` : ''}</div>`;
 }
+function calAfter() {
+  const ret = window.sgCalReturn;
+  window.sgCalReturn = null;
+  CAL.edit = null;
+  CAL.row = null;
+  if (typeof ret === 'function') return ret();
+  renderLeoView('cal');
+}
+window.calCancel = () => calAfter();
 window.calOpen = d => { CAL.d = d; CAL.mode = 'day'; renderLeoView('cal'); };
 window.calMode = m => { CAL.mode = m; renderLeoView('cal'); };
 window.calMove = n => {
@@ -362,7 +433,7 @@ window.calMove = n => {
   else CAL.d = calAdd(CAL.d, n * (CAL.mode === 'week' ? 7 : 1));
   renderLeoView('cal');
 };
-window.calEdit = id => { CAL.edit = id; renderLeoView('cal'); window.scrollTo(0, 0); };
+window.calEdit = id => { window.sgCalReturn = null; CAL.row = null; CAL.edit = id; renderLeoView('cal'); window.scrollTo(0, 0); };
 window.calFlip = key => {
   if (!/^[0-9A-Za-z_-]+$/.test(String(key))) return;
   const more = document.getElementById('cm' + key);
@@ -376,6 +447,30 @@ window.calFlip = key => {
     more.scrollIntoView({ block: 'nearest' });
   }
 };
+async function calDropChild(day, child, keepId) {
+  let evs = [];
+  try { evs = await sb('leo_events?day=eq.' + day + '&kind=in.(利用,迎え,送り)&select=id,kind,child,kids,staff,day'); } catch (e) { return; }
+  const key = nk(child);
+  const stamp = () => new Date().toISOString();
+  for (const e of evs || []) {
+    if (keepId && String(e.id) === String(keepId)) continue;
+    const kids = (e.kids && e.kids.length) ? e.kids : (e.child ? [e.child] : []);
+    const mine = e.kind === '利用' ? nk(e.child) === key : kids.some(k => nk(k) === key);
+    if (!mine) continue;
+    const tomb = { day, kind: e.kind, child: e.kind === '利用' ? (e.child || child) : null, kids: e.kind === '利用' ? [] : [child], staff: e.staff || null,
+      start_time: null, end_time: null, parent_drop: false, parent_pick: false, place: null, note: 'カレンダーで削除', title: 'カレンダーで削除', source: 'portal', updated_at: stamp() };
+    if (e.kind === '利用') {
+      await sb('leo_events?id=eq.' + e.id, { method: 'DELETE' });
+      await sb('leo_events', { method: 'POST', body: JSON.stringify(tomb) });
+      continue;
+    }
+    const rest = kids.filter(k => nk(k) !== key);
+    if (!rest.length) await sb('leo_events?id=eq.' + e.id, { method: 'DELETE' });
+    else await sb('leo_events?id=eq.' + e.id, { method: 'PATCH', body: JSON.stringify({ kids: rest, child: null, source: 'portal', updated_at: stamp() }) });
+    tomb.updated_at = stamp();
+    await sb('leo_events', { method: 'POST', body: JSON.stringify(tomb) });
+  }
+}
 window.calSave = async () => {
   if (DEMO) return alert('見本モードでは保存しません。');
   const g = id => document.getElementById(id), body = { day: g('cf_day').value, kind: g('cf_kind').value, child: g('cf_child').value.trim() || null,
@@ -383,23 +478,45 @@ window.calSave = async () => {
     start_time: g('cf_st').value || null, end_time: g('cf_en').value || null, parent_drop: g('cf_pd').checked, parent_pick: g('cf_pp').checked,
     place: g('cf_place').value.trim() || null, note: g('cf_note').value.trim() || null, source: 'portal', updated_at: new Date().toISOString() };
   if (!body.day) return alert('日付を入れてください');
+  let abs = null;
+  if (body.kind === '休み' && body.child) {
+    const contact = (g('cf_contact') && g('cf_contact').value) || '';
+    if (!contact) return alert('連絡日を入れてください');
+    const picked = document.querySelector('input[name=cf_abs]:checked');
+    const mode = picked ? picked.value : 'auto';
+    const auto = leoAbsentAuto(body.day, contact);
+    const cls = mode === 'kesseki' ? '欠席' : mode === 'cancel' ? 'キャンセル' : auto;
+    const label = cls === '欠席' ? '欠席（欠席時対応加算）' : 'キャンセル';
+    body.title = label;
+    body.note = ['連絡日:' + contact, '区分:' + label, body.note].filter(Boolean).join('\n').slice(0, 500);
+    abs = cls;
+  } else if (CAL.row && (CAL.row.title === '欠席（欠席時対応加算）' || CAL.row.title === 'キャンセル')) body.title = null;
   try {
     if (CAL.edit && CAL.edit !== 'new') await sb('leo_events?id=eq.' + CAL.edit, { method: 'PATCH', body: JSON.stringify(body) });
     else await sb('leo_events', { method: 'POST', body: JSON.stringify(body) });
-    CAL.d = body.day; CAL.edit = null; renderLeoView('cal');
+    if (abs === 'キャンセル' && body.child) await calDropChild(body.day, body.child, CAL.edit);
+    CAL.d = body.day; calAfter();
   } catch (e) { alert(e.message); }
 };
 window.calDel = async () => {
-  if (DEMO) return alert('見本モードでは削除しません。');
   if (!confirm('この予定を削除しますか？')) return;
+  if (DEMO) return alert('見本モードでは削除しません。');
+  const row = CAL.row;
   await sb('leo_events?id=eq.' + CAL.edit, { method: 'DELETE' });
-  CAL.edit = null; renderLeoView('cal');
+  if (row && (row.kind === '利用' || row.kind === '迎え' || row.kind === '送り')) {
+    const tomb = { day: row.day, kind: row.kind, child: row.child || null, kids: row.kids || [], staff: row.staff || null,
+      start_time: null, end_time: null, parent_drop: false, parent_pick: false, place: null, note: 'カレンダーで削除', title: 'カレンダーで削除',
+      source: 'portal', updated_at: new Date().toISOString() };
+    await sb('leo_events', { method: 'POST', body: JSON.stringify(tomb) });
+  }
+  calAfter();
 };
 
 LEO_VIEWS.cal = async function () {
   CAL.d = CAL.d || today();
   const [evs0, cc, ch, LEFT] = await Promise.all([calLoad(), DEMO ? [] : sb('leo_child_care?select=child,note').catch(() => []), canManage() && !DEMO ? sb('leo_children?select=name').catch(() => []) : [], loadLeftIndex()]);
-  const evs = filterEventsByLeft(evs0, LEFT);
+  const shown = (evs0 || []).filter(e => typeof leoCalHidden !== 'function' || !leoCalHidden(e));
+  const evs = filterEventsByLeft(shown, LEFT);
   const care = Object.fromEntries(cc.filter(x => x.note).map(x => [nk(x.child), x.note]));
   if (DEMO) care[nk('児童B')] = '（見本）車に乗るとき、抱っこが必要です。';
   const [a, b] = calRange(), btn = (m, l) => `<button onclick="calMode('${m}')"${CAL.mode === m ? ' style="font-weight:bold;background:#e8833a;color:#fff"' : ''}>${l}</button>`;
@@ -410,6 +527,7 @@ LEO_VIEWS.cal = async function () {
     ${canManage() ? ` <button onclick="calEdit('new')">＋追加</button>` : ''}</p>`;
   if (CAL.edit) {
     const e = CAL.edit === 'new' ? { day: CAL.d, kind: '利用', kids: [] } : evs.find(x => x.id === CAL.edit) || {};
+    CAL.row = e.id ? e : null;
     h += calForm(e, [...new Set([...ch.map(x => x.name), ...evs.map(x => x.child).filter(Boolean)])].sort(), [...new Set(evs.map(x => x.staff).filter(Boolean))].sort());
   }
   h += calWrap(`<p class="calv-date">${head}</p><p class="calv-hint">横軸は時刻、色の棒は児童の利用時間です。棒をタップすると、迎え（☆）・送り（★）の担当・時刻・場所と、保護者の備考が出ます。</p>${body}`);

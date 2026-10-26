@@ -226,5 +226,35 @@ const bare = sgDayHtml('2026-10-27', evs, {}, { demo: false, today: '2026-10-26'
 assert.ok(bare.includes('終日'), '時刻のない予定は終日');
 assert.ok(bare.includes('未定'));
 assert.ok(!bare.includes('data-sg-now'), '今日以外に現在時刻の線は出さない');
+assert.ok(!day.includes('予定を追加') && !day.includes('sgEvOpen') && !day.includes('sgEditSlot'), '直す権限が無い日は今までどおり');
+
+const editableEvs = evs.map((e, i) => ({ ...e, id: i + 1 }));
+const edit = sgDayHtml('2026-10-26', editableEvs, {}, { demo: true, today: '2026-10-26', canEdit: true });
+assert.ok(edit.includes('予定を追加') && edit.includes('sgEditNew(') && edit.includes('sgEvOpen(') && edit.includes('sgEditSlot('));
+assert.ok(edit.includes('min-height:44px'));
+const top = edit.slice(edit.indexOf('class="sg-top"'), edit.indexOf('</div>'));
+assert.ok(!top.includes('予定を追加'), '追加ボタンは日付の行の外');
+assert.ok(edit.indexOf('予定を追加') > edit.indexOf('</div>'));
+
+sandbox.ROLE = '職員'; sandbox.DUTY = '児発管';
+assert.strictEqual(sandbox.sgCanEditCal('職員X'), true);
+sandbox.DUTY = '管理者';
+assert.strictEqual(sandbox.sgCanEditCal('職員Y'), true);
+sandbox.ROLE = '事務'; sandbox.DUTY = '現場支援員';
+assert.strictEqual(sandbox.sgCanEditCal(''), true);
+sandbox.ROLE = '職員'; sandbox.DUTY = '現場支援員';
+assert.strictEqual(sandbox.sgCanEditCal('中村 友香'), true);
+assert.strictEqual(sandbox.sgCanEditCal('中村\u3000友香'), true);
+assert.strictEqual(sandbox.sgCanEditCal('中村友香'), true);
+assert.strictEqual(sandbox.sgCanEditCal('中村'), false);
+assert.strictEqual(sandbox.sgCanEditCal('友香'), false);
+assert.strictEqual(sandbox.sgCanEditCal('中村文'), false);
+assert.strictEqual(sandbox.sgCanEditCal('中村 亮仁'), false);
+assert.strictEqual(sandbox.sgCanEditCal(''), false);
+const cfg = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
+assert.ok(!/'事務': \[[^\]]*児童の利用・送迎予定/.test(cfg), '事務の仕事から予定タイルを外す');
+assert.ok(!/中村 友香がする', \[[^\]]*児童の利用・送迎予定/.test(cfg), '中村の欄から予定タイルを外す');
+assert.ok(cfg.includes("'#leo/cal'"), '予定の画面は残す');
+assert.ok(cfg.includes("その他', ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定'"));
 
 console.log('leo_home_cal_test ok');
