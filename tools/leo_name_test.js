@@ -80,10 +80,17 @@ const core = block(name, '-- BEGIN leo_sched_plan_core', '-- END leo_sched_plan_
 for (const text of [left, sched, build]) assert.strictEqual(block(text, '-- BEGIN leo_name_helpers', '-- END leo_name_helpers'), helpers);
 for (const text of [left, build]) assert.strictEqual(block(text, '-- BEGIN leo_sched_plan_core', '-- END leo_sched_plan_core'), core);
 assert.ok(!/insert\s+into\s+leo_events/i.test(core));
+assert.ok(core.includes('未回答のため予定を作りません'));
+assert.ok(core.includes("r.kind = 'ambiguous'"));
+assert.ok(!core.includes('型表の「毎週」どおりで作成'));
 const planStart = build.indexOf('create or replace function public.leo_sched_plan(');
 const commitStart = build.indexOf('create or replace function public.leo_sched_commit(');
 assert.ok(planStart >= 0 && commitStart > planStart);
 assert.ok(!/insert\s+into\s+leo_events/i.test(build.slice(planStart, commitStart)));
+const commitFn = build.slice(commitStart);
+assert.ok(commitFn.includes('_regen'), '確定は今回の児童だけ入れ替える');
+assert.ok(!commitFn.includes("kind in ('利用','休み','迎え','送り')"), '月の kata 行をまとめて消さない');
+assert.ok(commitFn.includes("e.source = 'kata'"));
 assert.ok(sched.includes('cname := public.leo_name_canon'));
 assert.ok(read('leo.js').includes('uiCanon(raw) !== name'));
 

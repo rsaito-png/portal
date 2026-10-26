@@ -154,19 +154,34 @@
       return x.href;
     } catch (e) { return ''; }
   }
-  // Stripe の checkout.session.* を、入金確定にしてよいかに分ける。金額の一致は呼び出し側で見る。
-  function stripeDecision(event) {
+  const PAY_METHOD = { square: 'Square', bank: '振込', none: 'なし', stripe: '旧カード' };
+  function methodLabel(method) { return PAY_METHOD[method] || method || ''; }
+  // Square の payment.created / payment.updated を、入金確定にしてよいかに分ける。金額の一致は呼び出し側で見る。
+  // supabase/functions/_shared/square.ts の squareDecision と同じ。
+  // COMPLETED かつ JPY かつ合計が請求額と一致するときだけ pay。APPROVED / FAILED / CANCELED は入金にしない。
+  function squareDecision(event) {
     const type = event && event.type;
     const obj = (event && event.data && event.data.object) || {};
-    const paymentId = (obj.metadata && obj.metadata.payment_id) || obj.client_reference_id || null;
-    const base = { sessionId: obj.id || null, paymentId, amount: obj.amount_total, currency: obj.currency || null, plan: obj.metadata && obj.metadata.plan, paymentIntent: typeof obj.payment_intent === 'string' ? obj.payment_intent : (obj.payment_intent && obj.payment_intent.id) || null };
-    if (type === 'checkout.session.expired' || type === 'checkout.session.async_payment_failed') return { action: 'fail', ...base };
-    if (type === 'checkout.session.completed' || type === 'checkout.session.async_payment_succeeded') {
-      if (obj.payment_status !== 'paid') return { action: 'ignore', reason: 'unpaid', ...base };
-      if (obj.currency && obj.currency !== 'jpy') return { action: 'ignore', reason: 'currency', ...base };
-      return { action: 'pay', ...base };
-    }
-    return { action: 'ignore', reason: type || 'unknown', ...base };
+    const payment = obj.payment || (obj.status || obj.amount_money ? obj : {});
+    const money = payment.amount_money || {};
+    const total = payment.total_money || null;
+    const note = typeof payment.note === 'string' ? payment.note.trim() : '';
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const base = {
+      paymentId: uuid.test(note) ? note : null,
+      orderId: typeof payment.order_id === 'string' ? payment.order_id : null,
+      squarePaymentId: typeof payment.id === 'string' ? payment.id : null,
+      amount: money.amount,
+      total: total ? total.amount : undefined,
+      currency: money.currency || null,
+    };
+    if (type !== 'payment.updated' && type !== 'payment.created') return { action: 'ignore', reason: type || 'unknown', ...base };
+    const status = typeof payment.status === 'string' ? payment.status : '';
+    if (status !== 'COMPLETED') return { action: 'ignore', reason: status ? status.toLowerCase() : 'unpaid', ...base };
+    if (typeof money.amount !== 'number' || !Number.isFinite(money.amount)) return { action: 'ignore', reason: 'amount', ...base };
+    if (String(money.currency || '').toUpperCase() !== 'JPY') return { action: 'ignore', reason: 'currency', ...base };
+    if (total && total.amount != null && Number(total.amount) !== Number(money.amount)) return { action: 'ignore', reason: 'total', ...base };
+    return { action: 'pay', ...base };
   }
   function b64json(data) {
     const s = String(data || '').replace(/-/g, '+').replace(/_/g, '/');
@@ -204,7 +219,7 @@
   const api = {
     SUBJECTS, LICENSES, PRICES, REFUND_POLICY, esc, jstDate, jstYear, daysBefore, minutesBetween,
     pricePlan, requiredSubjectIds, countedMinutes, progress, refundSuggestion, annualRows, toCsv, csvCell,
-    safeUrl, stripeDecision, parseMeetPush, certSubjects,
+    safeUrl, methodLabel, squareDecision, parseMeetPush, certSubjects,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Sct = api;
