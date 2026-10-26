@@ -1169,6 +1169,28 @@ async function staffMon(name, term, cur) {
 // ===== 配置表・型表・管理表の入力（児発管・管理者・事務）＋ 送迎の配慮 =====
 const MASTER_LABEL = { kata: '送迎 型表', keikaku: '個別支援計画 管理表', haichi: '職員配置表', care: '送迎の配慮（児童ごと）' };
 let MASTER_KIND = 'kata';
+// 型表の画面上の列順だけ。data-c は保存されている列名のまま（迎え時間＝迎え開始、送り時間＝送り終了、送り場所＝送り場所（空欄なら自宅））。ここに無い列は今の順でうしろ。
+const KATA_COL_SLOTS = [
+  ['曜日'], ['児童名'], ['利用週'], ['利用開始'], ['利用終了'], ['迎え順'],
+  ['迎え開始', '迎え時間'], ['迎え場所'], ['迎え担当'], ['送り順'],
+  ['送り終了', '送り時間'], ['送り場所（空欄なら自宅）', '送り場所'], ['送り担当'],
+];
+function orderKataCols(cols) {
+  const left = [...cols];
+  const out = [];
+  for (const names of KATA_COL_SLOTS) {
+    let picked = -1;
+    for (const n of names) { const i = left.indexOf(n); if (i >= 0) { picked = i; break; } }
+    if (picked >= 0) out.push(left.splice(picked, 1)[0]);
+  }
+  return out.concat(left);
+}
+// 型表の見出しだけ。保存する列名（data-c）は変えない。
+function kataColLabel(c) {
+  if (c === '迎え開始') return '迎え時間';
+  if (c === '送り終了') return '送り時間';
+  return c;
+}
 LEO_VIEWS.master = async function () {
   if (!canManage()) return '<p>この画面は児発管・管理者・事務だけです。</p>';
   const tabs = '<p class="ptabs">' + Object.entries(MASTER_LABEL).map(([k, l]) => `<button class="${k === MASTER_KIND ? 'on' : ''}" onclick="MASTER_KIND='${k}';renderLeoView('master')">${l}</button>`).join('') + '</p>';
@@ -1179,10 +1201,12 @@ LEO_VIEWS.master = async function () {
       ${kids.map(k => `<label>${esc(k)}${leftDone(LEFT, k, tday) ? '（退所）' : leftOnOf(LEFT, k) ? '（退所予定）' : ''}<input class="care" data-c="${esc(k)}" value="${esc(C2[k] || '')}"></label>`).join('')}<button onclick="saveCare()">保存</button><div id="ms_msg"></div>`;
   }
   const own = DEMO ? [] : await sb(`leo_master?kind=eq.${MASTER_KIND}&order=row_no`), g = DEMO ? DEMO_DATA[MASTER_KIND] : (await sb(`leo_sheet?kind=eq.${MASTER_KIND}&order=row_no`)).map(r => r.data);
-  const rows = own.length ? own.map(r => r.data) : g, cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
+  const rows = own.length ? own.map(r => r.data) : g;
+  let cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
+  if (MASTER_KIND === 'kata') cols = orderKataCols(cols);
   return `<h3>${MASTER_LABEL[MASTER_KIND]}の入力</h3>${demoNote()}${tabs}
     <p class="note">${own.length ? 'ポータルで入力した内容です（ポータルの画面はこちらを使います）。' : 'まだポータルで入力していません。下はGoogleの表の写しです。「保存」するとポータルの表になります（Googleの表は変わりません）。'}11/1まではGoogleの表も今まで通り使ってください。文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
-    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)"></td>`).join('')}</tr>`).join('')}</table></div>
+    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)"></td>`).join('')}</tr>`).join('')}</table></div>
     <button onclick="renderLeoView('master').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
 };
 // 型表などの入力欄。短い列は中身（曜日は1文字、時刻は HH:MM）に合わせ、見出しは折り返す。保存する中身は変えない。
@@ -1231,7 +1255,7 @@ function fitMasterSheet() {
   });
   table.querySelectorAll('input').forEach(inp => { inp.style.width = byCol[inp.dataset.c] + 'px'; });
   table.querySelectorAll('th').forEach(th => {
-    const w = byCol[th.textContent];
+    const w = byCol[th.dataset.c || th.textContent];
     if (!w) return;
     th.style.width = w + 'px';
     th.style.maxWidth = w + 'px';
