@@ -1,17 +1,25 @@
 // 評定所＝全体の報連相。全職員と会長が投稿・閲覧・返信（supabase/hyojosho_open.sql の RLS）。会長のリアクションは会長のみ
+// 一旦保留。true のあいだは総合トップのタイルを出さず、#leaderboard は案内だけ。戻すときは false（投稿・表・RLSはそのまま）。
+const HYOJOSHO_HOLD = true;
 const LB = { ok: null, chair: false, office: '' };
 async function lbRpc(fn) { const s = JSON.parse(localStorage.getItem('sess') || '{}'); const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' }); return r.ok && (await r.json()) === true; }
 async function lbCheck() { if (DEMO) return false; if (LB.ok === null) { try { [LB.ok, LB.chair] = await Promise.all([lbRpc('is_staff'), lbRpc('is_chair')]); } catch (e) { LB.ok = false; } } return LB.ok; }
 // 総合トップの評定所タイルに、会長だけ「未返信」バッジ
 async function lbBadge() {
+  if (HYOJOSHO_HOLD) return;
   if (!(await lbCheck()) || !LB.chair) return;
   const a = document.querySelector('#view .grid a[href="#leaderboard"]'); if (!a || a.querySelector('.badge')) return;
   try { const n = (await sb('leader_post?select=id&replied_at=is.null')).length; if (n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未返信 ${n}</span>`); } catch (e) {}
 }
 const lbT = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const LB_KC = { '報告': '#2e6b9f', '連絡': '#2e8b57', '相談': '#b8860b' };
+function lbHoldHtml() {
+  const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
+  return back + '<h3>🏯 評定所</h3><p>評定所はいま保留にしています。報告・連絡・相談は<a href="#banto">番頭さん</a>へ送ってください。</p>';
+}
 async function renderLeaderBoard() {
   const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
+  if (HYOJOSHO_HOLD) return $('view').innerHTML = lbHoldHtml();
   if (DEMO) return $('view').innerHTML = back + '<h3>評定所</h3><p>見本モードでは表示しません。</p>';
   $('view').innerHTML = '<p>読み込み中…</p>';
   if (!(await lbCheck())) return $('view').innerHTML = back + '<h3>評定所</h3><p>評定所は、職員と会長が見られます。</p>';
@@ -45,14 +53,17 @@ function lbCard(p) {
     <div style="margin-top:6px"><textarea id="lbc${p.id}" rows="3" placeholder="返信を書く" style="display:block;width:100%;box-sizing:border-box;font-size:16px;resize:vertical;margin:6px 0"></textarea><button style="width:auto" onclick="lbComment(${p.id})">返信</button></div>${form}</div>`;
 }
 async function lbPost() {
+  if (HYOJOSHO_HOLD) return $('view').innerHTML = lbHoldHtml();
   const t = $('lb1').value.trim(); if (!t) return alert('中身を書いてください');
   try { await sb('leader_post', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ kind: $('lbk').value, today: t }) }); renderLeaderBoard(); } catch (e) { alert('送れませんでした：' + e.message); }
 }
 async function lbComment(id) {
+  if (HYOJOSHO_HOLD) return $('view').innerHTML = lbHoldHtml();
   const t = $('lbc' + id).value.trim(); if (!t) return;
   try { await sb('leader_reply', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ post_id: id, body: t }) }); renderLeaderBoard(); } catch (e) { alert('返信できませんでした：' + e.message); }
 }
 async function lbReply(id, reaction) {
+  if (HYOJOSHO_HOLD) return $('view').innerHTML = lbHoldHtml();
   const body = reaction ? { reaction } : { reply: $('lbr' + id).value.trim() };
   try { await sb('leader_post?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) }); renderLeaderBoard(); } catch (e) { alert('返信できませんでした：' + e.message); }
 }
