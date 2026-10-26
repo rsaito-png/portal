@@ -6,12 +6,24 @@ header{background:#2e6b4f;color:#fff;padding:14px 16px;font-size:18px}
 main{max-width:640px;margin:auto;padding:16px}
 section{background:#fff;border-radius:12px;padding:14px 18px;margin:12px 0;box-shadow:0 1px 3px #0002}
 h2{font-size:17px;margin:4px 0}
-p,li{overflow-wrap:anywhere}
+p,li,td{overflow-wrap:anywhere}
 ol,ul{padding-left:1.3em;margin:8px 0}
 li{margin:4px 0}
 table{width:100%;border-collapse:collapse;font-size:15px}
 th,td{text-align:left;vertical-align:top;padding:6px 4px;border-bottom:1px solid #e6e6e6}
 th{color:#555;font-weight:600}
+.flowwrap{container-type:inline-size}
+.flow{list-style:none;display:flex;flex-direction:column;align-items:stretch;gap:0;margin:10px 0 0;padding:0}
+.flow li{display:flex;flex-direction:column;align-items:stretch;margin:0;min-width:0}
+.flow li+li::before{content:"↓";color:#2e6b4f;text-align:center;font-size:20px;line-height:1;padding:4px 0;font-weight:700}
+.flow a{display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;text-decoration:none;color:#17382a;background:#eef6f2;border:2px solid #2e6b4f;border-radius:10px;padding:8px 10px;font-weight:700;min-height:44px}
+.flow i{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#2e6b4f;color:#fff;font-style:normal;font-size:13px;line-height:22px;text-align:center}
+@container (min-width:520px){
+  .flow{flex-direction:row;align-items:stretch}
+  .flow li{flex:1 1 0;flex-direction:row;align-items:center}
+  .flow li+li::before{content:"→";padding:0 3px;font-size:16px}
+  .flow a{flex-direction:column;gap:2px;width:100%;padding:8px 4px;font-size:14px;text-align:center}
+}
 nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px}
 nav a{background:#fff;color:#2e6b4f;border-radius:999px;padding:4px 10px;text-decoration:none;font-size:14px;border:1px solid #d5e3dc}
 a.btn{display:block;text-align:center;background:#2e6b4f;color:#fff;padding:12px;border-radius:8px;text-decoration:none;margin:8px 0}
@@ -20,6 +32,24 @@ p.foot{color:#666;font-size:14px;margin:16px 0 8px}
 </style></head><body>
 <header>実施者養成研修　運用マニュアル</header>
 <main>
+
+<section id="learner"><h2>受講の流れ</h2>
+<div class="flowwrap"><ol class="flow">
+<li><a href="#open"><i>1</i>申込</a></li>
+<li><a href="#pay"><i>2</i>入金</a></li>
+<li><a href="#attend"><i>3</i>受講</a></li>
+<li><a href="#cert"><i>4</i>修了証</a></li>
+</ol></div></section>
+
+<section id="day"><h2>運営の一日</h2>
+<div class="flowwrap"><ol class="flow">
+<li><a href="#session"><i>1</i>開催作成</a></li>
+<li><a href="#exempt"><i>2</i>免除確認</a></li>
+<li><a href="#pay"><i>3</i>入金確認</a></li>
+<li><a href="#attend"><i>4</i>出席</a></li>
+<li><a href="#cert"><i>5</i>修了</a></li>
+</ol></div></section>
+
 <nav>
 <a href="#open">開き方</a>
 <a href="#price">料金</a>
@@ -36,80 +66,75 @@ p.foot{color:#666;font-size:14px;margin:16px 0 8px}
 <section id="open"><h2>1. 開き方</h2>
 <ol>
 <li>受講者は <a href="https://rsaito-png.github.io/portal/sct.html">https://rsaito-png.github.io/portal/sct.html</a> を開きます。</li>
-<li>運営は職員ポータルにログインし、トップの<b>ストレスチェック実施者養成（運営）</b>、または<b>総務</b> → <b>人事労務</b>の<b>実施者養成研修（運営）</b>を開きます。</li>
+<li>運営は、トップの<b>ストレスチェック実施者養成（運営）</b>、または<b>総務</b> → <b>人事労務</b>の<b>実施者養成研修（運営）</b>を開きます。</li>
 <li>このページは、運営画面の上部<b>運用マニュアル</b>から開きます。</li>
 </ol></section>
 
 <section id="price"><h2>2. 料金（税込）</h2>
-<ul>
-<li><b>3科目</b>：12,800円。科目1・2・3。</li>
-<li><b>科目1免除</b>（衛生管理者）：10,800円。科目2・3。承認してからこの金額です。</li>
-<li><b>全免除</b>（労働衛生コンサルタント）：0円。受講不要。修了証は出しません。</li>
-</ul></section>
+<table>
+<tr><th>区分</th><th>金額</th><th>条件</th></tr>
+<tr><td>3科目</td><td>12,800円</td><td>科目1・2・3</td></tr>
+<tr><td>科目1免除</td><td>10,800円</td><td>衛生管理者。承認後</td></tr>
+<tr><td>全免除</td><td>0円</td><td>修了証なし</td></tr>
+</table></section>
 
 <section id="session"><h2>3. 開催を作る</h2>
 <ol>
-<li><b>開催</b>で科目を選びます。講師はそのままで西岡愛梨です。別の人は<b>講師</b>で氏名を入れて<b>追加</b>してから選びます。</li>
-<li><b>開始（日本時間）</b>と<b>終了（日本時間）</b>を入れます。科目1は2時間、科目2と科目3は1時間30分にします。</li>
-<li><b>状態</b>を<b>募集中</b>にし、<b>Meet URL</b>に https:// から始まるアドレスを入れて<b>保存</b>します。直すときは一覧の<b>直す</b>です。</li>
+<li><b>開催</b>で科目を選びます。講師はそのままで西岡愛梨です。別の人は<b>講師</b>で<b>追加</b>します。</li>
+<li><b>開始（日本時間）</b>と<b>終了（日本時間）</b>。科目1は2時間、科目2と3は1時間30分。</li>
+<li><b>状態</b>を<b>募集中</b>、<b>Meet URL</b>は https:// から。<b>保存</b>。直しは<b>直す</b>。</li>
 </ol></section>
 
 <section id="exempt"><h2>4. 免除の承認</h2>
 <ol>
-<li><b>受講者・出席</b>で<b>免除の証明</b>を開きます。確認待ちのあいだは、支払いへ進めません。</li>
-<li>証明がよければ<b>免除を認める</b>。科目1免除は10,800円、全免除は0円（修了証なし）になります。</li>
-<li>違うときは<b>免除を却下</b>。3科目の12,800円に戻ります。</li>
+<li><b>受講者・出席</b>で<b>免除の証明</b>を開きます。確認待ちは支払いできません。</li>
+<li>よければ<b>免除を認める</b>（10,800円、または0円で修了証なし）。</li>
+<li>違うときは<b>免除を却下</b>（12,800円）。</li>
 </ol></section>
 
 <section id="pay"><h2>5. 入金</h2>
 <ol>
-<li>Squareのカードは、支払いが終わると自動で<b>入金済</b>になります。</li>
-<li>戻ったアドレスの <b>?paid=1</b> だけでは入金にしません。少し待って<b>入金・返金</b>を開き直します。</li>
-<li>振込は<b>入金・返金</b>の<b>振込を記録</b>で受講者とメモを入れ、<b>未入金として記録</b>します。通帳で確認したら、その行の<b>入金確認</b>を押します。</li>
-<li>Squareの未入金が残っているときは、先にその行の<b>無効</b>を押します。</li>
+<li>Squareのカードは、終わると自動で<b>入金済</b>になります。</li>
+<li>戻ったアドレスの <b>?paid=1</b> だけでは入金にしません。<b>入金・返金</b>を開き直します。</li>
+<li>振込は<b>振込を記録</b>で<b>未入金として記録</b>。通帳のあと<b>入金確認</b>。未完了のカードは先に<b>無効</b>。</li>
 </ol></section>
 
 <section id="refund"><h2>6. 返金の目安</h2>
-<p>まずは振替を案内します。日数は開催日の日付（日本時間）で数えます。</p>
+<p>振替を先に。日数は開催日（日本時間）。</p>
 <table>
 <tr><th>いつ</th><th>返金</th></tr>
-<tr><td>7日前まで</td><td>全額（決済手数料の実費は引いてよい）</td></tr>
+<tr><td>7日前まで</td><td>全額（手数料の実費は引いてよい）</td></tr>
 <tr><td>6日前〜前日</td><td>半額</td></tr>
 <tr><td>当日以降・無断欠席</td><td>なし</td></tr>
 <tr><td>主催の都合</td><td>全額</td></tr>
 </table>
-<ol>
-<li>お金の移動は Square のダッシュボードで行います。</li>
-<li><b>入金・返金</b>の入金済の行で<b>返金を記録</b>を押し、区分と<b>返金額</b>を入れて<b>記録する</b>。手数料を引くときは、引いたあとの額を入れます。</li>
-</ol></section>
+<p><b>入金・返金</b>の<b>返金を記録</b>で残す。お金の移動は Square。</p></section>
 
 <section id="attend"><h2>7. 当日の出席</h2>
 <ol>
-<li>当日は Meet で録画を流します。受講者はカメラをオンにします。</li>
-<li><b>受講者・出席</b>で<b>本人確認書類</b>を見て、よければ<b>本人確認済</b>、違うときは<b>本人差戻し</b>を押します。</li>
-<li>来ていれば<b>出席</b>、連絡なく来なければ<b>無断欠席</b>です。入室と退室は<b>入退室</b>に日本時間を入れて<b>記録する</b>。</li>
-<li>カメラを2分を超えて切っていた回は<b>カメラOFFで出席外し</b>を押します。確認が出ます。自動では外れません。</li>
+<li>Meetで録画を流します。受講者はカメラをオンにします。</li>
+<li><b>受講者・出席</b>の<b>本人確認書類</b>を見て、<b>本人確認済</b>か<b>本人差戻し</b>。</li>
+<li>来ていれば<b>出席</b>、連絡なしは<b>無断欠席</b>。時刻は<b>入退室</b>で<b>記録する</b>。</li>
+<li>カメラが2分を超えて切れた回は<b>カメラOFFで出席外し</b>。自動では外れません。</li>
 </ol></section>
 
 <section id="cert"><h2>8. 修了証を出す</h2>
 <ol>
-<li><b>受講者・出席</b>の視聴が<b>修了可</b>なら<b>修了処理</b>を押します。別の窓の修了証を、ブラウザの印刷で出します。</li>
-<li>窓が出ないときは、ポップアップを許可してもう一度押します。氏名の間違いは、出す前に直します。</li>
-<li>全免除の人は修了証を出しません。</li>
+<li>視聴が<b>修了可</b>なら<b>修了処理</b>。別窓を印刷します。</li>
+<li>窓が出なければポップアップを許可します。氏名は出す前に直します。</li>
+<li>全免除は修了証を出しません。</li>
 </ol></section>
 
 <section id="csv"><h2>9. 年次CSV</h2>
 <ol>
-<li><b>年次CSV</b>を開きます。</li>
-<li>年を入れて<b>表示</b>を押します。</li>
-<li><b>CSV</b>でダウンロードします。</li>
+<li><b>年次CSV</b>で年を入れ、<b>表示</b>のあと<b>CSV</b>。</li>
 </ol></section>
 
 <section id="trouble"><h2>10. 困ったとき</h2>
 <ul>
-<li><b>入金が反映されない</b>：少し待って<b>入金・返金</b>を開き直します。?paid=1 だけでは入金にしません。取りやめるときは<b>無効</b>です。</li>
-<li><b>免除待ちで支払えない</b>：<b>受講者・出席</b>で証明を見て<b>免除を認める</b>か<b>免除を却下</b>します。</li>
-<li><b>修了できない</b>：<b>本人確認済</b>か、視聴が足りているかを見ます。<b>カメラOFFで出席外し</b>した回は0分です。全免除は修了証を出しません。</li>
+<li><b>入金が反映されない</b>：少し待って<b>入金・返金</b>を開き直す。?paid=1 だけでは入金にしません。取りやめは<b>無効</b>。</li>
+<li><b>免除待ちで支払えない</b>：<b>免除を認める</b>か<b>免除を却下</b>。</li>
+<li><b>修了できない</b>：<b>本人確認済</b>と視聴。外した回は0分。全免除は修了証なし。</li>
 </ul></section>
 
 <p class="foot">開発者向けは <a href="docs/sct.md">docs/sct.md</a></p>
