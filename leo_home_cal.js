@@ -167,12 +167,9 @@ function sgStaffMine(staff, me, opt) {
 function sgMineEvents(es, me, opt) {
   if (!me) return { events: [], empty: true, unnamed: true };
   const rides = (es || []).filter(e => (e.kind === '迎え' || e.kind === '送り') && sgStaffMine(e.staff, me, opt));
-  const kids = new Set();
-  rides.forEach(e => ((e.kids && e.kids.length) ? e.kids : (e.child ? [e.child] : [])).forEach(k => k && kids.add(sgNk(k))));
   const events = (es || []).filter(e => {
+    if (e.kind === '利用') return false;
     if (e.kind === '迎え' || e.kind === '送り') return sgStaffMine(e.staff, me, opt);
-    // 利用に担当は無い。残した送迎にいる児童だけ出す。関係の無い児童は隠す。
-    if (e.kind === '利用') return !!(e.child && kids.has(sgNk(e.child)));
     if (e.kind === '休所') return true;
     if (e.kind === '勤務' || e.kind === '不在' || e.kind === 'その他') return sgStaffMine(e.staff, me, opt);
     return false;
@@ -340,7 +337,7 @@ function sgDayHtml(day, evs, care, opt) {
     es = picked.events;
     mineNote = picked.unnamed
       ? '<p class="sg-empty">担当の名前が未登録です。自分の担当は出せません。</p>'
-      : (picked.empty ? '<p class="sg-empty">この日の自分の担当はありません。</p>' : '<p class="sg-mine-note">自分の担当の迎え・送りだけです。利用は、その送迎にいる児童だけ出します。</p>');
+      : (picked.empty ? '<p class="sg-empty">この日の自分の担当はありません。</p>' : '<p class="sg-mine-note">自分の担当の迎え・送りだけです。</p>');
   }
   const { allDay, timed } = sgSplit(es);
   const demo = (opt && opt.demo) || (typeof DEMO !== 'undefined' && DEMO);
@@ -365,7 +362,7 @@ function sgDayHtml(day, evs, care, opt) {
   const legend = staff.map(s => {
     const p = sgStaffPaint(s.raw, { demo });
     return `<span><i style="background:${p.hex}"></i>${sgEsc(s.show)}${p.mapped ? '' : ' <span class="other">その他</span>'}</span>`;
-  }).join('') + `<span><i style="background:${SG_USE_HEX}"></i>利用児童</span><span>☆迎え　<u>★送り</u>（色は担当）</span>`;
+  }).join('') + (mineOn ? '' : `<span><i style="background:${SG_USE_HEX}"></i>利用児童</span>`) + `<span>☆迎え　<u>★送り</u>（色は担当）</span>`;
   const chips = allDay.map(e => {
     const p = sgEventPaint(e, { demo });
     const style = p ? ` style="background:${p.hex};color:${p.ink}"` : '';
