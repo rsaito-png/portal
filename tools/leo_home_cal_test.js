@@ -10,7 +10,7 @@ vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'leo_name.js'), 'utf8'), sandbox, { filename: 'leo_name.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'leo_home_cal.js'), 'utf8'), sandbox, { filename: 'leo_home_cal.js' });
 
-const { sgGrid, sgLayout, sgStaffPaint, sgMonthHtml, sgDayHtml, sgSplit, sgName, SG_STAFF_COLOR } = sandbox;
+const { sgGrid, sgLayout, sgStaffPaint, sgStaffShow, sgMonthHtml, sgDayHtml, sgSplit, sgName, SG_STAFF_COLOR } = sandbox;
 
 assert.strictEqual(sgName('山根\u3000一輝'), '山根 一輝');
 assert.strictEqual(sgName('  山根  一輝 \n'), '山根 一輝');
@@ -44,11 +44,11 @@ assert.strictEqual(sgStaffPaint('職員X', { demo: true }).hex, '#039be5');
 assert.strictEqual(sgStaffPaint('職員Y', { demo: true }).hex, '#f4511e');
 
 const staffHex = {
-  'れん': '#039be5', '連': '#039be5', 'れん先生': '#039be5', '齊藤　連': '#039be5', '斎藤連': '#039be5', '斉藤 連': '#039be5', '齋藤連': '#039be5', '山田連': '#039be5',
-  'ゆか': '#33b679', 'ゆか先生': '#33b679', '鈴木　ゆか': '#33b679',
+  'れん': '#1a237e', '連': '#1a237e', 'れん先生': '#1a237e', '齊藤　連': '#1a237e', '斎藤連': '#1a237e', '斉藤 連': '#1a237e', '齋藤連': '#1a237e', '山田連': '#1a237e',
+  'ゆか': '#33b679', 'ゆか先生': '#33b679', '友香': '#33b679', '鈴木　友香': '#33b679',
   'あや': '#8e24aa', 'あやさん': '#8e24aa',
-  'さち': '#e67c73', 'さち先生': '#e67c73',
-  'なお': '#7986cb', 'なお先生': '#7986cb',
+  'さち': '#e67c73', 'さち先生': '#e67c73', '祥': '#e67c73', '鈴木祥': '#e67c73',
+  'なお': '#7986cb', 'なお先生': '#7986cb', '尚': '#7986cb', '尚先生': '#7986cb',
   '宮本': '#d81b60', '宮本さん': '#d81b60', '宮本　花': '#d81b60',
   '加藤': '#4fc3f7', '加藤先生': '#4fc3f7', '加藤　花': '#4fc3f7',
 };
@@ -57,6 +57,19 @@ for (const [name, hex] of Object.entries(staffHex)) {
   assert.strictEqual(p.hex, hex, name);
   assert.strictEqual(p.mapped, true, name);
 }
+assert.strictEqual(sgStaffPaint('連先生').ink, '#fff', '紺は白い文字');
+assert.notStrictEqual(sgStaffPaint('尚先生').hex, sgStaffPaint('連先生').hex);
+assert.notStrictEqual(sgStaffPaint('加藤先生').hex, sgStaffPaint('連先生').hex);
+assert.strictEqual(sgStaffShow('斉藤　連'), '連先生');
+assert.strictEqual(sgStaffShow('れん'), '連先生');
+assert.strictEqual(sgStaffShow('ゆか'), '友香先生');
+assert.strictEqual(sgStaffShow('友香'), '友香先生');
+assert.strictEqual(sgStaffShow('さち'), '祥先生');
+assert.strictEqual(sgStaffShow('祥'), '祥先生');
+assert.strictEqual(sgStaffShow('なお先生'), '尚先生');
+assert.strictEqual(sgStaffShow('尚'), '尚先生');
+assert.strictEqual(sgStaffShow('あや'), 'あや', 'あやは漢字にしない');
+assert.strictEqual(sgStaffShow('あや先生'), 'あや先生');
 assert.strictEqual(sgStaffPaint('加藤先生').ink, '#222', '水色は暗い文字');
 assert.strictEqual(sgStaffPaint('宮本さん').ink, '#fff', 'ピンクは白い文字');
 assert.strictEqual(sgStaffPaint('加藤 湊').mapped, false, '児童の加藤湊は担当でも加藤先生にしない');
@@ -105,7 +118,8 @@ assert.ok(day.includes('class="sg-ev drop"') || day.includes('sg-ev drop'), '送
 const named = [
   { day: '2026-10-26', kind: '利用', child: '加藤 湊', start_time: '10:00', end_time: '12:00' },
   { day: '2026-10-26', kind: '迎え', staff: '加藤先生', kids: ['加藤 湊'], start_time: '09:40', end_time: '10:10', kid_places: { '加藤 湊': '小学校' } },
-  { day: '2026-10-26', kind: '迎え', staff: 'れん先生', kids: ['児童A'], start_time: '10:10', end_time: '10:40' },
+  { day: '2026-10-26', kind: '迎え', staff: '斉藤　連', kids: ['児童A'], start_time: '10:10', end_time: '10:40' },
+  { day: '2026-10-26', kind: '送り', staff: 'れん', kids: ['児童A'], start_time: '10:45', end_time: '11:10' },
   { day: '2026-10-26', kind: '送り', staff: 'ゆか', kids: ['児童B'], start_time: '12:10', end_time: '12:40' },
   { day: '2026-10-26', kind: '送り', staff: 'あや先生', kids: ['児童C'], start_time: '13:00', end_time: '13:30' },
   { day: '2026-10-26', kind: '迎え', staff: 'さち', kids: ['児童D'], start_time: '14:00', end_time: '14:30' },
@@ -116,8 +130,13 @@ const named = [
 const colored = sgDayHtml('2026-10-26', named, {}, { demo: false, today: '2026-10-27' });
 assert.ok(colored.includes('#f4511e') && colored.includes('加藤 湊'), '加藤湊の利用はオレンジ');
 assert.ok(colored.includes('#4fc3f7'), '加藤先生の送迎は水色');
-assert.ok(colored.includes('#039be5') && colored.includes('#33b679') && colored.includes('#8e24aa'));
+assert.ok(colored.includes('#1a237e') && colored.includes('#33b679') && colored.includes('#8e24aa'));
 assert.ok(colored.includes('#e67c73') && colored.includes('#7986cb') && colored.includes('#d81b60'));
+assert.ok(colored.includes('連先生') && colored.includes('友香先生') && colored.includes('祥先生') && colored.includes('尚先生'));
+assert.ok(!colored.includes('斉藤'), '斉藤　連は連先生と出す');
+assert.ok(!colored.includes('ゆか'), 'ゆかは友香先生と出す');
+const legend = colored.slice(colored.indexOf('class="sg-leg"'), colored.indexOf('class="sg-cal"'));
+assert.strictEqual((legend.match(/連先生/g) || []).length, 1, 'れんの表記ゆれは凡例で1つ');
 assert.ok(colored.includes('#d50000') && colored.includes('その他'), '一覧外の担当は赤');
 const useBlock = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="利用[^"]*加藤 湊/);
 assert.ok(useBlock && useBlock[1] === '#f4511e', '利用ブロック自体がオレンジ');

@@ -21,28 +21,31 @@ const GCAL_EVENT_COLORS = {
 };
 const SG_USE_HEX = '#f4511e';
 const SG_OTHER_HEX = '#d50000';
-// ゆか・あや・さち・なおの漢字氏名は、公開リポジトリにも日誌の対応表（DB上の leo_sched_staff）にも無い。ひらがなの名で照合する。
-// 宮本さん・加藤先生の下の名前も同じ理由で不明。姓で始まる担当名に当てる。
+// ゆか＝友香、さち＝祥、なお＝尚。あやの漢字は未指定なので、あやのまま出す。
+// 宮本さん・加藤先生の下の名前は、公開リポジトリにも日誌の対応表にも無い。姓で始まる担当名に当てる。
+const SG_NAVY = '#1a237e';
 const SG_STAFF_COLOR = {
-  'れん先生': 7,       // 青 Peacock
-  'ゆか先生': 2,       // 黄緑 Sage
-  'あや先生': 3,       // 紫 Grape
-  'さち先生': 4,       // 薄ピンク Flamingo
-  'なお先生': 1,       // 藤色 Lavender
+  '連先生': SG_NAVY,     // 紺。藤色・水色と分ける（Blueberry #3f51b5 は藤色に近い）
+  '友香先生': 2,         // 黄緑 Sage
+  'あや先生': 3,         // 紫 Grape
+  '祥先生': 4,           // 薄ピンク Flamingo
+  '尚先生': 1,           // 藤色 Lavender
   '宮本さん': '#d81b60', // ピンク Cherry blossom（colorId には無い）
   '加藤先生': '#4fc3f7', // 水色。Peacock より明るい青
 };
+// 凡例と予定に出す名前。ここにある人だけ、日誌の表記をこの表示にそろえる。
+const SG_STAFF_SHOW = { '連先生': '連先生', '友香先生': '友香先生', '祥先生': '祥先生', '尚先生': '尚先生' };
 // exact は完全一致。family は姓＋名。given は名だけ、または漢字の姓＋その名。
 const SG_STAFF_ALIAS = {
-  'れん先生': [
+  '連先生': [
     { t: 'given', s: 'れん' }, { t: 'given', s: '連' },
     { t: 'family', s: '齊藤' }, { t: 'family', s: '斎藤' }, { t: 'family', s: '斉藤' }, { t: 'family', s: '齋藤' },
     { t: 'exact', s: '齊藤連' }, { t: 'exact', s: '斎藤連' }, { t: 'exact', s: '斉藤連' }, { t: 'exact', s: '齋藤連' },
   ],
-  'ゆか先生': [{ t: 'given', s: 'ゆか' }],
+  '友香先生': [{ t: 'given', s: 'ゆか' }, { t: 'given', s: '友香' }],
   'あや先生': [{ t: 'given', s: 'あや' }],
-  'さち先生': [{ t: 'given', s: 'さち' }],
-  'なお先生': [{ t: 'given', s: 'なお' }],
+  '祥先生': [{ t: 'given', s: 'さち' }, { t: 'given', s: '祥' }],
+  '尚先生': [{ t: 'given', s: 'なお' }, { t: 'given', s: '尚' }],
   '宮本さん': [{ t: 'family', s: '宮本' }],
   '加藤先生': [{ t: 'family', s: '加藤' }],
 };
@@ -139,6 +142,11 @@ function sgStaffPaint(name, opt) {
   if (demo && Object.prototype.hasOwnProperty.call(SG_STAFF_COLOR_DEMO, label)) return sgPaintFrom(SG_STAFF_COLOR_DEMO[label], true);
   return sgPaintFrom(11, false);
 }
+function sgStaffShow(name, opt) {
+  const label = sgStaffLabel(name, opt);
+  if (SG_STAFF_SHOW[label]) return SG_STAFF_SHOW[label];
+  return String(name ?? '').replace(/[ \t\u3000]+/g, ' ').trim();
+}
 function sgUsePaint() {
   return { id: 6, hex: SG_USE_HEX, ink: sgInk(SG_USE_HEX), mapped: true, name: 'Tangerine', role: 'use' };
 }
@@ -204,7 +212,7 @@ function sgKind(e) {
 function sgLines(e) {
   if (e.kind === '迎え' || e.kind === '送り') {
     const kids = e.kids || [];
-    if (!kids.length) return [sgName(e.title || e.place || e.staff || '')];
+    if (!kids.length) return [sgName(e.title || e.place || '') || sgStaffShow(e.staff)];
     return kids.map(k => {
       const pl = sgKid(e.kid_places, k) || (!e.kid_places && e.place) || '';
       const tm = sgKid(e.kid_times, k);
@@ -217,7 +225,7 @@ function sgLines(e) {
     if (e.parent_pick) bits.push('保護者が迎える');
     return [bits.filter(Boolean).join('　')];
   }
-  return [`${e.staff || ''} ${e.title || e.note || ''}`.trim()];
+  return [`${e.staff ? sgStaffShow(e.staff) : ''} ${e.title || e.note || ''}`.trim()];
 }
 function sgCss() {
   return `<style>
@@ -307,13 +315,15 @@ function sgDayHtml(day, evs, care, opt) {
   const staff = [];
   const seen = new Set();
   for (const e of es) {
-    if (!e.staff || seen.has(sgNk(e.staff))) continue;
-    seen.add(sgNk(e.staff));
-    staff.push(e.staff);
+    if (!e.staff) continue;
+    const show = sgStaffShow(e.staff, { demo });
+    if (!show || seen.has(sgNk(show))) continue;
+    seen.add(sgNk(show));
+    staff.push({ raw: e.staff, show });
   }
   const legend = staff.map(s => {
-    const p = sgStaffPaint(s, { demo });
-    return `<span><i style="background:${p.hex}"></i>${sgEsc(s)}${p.mapped ? '' : ' <span class="other">その他</span>'}</span>`;
+    const p = sgStaffPaint(s.raw, { demo });
+    return `<span><i style="background:${p.hex}"></i>${sgEsc(s.show)}${p.mapped ? '' : ' <span class="other">その他</span>'}</span>`;
   }).join('') + `<span><i style="background:${SG_USE_HEX}"></i>利用児童</span><span>☆迎え　<u>★送り</u>（色は担当）</span>`;
   const chips = allDay.map(e => {
     const p = sgEventPaint(e, { demo });
@@ -336,12 +346,13 @@ function sgDayHtml(day, evs, care, opt) {
     const width = `calc((100% * ${e.span} / ${e.cols}) - 4px)`;
     const cls = `sg-ev${p ? '' : ' neutral'}${ev.kind === '送り' ? ' drop' : ''}${ev.kind === '迎え' ? ' pick' : ''}`;
     const style = `top:${top}px;height:${height}px;left:${left};width:${width};${p ? `background:${p.hex};color:${p.ink}` : ''}`;
-    const who = ev.staff ? sgEsc(ev.staff) : (ev.kind === '迎え' || ev.kind === '送り' ? '<b class="ng">未定</b>' : '');
+    const shown = ev.staff ? sgStaffShow(ev.staff, { demo }) : '';
+    const who = shown ? sgEsc(shown) : (ev.kind === '迎え' || ev.kind === '送り' ? '<b class="ng">未定</b>' : '');
     const t0 = sgMin(ev.start_time), t1 = sgMin(ev.end_time);
     const when = t0 == null ? sgHH(e.start) : (t1 != null && t1 > t0 ? `${sgHH(t0)}–${sgHH(t1)}` : sgHH(t0));
     const careLine = (ev.kind === '利用' || ev.kind === '休み') && care && care[sgNk(ev.child)] ? `⚠ ${care[sgNk(ev.child)]}` : '';
     const body = sgLines(ev).concat(careLine ? [careLine] : []).map(sgEsc).join('\n');
-    const tip = `${sgKind(ev)} ${when} ${sgLines(ev).join(' / ')} ${ev.staff || ''}`.trim();
+    const tip = `${sgKind(ev)} ${when} ${sgLines(ev).join(' / ')} ${shown}`.trim();
     return `<div class="${cls}" style="${style}" title="${sgEsc(tip)}"><div class="k">${sgEsc(sgKind(ev))} ${when}${who ? '　' + who : ''}</div><div class="nm">${body}</div></div>`;
   }).join('');
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';
@@ -427,6 +438,7 @@ window.sgMonthHtml = sgMonthHtml;
 window.sgDayHtml = sgDayHtml;
 window.sgLayout = sgLayout;
 window.sgStaffPaint = sgStaffPaint;
+window.sgStaffShow = sgStaffShow;
 window.sgGrid = sgGrid;
 window.sgSplit = sgSplit;
 window.sgName = sgName;
