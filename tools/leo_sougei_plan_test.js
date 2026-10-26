@@ -33,6 +33,8 @@ const grab = name => vm.runInContext(name, sandbox);
 const leoPlanJobs = grab('leoPlanJobs');
 const leoTileStatus = grab('leoTileStatus');
 const leoKidTile = grab('leoKidTile');
+const leoKidPlanHtml = grab('leoKidPlanHtml');
+const leoKidWarnHtml = grab('leoKidWarnHtml');
 const leoSougeiAllHtml = grab('leoSougeiAllHtml');
 const LEO_PLAN_NOTE = grab('LEO_PLAN_NOTE');
 const same = grab('same');
@@ -72,6 +74,22 @@ assert.strictEqual(leoTileStatus([], [], day), '日誌なし');
 assert.strictEqual(leoKidTile([], events, day), '予定 2人');
 assert.strictEqual(leoKidTile([], events, next), '予定 1人');
 assert.strictEqual(leoKidTile([], [], day), '0人');
+
+const planHtml = leoKidPlanHtml('児童 A', { term: '2期', period: '2026年5月〜2026年10月', body: '【利用者名】児童A\n【長期目標】\n見本の目標です。' });
+assert.ok(planHtml.includes('個別支援計画（2期　2026年5月〜2026年10月）を読む'));
+assert.ok(planHtml.startsWith('<details'));
+assert.ok(planHtml.includes('見本の目標です。'));
+assert.ok(!planHtml.includes('【利用者名】'));
+assert.ok(!planHtml.includes('個別支援計画を開く'));
+const planBtn = leoKidPlanHtml('児童 B', null);
+assert.ok(planBtn.includes("PLAN_OPEN='児童B'"));
+assert.ok(planBtn.includes("location.hash='leo/plan'"));
+assert.ok(planBtn.includes('📋 個別支援計画を開く'));
+assert.strictEqual(leoKidWarnHtml([]), '');
+assert.strictEqual(leoKidWarnHtml(null), '');
+const warnHtml = leoKidWarnHtml(['送迎の配慮：<見本>', 'メモ：半分']);
+assert.ok(warnHtml.includes('⚠ 送迎の配慮：&lt;見本&gt;'));
+assert.ok(warnHtml.includes('⚠ メモ：半分'));
 
 const nikki = [
   { day, kind: '利用', child: '児童A', pick_driver: '連先生', pick_car: '2号車', drop_driver: '友香先生', drop_car: '2号車', pick_time: '14:35', drop_time: '17:15', pick_place: '見本小学校', drop_place: '自宅' },
@@ -169,6 +187,30 @@ vm.runInContext(`
   if (mine.includes('児童B')) throw new Error('sougei leaked another driver');
   const kids = await LEO_VIEWS.kids();
   if (!kids.includes('予定表から表示（日誌取り込み前）') || !kids.includes('児童A')) throw new Error('kids fallback');
+  if (!kids.includes('個別支援計画を開く') || !kids.includes("PLAN_OPEN='児童A'")) throw new Error('kids fallback plan button');
+  if (kids.includes('を読む')) throw new Error('no plan row should stay a button');
+  sb = async (path) => {
+    const p = String(path);
+    if (p.startsWith('staff_profiles')) return [{ nikki_name: '連先生' }];
+    if (p.includes('leo_nikki')) return [];
+    if (p.includes('kind=eq.利用')) return [
+      { day: t, kind: '利用', child: '児童A', start_time: '14:45', end_time: '17:00' },
+      { day: t, kind: '利用', child: '児童 B', start_time: '15:00', end_time: '17:30' },
+    ];
+    if (p.includes('leo_child_plan')) return [{ name: '児童 A', term: '2期', period: '2026年5月〜2026年10月', body: '【利用者名】児童A\\n【長期目標】\\n見本の目標です。' }];
+    if (p.startsWith('leo_child_care')) return [{ child: '児童A', note: '（見本）助手席の後ろ' }];
+    if (p.includes('select=name,note')) return [{ name: '児童 B', note: '（見本）おやつは半分' }];
+    return [];
+  };
+  const rich = await LEO_VIEWS.kids();
+  if (!rich.includes('予定表から表示（日誌取り込み前）')) throw new Error('rich fallback note');
+  const cards = rich.split('class="card"').slice(1);
+  if (cards.length !== 2) throw new Error('two fallback cards');
+  if (!cards[0].includes('児童A') || !cards[0].includes('個別支援計画（2期　2026年5月〜2026年10月）を読む') || !cards[0].includes('見本の目標です。')) throw new Error('fallback plan details');
+  if (cards[0].includes('【利用者名】') || cards[0].includes('メモ：')) throw new Error('fallback plan card mixed');
+  if (!cards[0].includes('送迎の配慮：（見本）助手席の後ろ')) throw new Error('fallback care');
+  if (!cards[1].includes("PLAN_OPEN='児童B'") || !cards[1].includes('メモ：（見本）おやつは半分')) throw new Error('fallback button and memo');
+  if (cards[1].includes('送迎の配慮') || cards[1].includes('を読む')) throw new Error('fallback button card mixed');
   sb = async (path) => {
     const p = String(path);
     if (p.startsWith('staff_profiles')) return [{ nikki_name: '連先生' }];
@@ -182,5 +224,17 @@ vm.runInContext(`
   const mineLogged = await LEO_VIEWS.sougei();
   if (mineLogged.includes('予定表から表示（日誌取り込み前）')) throw new Error('sougei note while nikki exists');
   if (!mineLogged.includes('児童A')) throw new Error('sougei still uses the schedule when it exists');
+  sb = async (path) => {
+    const p = String(path);
+    if (p.includes('leo_nikki')) return [{ day: t, kind: '利用', child: '児童B', service: '放デイ', pick_driver: '連先生', pick_car: '2号車', drop_driver: '友香先生', drop_car: '2号車', pick_time: '14:40', drop_time: '17:20', pick_place: '見本小学校', drop_place: '自宅', start_time: '15:00', end_time: '17:30' }];
+    if (p.includes('leo_child_plan')) return [{ name: '児童B', term: '1期', period: '見本期間', body: '【長期目標】\\n日誌側の本文' }];
+    if (p.startsWith('leo_child_care')) return [{ child: '児童B', note: '（見本）チャイルドシート' }];
+    if (p.includes('select=name,note')) return [{ name: '児童B', note: '（見本）メモです' }];
+    return [];
+  };
+  const loggedKids = await LEO_VIEWS.kids();
+  if (loggedKids.includes('予定表から表示')) throw new Error('nikki kids stays off the schedule');
+  if (!loggedKids.includes('個別支援計画（1期　見本期間）を読む') || !loggedKids.includes('日誌側の本文')) throw new Error('nikki plan helper');
+  if (!loggedKids.includes('送迎の配慮：（見本）チャイルドシート') || !loggedKids.includes('メモ：（見本）メモです')) throw new Error('nikki warn helper');
 })()
 `, sandbox).then(() => console.log('leo_sougei_plan_test ok')).catch(err => { console.error(err); process.exit(1); });

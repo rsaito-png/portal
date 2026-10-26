@@ -155,6 +155,14 @@ function leoKidTile(nikkiRows, events, day) {
   (events || []).filter(e => e.day === day && e.kind === '利用' && e.child).forEach(e => names.add(String(e.child).replace(/\s/g, '')));
   return names.size ? `予定 ${names.size}人` : '0人';
 }
+function leoKidWarnHtml(lines) {
+  return lines && lines.length ? `<div style="background:#fff6e5;border-left:4px solid #e8833a;padding:6px 8px;margin:6px 0">${lines.map(x => '⚠ ' + esc(x)).join('<br>')}</div>` : '';
+}
+function leoKidPlanHtml(name, plan) {
+  const key = String(name || '').replace(/\s/g, '');
+  if (plan) return `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">📋 個別支援計画（${esc(plan.term || '')}　${esc(plan.period || '')}）を読む</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(plan.body)}</div></details>`;
+  return `<button onclick="PLAN_OPEN='${key}';location.hash='leo/plan'">📋 個別支援計画を開く</button>`;
+}
 function leoSougeiAllHtml(rows, events, care) {
   const CARE = care || {};
   const logged = new Set((rows || []).map(r => r.day));
@@ -226,16 +234,14 @@ const LEO_VIEWS = {
         const by = {};
         ev.forEach(e => { (by[e.day] = by[e.day] || []).push(e); });
         return head + `<p class="note">予定表から表示（日誌取り込み前）</p>` + Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}（${by[d].length}人）</h4>${by[d].map(e =>
-          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}</div>`).join('')}`).join('');
+          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}${leoKidWarnHtml(msg(e.child))}${leoKidPlanHtml(e.child, PL[N(e.child)])}</div>`).join('')}`).join('');
       }
     }
     return head + (days.length ? days.map(([d, rs]) => {
       const use = rs.filter(r => r.kind === '利用'), abs = rs.filter(r => r.kind === '欠席');
       return `<h4>${fmtDay(d)}（${use.length}人）</h4>${use.map(r => { const m = msg(r.child);
         return `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(r.child)}</b>　${esc(r.service)}　${esc(r.start_time)}〜${esc(r.end_time)}<br><small>迎え：${esc(r.pick_time)} ${esc(r.pick_place || '自宅')}（${esc(r.pick_driver) || '未定'}）／送り：${esc(r.drop_time)} ${esc(r.drop_place || '自宅')}（${esc(r.drop_driver) || '未定'}）</small>
-        ${m.length ? `<div style="background:#fff6e5;border-left:4px solid #e8833a;padding:6px 8px;margin:6px 0">${m.map(x => '⚠ ' + esc(x)).join('<br>')}</div>` : ''}
-        ${PL[N(r.child)] ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">📋 個別支援計画（${esc(PL[N(r.child)].term || '')}　${esc(PL[N(r.child)].period || '')}）を読む</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(PL[N(r.child)].body)}</div></details>`
-        : `<button onclick="PLAN_OPEN='${N(r.child)}';location.hash='leo/plan'">📋 個別支援計画を開く</button>`}</div>`; }).join('')}
+        ${leoKidWarnHtml(m)}${leoKidPlanHtml(r.child, PL[N(r.child)])}</div>`; }).join('')}
         ${abs.length ? `<p>欠席：${abs.map(r => esc(r.child)).join('、')}</p>` : ''}`;
     }).join('') : noTab());
   },
