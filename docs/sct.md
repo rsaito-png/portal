@@ -16,7 +16,7 @@
 
 既定の講師は西岡愛梨です。実務年数の要件は画面では判定せず、講師メモに照合結果を残せます。
 
-返金の目安（振替を優先）: 開催7日前まで全額（決済手数料の実費を控除できる）、6日前から前日は半額、当日以降と無断欠席は返金なし、主催都合は全額。日数は開催日の日本時間の日付で数えます。返金の実行は Stripe ダッシュボード等で行い、ポータルには結果の状態だけを残します。
+返金の目安（振替を優先）: 開催7日前まで全額（決済手数料の実費を控除できる）、6日前から前日は半額、当日以降と無断欠席は返金なし、主催都合は全額。日数は開催日の日本時間の日付で数えます。返金の実行は Square ダッシュボードで行い、ポータルには結果の状態だけを残します。
 
 帳簿・視聴ログ・本人確認・修了証控え・決済・Meet受信は削除できません。自動で消す処理はありません。
 
@@ -37,7 +37,12 @@ node tools/sct_check.js
 
 プロジェクトは `config.js` の Supabase（`zvrardoyxocmqhvyddnf`）です。秘密はリポジトリに書かず、ダッシュボードか `supabase secrets set` にだけ置きます。
 
-1. SQL Editor で `supabase/sct.sql` を実行する（再実行できます）。
+1. SQL Editor で SQL を実行する（どちらも再実行できます）。
+
+- まだ `sct.sql` を流していないとき: 更新後の `supabase/sct.sql` を実行する。続けて `supabase/sct_square.sql` を実行しても結果は同じです。
+- すでに Stripe 版の `sct.sql` を流しているとき: `supabase/sct_square.sql` を実行する。更新後の `sct.sql` を最初から流し直しても、列の追加と関数の置き換えまで進みます。
+- 入金済みの `method=stripe` は残します。未入金の `stripe` だけ `square` になります。`stripe_session_id` などの旧列は消しません。手数料の控えは `processor_fee_yen`（空なら旧 `stripe_fee_yen` を写す）です。
+
 2. Authentication で受講者の自己登録を許可する。メール確認を使う場合は、リダイレクトURLに `sct.html` の公開URLを足す。
 3. 運営にする人は、既存の `app_metadata.role` が `事務` ならそのままで足ります。別の人はログインし直したあとに有効です。
 
@@ -47,44 +52,70 @@ set raw_app_meta_data = raw_app_meta_data || '{"role":"sct_admin"}'
 where email = '対象のメール';
 ```
 
-4. シークレット（値はプレースホルダです）。
+4. シークレット（値はプレースホルダです。リポジトリにも画面にも書きません）。レオの実費と同じ Square アカウントで構いません。場所（location）は、その実費の支払いリンクを作っている場所に揃えます。
 
 ```bash
 supabase secrets set \
-  STRIPE_SECRET_KEY=rk_test_置き換え \
-  STRIPE_WEBHOOK_SECRET=whsec_置き換え \
+  SQUARE_ACCESS_TOKEN=置き換え \
+  SQUARE_LOCATION_ID=置き換え \
+  SQUARE_ENVIRONMENT=sandbox \
+  SQUARE_WEBHOOK_SIGNATURE_KEY=置き換え \
+  SQUARE_WEBHOOK_NOTIFICATION_URL=https://zvrardoyxocmqhvyddnf.supabase.co/functions/v1/square-webhook \
   MEET_WEBHOOK_SECRET=長いランダム文字列 \
   SCT_ALLOWED_ORIGINS=https://公開オリジン \
   SCT_PUBLIC_URL=https://公開オリジン/ポータルのパス \
   --project-ref zvrardoyxocmqhvyddnf
 ```
 
-`STRIPE_SECRET_KEY` は制限付きキー（`rk_`）で、Checkout Session の作成ができるものにします。`SCT_PUBLIC_URL` は `sct.html` があるディレクトリ（末尾スラッシュなし）。`SCT_ALLOWED_ORIGINS` はカンマ区切りのオリジンで、受講者画面が送る戻り先と一致させます。`SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` と `SUPABASE_ANON_KEY` は関数の実行環境に入っています。サービスロールキーはブラウザに出しません。
+| 名前 | どこで取るか |
+| --- | --- |
+| `SQUARE_ACCESS_TOKEN` | Developer Console の Credentials。サンドボックスと本番で別のトークンです。権限に `ORDERS_READ`、`ORDERS_WRITE`、`PAYMENTS_WRITE`、`PAYMENTS_READ` を含めます。 |
+| `SQUARE_LOCATION_ID` | Developer Console または Square ダッシュボードの Locations。レオの実費と同じ場所の ID です。 |
+| `SQUARE_ENVIRONMENT` | `sandbox` か `production`。トークンと webhook の環境をこれに合わせます。 |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Webhooks → Subscriptions → 作ったエンドポイントの Signature key。 |
+| `SQUARE_WEBHOOK_NOTIFICATION_URL` | その購読に登録した URL と、文字まで同じにします（上の URL。末尾スラッシュやクエリは付けない）。署名は「この URL + 生のボディ」です。 |
+| `SCT_PUBLIC_URL` | `sct.html` があるディレクトリ（末尾スラッシュなし）か、`sct.html` 自身の URL。`https` 必須。Square の支払い後の戻り先になります。 |
+| `SCT_ALLOWED_ORIGINS` | カンマ区切り。`SCT_PUBLIC_URL` が空のときの戻り先オリジンです。 |
 
-5. 関数をデプロイする。`supabase/config.toml` で webhook と Meet 受信は JWT 検証を切っています（Stripe と Pub/Sub は利用者JWTを持たないため）。
+`SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` と `SUPABASE_ANON_KEY` は関数の実行環境に入っています。サービスロールキーはブラウザに出しません。以前の `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` は、この研修では使いません。
+
+5. 関数をデプロイする。`supabase/config.toml` で webhook と Meet 受信は JWT 検証を切っています（Square と Pub/Sub は利用者JWTを持たないため）。
 
 ```bash
 supabase functions deploy sct-checkout --project-ref zvrardoyxocmqhvyddnf
 supabase functions deploy sct-certificate --project-ref zvrardoyxocmqhvyddnf
-supabase functions deploy stripe-webhook --project-ref zvrardoyxocmqhvyddnf
+supabase functions deploy square-webhook --project-ref zvrardoyxocmqhvyddnf
 supabase functions deploy meet-events --project-ref zvrardoyxocmqhvyddnf
 ```
 
 `config.toml` を読まないデプロイでは、次の2つに `--no-verify-jwt` を付けます。`sct-checkout` と `sct-certificate` には付けません。
 
 ```bash
-supabase functions deploy stripe-webhook --no-verify-jwt --project-ref zvrardoyxocmqhvyddnf
+supabase functions deploy square-webhook --no-verify-jwt --project-ref zvrardoyxocmqhvyddnf
 supabase functions deploy meet-events --no-verify-jwt --project-ref zvrardoyxocmqhvyddnf
 ```
 
-6. Stripe の webhook エンドポイント（テストモードのサンドボックスで先に確認する）。
+`stripe-webhook` を以前デプロイしている場合は、ダッシュボードからその関数を消すか、次で削除します。
 
-- URL: `https://zvrardoyxocmqhvyddnf.supabase.co/functions/v1/stripe-webhook`
-- イベント: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`
-- 署名秘密は `STRIPE_WEBHOOK_SECRET`。入金の確定はこの関数だけが行います。決済成功ページでは確定しません。
-- カードの試験番号は Stripe のテストカード（`4242 4242 4242 4242`）です。
+```bash
+supabase functions delete stripe-webhook --project-ref zvrardoyxocmqhvyddnf
+```
 
-振込は運営画面の「入金・返金」から記録します。状態は `stripe` と `bank` と `none`（課金なし）を持てます。
+6. Square Developer の webhook（先に Sandbox のアプリケーションで確認する）。
+
+- 左の Webhooks → Subscriptions → Add subscription。
+- 通知 URL: `https://zvrardoyxocmqhvyddnf.supabase.co/functions/v1/square-webhook`
+- API version: `2026-09-16` 以降（関数が送る `Square-Version` と同じ世代）。
+- イベント: `payment.created` と `payment.updated`。
+- 保存後、Endpoint Details の Signature key を `SQUARE_WEBHOOK_SIGNATURE_KEY` に、登録した URL を `SQUARE_WEBHOOK_NOTIFICATION_URL` に、それぞれそのまま置きます。
+- 入金の確定はこの関数だけが行います。`sct.html?paid=1` では確定しません。反映まで少し待つ案内だけです。
+- 金額は DB の `sct_price`（12,800 / 10,800 / 0）です。関数はリクエストの金額を使いません。Square の JPY は円単位なので、12,800 円は `12800` です。チップ・クーポン・ポイントは支払いリンク側でオフにします。
+- 同じアカウントの他の入金（レオの実費の支払いリンクなど）もこの URL に届きます。`sct_payments` の注文 ID か、支払いノートに入れた決済 ID と一致しない通知は記録するだけで入金にしません。
+- カード拒否（`FAILED`）では行を失敗にしません。同じ支払いリンクでやり直せるためです。取りやめるときは運営の「無効」です。
+- Sandbox の試験番号は `4111 1111 1111 1111`（有効期限は未来、セキュリティコードは任意）です。本番のカード番号は使いません。
+- 確認: Square ダッシュボードの Payments と Orders。支払う前の注文は `DRAFT`、支払い後は `OPEN` です。ポータルの状態が「入金済」になるのは webhook のあとです。
+
+振込は運営画面の「入金・返金」から記録します。方法は `square`（カード）、`bank`（振込）、`none`（課金なし）です。以前のカード行は `stripe` のまま残し、画面では「旧カード」と出します。未入金の `stripe` だけ、`sct_square.sql` が `square` に替えます。
 
 ## Google Meet の入退室（骨格）
 

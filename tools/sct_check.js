@@ -79,11 +79,19 @@ const html = SctCert.html(snap);
 ok(html.includes('修了日') && html.includes('科目') && html.includes('講師名') && html.includes('西岡愛梨') && html.includes('見本 &lt;花子&gt;') && !html.includes('<花子>'), 'certificate fields and escape');
 ok(Sct.safeUrl('javascript:alert(1)') === '' && Sct.safeUrl('https://meet.google.com/abc-defg-hij').startsWith('https://'), 'meet url allowlist');
 
-eq(Sct.stripeDecision({ type: 'checkout.session.completed', data: { object: { id: 'cs_1', payment_status: 'unpaid', metadata: { payment_id: 'p1' } } } }).action, 'ignore', 'unpaid checkout does not fulfill');
-const paid = Sct.stripeDecision({ type: 'checkout.session.async_payment_succeeded', data: { object: { id: 'cs_2', payment_status: 'paid', amount_total: 12800, currency: 'jpy', metadata: { payment_id: 'p2', plan: 'bundle' }, payment_intent: 'pi_2' } } });
-eq(paid.action, 'pay', 'async paid fulfills');
+const noteId = '11111111-1111-4111-8111-111111111111';
+eq(Sct.methodLabel('square'), 'Square', 'square label');
+eq(Sct.methodLabel('stripe'), '旧カード', 'legacy card label');
+eq(Sct.squareDecision({ type: 'payment.updated', data: { object: { payment: { id: 'pay1', status: 'APPROVED', amount_money: { amount: 12800, currency: 'JPY' }, note: noteId } } } }).action, 'ignore', 'approved does not fulfill');
+const paid = Sct.squareDecision({ type: 'payment.updated', data: { object: { payment: { id: 'sqpay', status: 'COMPLETED', order_id: 'ord1', amount_money: { amount: 12800, currency: 'JPY' }, total_money: { amount: 12800, currency: 'JPY' }, note: noteId } } } });
+eq(paid.action, 'pay', 'completed fulfills');
 eq(paid.amount, 12800, 'amount passed through');
-eq(Sct.stripeDecision({ type: 'checkout.session.expired', data: { object: { id: 'cs_3', client_reference_id: 'p3' } } }).action, 'fail', 'expired fails');
+eq(paid.paymentId, noteId, 'note is the payment id');
+eq(paid.orderId, 'ord1', 'order id passed through');
+eq(Sct.squareDecision({ type: 'payment.updated', data: { object: { payment: { id: 'pay3', status: 'FAILED', amount_money: { amount: 12800, currency: 'JPY' }, note: noteId } } } }).action, 'ignore', 'failed attempt does not fulfill');
+eq(Sct.squareDecision({ type: 'payment.created', data: { object: { payment: { id: 'pay4', status: 'COMPLETED', amount_money: { amount: 100, currency: 'USD' }, total_money: { amount: 100, currency: 'USD' }, note: noteId } } } }).action, 'ignore', 'non-jpy ignored');
+eq(Sct.squareDecision({ type: 'payment.updated', data: { object: { payment: { id: 'pay5', status: 'COMPLETED', amount_money: { amount: 12800, currency: 'JPY' }, total_money: { amount: 13000, currency: 'JPY' }, note: noteId } } } }).reason, 'total', 'tip or discount does not fulfill');
+eq(Sct.squareDecision({ type: 'order.updated', data: { object: {} } }).action, 'ignore', 'other events ignored');
 
 const raw = Buffer.from(JSON.stringify({ type: 'google.workspace.meet.participant.v2.left', data: { participantSession: { name: 'conferenceRecords/c/participants/p/participantSessions/s', startTime: '2026-11-20T01:00:00Z', endTime: '2026-11-20T03:00:00Z', participant: { signedinUser: { displayName: '見本 花子' } } } } }), 'utf8').toString('base64');
 const meet = Sct.parseMeetPush({ message: { messageId: 'm1', data: raw } });
@@ -92,16 +100,31 @@ eq(meet.eventType, 'google.workspace.meet.participant.v2.left', 'meet event type
 ok(meet.resourceName.includes('participantSessions'), 'participantSessions name kept');
 
 const sql = fs.readFileSync(path.join(root, 'supabase/sct.sql'), 'utf8');
-for (const t of ['sct_subjects', 'sct_instructors', 'sct_settings', 'sct_profiles', 'sct_sessions', 'sct_session_access', 'sct_bookings', 'sct_payments', 'sct_attendance', 'sct_meet_events', 'sct_stripe_events', 'sct_certificates', 'sct_quiz']) {
+for (const t of ['sct_subjects', 'sct_instructors', 'sct_settings', 'sct_profiles', 'sct_sessions', 'sct_session_access', 'sct_bookings', 'sct_payments', 'sct_attendance', 'sct_meet_events', 'sct_stripe_events', 'sct_square_events', 'sct_certificates', 'sct_quiz']) {
   ok(sql.includes('alter table public.' + t + ' enable row level security'), 'rls ' + t);
 }
 ok(sql.includes('12800') && sql.includes('10800') && sql.includes('120') && sql.includes('西岡愛梨'), 'sql prices and instructor');
 ok(sql.includes('sct_no_delete') && sql.includes("app_metadata") && sql.includes('sct-proofs') && sql.includes('revoke all on function'), 'sql retention, role, storage');
-ok(!/sk_live_|whsec_[0-9a-zA-Z]{8}/.test(sql), 'sql has no stripe secrets');
-for (const f of ['supabase/functions/stripe-webhook/index.ts', 'supabase/functions/sct-checkout/index.ts', 'supabase/functions/meet-events/index.ts', 'supabase/functions/sct-certificate/index.ts']) {
+ok(sql.includes("else 'square'") && sql.includes('square_order_id') && sql.includes('processor_fee_yen'), 'sql begins square payments');
+const squareSql = fs.readFileSync(path.join(root, 'supabase/sct_square.sql'), 'utf8');
+ok(squareSql.includes('sct_square_events') && squareSql.includes("else 'square'") && squareSql.includes('sct_payments_method_check') && squareSql.includes("status = 'pending'"), 'square migration is re-runnable');
+const secret = /sk_live_|rk_live_|whsec_[A-Za-z0-9]{10}|sq0atp-|sq0csp-|EAAA[A-Za-z0-9_-]{20}/;
+ok(!secret.test(sql + squareSql), 'sql has no payment secrets');
+ok(!fs.existsSync(path.join(root, 'supabase/functions/stripe-webhook/index.ts')), 'stripe webhook removed');
+const toml = fs.readFileSync(path.join(root, 'supabase/config.toml'), 'utf8');
+ok(toml.includes('[functions.square-webhook]') && !toml.includes('stripe-webhook'), 'jwt skip is square');
+for (const f of ['supabase/functions/square-webhook/index.ts', 'supabase/functions/sct-checkout/index.ts', 'supabase/functions/_shared/square.ts', 'supabase/functions/meet-events/index.ts', 'supabase/functions/sct-certificate/index.ts']) {
   const src = fs.readFileSync(path.join(root, f), 'utf8');
-  ok(!/sk_live_|rk_live_|whsec_[A-Za-z0-9]{10}/.test(src), 'no embedded secret in ' + f);
+  ok(!secret.test(src), 'no embedded secret in ' + f);
+  ok(!src.includes('STRIPE_'), 'no stripe secret name in ' + f);
 }
+const squareSrc = fs.readFileSync(path.join(root, 'supabase/functions/_shared/square.ts'), 'utf8');
+const hook = fs.readFileSync(path.join(root, 'supabase/functions/square-webhook/index.ts'), 'utf8');
+ok(hook.includes('x-square-hmacsha256-signature') && hook.includes('notificationUrl + raw') && hook.includes('SQUARE_WEBHOOK_SIGNATURE_KEY') && hook.includes('SQUARE_WEBHOOK_NOTIFICATION_URL'), 'signature uses notification url and raw body');
+const crypto = require('crypto');
+const vector = crypto.createHmac('sha256', 'asdf1234').update('https://example.com/webhook{"hello":"world"}').digest('base64');
+ok(vector === '2kRE5qRU2tR+tBGlDwMEw2avJ7QM4ikPYD/PJ3bd9Og=' && squareSrc.includes(vector), 'square published signature vector');
+ok(!/Stripe/.test(fs.readFileSync(path.join(root, 'sct.html'), 'utf8') + fs.readFileSync(path.join(root, 'sct.js'), 'utf8') + fs.readFileSync(path.join(root, 'README.md'), 'utf8')), 'screens and readme do not say Stripe');
 ok(fs.readFileSync(path.join(root, 'supabase/functions/_shared/cert.ts'), 'utf8').includes('講師名'), 'edge cert template');
 ok(fs.readFileSync(path.join(root, 'index.html'), 'utf8').includes("id === 'sct'") && fs.readFileSync(path.join(root, 'sct.html'), 'utf8').includes('sct_logic.js'), 'pages wired');
 
