@@ -38,7 +38,7 @@ LEO_VIEWS.yotei = async function () {
     <b>やること：①下の「全員分まとめてコピー」→ 公式LINEに児童ごとに貼って送る　②回答がそろったら「予定を作る」で確認して確定</b></p>
     ${!YT_ROWS.length ? `<div class="card"><p>${mn}月分の依頼はまだありません。</p>${mgr ? `<button onclick="ytOpen()">${mn}月分のリンクを作る（型表の児童。退所日がこの月より前の子は除く。作るだけで、誰にも送りません）</button><span id="yt_om"></span>` : ''}</div>`
     : `<p style="font-size:18px"><b>${done.length} / ${YT_ROWS.length}人 回答済み</b>${left.length ? `（まだ：${left.map(r => esc(ytFace(r.child))).join('、')}）` : ' ✅ 全員そろいました'}</p>${mgr ? `<div class="card"><button onclick="ytCopyAll('send')">全員分まとめてコピー（児童ごとのLINE文面つき）</button> <button onclick="ytCopyAll('remind')">まだの人だけ催促の文をまとめてコピー</button><br><small>児童ごとに「■名前」の見出しで区切ります。見出しごとに分けて、それぞれのご家庭にだけ送ってください（リンクは家庭ごとに別です）。</small><div id="yt_all"></div></div>` : ''}${left.map(row).join('')}${done.map(row).join('')}
-      ${mgr ? `<div class="card"><h3>${mn}月分の予定を作る</h3><p class="note">回答（未回答は型表どおり）＋お休み・母の送迎から、${mn}月の 利用・迎え・送り を作ります。退所日の翌日以降の児童は入れません。型表は変更しません。まず確認だけ（何も書き込みません）。</p><button onclick="ytPlan()">${mn}月分の予定を作る（確認してから確定）</button><div id="yt_plan"></div></div>` : ''}`}
+      ${mgr ? `<div class="card"><h3>${mn}月分の予定を作る</h3><p class="note">回答のあった児童だけ、お休み・母の送迎も合わせて ${mn}月の 利用・迎え・送り を作ります。未回答の児童は型表から予定を作りません（そのご家庭にはリンクを再送してください）。退所日の翌日以降の児童は入れません。型表は変更しません。まず確認だけ（何も書き込みません）。</p><button onclick="ytPlan()">${mn}月分の予定を作る（確認してから確定）</button><div id="yt_plan"></div></div>` : ''}`}
     ${skipped.length ? `<details style="margin-top:8px"><summary>退所のため、この月の予定に入れていない児童（${skipped.length}人）</summary><p class="note">${skipped.map(r => esc(ytFace(r.child))).join('、')}。依頼の記録は消していません。型表も変更していません。</p></details>` : ''}
     <p class="note" style="margin-top:12px"><a href="yotei.html?demo=1&m=${YT_MONTH.slice(0, 7)}" target="_blank">保護者の画面の見本（架空データ・送信されません）</a></p>`;
 };
@@ -79,22 +79,50 @@ async function ytCopyAll(kind) {
   } catch (e) { box.innerHTML = `<p style="color:#c00">${esc(e.message)}</p>`; }
 }
 const ytHm = r => r.kind === '利用' ? `${r.child} ${r.start_time || ''}-${r.end_time || ''}${r.parent_drop ? '（母の送り）' : r.parent_pick ? '（母の迎え）' : ''}` : r.kind === '休み' ? `${r.child} 休み` : `${r.kind === '迎え' ? '☆' : '★'}${(r.kids || []).join('→')} ${r.start_time || ''}-${r.end_time || ''} ${r.staff ? esc(r.staff).replace(/　/g, ' ') : '<b style="color:#c00">担当なし</b>'}${r.place ? '（' + esc(r.place) + '）' : ''}`;
+const YT_SKIP = '未回答のため予定を作りません';
+function ytPlanHtml(p) {
+  const ev = p.events || [], by = {}; ev.forEach(e => (by[e.day] = by[e.day] || []).push(e));
+  const cnt = k => ev.filter(e => e.kind === k).length, mn = +String(YT_MONTH).slice(5, 7);
+  const warn = p.warnings || [], skipped = warn.filter(w => w.msg === YT_SKIP), rest = warn.filter(w => w.msg !== YT_SKIP);
+  const order = { 利用: 0, 休み: 1, 迎え: 2, 送り: 3 };
+  const days = Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}</h4><small>${by[d].sort((a, b) => (order[a.kind] - order[b.kind]) || (a.start_time || '').localeCompare(b.start_time || '')).map(ytHm).join('<br>')}</small>`).join('');
+  const detail = typeof calWrap === 'function' && typeof calDay === 'function'
+    ? calWrap(Object.keys(by).sort().map(d => `<section class="calv-wday"><p class="calv-h4">${fmtDay(d)}</p>${calDay(d, by[d], {})}</section>`).join(''))
+    : days;
+  return `<p><b>${mn}月分の確認</b>：利用 ${cnt('利用')}件／休み ${cnt('休み')}件／迎え ${cnt('迎え')}件／送り ${cnt('送り')}件　（回答済み ${p.answered}/${p.children}人）</p>
+    ${skipped.length ? `<div style="background:#fff6e5;border-left:4px solid #e8833a;padding:8px;border-radius:6px;margin:8px 0"><b>未回答のため予定を作りません（${skipped.length}人）</b><br>${skipped.map(w => esc(w.child)).join('、')}<br><small>型表の内容では予定を作りません。リンクを再送し、回答のあとにもう一度「予定を作る」とその子の分が足されます。</small></div>` : '<p style="color:#080">未回答の児童はいません。</p>'}
+    ${p.closed && p.closed.length ? `<p class="note">お休み（休所）：${p.closed.map(d => +String(d).slice(8) + '日').join('・')}</p>` : '<p class="note" style="color:#c60">⚠ 休所日が登録されていません。祝日（11/3・11/23 など）や休みの日は、児童の利用・送迎予定で「休所」を先に入れてください。</p>'}
+    ${rest.length ? `<div style="background:#fff4e0;padding:8px;border-radius:6px"><b>⚠ 確認が必要 ${rest.length}件</b><br>${rest.map(w => `${esc(w.child)}：${esc(w.msg)}`).join('<br>')}</div>` : '<p style="color:#080">⚠ 確認が必要なものはありません</p>'}
+    <details><summary>日ごとの中身を見る</summary>${detail}</details>
+    ${p.google_events > 0 ? `<p style="color:#c00">この月には Googleカレンダー由来の予定が ${p.google_events}件 あります。二重になるため確定できません。Googleで作る処理（25日のGAS）を止めてからにしてください。</p>`
+    : `<p><button onclick="ytCommit()" style="background:#080;color:#fff">この内容で確定する（${mn}月分の予定を作る）</button><br><small>今回の予定に入った児童だけ、前にこの処理で作った行を入れ替えます。未回答のままの児童の、すでに入っている予定は消しません。職員が手で直した予定も消えません。回答が来てからもう一度作ると、その子の分が足されます。</small></p>`}`;
+}
+function ytDemoPlan() {
+  const m = String(YT_MONTH).slice(0, 8);
+  return {
+    events: [
+      { day: m + '04', kind: '利用', child: '児童A', start_time: '15:00', end_time: '17:00' },
+      { day: m + '10', kind: '利用', child: '児童A', start_time: '14:30', end_time: '17:00' },
+      { day: m + '10', kind: '迎え', kids: ['児童A'], staff: '連先生', start_time: '14:10', end_time: '14:30', place: '見本小学校' },
+      { day: m + '10', kind: '送り', kids: ['児童A'], staff: '友香先生', start_time: '17:00', end_time: '17:20' },
+      { day: m + '11', kind: '休み', child: '児童A' },
+      { day: m + '12', kind: '利用', child: '児童C', start_time: '10:00', end_time: '13:00' },
+      { day: m + '12', kind: '迎え', kids: ['児童C'], staff: '連先生', start_time: '09:40', end_time: '10:00', place: '見本園' },
+    ],
+    warnings: [{ child: '児童B', msg: YT_SKIP }],
+    closed: [m + '03', m + '23'], answered: 2, children: 3, google_events: 0,
+  };
+}
 async function ytPlan() {
   const box = document.getElementById('yt_plan'); box.innerHTML = '確認中…';
-  try { if (DEMO) { box.innerHTML = '<p>見本モードです。</p>'; return; }
-    const p = await sb('rpc/leo_sched_plan', { method: 'POST', body: JSON.stringify({ p_month: YT_MONTH }) });
-    const ev = p.events || [], by = {}; ev.forEach(e => (by[e.day] = by[e.day] || []).push(e));
-    const cnt = k => ev.filter(e => e.kind === k).length, mn = +YT_MONTH.slice(5, 7);
-    box.innerHTML = `<p><b>${mn}月分の確認</b>：利用 ${cnt('利用')}件／休み ${cnt('休み')}件／迎え ${cnt('迎え')}件／送り ${cnt('送り')}件　（回答済み ${p.answered}/${p.children}人）</p>
-      ${p.closed && p.closed.length ? `<p class="note">お休み（休所）：${p.closed.map(d => +d.slice(8) + '日').join('・')}</p>` : '<p class="note" style="color:#c60">⚠ 休所日が登録されていません。祝日（11/3・11/23 など）や休みの日は、児童の利用・送迎予定で「休所」を先に入れてください。</p>'}
-      ${p.warnings.length ? `<div style="background:#fff4e0;padding:8px;border-radius:6px"><b>⚠ 確認が必要 ${p.warnings.length}件</b><br>${p.warnings.map(w => `${esc(w.child)}：${esc(w.msg)}`).join('<br>')}</div>` : '<p style="color:#080">⚠ 確認が必要なものはありません</p>'}
-      <details><summary>日ごとの中身を見る</summary>${typeof calWrap === 'function' ? calWrap(Object.keys(by).sort().map(d => `<section class="calv-wday"><p class="calv-h4">${fmtDay(d)}</p>${calDay(d, by[d], {})}</section>`).join('')) : Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}</h4><small>${by[d].sort((a, b) => ({ 利用: 0, 休み: 1, 迎え: 2, 送り: 3 })[a.kind] - ({ 利用: 0, 休み: 1, 迎え: 2, 送り: 3 })[b.kind] || (a.start_time || '').localeCompare(b.start_time || '')).map(ytHm).join('<br>')}</small>`).join('')}</details>
-      ${p.google_events > 0 ? `<p style="color:#c00">この月には Googleカレンダー由来の予定が ${p.google_events}件 あります。二重になるため確定できません。Googleで作る処理（25日のGAS）を止めてからにしてください。</p>`
-      : `<p><button onclick="ytCommit()" style="background:#080;color:#fff">この内容で確定する（${mn}月分の予定を作る）</button><br><small>職員が手で直した予定は消えません。何度でも作り直せます。</small></p>`}`;
+  try {
+    const p = DEMO ? ytDemoPlan() : await sb('rpc/leo_sched_plan', { method: 'POST', body: JSON.stringify({ p_month: YT_MONTH }) });
+    box.innerHTML = (DEMO ? '<p class="note">見本データです（架空）。書き込みはしていません。</p>' : '') + ytPlanHtml(p);
   } catch (e) { box.innerHTML = `<p style="color:#c00">${esc(e.message)}</p>`; }
 }
 async function ytCommit() {
   const box = document.getElementById('yt_plan');
+  if (DEMO) { box.insertAdjacentHTML('beforeend', '<p>見本モードでは書き込みません。</p>'); return; }
   if (!confirm(YT_MONTH.slice(5, 7) + '月分の予定を作ります。よいですか？')) return;
   try { const r = await sb('rpc/leo_sched_commit', { method: 'POST', body: JSON.stringify({ p_month: YT_MONTH }) });
     box.innerHTML = `<p style="color:#080;font-size:17px">✅ ${r.inserted}件の予定を作りました。<a href="#leo/cal">児童の利用・送迎予定</a>／<a href="#leo/sougeiall">みんなの送迎</a>で見られます。</p>`; }

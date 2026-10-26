@@ -134,15 +134,14 @@ begin
   if exists (select 1 from jsonb_array_elements(p->'events') e where e->>'child' = '山根　一輝') then
     raise exception 'FAIL fullwidth child on event'; end if;
 
-  select coalesce(array_agg((e->>'day')::date order by (e->>'day')::date), '{}') into days
-    from jsonb_array_elements(p->'events') e where e->>'kind' = '利用' and e->>'child' = '児童C';
-  if days <> array['2026-11-10','2026-11-17','2026-11-24']::date[] then
-    raise exception 'FAIL 児童C days %', days; end if;
+  if exists (select 1 from jsonb_array_elements(p->'events') e
+    where e->>'child' = '児童C' or (e->'kids') ? '児童C') then
+    raise exception 'FAIL 児童C unanswered must have no events'; end if;
 
-  if exists (select 1 from jsonb_array_elements(p->'warnings') w where w->>'msg' like '回答がありません%' and w->>'child' in ('市川 碧音','山根 一輝')) then
+  if exists (select 1 from jsonb_array_elements(p->'warnings') w where w->>'msg' like '未回答のため予定を作りません' and w->>'child' in ('市川 碧音','山根 一輝')) then
     raise exception 'FAIL matched child warned as unanswered'; end if;
-  if not exists (select 1 from jsonb_array_elements(p->'warnings') w where w->>'child' = '児童C' and w->>'msg' like '回答がありません%') then
-    raise exception 'FAIL 児童C should warn'; end if;
+  if (select count(*) from jsonb_array_elements(p->'warnings') w where w->>'child' = '児童C' and w->>'msg' = '未回答のため予定を作りません') <> 1 then
+    raise exception 'FAIL 児童C should be listed as unanswered'; end if;
 
   if (select count(*) from public.leo_events where child = 'marker' and source = 'portal') <> 1 then
     raise exception 'FAIL marker event'; end if;

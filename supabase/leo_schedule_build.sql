@@ -2,7 +2,7 @@
 -- 確認（leo_sched_plan）は何も書き込まない。確定（leo_sched_commit）だけが source='kata' の予定を入れる。型表は書き換えない。
 -- 利用予定の作成（25日に実行）：保護者の回答（leo_schedule_weekday / exception）＋型表 → leo_events（利用・休み・迎え・送り）
 -- 意味は Google の GAS と同じ：利用＝来る時間／迎え☆＝担当ごとにまとめて乗る順／送り★／母の送り＝迎えなし／母の迎え＝送りなし
--- source='kata' が「この処理で作った行」。作り直すときはこの行だけ消して入れ直す（職員が直した source='portal' 行・Google取込 source='google' 行は触らない）
+-- source='kata' が「この処理で作った行」。作り直すときは、今回の予定に入った児童の行だけ消して入れ直す（未回答の子の既存行・職員が直した source='portal' 行・Google取込 source='google' 行は触らない）
 alter table public.leo_events add column if not exists kid_places jsonb;   -- 迎え・送り：児童ごとの場所
 alter table public.leo_events add column if not exists kid_times jsonb;    -- 迎え・送り：児童ごとの目安時刻
 
@@ -117,7 +117,7 @@ revoke all on function public.leo_name_canon(text), public.leo_name_tokens(text)
 
 -- 中身（権限チェックなし。直接は呼べない）
 -- BEGIN leo_sched_plan_core
--- 予定の中身。型表は読むだけ。回答が結び付いた子は回答を優先し、結び付かない子だけ型表の「毎週」どおり。確認用の呼び出しは書き込まない。
+-- 予定の中身。型表は読むだけ。回答が結び付いた子は回答を優先する。未回答の子は型表から予定を作らない。名前が複数の児童に当たる回答だけ、これまでどおり型表の「毎週」を使う。確認用の呼び出しは書き込まない。
 create or replace function public.leo_sched_plan_core(p_month date) returns jsonb language plpgsql security definer set search_path = public as $$
 declare ev jsonb := '[]'; warn jsonb := '[]'; closed date[]; last_day date := (p_month + interval '1 month - 1 day')::date;
   v record; g record; hol text;
@@ -148,7 +148,9 @@ begin
            select w.use from _nres r join leo_schedule_weekday w on w.child = r.answer and w.month = p_month and w.dow = d.dow
            where r.kind = 'link' and r.kata = public.leo_name_canon(kata.k->>'児童名')
            order by w.answered_at desc nulls last, w.child limit 1), false)
-         else coalesce(kata.k->>'利用週', '毎週') <> '不定期' end);
+         when exists (select 1 from _nres r where r.kind = 'ambiguous' and r.kata = public.leo_name_canon(kata.k->>'児童名'))
+         then coalesce(kata.k->>'利用週', '毎週') <> '不定期'
+         else false end);
   for v in
     select c from (
       select distinct public.leo_name_canon(k->>'児童名') c from leo_sched_kata_all() k where coalesce(k->>'児童名', '') <> ''
@@ -163,7 +165,7 @@ begin
         where r.kind = 'link' and r.kata = c)
       and not exists (select 1 from _nres r where r.kind = 'ambiguous' and r.kata = c)
   loop
-    warn := warn || jsonb_build_array(jsonb_build_object('child', v.c, 'msg', '回答がありません（型表の「毎週」どおりで作成）'));
+    warn := warn || jsonb_build_array(jsonb_build_object('child', v.c, 'msg', '未回答のため予定を作りません'));
   end loop;
   for v in
     select public.leo_name_canon(answer) as answer, string_agg(distinct kata, '、' order by kata) as detail
@@ -280,20 +282,62 @@ begin
   if extract(day from p_month) <> 1 then raise exception '月の1日を指定してください'; end if;
   return leo_sched_plan_core(p_month);
 end $$;
--- 確定（この処理で作った source='kata' の行だけ入れ替える）。Googleの予定が同じ月にあるときは止める（二重になるため）
+-- 確定。今回の予定に入った児童の source='kata' だけ入れ替える。未回答で今回作らない児童の、すでに入っている予定は消さない。
+-- 手直し（source='portal'）と Google 取込（source='google'）も消さない。他の月も触らない。
 create or replace function public.leo_sched_commit(p_month date, p_force boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
-declare p jsonb; n int; last_day date := (p_month + interval '1 month - 1 day')::date;
+declare p jsonb; n int := 0; last_day date := (p_month + interval '1 month - 1 day')::date;
+  evj jsonb; kids_left text[];
 begin
   if not public.can_manage() then raise exception '児発管・管理者・事務のみ'; end if;
   if extract(day from p_month) <> 1 then raise exception '月の1日を指定してください'; end if;
   p := leo_sched_plan_core(p_month);
   if (p->>'google_events')::int > 0 and not p_force then raise exception 'この月にはGoogleカレンダー由来の予定が % 件あります。二重になるので、Googleで作る処理を止めたことを確認してから進めてください', p->>'google_events'; end if;
-  delete from leo_events where source = 'kata' and day >= p_month and day <= last_day and kind in ('利用','休み','迎え','送り');
-  insert into leo_events (day, kind, child, kids, staff, start_time, end_time, parent_drop, parent_pick, place, note, title, source, kid_places, kid_times)
-  select (x->>'day')::date, x->>'kind', x->>'child', coalesce(array(select jsonb_array_elements_text(x->'kids')), '{}'), x->>'staff', x->>'start_time', x->>'end_time',
-    coalesce((x->>'parent_drop')::bool, false), coalesce((x->>'parent_pick')::bool, false), x->>'place', x->>'note', x->>'title', 'kata', x->'kid_places', x->'kid_times'
-  from jsonb_array_elements(p->'events') x;
-  get diagnostics n = row_count;
+  create temp table if not exists _regen (child text primary key) on commit drop;
+  truncate _regen;
+  insert into _regen(child)
+  select distinct public.leo_name_canon(c) from (
+    select ev->>'child' as c from jsonb_array_elements(p->'events') ev where coalesce(ev->>'child', '') <> ''
+    union all
+    select k from jsonb_array_elements(p->'events') ev
+      cross join lateral jsonb_array_elements_text(coalesce(ev->'kids', '[]'::jsonb)) k
+      where coalesce(k, '') <> ''
+  ) s
+  where public.leo_name_canon(c) <> ''
+  on conflict do nothing;
+  delete from leo_events e
+  where e.source = 'kata' and e.day >= p_month and e.day <= last_day and e.kind in ('利用','休み')
+    and public.leo_name_canon(e.child) in (select child from _regen);
+  delete from leo_events e
+  where e.source = 'kata' and e.day >= p_month and e.day <= last_day and e.kind in ('迎え','送り')
+    and coalesce(cardinality(e.kids), 0) > 0
+    and not exists (
+      select 1 from unnest(e.kids) k
+      where public.leo_name_canon(k) <> '' and public.leo_name_canon(k) not in (select child from _regen));
+  for evj in select value from jsonb_array_elements(coalesce(p->'events', '[]'::jsonb)) loop
+    if evj->>'kind' in ('迎え','送り') then
+      select coalesce(array_agg(t.k order by t.ord), '{}') into kids_left
+      from jsonb_array_elements_text(coalesce(evj->'kids', '[]'::jsonb)) with ordinality t(k, ord)
+      where not exists (
+        select 1 from leo_events e
+        where e.source = 'kata' and e.kind = evj->>'kind' and e.day = (evj->>'day')::date
+          and public.leo_name_canon(t.k) in (select public.leo_name_canon(u) from unnest(e.kids) u));
+      if coalesce(cardinality(kids_left), 0) = 0 then continue; end if;
+      insert into leo_events (day, kind, child, kids, staff, start_time, end_time, parent_drop, parent_pick, place, note, title, source, kid_places, kid_times)
+      values ((evj->>'day')::date, evj->>'kind', null, kids_left, evj->>'staff', evj->>'start_time', evj->>'end_time', false, false,
+        (select string_agg(distinct v, '、') from jsonb_each_text(coalesce(evj->'kid_places', '{}'::jsonb)) e(k, v)
+          where public.leo_name_canon(e.k) in (select public.leo_name_canon(u) from unnest(kids_left) u) and v <> '自宅'),
+        evj->>'note', (case when evj->>'kind' = '迎え' then '☆' else '★' end) || array_to_string(kids_left, '→'), 'kata',
+        (select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) from jsonb_each(coalesce(evj->'kid_places', '{}'::jsonb)) e
+          where public.leo_name_canon(e.key) in (select public.leo_name_canon(u) from unnest(kids_left) u)),
+        (select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) from jsonb_each(coalesce(evj->'kid_times', '{}'::jsonb)) e
+          where public.leo_name_canon(e.key) in (select public.leo_name_canon(u) from unnest(kids_left) u)));
+    else
+      insert into leo_events (day, kind, child, kids, staff, start_time, end_time, parent_drop, parent_pick, place, note, title, source, kid_places, kid_times)
+      values ((evj->>'day')::date, evj->>'kind', evj->>'child', coalesce(array(select jsonb_array_elements_text(evj->'kids')), '{}'), evj->>'staff', evj->>'start_time', evj->>'end_time',
+        coalesce((evj->>'parent_drop')::bool, false), coalesce((evj->>'parent_pick')::bool, false), evj->>'place', evj->>'note', evj->>'title', 'kata', evj->'kid_places', evj->'kid_times');
+    end if;
+    n := n + 1;
+  end loop;
   return jsonb_build_object('inserted', n, 'warnings', p->'warnings');
 end $$;
 revoke all on function public.leo_sched_plan, public.leo_sched_commit from public;

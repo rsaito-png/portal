@@ -211,7 +211,7 @@ revoke all on function public.leo_sched_get(text), public.leo_sched_submit(text,
 grant execute on function public.leo_sched_get(text), public.leo_sched_submit(text, jsonb) to anon, authenticated;
 
 -- BEGIN leo_sched_plan_core
--- 予定の中身。型表は読むだけ。回答が結び付いた子は回答を優先し、結び付かない子だけ型表の「毎週」どおり。確認用の呼び出しは書き込まない。
+-- 予定の中身。型表は読むだけ。回答が結び付いた子は回答を優先する。未回答の子は型表から予定を作らない。名前が複数の児童に当たる回答だけ、これまでどおり型表の「毎週」を使う。確認用の呼び出しは書き込まない。
 create or replace function public.leo_sched_plan_core(p_month date) returns jsonb language plpgsql security definer set search_path = public as $$
 declare ev jsonb := '[]'; warn jsonb := '[]'; closed date[]; last_day date := (p_month + interval '1 month - 1 day')::date;
   v record; g record; hol text;
@@ -242,7 +242,9 @@ begin
            select w.use from _nres r join leo_schedule_weekday w on w.child = r.answer and w.month = p_month and w.dow = d.dow
            where r.kind = 'link' and r.kata = public.leo_name_canon(kata.k->>'児童名')
            order by w.answered_at desc nulls last, w.child limit 1), false)
-         else coalesce(kata.k->>'利用週', '毎週') <> '不定期' end);
+         when exists (select 1 from _nres r where r.kind = 'ambiguous' and r.kata = public.leo_name_canon(kata.k->>'児童名'))
+         then coalesce(kata.k->>'利用週', '毎週') <> '不定期'
+         else false end);
   for v in
     select c from (
       select distinct public.leo_name_canon(k->>'児童名') c from leo_sched_kata_all() k where coalesce(k->>'児童名', '') <> ''
@@ -257,7 +259,7 @@ begin
         where r.kind = 'link' and r.kata = c)
       and not exists (select 1 from _nres r where r.kind = 'ambiguous' and r.kata = c)
   loop
-    warn := warn || jsonb_build_array(jsonb_build_object('child', v.c, 'msg', '回答がありません（型表の「毎週」どおりで作成）'));
+    warn := warn || jsonb_build_array(jsonb_build_object('child', v.c, 'msg', '未回答のため予定を作りません'));
   end loop;
   for v in
     select public.leo_name_canon(answer) as answer, string_agg(distinct kata, '、' order by kata) as detail
