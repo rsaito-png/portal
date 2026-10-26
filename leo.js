@@ -194,10 +194,10 @@ const LEO_VIEWS = {
     const days = [...new Set(rows.map(r => r['日付']))];
     const pick = DEMO ? days : days.filter(d => d >= t).slice(0, 7);
     const show = pick.length ? pick : days.slice(-3);
-    return `<h3>職員配置表（見るだけ）</h3>${demoNote()}<p class="note">日誌から作られた配置です（${pick.length ? '今日以降' : '直近'}）。</p>` + show.map(d => {
+    return `<h3>職員配置表（見るだけ）</h3>${demoNote()}<p class="note">日誌から作られた配置です（${pick.length ? '今日以降' : '直近'}）。職員名は届け出上の名前です。</p>` + show.map(d => {
       const rs = rows.filter(r => r['日付'] === d);
       return `<h4>${esc(d)}（${esc(rs[0]['曜日'])}） 児童${esc(rs[0]['利用児童数'])}人</h4><table><tr><th>職員</th><th>時間</th><th>役割</th></tr>${rs.map(r =>
-        `<tr><td>${esc(r['職員名'])}<br><small>${esc(r['常勤/非常勤'])}</small></td><td>${esc(r['配置開始'])}〜${esc(r['配置終了'])}</td><td><small>${esc(r['役割(日誌)'])}</small></td></tr>`).join('')}</table>`;
+        `<tr><td>${esc(filingDriverName(r['職員名']))}<br><small>${esc(r['常勤/非常勤'])}</small></td><td>${esc(r['配置開始'])}〜${esc(r['配置終了'])}</td><td><small>${esc(r['役割(日誌)'])}</small></td></tr>`).join('')}</table>`;
     }).join('');
   },
   async edits() {
@@ -222,22 +222,38 @@ const LEO_VIEWS = {
     let act = [];
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${today()}`); } catch (e) { }
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直したらすぐ日誌に反映されます（1分ほど）。日誌のほうが先に変わっていたときは反映せず「衝突」になります。食事・おやつは日誌で直接直してください。活動記録はLINE下書きからの自動転記分も表示します。</p>` +
+    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直したらすぐ日誌に反映されます（1分ほど）。日誌のほうが先に変わっていたときは反映せず「衝突」になります。食事・おやつは日誌で直接直してください。活動記録はLINE下書きからの自動転記分も表示します。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
       rows.map(r => { const a = A[String(r.child || '').replace(/\s/g, '')], actVal = (a && a.text) || r.activity || '';
         return `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
         ${NIKKI_FIELDS.map(([f, l]) => {
-          const v = f === 'activity' ? actVal : r[f];
+          const raw = f === 'activity' ? actVal : (r[f] ?? '');
+          const shown = nikkiShownValue(f, raw);
           return f === 'activity'
-            ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(v)}">${esc(v)}</textarea></label>`
-            : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(v)}" value="${esc(v)}"></label>`;
+            ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}">${esc(shown)}</textarea></label>`
+            : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}" value="${esc(shown)}"></label>`;
         }).join('')}</div>`; }).join('') +
       `<button onclick="saveNikki()">直した所を送る</button><div id="saved"></div>`;
   },
   async jisseki() {
     const rows = DEMO ? DEMO_DATA.jisseki : await sb('leo_jisseki?order=day.desc,child&limit=200');
-    return `<h3>実績記録（見るだけ）</h3>${demoNote()}<p class="note">利用料・加算などの請求の項目はここには出しません。</p>
-      <table><tr><th>日付</th><th>児童</th><th>状況</th><th>時間</th></tr>${rows.map(r =>
-      `<tr><td>${esc(r.day)}</td><td>${esc(r.child)}</td><td>${esc(r.status)}</td><td>${esc(r.start_time)}〜${esc(r.end_time)}</td></tr>`).join('')}</table>
+    let nk = [];
+    if (DEMO) nk = DEMO_DATA.nikki;
+    else if (rows.length) {
+      const days = [...new Set(rows.map(r => r.day).filter(Boolean))];
+      if (days.length) nk = await sb(`leo_nikki?day=in.(${days.join(',')})&select=day,child,kind,pick_driver,drop_driver`);
+    }
+    const by = {};
+    nk.forEach(n => {
+      const k = DEMO ? n.child : (n.day + n.child);
+      const prev = by[k];
+      if (!prev || (n.kind === '利用' && prev.kind !== '利用')) by[k] = n;
+    });
+    const trip = r => filingTripDrivers(by[DEMO ? r.child : (r.day + r.child)]);
+    return `<h3>実績記録（見るだけ）</h3>${demoNote()}<p class="note">利用料・加算などの請求の項目はここには出しません。迎え・送りの担当は届け出上の名前です。</p>
+      <table><tr><th>日付</th><th>児童</th><th>状況</th><th>時間</th><th>迎え</th><th>送り</th></tr>${rows.map(r => {
+      const d = trip(r);
+      return `<tr><td>${esc(r.day)}</td><td>${esc(r.child)}</td><td>${esc(r.status)}</td><td>${esc(r.start_time)}〜${esc(r.end_time)}</td><td>${esc(d.pick)}</td><td>${esc(d.drop)}</td></tr>`;
+    }).join('')}</table>
       <p class="note">直したいときは日誌側で直すと、夜の転記で実績にも入ります。</p>`;
   },
 };
@@ -372,12 +388,17 @@ LEO_VIEWS.home = async function () {
 };
 
 async function saveNikki() {
-  const ch = [...document.querySelectorAll('.rec input, .rec textarea')].filter(i => i.value !== i.dataset.old)
-    .map(i => ({ target: 'nikki', day: today(), row_key: i.dataset.row, field: i.dataset.f, old_value: i.dataset.old, new_value: i.value }));
+  const ch = [];
+  for (const i of document.querySelectorAll('.rec input, .rec textarea')) {
+    const edit = nikkiEditValue(i.dataset.f, i.dataset.old, i.value);
+    if (!edit) continue;
+    ch.push({ target: 'nikki', day: today(), row_key: i.dataset.row, field: i.dataset.f, old_value: edit.old_value, new_value: edit.new_value });
+    i.dataset.old = edit.new_value;
+  }
   if (!ch.length) { $('saved').textContent = '変更はありません。'; return; }
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${ch.length}件の修正）。`; return; }
   try { await sb('leo_edits', { method: 'POST', body: JSON.stringify(ch), headers: { Prefer: 'return=minimal' } });
-    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; document.querySelectorAll(".rec input, .rec textarea").forEach(i => { i.dataset.old = i.value; }); }
+    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; }
   catch (e) { $('saved').textContent = e.message; }
 }
 
@@ -1211,11 +1232,11 @@ LEO_VIEWS.diary = async function () {
   const idOf = k => 'dr_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
   return `<h3>日誌（児童ごと）</h3>${demoNote()}
     <p class="ptabs"><button onclick="DIA_DAY=addDays(DIA_DAY,-1);renderLeoView('diary')">← 前の日</button> <b>${fmtDay(DIA_DAY)}</b> <button onclick="DIA_DAY=addDays(DIA_DAY,1);renderLeoView('diary')">次の日 →</button></p>
-    <p class="note">活動記録は、Google日誌の内容に加え、LINE下書きから自動転記された分も表示します。下の「下書き」欄への保存だけでは日誌には入りません（トップの「LINEの下書き」から保存してください）。</p>
+    <p class="note">活動記録は、Google日誌の内容に加え、LINE下書きから自動転記された分も表示します。下の「下書き」欄への保存だけでは日誌には入りません（トップの「LINEの下書き」から保存してください）。迎え・送りの名前は届け出上の担当です。</p>
     ${noTable ? '<p style="color:#c00">下書きの保存場所がまだありません（管理者が準備中です）。</p>' : ''}
     ${rows.map(r => { const k = r.child, d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
       return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
-        <div style="padding:0 14px 14px"><p class="note">迎え：${esc(r.pick_driver || '-')}　送り：${esc(r.drop_driver || '-')}</p>
+        <div style="padding:0 14px 14px"><p class="note">迎え：${esc(filingDriverName(r.pick_driver) || '-')}　送り：${esc(filingDriverName(r.drop_driver) || '-')}</p>
         ${actText ? `<p style="white-space:pre-wrap"><b>日誌の活動記録${actSrc ? '（' + esc(actSrc) + '）' : ''}</b><br>${esc(actText)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
         <b>下書き（です・ます調）</b>${d ? `<small>　${esc(d.author || '')}</small>` : ''}
         <textarea id="${id}" rows="30" style="width:100%;font-size:16px;box-sizing:border-box" ${noTable ? 'disabled' : ''}>${esc(d ? d.body : '')}</textarea>
