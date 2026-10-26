@@ -1,5 +1,6 @@
 -- 日中一時支援（星心会レスパイトスタジオ）。居宅介護の kin_visit とは別テーブル。kin_* は変更しない。
--- 読む・書く: nicchu_can()（担当フラグ / 所属がレスパイトか日中一時 / 事務・管理者・児発管 / 会長）
+-- 読む・書く: nicchu_can()（担当フラグ / 所属が日中一時支援・レスパイト・日中一時 / 事務・管理者・児発管 / 会長）
+-- 署名の列は残す。画面は署名を受け取らない（印刷して市役所へ出す）。利用ありは時刻・送迎・食事・活動・ご様子だけで保存できる。
 -- 適用: Supabase SQL Editor にこのファイルを貼って Run（再実行できる）
 -- 利用者・記入者の実名はこのファイルに置かない。画面の「利用者を追加」か、次の形で登録する:
 --   insert into public.nicchu_user(name, kana, sort) values ('氏名', 'ふりがな', 1);
@@ -23,7 +24,7 @@ as $$
       select 1 from public.staff_profiles
       where user_id = auth.uid()
         and active
-        and (nicchu or office in ('レスパイト', '日中一時'))
+        and (nicchu or office in ('日中一時支援', 'レスパイト', '日中一時'))
     ),
     false)
 $$;
@@ -86,13 +87,13 @@ create table if not exists public.nicchu_record (
     and transport is not null and meal_served is not null
     and char_length(btrim(coalesce(activity, ''))) > 0
     and char_length(btrim(coalesce(state, ''))) > 0
-    and signer_kind is not null and sign_status is not null
   )),
-  constraint nicchu_record_sign_shape check (not present or (
-    (signer_kind = 'あとで署名' and sign_status = '署名待ち' and signature is null and signed_at is null)
+  constraint nicchu_record_sign_shape check (
+    (signer_kind is null and sign_status is null and signature is null and sign_reason is null and signed_at is null)
+    or (signer_kind = 'あとで署名' and sign_status = '署名待ち' and signature is null and signed_at is null)
     or (signer_kind = '署名困難' and sign_status = '署名済' and signature is null and char_length(btrim(coalesce(sign_reason, ''))) > 0)
     or (signer_kind in ('本人', 'ご家族') and sign_status = '署名済' and signature is not null and signed_at is not null)
-  )),
+  ),
   constraint nicchu_record_when_absent check (present or (
     start_time is null and end_time is null and transport is null and meal_served is null
     and activity is null and state is null and signer_kind is null and sign_reason is null
@@ -112,6 +113,22 @@ create table if not exists public.nicchu_sign_log (
     (signer_kind = '署名困難' and signature is null and char_length(btrim(coalesce(sign_reason, ''))) > 0)
     or (signer_kind in ('本人', 'ご家族') and signature is not null)
   )
+);
+
+-- すでに作った表の制約を、署名なしでも保存できる形に揃える（再実行できる）
+alter table public.nicchu_record drop constraint if exists nicchu_record_when_present;
+alter table public.nicchu_record add constraint nicchu_record_when_present check (not present or (
+  start_time is not null and end_time is not null and end_time > start_time
+  and transport is not null and meal_served is not null
+  and char_length(btrim(coalesce(activity, ''))) > 0
+  and char_length(btrim(coalesce(state, ''))) > 0
+));
+alter table public.nicchu_record drop constraint if exists nicchu_record_sign_shape;
+alter table public.nicchu_record add constraint nicchu_record_sign_shape check (
+  (signer_kind is null and sign_status is null and signature is null and sign_reason is null and signed_at is null)
+  or (signer_kind = 'あとで署名' and sign_status = '署名待ち' and signature is null and signed_at is null)
+  or (signer_kind = '署名困難' and sign_status = '署名済' and signature is null and char_length(btrim(coalesce(sign_reason, ''))) > 0)
+  or (signer_kind in ('本人', 'ご家族') and sign_status = '署名済' and signature is not null and signed_at is not null)
 );
 
 create index if not exists nicchu_day_date on public.nicchu_day(service_date desc);
@@ -207,3 +224,34 @@ end $$;
 
 revoke all on function public.nicchu_sign_later(bigint[], text, text, text) from public, anon;
 grant execute on function public.nicchu_sign_later(bigint[], text, text, text) to authenticated;
+
+-- 第８号様式（実績記録票）に書く受給者情報。実名や番号はこのファイルに置かない。
+alter table public.nicchu_user add column if not exists recipient_no text;
+alter table public.nicchu_user add column if not exists kubun text;
+alter table public.nicchu_user add column if not exists monthly_quota int;
+alter table public.nicchu_user add column if not exists guardian_name text;
+alter table public.nicchu_user drop constraint if exists nicchu_user_recipient_no_chk;
+alter table public.nicchu_user add constraint nicchu_user_recipient_no_chk check (recipient_no is null or recipient_no ~ '^[0-9]{1,10}$');
+alter table public.nicchu_user drop constraint if exists nicchu_user_kubun_chk;
+alter table public.nicchu_user add constraint nicchu_user_kubun_chk check (kubun is null or kubun in ('区分１', '区分２', '区分３'));
+alter table public.nicchu_user drop constraint if exists nicchu_user_quota_chk;
+alter table public.nicchu_user add constraint nicchu_user_quota_chk check (monthly_quota is null or monthly_quota between 1 and 31);
+alter table public.nicchu_user drop constraint if exists nicchu_user_guardian_chk;
+alter table public.nicchu_user add constraint nicchu_user_guardian_chk check (char_length(guardian_name) <= 100);
+
+create table if not exists public.nicchu_office (
+  id int primary key check (id = 1),
+  office_no text check (office_no is null or office_no ~ '^[0-9]{1,10}$'),
+  office_name text check (char_length(office_name) <= 200),
+  updated_at timestamptz not null default now()
+);
+insert into public.nicchu_office(id, office_name)
+values (1, E'一般社団法人 心理社会的リハビリテーション・星心会\n星心会レスパイトスタジオ')
+on conflict (id) do nothing;
+
+alter table public.nicchu_office enable row level security;
+drop policy if exists nicchu_office_rw on public.nicchu_office;
+create policy nicchu_office_rw on public.nicchu_office for all to authenticated
+  using (public.nicchu_can()) with check (public.nicchu_can());
+revoke all on public.nicchu_office from anon, public;
+grant select, insert, update, delete on public.nicchu_office to authenticated;

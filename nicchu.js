@@ -1,13 +1,13 @@
-// 日中一時支援（星心会レスパイトスタジオ）。#nicchu/log 一覧・その日の記録、#nicchu/sign あとで署名。
-// 金斗雲の訪問記録（kin_visit）とは別。署名欄は signpad.js（契約署名と同じ全画面パッド）。
-const NC = { month: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7), sig: {}, keep: {}, pad: null, padKey: null, shown: [], dayId: null, pending: [], scrollY: 0, mem: null, flash: '' };
+// 日中一時支援（星心会レスパイトスタジオ）。#nicchu/log 一覧・その日の記録。
+// 署名はポータルでは受けない（印刷して市役所へ出す）。金斗雲の訪問記録（kin_visit）とは別。
+const NC = { month: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7), shown: [], dayId: null, mem: null, flash: '', busy: false };
 const NC_PLACE = '星心会レスパイトスタジオ（四日市市あさけが丘2-1-12）';
+const NC_HELPERS = ['山川美恵子', '大坪シズカ', '齊藤連'];
 
 /* nc-pure */
 const NC_WEATHER = ['晴れ', 'くもり', '雨', '雪'];
 const NC_TRANSPORT = ['往復', '迎えのみ', '送りのみ', 'なし'];
 const NC_MEAL = ['あり', 'なし'];
-const NC_SIGNER = ['本人', 'ご家族', '署名困難', 'あとで署名'];
 function ncClip(s, n) { return String(s == null ? '' : s).trim().slice(0, n); }
 function ncMin(t) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim());
@@ -58,54 +58,89 @@ function ncValidate(f) {
     else if (activity.length > 2000) err.push(n + '活動内容は2000文字以内にしてください');
     if (!state) err.push(n + 'ご様子を入れてください');
     else if (state.length > 2000) err.push(n + 'ご様子は2000文字以内にしてください');
-    if (NC_SIGNER.indexOf(u.signer_kind) < 0) err.push(n + '署名する人を選んでください');
-    if (u.signer_kind === '署名困難' && !ncClip(u.sign_reason, 500)) err.push(n + '署名困難の理由を入れてください');
-    if (u.signer_kind === '署名困難' && String(u.sign_reason || '').trim().length > 500) err.push(n + '署名困難の理由は500文字以内にしてください');
-    if (u.signer_kind === '本人' || u.signer_kind === 'ご家族') {
-      const sig = String(u.signature || '');
-      if (!/^data:image\/png;base64,/.test(sig)) err.push(n + '署名がありません');
-      else if (sig.length > 300000) err.push(n + '署名画像が大きすぎます。書き直してください');
-    }
   });
   return err;
 }
-function ncRecordBody(u, keep, now) {
-  const ts = now || new Date().toISOString();
+function ncRecordBody(u) {
+  const blank = { signer_kind: null, sign_reason: null, signature: null, sign_status: null, signed_at: null };
   if (!u.present) {
-    return { user_id: u.user_id, present: false, start_time: null, end_time: null, transport: null, meal_served: null, activity: null, state: null, signer_kind: null, sign_reason: null, signature: null, sign_status: null, signed_at: null };
-  }
-  const later = u.signer_kind === 'あとで署名', hard = u.signer_kind === '署名困難', signed = !later && !hard;
-  const signature = signed ? u.signature : null;
-  const sign_reason = hard ? ncClip(u.sign_reason, 500) : null;
-  let signed_at = null;
-  if (!later) {
-    const same = keep && keep.sign_status === '署名済' && keep.signer_kind === u.signer_kind && (keep.signature || null) === (signature || null) && (keep.sign_reason || null) === (sign_reason || null) && keep.signed_at;
-    signed_at = same ? keep.signed_at : ts;
+    return { user_id: u.user_id, present: false, start_time: null, end_time: null, transport: null, meal_served: null, activity: null, state: null, ...blank };
   }
   return {
     user_id: u.user_id, present: true, start_time: u.start_time, end_time: u.end_time, transport: u.transport, meal_served: u.meal_served,
-    activity: ncClip(u.activity, 2000), state: ncClip(u.state, 2000), signer_kind: u.signer_kind, sign_reason, signature,
-    sign_status: later ? '署名待ち' : '署名済', signed_at
+    activity: ncClip(u.activity, 2000), state: ncClip(u.state, 2000), ...blank
   };
 }
-function ncNeedLog(body, keep) {
-  if (!body.present || body.sign_status !== '署名済') return false;
-  if (!keep || keep.sign_status !== '署名済') return true;
-  return (keep.signature || null) !== (body.signature || null) || keep.signer_kind !== body.signer_kind || (keep.sign_reason || null) !== (body.sign_reason || null);
+const NC_KUBUN = ['区分１', '区分２', '区分３'];
+const NC_JISSEKI_ROWS = 20;
+function ncReiwa(year) {
+  const y = +year;
+  if (y === 2019) return '元';
+  if (y > 2019) return String(y - 2018);
+  return '';
 }
-function ncLaterValidate(ids, kind, reason, signature) {
+function ncJissekiMinutes(start, end) {
+  const s = ncMin(start), e = ncMin(end);
+  if (Number.isNaN(s) || Number.isNaN(e) || e <= s) return null;
+  return e - s;
+}
+function ncJissekiBand(minutes) {
+  if (minutes == null) return '';
+  return minutes < 240 ? 'under' : 'over';
+}
+function ncJissekiMeal(v) { return v === 'あり' ? '1' : ''; }
+function ncJissekiTransport(v) {
+  if (v === '往復') return '2';
+  if (v === '迎えのみ' || v === '送りのみ') return '1';
+  return '';
+}
+function ncJissekiLines(records) {
+  return (records || []).filter(r => r && r.present !== false && r.service_date).map(r => {
+    const minutes = ncJissekiMinutes(r.start_time, r.end_time);
+    return {
+      date: r.service_date,
+      dayLabel: (+String(r.service_date).slice(8, 10)) + '日',
+      weekday: ncWeekday(r.service_date),
+      start: String(r.start_time || '').slice(0, 5),
+      end: String(r.end_time || '').slice(0, 5),
+      minutes,
+      band: ncJissekiBand(minutes),
+      meal: ncJissekiMeal(r.meal_served),
+      transport: ncJissekiTransport(r.transport)
+    };
+  }).filter(r => r.weekday).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+}
+function ncJissekiSheet(records) {
+  const lines = ncJissekiLines(records);
+  const totals = { under: 0, over: 0, meal: 0, transport: 0 };
+  lines.forEach(r => {
+    if (r.band === 'under') totals.under++;
+    if (r.band === 'over') totals.over++;
+    if (r.meal) totals.meal += +r.meal;
+    if (r.transport) totals.transport += +r.transport;
+  });
+  const pages = [];
+  const n = Math.max(1, Math.ceil(lines.length / NC_JISSEKI_ROWS));
+  for (let p = 0; p < n; p++) {
+    const slice = lines.slice(p * NC_JISSEKI_ROWS, (p + 1) * NC_JISSEKI_ROWS);
+    while (slice.length < NC_JISSEKI_ROWS) slice.push(null);
+    pages.push(slice);
+  }
+  return { lines, totals, pages };
+}
+function ncJissekiMasterErrors(p) {
   const err = [];
-  if (!ids || !ids.length) err.push('署名する記録を選んでください');
-  if (['本人', 'ご家族', '署名困難'].indexOf(kind) < 0) err.push('署名する人を選んでください');
-  if (kind === '署名困難' && !ncClip(reason, 500)) err.push('署名困難の理由を入れてください');
-  if (kind === '署名困難' && String(reason || '').trim().length > 500) err.push('署名困難の理由は500文字以内にしてください');
-  if (kind !== '署名困難' && !/^data:image\/png;base64,/.test(String(signature || ''))) err.push('署名がありません');
-  if (kind !== '署名困難' && String(signature || '').length > 300000) err.push('署名画像が大きすぎます。書き直してください');
+  const no = String((p && p.recipient_no) || '').trim();
+  const ono = String((p && p.office_no) || '').trim();
+  const kubun = String((p && p.kubun) || '').trim();
+  const quota = String((p && p.monthly_quota) == null ? '' : p.monthly_quota).trim();
+  if (no && !/^[0-9]{1,10}$/.test(no)) err.push('受給者番号は10桁までの数字にしてください');
+  if (ono && !/^[0-9]{1,10}$/.test(ono)) err.push('事業所番号は10桁までの数字にしてください');
+  if (kubun && NC_KUBUN.indexOf(kubun) < 0) err.push('区分を選んでください');
+  if (quota && (!/^\d+$/.test(quota) || +quota < 1 || +quota > 31)) err.push('支給量は1から31の回数にしてください');
+  if (String((p && p.guardian_name) || '').trim().length > 100) err.push('保護者氏名は100文字以内にしてください');
+  if (String((p && p.office_name) || '').trim().length > 200) err.push('事業所名は200文字以内にしてください');
   return err;
-}
-function ncLaterPatch(kind, reason, signature, now) {
-  const hard = kind === '署名困難';
-  return { signer_kind: kind, sign_reason: hard ? ncClip(reason, 500) : null, signature: hard ? null : signature, sign_status: '署名済', signed_at: now || new Date().toISOString() };
 }
 /* /nc-pure */
 
@@ -124,16 +159,12 @@ function ncDemoInit() {
       { id: 1, name: '利用者A', kana: 'りようしゃ えー', active: true, sort: 1 },
       { id: 2, name: '利用者B', kana: 'りようしゃ びー', active: true, sort: 2 }
     ],
-    helpers: [{ id: 1, name: '職員A', active: true, sort: 1 }],
+    helpers: NC_HELPERS.map((name, i) => ({ id: i + 1, name, active: true, sort: i + 1 })),
+    office: { office_no: '', office_name: '一般社団法人 心理社会的リハビリテーション・星心会\n星心会レスパイトスタジオ' },
     days: [], recs: [], seq: 10
   };
 }
-function ncCleanup() {
-  const ov = document.getElementById('nc_ov');
-  if (ov) ov.hidden = true;
-  document.body.classList.remove('nc-lock');
-  document.body.style.top = '';
-}
+function ncCleanup() {}
 function ncEnsureStyle() {
   if (document.getElementById('nc_style')) return;
   const st = document.createElement('style');
@@ -148,24 +179,31 @@ function ncEnsureStyle() {
 button.nc-chip,button.nc-mini{width:auto;display:inline-block;margin:4px 4px 4px 0;padding:8px 12px;background:#fff;color:#222;border:1px solid #bbb;border-radius:999px}
 button.nc-chip.on{background:var(--main);color:#fff;border-color:var(--main)}
 .nc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.nc-prev{border:2px dashed #888;border-radius:8px;min-height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;background:#fff;padding:8px;margin-top:6px}
-img.nc-sig{max-width:100%;max-height:100px;background:#fff}
-.nc-pend{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #eee}
 .nc-msg{white-space:pre-wrap;color:#c00}
 .nc-ok{color:#2e6b4f}
-#nc_ov{position:fixed;left:0;top:0;right:0;bottom:0;background:#fff;z-index:30;display:flex;flex-direction:column;touch-action:none;-webkit-user-select:none;user-select:none}
-#nc_ov[hidden],.nc-pend[hidden]{display:none !important}
-#nc_cvw{flex:1;min-height:0;position:relative}
-#nc_cv{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
-#nc_ovb{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;padding-bottom:max(env(safe-area-inset-bottom),12px);border-top:1px solid #ccc}
-#nc_ovb button{width:auto;margin:0}
-body.nc-lock{overflow:hidden;position:fixed;width:100%}
+.nc-form{font-family:"Hiragino Mincho ProN","Yu Mincho","MS PMincho",serif;color:#000;background:#fff;padding:8px 4px;overflow-x:auto}
+.nc-form h2{font-size:16px;text-align:center;margin:4px 0 8px;font-weight:normal}
+.nc-form .nc-era{text-align:right;font-size:14px;margin:0 0 6px}
+.nc-form .nc-sub{font-size:11px;margin:0}
+.nc-form table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;background:#fff}
+.nc-form td{border:1px solid #222;padding:2px 3px;text-align:center;vertical-align:middle;line-height:1.25}
+.nc-form td.lab{font-size:10px;background:#fff}
+.nc-form td.nm{text-align:left;white-space:pre-wrap}
+.nc-form .digits{display:flex}
+.nc-form .digits i{flex:1;border-left:1px solid #222;font-style:normal;min-height:1.4em}
+.nc-form .digits i:first-child{border-left:0}
+.nc-ring{border:1.5px solid #000;border-radius:10px;padding:0 3px}
+.nc-sheet{margin:0 0 16px}
+@media print{
+  header,.noprint,#out{display:none!important}
+  body{background:#fff!important}
+  main,#home,#view{max-width:none!important;padding:0!important;margin:0!important}
+  .nc-sheet{page-break-after:always}
+  .nc-sheet:last-child{page-break-after:auto}
+}
+@page{size:A4 portrait;margin:8mm}
 `;
   document.head.appendChild(st);
-  if (!window.__ncResize) {
-    window.__ncResize = true;
-    window.addEventListener('resize', () => { const ov = document.getElementById('nc_ov'); if (NC.pad && ov && !ov.hidden) NC.pad.remeasure(); });
-  }
 }
 async function ncRest(path, opt, retried) {
   let s = JSON.parse(localStorage.getItem('sess') || '{}');
@@ -177,8 +215,8 @@ async function ncRest(path, opt, retried) {
   if (!r.ok) {
     let msg = '読み込めませんでした（' + r.status + '）';
     try { const j = await r.json(); if (j.message) msg = j.message; if (j.code) msg += ' ' + j.code; } catch (e) { /* 本文なし */ }
-    if (r.status === 401 || r.status === 403 || /row-level security/i.test(msg)) msg = 'この操作は日中一時の担当職員だけができます。';
-    else if (/nicchu_record_|check constraint|23514/i.test(msg)) msg = '入力が不足しているか、署名の組み合わせが正しくありません。来所・退所・送迎・食事・活動・ご様子・署名を確認してください。';
+    if (r.status === 401 || r.status === 403 || /row-level security/i.test(msg)) msg = 'この操作は日中一時支援の担当職員だけができます。';
+    else if (/nicchu_record_|check constraint|23514/i.test(msg)) msg = '入力が不足しています。来所・退所・送迎・食事・活動・ご様子を確認してください。';
     throw new Error(msg);
   }
   if (r.status === 204) return null;
@@ -188,29 +226,19 @@ async function ncRest(path, opt, retried) {
 }
 async function ncCan() { return (await ncRest('rpc/nicchu_can', { method: 'POST', body: '{}' })) === true; }
 function ncDenied() {
-  return `<div class="nc-card"><p>日中一時の記録は、担当の職員と、事務・管理者・児発管・会長が読み書きできます。</p>${ncPt('担当にするには、管理者に staff_profiles の nicchu を有効にしてもらってください。')}</div>`;
+  return `<div class="nc-card"><p>日中一時支援の記録は、担当の職員と、事務・管理者・児発管・会長が読み書きできます。</p>${ncPt('担当にするには、管理者に staff_profiles の nicchu を有効にしてもらってください。')}</div>`;
 }
 function ncDemoNote() { return ncIsDemo() ? `<p class="nc-pt">見本モードです。この端末の中だけに残り、サーバには保存しません。</p>` : ''; }
 async function ncUsers(all) {
   if (ncIsDemo()) { ncDemoInit(); return NC.mem.users.filter(u => all || u.active).slice().sort((a, b) => a.sort - b.sort || a.id - b.id); }
-  return await ncRest('nicchu_user?' + (all ? '' : 'active=eq.true&') + 'select=id,name,kana,active,sort&order=sort.asc,id.asc');
+  return await ncRest('nicchu_user?' + (all ? '' : 'active=eq.true&') + 'select=id,name,kana,active,sort,recipient_no,kubun,monthly_quota,guardian_name&order=sort.asc,id.asc');
 }
 async function ncHelpers() {
   if (ncIsDemo()) { ncDemoInit(); return NC.mem.helpers.filter(h => h.active).slice(); }
   return await ncRest('nicchu_helper?active=eq.true&select=id,name,sort&order=sort.asc,id.asc');
 }
-async function ncHelperNames(extra) {
-  const names = (await ncHelpers()).map(h => h.name);
-  if (extra && names.indexOf(extra) < 0) names.unshift(extra);
-  if (!ncIsDemo()) {
-    try {
-      const p = await ncRest('staff_profiles?select=nikki_name,full_name');
-      const me = p && p[0];
-      const n = me && String(me.full_name || me.nikki_name || '').trim();
-      if (n && names.indexOf(n) < 0) names.unshift(n);
-    } catch (e) { /* 自分の名前が読めなくても記録は書ける */ }
-  }
-  return names;
+async function ncHelperNames() {
+  return (await ncHelpers()).map(h => h.name);
 }
 function ncNormDay(d) { return d ? { ...d, records: d.records || d.nicchu_record || [] } : null; }
 async function ncMonth(m) {
@@ -219,7 +247,7 @@ async function ncMonth(m) {
     ncDemoInit();
     return NC.mem.days.filter(d => d.service_date >= m + '-01' && d.service_date < next).sort((a, b) => a.service_date < b.service_date ? 1 : -1).map(d => ({ ...d, records: NC.mem.recs.filter(r => r.day_id === d.id) }));
   }
-  const rows = await ncRest(`nicchu_day?service_date=gte.${m}-01&service_date=lt.${next}&select=id,service_date,staff_name,weather,nicchu_record(user_id,present,start_time,end_time,transport,sign_status)&order=service_date.desc`);
+  const rows = await ncRest(`nicchu_day?service_date=gte.${m}-01&service_date=lt.${next}&select=id,service_date,staff_name,weather,nicchu_record(user_id,present,start_time,end_time,transport)&order=service_date.desc`);
   return rows.map(ncNormDay);
 }
 async function ncGetDay(date) {
@@ -228,21 +256,8 @@ async function ncGetDay(date) {
     const day = NC.mem.days.find(d => d.service_date === date);
     return day ? { ...day, records: NC.mem.recs.filter(r => r.day_id === day.id) } : null;
   }
-  const rows = await ncRest(`nicchu_day?service_date=eq.${date}&select=id,service_date,staff_name,weather,meal_menu,general_notes,nicchu_record(id,user_id,present,start_time,end_time,transport,meal_served,activity,state,signer_kind,sign_reason,signature,sign_status,signed_at)`);
+  const rows = await ncRest(`nicchu_day?service_date=eq.${date}&select=id,service_date,staff_name,weather,meal_menu,general_notes,nicchu_record(id,user_id,present,start_time,end_time,transport,meal_served,activity,state)`);
   return rows.length ? ncNormDay(rows[0]) : null;
-}
-async function ncPending() {
-  if (ncIsDemo()) {
-    ncDemoInit();
-    return NC.mem.recs.filter(r => r.present && r.sign_status === '署名待ち').map(r => {
-      const day = NC.mem.days.find(d => d.id === r.day_id) || {};
-      const user = NC.mem.users.find(u => u.id === r.user_id) || {};
-      return { id: r.id, user_id: r.user_id, name: user.name || '', kana: user.kana || '', date: day.service_date, staff: day.staff_name || '', start: r.start_time, end: r.end_time, transport: r.transport, meal: r.meal_served, activity: r.activity, state: r.state };
-    }).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.name).localeCompare(String(b.name), 'ja'));
-  }
-  const rows = await ncRest('nicchu_record?present=eq.true&sign_status=eq.' + encodeURIComponent('署名待ち') + '&select=id,user_id,start_time,end_time,transport,meal_served,activity,state,nicchu_day(service_date,staff_name),nicchu_user(name,kana)');
-  return rows.map(r => ({ id: r.id, user_id: r.user_id, name: (r.nicchu_user || {}).name || '', kana: (r.nicchu_user || {}).kana || '', date: (r.nicchu_day || {}).service_date, staff: (r.nicchu_day || {}).staff_name || '', start: r.start_time, end: r.end_time, transport: r.transport, meal: r.meal_served, activity: r.activity, state: r.state }))
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.name).localeCompare(String(b.name), 'ja'));
 }
 async function ncSaveDay(form) {
   const errs = ncValidate(form);
@@ -255,27 +270,19 @@ async function ncSaveDay(form) {
     if (!day) { day = { id: ++NC.mem.seq, service_date: form.service_date }; NC.mem.days.push(day); }
     Object.assign(day, dayBody);
     form.users.forEach(u => {
-      const keep = (form.keep || {})[u.user_id];
-      const body = ncRecordBody(u, keep);
+      const body = ncRecordBody(u);
       let rec = NC.mem.recs.find(r => r.day_id === day.id && r.user_id === u.user_id);
       if (!rec) { rec = { id: ++NC.mem.seq, day_id: day.id }; NC.mem.recs.push(rec); }
       Object.assign(rec, body);
     });
-    if (!NC.mem.helpers.some(h => h.name === staff)) NC.mem.helpers.push({ id: ++NC.mem.seq, name: staff, active: true, sort: 50 });
     return { ok: true };
   }
   const dayRows = await ncRest('nicchu_day?on_conflict=service_date', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(dayBody) });
   const day = dayRows[0];
   for (let i = 0; i < form.users.length; i++) {
-    const u = form.users[i];
-    const keep = (form.keep || {})[u.user_id];
-    const body = ncRecordBody(u, keep);
-    const saved = await ncRest('nicchu_record?on_conflict=day_id,user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ day_id: day.id, ...body, updated_at: new Date().toISOString() }) });
-    if (ncNeedLog(body, keep)) {
-      await ncRest('nicchu_sign_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ record_id: saved[0].id, signer_kind: body.signer_kind, sign_reason: body.sign_reason, signature: body.signature }) });
-    }
+    const body = ncRecordBody(form.users[i]);
+    await ncRest('nicchu_record?on_conflict=day_id,user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ day_id: day.id, ...body, updated_at: new Date().toISOString() }) });
   }
-  await ncRest('nicchu_helper?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify({ name: staff }) });
   return { ok: true };
 }
 async function ncDeleteDay(id) {
@@ -304,47 +311,22 @@ async function ncUserActive(id, active) {
   else await ncRest('nicchu_user?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ active: active, updated_at: new Date().toISOString() }) });
   renderNicchu();
 }
-async function ncSignLater(ids, kind, reason, signature) {
-  const errs = ncLaterValidate(ids, kind, reason, signature);
-  if (errs.length) return { ok: false, errs };
-  if (ncIsDemo()) {
-    ncDemoInit();
-    const recs = ids.map(id => NC.mem.recs.find(r => r.id === id));
-    if (recs.some(r => !r || !r.present || r.sign_status !== '署名待ち')) return { ok: false, errs: ['署名待ちの記録がありません。画面を読み込み直してください'] };
-    if (new Set(recs.map(r => r.user_id)).size > 1) return { ok: false, errs: ['一度に署名できるのはお一人分です'] };
-    const patch = ncLaterPatch(kind, reason, signature);
-    recs.forEach(r => Object.assign(r, patch));
-    return { ok: true, n: recs.length };
-  }
-  const n = await ncRest('rpc/nicchu_sign_later', { method: 'POST', body: JSON.stringify({ p_ids: ids, p_kind: kind, p_reason: reason || null, p_signature: signature || null }) });
-  return { ok: true, n: n };
-}
 function ncChips(name, values, current) {
   return `<div class="nc-chips">${values.map(v => `<button type="button" class="nc-chip${v === current ? ' on' : ''}" data-name="${esc(name)}" data-value="${esc(v)}" onclick="ncChipClick(this)">${esc(v)}</button>`).join('')}</div>`;
 }
 function ncChipClick(btn) {
   const name = btn.dataset.name;
   document.querySelectorAll('.nc-chip').forEach(b => { if (b.dataset.name === name) b.classList.toggle('on', b === btn); });
-  if (name.indexOf('sg_') === 0) ncSignerUI(name.slice(3));
-  if (name === 'ls_kind') ncLsUI();
 }
 function ncVal(name) {
   const all = document.querySelectorAll('.nc-chip');
   for (let i = 0; i < all.length; i++) if (all[i].dataset.name === name && all[i].classList.contains('on')) return all[i].dataset.value;
   return '';
 }
-function ncSignerUI(uid) {
-  const k = ncVal('sg_' + uid);
-  const later = document.getElementById('later_' + uid), reason = document.getElementById('reason_' + uid), box = document.getElementById('signbox_' + uid);
-  if (later) later.hidden = k !== 'あとで署名';
-  if (reason) reason.hidden = k !== '署名困難';
-  if (box) box.hidden = !(k === '本人' || k === 'ご家族');
-}
 function ncPresentUI(uid) {
   const body = document.getElementById('body_' + uid), box = document.getElementById('p_' + uid);
   if (body && box) body.hidden = !box.checked;
 }
-function ncStaffUI() { const o = document.getElementById('nc_staff_other'); if (o) o.hidden = document.getElementById('nc_staff').value !== '__other'; }
 function ncUserAdmin(users) {
   const active = users.filter(u => u.active), off = users.filter(u => !u.active);
   return `<details class="nc-card"><summary>利用者（${active.length}人）</summary>
@@ -364,60 +346,6 @@ function ncOpenDate() {
   if (!ncWeekday(d)) { alert('日付を選んでください'); return; }
   location.hash = 'nicchu/log?d=' + d;
 }
-function ncSigOk(sig) { return /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(sig || ''); }
-function ncShowPrev(key) {
-  const el = document.getElementById('prev_' + key);
-  if (!el) return;
-  const sig = NC.sig[key];
-  el.innerHTML = ncSigOk(sig) ? `<img class="nc-sig" alt="署名" src="${sig}"><div class="nc-pt">タップして書き直し</div>` : 'タップして署名を書く';
-}
-function ncClearSig(key) { delete NC.sig[key]; ncShowPrev(key); }
-function ncEnsureOverlay() {
-  if (document.getElementById('nc_ov')) return;
-  const ov = document.createElement('div');
-  ov.id = 'nc_ov';
-  ov.hidden = true;
-  ov.innerHTML = `<div id="nc_cvw"><canvas id="nc_cv"></canvas></div><div id="nc_ovb"><span>指で書いてください</span><span><button type="button" class="nc-mini" onclick="ncPadClear()">書き直す</button><button type="button" class="nc-mini" onclick="ncPadClose(false)">閉じる</button><button type="button" class="nc-mini" onclick="ncPadClose(true)">これでよい</button></span></div>`;
-  document.body.appendChild(ov);
-}
-function ncOpenPad(key) {
-  if (typeof createSignPad !== 'function') { const m = document.getElementById('nc_msg'); if (m) m.textContent = '署名欄を読み込めませんでした。ページを再読み込みしてください。'; return; }
-  ncEnsureOverlay();
-  NC.padKey = key;
-  NC.scrollY = window.scrollY;
-  document.body.style.top = (-NC.scrollY) + 'px';
-  document.body.classList.add('nc-lock');
-  document.getElementById('nc_ov').hidden = false;
-  if (!NC.pad) NC.pad = createSignPad(document.getElementById('nc_cv'));
-  NC.pad.clear();
-  NC.pad.remeasure();
-  requestAnimationFrame(() => { if (NC.pad) NC.pad.remeasure(); });
-}
-function ncPadClear() { if (NC.pad) NC.pad.clear(); }
-function ncCropSig(cv) {
-  const g0 = cv.getContext('2d'), W = cv.width, H = cv.height, d = g0.getImageData(0, 0, W, H).data;
-  let x0 = W, y0 = H, x1 = 0, y1 = 0;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (d[i] < 200) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
-  if (x1 < x0) return '';
-  const p = 16, sx = Math.max(0, x0 - p), sy = Math.max(0, y0 - p), sw = Math.min(W - sx, x1 - x0 + 2 * p), sh = Math.min(H - sy, y1 - y0 + 2 * p), sc = Math.min(1, 600 / sw);
-  const t = document.createElement('canvas');
-  t.width = Math.max(1, Math.round(sw * sc)); t.height = Math.max(1, Math.round(sh * sc));
-  const g = t.getContext('2d');
-  g.fillStyle = '#fff'; g.fillRect(0, 0, t.width, t.height); g.drawImage(cv, sx, sy, sw, sh, 0, 0, t.width, t.height);
-  const url = t.toDataURL('image/png');
-  return ncSigOk(url) ? url : '';
-}
-function ncPadClose(ok) {
-  const ov = document.getElementById('nc_ov');
-  if (ov) ov.hidden = true;
-  document.body.classList.remove('nc-lock');
-  document.body.style.top = '';
-  window.scrollTo(0, NC.scrollY || 0);
-  if (ok && NC.pad && NC.pad.isDrawn()) {
-    const url = ncCropSig(document.getElementById('nc_cv'));
-    if (url) { NC.sig[NC.padKey] = url; ncShowPrev(NC.padKey); }
-  }
-}
 function ncPerson(u, rec) {
   const id = u.id;
   const present = rec ? !!rec.present : true;
@@ -425,8 +353,6 @@ function ncPerson(u, rec) {
   const end = rec && rec.end_time ? String(rec.end_time).slice(0, 5) : '13:00';
   const transport = rec && rec.transport || '往復';
   const meal = rec && rec.meal_served || 'あり';
-  const signer = rec && rec.signer_kind || '本人';
-  const later = signer === 'あとで署名', hard = signer === '署名困難', need = signer === '本人' || signer === 'ご家族';
   return `<div class="nc-card"><div class="nc-row"><div><b>${esc(u.name)} さん</b>${ncPt(u.kana || '')}</div>
     <label><input id="p_${id}" type="checkbox" style="width:auto" ${present ? 'checked' : ''} onchange="ncPresentUI(${id})"> 利用あり</label></div>
     <div id="body_${id}" ${present ? '' : 'hidden'}>
@@ -435,22 +361,15 @@ function ncPerson(u, rec) {
       <div>食事提供 ${ncPt('Refeição')}${ncChips('ml_' + id, NC_MEAL, meal)}</div>
       <label>活動内容 ${ncPt('Atividades')}<textarea id="ac_${id}" rows="3">${esc(rec && rec.activity || '')}</textarea></label>
       <label>ご様子 ${ncPt('Estado')}<textarea id="stt_${id}" rows="3">${esc(rec && rec.state || '')}</textarea></label>
-      <div>署名する人 ${ncPt('Quem assina')}${ncChips('sg_' + id, NC_SIGNER, signer)}</div>
-      <p id="later_${id}" class="nc-ok" ${later ? '' : 'hidden'}>いまは署名なしで保存します（署名待ち）。あとで「あとで署名」の画面でもらいます。</p>
-      <div id="reason_${id}" ${hard ? '' : 'hidden'}><label>署名困難の理由<textarea id="rs_${id}" rows="2">${esc(rec && rec.sign_reason || '')}</textarea></label></div>
-      <div id="signbox_${id}" ${need ? '' : 'hidden'}><div>確認署名 ${ncPt('Assinatura')}</div><div id="prev_${id}" class="nc-prev" onclick="ncOpenPad(${id})"></div><button type="button" class="nc-mini" onclick="ncClearSig(${id})">署名を消す</button></div>
     </div></div>`;
 }
 function ncReadForm() {
-  const sel = document.getElementById('nc_staff').value;
-  const staff = sel === '__other' ? document.getElementById('nc_staff_other').value.trim() : sel;
   return {
-    service_date: NC.editDate, staff_name: staff, weather: ncVal('weather'), meal_menu: document.getElementById('nc_menu').value, general_notes: document.getElementById('nc_notes').value, keep: NC.keep,
+    service_date: NC.editDate, staff_name: document.getElementById('nc_staff').value, weather: ncVal('weather'), meal_menu: document.getElementById('nc_menu').value, general_notes: document.getElementById('nc_notes').value,
     users: NC.shown.map(u => ({
       user_id: u.id, name: u.name, present: document.getElementById('p_' + u.id).checked,
       start_time: document.getElementById('st_' + u.id).value, end_time: document.getElementById('en_' + u.id).value,
-      transport: ncVal('tr_' + u.id), meal_served: ncVal('ml_' + u.id), activity: document.getElementById('ac_' + u.id).value, state: document.getElementById('stt_' + u.id).value,
-      signer_kind: ncVal('sg_' + u.id), sign_reason: document.getElementById('rs_' + u.id).value, signature: NC.sig[u.id] || ''
+      transport: ncVal('tr_' + u.id), meal_served: ncVal('ml_' + u.id), activity: document.getElementById('ac_' + u.id).value, state: document.getElementById('stt_' + u.id).value
     }))
   };
 }
@@ -461,7 +380,7 @@ async function ncSaveClick() {
   try {
     const res = await ncSaveDay(ncReadForm());
     if (!res.ok) { msg.textContent = res.errs.join('\n'); return; }
-    try { localStorage.setItem('nicchu.staff', ncClip(document.getElementById('nc_staff').value === '__other' ? document.getElementById('nc_staff_other').value : document.getElementById('nc_staff').value, 60)); } catch (e) { /* 端末に残せなくても保存は済んでいる */ }
+    try { localStorage.setItem('nicchu.staff', ncClip(document.getElementById('nc_staff').value, 60)); } catch (e) { /* 端末に残せなくても保存は済んでいる */ }
     NC.flash = '保存しました';
     if (location.hash.split('?')[0] === '#nicchu/log' && !ncHashDate()) renderNicchu();
     else location.hash = 'nicchu/log';
@@ -473,19 +392,19 @@ async function ncDeleteClick() {
   try { await ncDeleteDay(NC.dayId); NC.flash = '削除しました'; location.hash = 'nicchu/log'; } catch (e) { document.getElementById('nc_msg').textContent = e.message; }
 }
 async function ncPaintList() {
-  const [days, users, pending] = await Promise.all([ncMonth(NC.month), ncUsers(true), ncPending()]);
+  const [days, users] = await Promise.all([ncMonth(NC.month), ncUsers(true)]);
   const nm = {};
   users.forEach(u => { nm[u.id] = u.name; });
   const cards = days.map(d => `<div class="nc-card"><b>${esc(ncFmtDay(d.service_date))}</b>　記入 ${esc(d.staff_name)}
-    ${(d.records || []).map(r => `<div>${esc(nm[r.user_id] || '')}　${r.present ? `${esc(String(r.start_time || '').slice(0, 5))}〜${esc(String(r.end_time || '').slice(0, 5))} ${esc(r.transport || '')} ${esc(r.sign_status || '')}` : '利用なし'}</div>`).join('') || '<div class="nc-pt">利用者の行がありません</div>'}
+    ${(d.records || []).map(r => `<div>${esc(nm[r.user_id] || '')}　${r.present ? `${esc(String(r.start_time || '').slice(0, 5))}〜${esc(String(r.end_time || '').slice(0, 5))} ${esc(r.transport || '')}` : '利用なし'}</div>`).join('') || '<div class="nc-pt">利用者の行がありません</div>'}
     <button type="button" class="nc-mini" onclick="location.hash='nicchu/log?d=${d.service_date}'">開く</button></div>`).join('');
   const flash = NC.flash ? `<p class="nc-ok">${esc(NC.flash)}</p>` : '';
   NC.flash = '';
-  document.getElementById('view').innerHTML = `<button class="back" type="button" onclick="location.hash='nicchu'">← レスパイトへ</button>
-    <h3 style="color:#1f7a6b">日中一時 支援記録</h3>
-    <p class="nc-pt">${esc(NC_PLACE)}　ふだん 7:00–13:00。どの曜日でも記録できます。金斗雲の訪問記録とは別です。</p>
+  document.getElementById('view').innerHTML = `<button class="back" type="button" onclick="location.hash='nicchu'">← 日中一時支援へ</button>
+    <h3 style="color:#1f7a6b">日中一時支援</h3>
+    <p class="nc-pt">${esc(NC_PLACE)}　ふだん 7:00–13:00。どの曜日でも記録できます。金斗雲の訪問記録とは別です。署名は受け取らず、印刷して市役所へ出します。</p>
+    <p><a class="back" href="gl:g23" style="display:inline-block;text-decoration:none">📅 土日スケジュール</a></p>
     ${ncDemoNote()}${flash}
-    <p><button type="button" class="nc-mini" onclick="location.hash='nicchu/sign'">あとで署名${pending.length ? '（' + pending.length + '件）' : ''}</button></p>
     <div class="nc-card"><label>月<input type="month" id="nc_month" value="${esc(NC.month)}" onchange="NC.month=this.value||NC.month;renderNicchu()"></label>
       <label>この日を書く<input type="date" id="nc_open_date" value="${esc(ncToday())}"></label>
       <button type="button" onclick="ncOpenDate()">この日の記録</button></div>
@@ -503,21 +422,17 @@ async function ncPaintEdit(date) {
   NC.shown = shown;
   NC.editDate = date;
   NC.dayId = day ? day.id : null;
-  NC.keep = {};
-  NC.sig = {};
-  recs.forEach(r => { NC.keep[r.user_id] = r; if (r.signature) NC.sig[r.user_id] = r.signature; });
   const staffNames = names.slice();
-  if (day && day.staff_name && staffNames.indexOf(day.staff_name) < 0) staffNames.unshift(day.staff_name);
+  if (day && day.staff_name && staffNames.indexOf(day.staff_name) < 0) staffNames.push(day.staff_name);
   let picked = day ? day.staff_name : '';
   if (!picked) { try { picked = localStorage.getItem('nicchu.staff') || ''; } catch (e) { picked = ''; } }
-  const known = staffNames.indexOf(picked) >= 0;
+  if (staffNames.indexOf(picked) < 0) picked = '';
   const w = ncWeekday(date);
   document.getElementById('view').innerHTML = `<button class="back" type="button" onclick="location.hash='nicchu/log'">← 一覧へ</button>
     <h3 style="color:#1f7a6b">${esc(ncFmtDay(date))}の支援記録</h3>
-    <p class="nc-pt">${esc(NC_PLACE)}${w === '日' ? '' : '　日曜以外でも保存できます。'}</p>${ncDemoNote()}
+    <p class="nc-pt">${esc(NC_PLACE)}${w === '日' ? '' : '　日曜以外でも保存できます。'}　印刷して市役所へ出します。</p>${ncDemoNote()}
     ${shown.length ? `<div class="nc-card">
-      <label>記入者 ${ncPt('Funcionário')}<select id="nc_staff" onchange="ncStaffUI()"><option value="">選んでください</option>${staffNames.map(n => `<option value="${esc(n)}" ${known && n === picked ? 'selected' : ''}>${esc(n)}</option>`).join('')}<option value="__other" ${picked && !known ? 'selected' : ''}>その他（手入力）</option></select></label>
-      <input id="nc_staff_other" placeholder="記入者の名前" maxlength="60" value="${picked && !known ? esc(picked) : ''}" ${picked && !known ? '' : 'hidden'}>
+      <label>記入者 ${ncPt('Funcionário')}<select id="nc_staff"><option value="">選んでください</option>${staffNames.map(n => `<option value="${esc(n)}" ${n === picked ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
       <div>天気 ${ncPt('Tempo')}${ncChips('weather', NC_WEATHER, day && day.weather || '')}</div>
       <label>本日の食事内容 ${ncPt('Cardápio')}<textarea id="nc_menu" rows="2">${esc(day && day.meal_menu || '')}</textarea></label>
       <label>全体申し送り ${ncPt('Recados')}<textarea id="nc_notes" rows="2">${esc(day && day.general_notes || '')}</textarea></label>
@@ -526,11 +441,10 @@ async function ncPaintEdit(date) {
     <p><button type="button" onclick="ncSaveClick()">保存</button> ${day ? '<button type="button" class="back" onclick="ncDeleteClick()">この日を削除</button>' : ''}</p>` : `<div class="nc-card"><p>利用者がまだいません。追加してから、この日の記録を書いてください。</p></div>`}
     <p id="nc_msg" class="nc-msg"></p>
     ${shown.length ? '<p class="nc-pt">利用者の追加・休止は、一覧の下でできます。</p>' : ncUserAdmin(users)}`;
-  shown.forEach(u => ncShowPrev(u.id));
 }
 async function renderNicchu() {
   ncEnsureStyle();
-  const back = `<button class="back" type="button" onclick="location.hash='nicchu'">← レスパイトへ</button>`;
+  const back = `<button class="back" type="button" onclick="location.hash='nicchu'">← 日中一時支援へ</button>`;
   document.getElementById('view').innerHTML = back + '<p>読み込み中…</p>';
   try {
     if (!ncIsDemo() && !(await ncCan())) { document.getElementById('view').innerHTML = back + ncDenied(); return; }
@@ -539,61 +453,138 @@ async function renderNicchu() {
     else await ncPaintList();
   } catch (e) { document.getElementById('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }
-function ncLsUI() {
-  const k = ncVal('ls_kind');
-  const reason = document.getElementById('nc_ls_reason_wrap'), box = document.getElementById('nc_ls_sign');
-  if (reason) reason.hidden = k !== '署名困難';
-  if (box) box.hidden = k === '署名困難';
-}
-function ncSignUser() {
-  const uid = document.getElementById('nc_sign_user').value;
-  document.querySelectorAll('.nc-pend').forEach(el => { el.hidden = el.dataset.user !== uid; });
-}
-function ncSignAll(on) {
-  const uid = document.getElementById('nc_sign_user').value;
-  document.querySelectorAll('.nc-pend').forEach(el => { if (el.dataset.user === uid) el.querySelector('.nc-pick').checked = on; });
-}
-async function ncSignSubmit() {
-  const msg = document.getElementById('nc_msg');
-  if (NC.busy) return;
-  const uid = document.getElementById('nc_sign_user').value;
-  const ids = [];
-  document.querySelectorAll('.nc-pick').forEach(c => { if (c.checked && c.closest('.nc-pend').dataset.user === uid) ids.push(+c.value); });
-  const kind = ncVal('ls_kind');
-  NC.busy = true;
-  try {
-    const res = await ncSignLater(ids, kind, document.getElementById('nc_ls_reason').value, NC.sig.later || '');
-    if (!res.ok) { msg.textContent = res.errs.join('\n'); return; }
-    delete NC.sig.later;
-    NC.flash = res.n + '件に署名しました';
-    await renderNicchuSign();
-  } catch (e) { if (msg) msg.textContent = e.message; else alert(e.message); }
-  finally { NC.busy = false; }
-}
 async function renderNicchuSign() {
   ncEnsureStyle();
-  const back = `<button class="back" type="button" onclick="location.hash='nicchu'">← レスパイトへ</button>`;
+  const back = `<button class="back" type="button" onclick="location.hash='nicchu'">← 日中一時支援へ</button>`;
+  document.getElementById('view').innerHTML = `${back}<h3 style="color:#1f7a6b">日中一時支援</h3>
+    <div class="nc-card"><p>署名はポータルでは受け付けていません。記録を印刷して、市役所へ提出します。</p>
+    <p><button type="button" class="nc-mini" onclick="location.hash='nicchu/log'">支援記録へ</button></p></div>`;
+}
+function ncDemoOffice() {
+  ncDemoInit();
+  if (!NC.mem.office) NC.mem.office = { office_no: '', office_name: '一般社団法人 心理社会的リハビリテーション・星心会\n星心会レスパイトスタジオ' };
+  return NC.mem.office;
+}
+async function ncOffice() {
+  if (ncIsDemo()) return ncDemoOffice();
+  const rows = await ncRest('nicchu_office?id=eq.1&select=office_no,office_name');
+  return (rows && rows[0]) || { office_no: '', office_name: '' };
+}
+async function ncJissekiRecords(month, userId) {
+  const next = ncNextMonth(month);
+  if (ncIsDemo()) {
+    ncDemoInit();
+    return NC.mem.recs.filter(r => r.user_id === userId && r.present).map(r => {
+      const day = NC.mem.days.find(d => d.id === r.day_id);
+      return day ? { service_date: day.service_date, start_time: r.start_time, end_time: r.end_time, transport: r.transport, meal_served: r.meal_served, present: true } : null;
+    }).filter(r => r && r.service_date >= month + '-01' && r.service_date < next);
+  }
+  const rows = await ncRest('nicchu_record?user_id=eq.' + userId + '&present=eq.true&select=start_time,end_time,transport,meal_served,nicchu_day!inner(service_date)&nicchu_day.service_date=gte.' + month + '-01&nicchu_day.service_date=lt.' + next);
+  return (rows || []).map(r => ({ service_date: (r.nicchu_day || {}).service_date, start_time: r.start_time, end_time: r.end_time, transport: r.transport, meal_served: r.meal_served, present: true }));
+}
+function ncHm(t) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
+  return m ? [String(+m[1]), m[2]] : ['', ''];
+}
+function ncFw(s) { return String(s == null ? '' : s).replace(/\d/g, d => '０１２３４５６７８９'[d]); }
+function ncDigits(s) {
+  const chars = String(s || '').replace(/\D/g, '').slice(0, 10).split('');
+  while (chars.length < 10) chars.push('');
+  return `<div class="digits">${chars.map(c => `<i>${esc(c)}</i>`).join('')}</div>`;
+}
+function ncBandCell(band) {
+  const under = band === 'under' ? 'nc-ring' : '', over = band === 'over' ? 'nc-ring' : '';
+  return `<span class="${under}">4時間未満</span>　／　<span class="${over}">4時間以上</span>`;
+}
+function ncJissekiDoc(sheet, head) {
+  const names = (head.guardian ? head.guardian + '\n' : '') + (head.child || '');
+  const quota = head.quota ? `${ncFw(head.quota)}　回／月` : '　　回／月';
+  const totalBand = sheet.lines.length ? `${ncFw(sheet.totals.under)}　／　${ncFw(sheet.totals.over)}` : '／';
+  return sheet.pages.map((page, pi) => `<section class="nc-sheet">
+    <p class="nc-sub">第８号様式（第１０条関係）${sheet.pages.length > 1 ? '　' + (pi + 1) + '／' + sheet.pages.length : ''}</p>
+    <h2>四日市市障害者（児）日中一時支援サービス提供実績記録票</h2>
+    <p class="nc-era">令和 ${esc(ncFw(head.reiwa))} 年　${esc(ncFw(head.month))}　月 分</p>
+    <table>
+      <colgroup><col style="width:18%"><col style="width:28%"><col style="width:10%"><col style="width:14%"><col style="width:12%"><col style="width:18%"></colgroup>
+      <tr><td class="lab">受給者番号</td><td>${ncDigits(head.recipientNo)}</td><td class="lab">区分</td><td>${esc(head.kubun || '')}</td><td class="lab">事業所番号</td><td>${ncDigits(head.officeNo)}</td></tr>
+      <tr><td class="lab">支給決定障害者（保護者）氏名（児童氏名）</td><td class="nm">${esc(names)}</td><td class="lab">支給量</td><td>${esc(quota)}</td><td class="lab">事業者及びその事業所の名称</td><td class="nm">${esc(head.officeName || '')}</td></tr>
+    </table>
+    <table style="margin-top:6px">
+      <colgroup><col style="width:8%"><col style="width:6%"><col style="width:7%"><col style="width:3%"><col style="width:7%"><col style="width:7%"><col style="width:3%"><col style="width:7%"><col style="width:28%"><col style="width:8%"><col style="width:6%"><col style="width:5%"><col style="width:5%"></colgroup>
+      <tr><td class="lab" colspan="2">実施日</td><td class="lab" colspan="6">利用時間</td><td class="lab">時間数（いずれかに○）</td><td class="lab">食事提供</td><td class="lab">送迎</td><td class="lab">入浴</td><td class="lab">利用者確認印</td></tr>
+      <tr><td class="lab">日付</td><td class="lab">曜日</td><td class="lab" colspan="3">開始時間</td><td class="lab" colspan="3">終了時間</td><td></td><td></td><td></td><td></td><td></td></tr>
+      ${page.map(r => {
+        const sh = ncHm(r && r.start), eh = ncHm(r && r.end);
+        return `<tr><td>${r ? esc(ncFw(r.dayLabel)) : ''}</td><td>${r ? esc(r.weekday) : ''}</td><td>${esc(ncFw(sh[0]))}</td><td>：</td><td>${esc(ncFw(sh[1]))}</td><td>${esc(ncFw(eh[0]))}</td><td>：</td><td>${esc(ncFw(eh[1]))}</td><td>${ncBandCell(r && r.band)}</td><td>${r ? esc(r.meal) : ''}</td><td>${r ? esc(r.transport) : ''}</td><td></td><td></td></tr>`;
+      }).join('')}
+      <tr><td class="lab" colspan="8">合　　計</td><td>${esc(totalBand)}</td><td>${sheet.totals.meal ? esc(ncFw(sheet.totals.meal)) : ''}</td><td>${sheet.totals.transport ? esc(ncFw(sheet.totals.transport)) : ''}</td><td></td><td></td></tr>
+    </table>
+  </section>`).join('');
+}
+async function ncSaveJissekiMaster() {
+  const msg = document.getElementById('nc_msg');
+  const profile = {
+    recipient_no: document.getElementById('nc_recv').value.trim(),
+    kubun: document.getElementById('nc_kubun').value,
+    monthly_quota: document.getElementById('nc_quota').value.trim(),
+    guardian_name: document.getElementById('nc_guard').value.trim(),
+    office_no: document.getElementById('nc_offno').value.trim(),
+    office_name: document.getElementById('nc_offname').value.trim()
+  };
+  const errs = ncJissekiMasterErrors(profile);
+  if (errs.length) { msg.textContent = errs.join('\n'); return; }
+  const quota = profile.monthly_quota ? +profile.monthly_quota : null;
+  try {
+    if (ncIsDemo()) {
+      ncDemoInit();
+      const u = NC.mem.users.find(x => x.id === NC.jissekiUid);
+      if (u) Object.assign(u, { recipient_no: profile.recipient_no, kubun: profile.kubun, monthly_quota: quota, guardian_name: profile.guardian_name });
+      Object.assign(ncDemoOffice(), { office_no: profile.office_no, office_name: profile.office_name });
+    } else {
+      await ncRest('nicchu_user?id=eq.' + NC.jissekiUid, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ recipient_no: profile.recipient_no || null, kubun: profile.kubun || null, monthly_quota: quota, guardian_name: profile.guardian_name || null, updated_at: new Date().toISOString() }) });
+      await ncRest('nicchu_office?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 1, office_no: profile.office_no || null, office_name: profile.office_name || null, updated_at: new Date().toISOString() }) });
+    }
+    NC.flash = '請求の情報を保存しました';
+    renderNicchuJisseki();
+  } catch (e) { msg.textContent = e.message; }
+}
+async function renderNicchuJisseki() {
+  ncEnsureStyle();
+  document.body.classList.add('wide-sheet');
+  const back = `<button class="back noprint" type="button" onclick="location.hash='nicchu'">← 日中一時支援へ</button>`;
   document.getElementById('view').innerHTML = back + '<p>読み込み中…</p>';
   try {
     if (!ncIsDemo() && !(await ncCan())) { document.getElementById('view').innerHTML = back + ncDenied(); return; }
-    const rows = await ncPending();
-    NC.pending = rows;
-    const users = [];
-    rows.forEach(r => { if (!users.some(u => u.id === r.user_id)) users.push({ id: r.user_id, name: r.name, kana: r.kana }); });
+    const users = (await ncUsers(true)).slice().sort((a, b) => a.sort - b.sort || a.id - b.id);
+    if (!users.length) { document.getElementById('view').innerHTML = back + '<div class="nc-card"><p>利用者がまだいません。支援記録の一覧から追加してください。</p></div>'; return; }
+    if (!users.some(u => u.id === NC.jissekiUid)) NC.jissekiUid = (users.find(u => u.active) || users[0]).id;
+    const user = users.find(u => u.id === NC.jissekiUid);
+    const office = await ncOffice();
+    const records = await ncJissekiRecords(NC.month, user.id);
+    const sheet = ncJissekiSheet(records);
+    const y = +NC.month.slice(0, 4), mo = +NC.month.slice(5, 7);
     const flash = NC.flash ? `<p class="nc-ok">${esc(NC.flash)}</p>` : '';
     NC.flash = '';
-    const first = users.length ? String(users[0].id) : '';
-    document.getElementById('view').innerHTML = `${back}<h3 style="color:#1f7a6b">あとで署名</h3>
-      <p class="nc-pt">${esc(NC_PLACE)}　タブレットで、署名待ちの記録にまとめて署名します。</p>${ncDemoNote()}${flash}
-      <p><button type="button" class="nc-mini" onclick="location.hash='nicchu/log'">支援記録へ</button></p>
-      ${users.length ? `<div class="nc-card"><label>利用者<select id="nc_sign_user" onchange="ncSignUser()">${users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select>${users.map(u => ncPt(u.kana || '')).join('')}</label>
-        <p><button type="button" class="nc-mini" onclick="ncSignAll(true)">この人を全部選ぶ</button><button type="button" class="nc-mini" onclick="ncSignAll(false)">選択を外す</button></p>
-        ${rows.map(r => `<label class="nc-pend" data-user="${r.user_id}" ${String(r.user_id) === first ? '' : 'hidden'}><input class="nc-pick" type="checkbox" style="width:auto" value="${r.id}" checked><span><b>${esc(ncFmtDay(r.date))}</b> ${esc(String(r.start || '').slice(0, 5))}〜${esc(String(r.end || '').slice(0, 5))}　送迎:${esc(r.transport || '')}　食事:${esc(r.meal || '')}${ncPt('活動: ' + (r.activity || ''))}${ncPt('様子: ' + (r.state || ''))}${ncPt('記入者: ' + (r.staff || ''))}</span></label>`).join('')}
+    document.getElementById('view').innerHTML = `${back}
+      <div class="noprint"><h3 style="color:#1f7a6b">実績記録票（第８号様式）</h3>
+      <p class="nc-pt">紙に印刷して、市役所へ郵送します。電子提出でも、ポータル上の署名でもありません。利用者確認印は空欄です（あとから押します）。入浴の欄は記録にないので空欄です。</p>
+      ${ncDemoNote()}${flash}
+      <div class="nc-card">
+        <label>利用者<select id="nc_ju" onchange="NC.jissekiUid=+this.value;renderNicchuJisseki()">${users.map(u => `<option value="${u.id}" ${u.id === user.id ? 'selected' : ''}>${esc(u.name)}${u.active ? '' : '（休止）'}</option>`).join('')}</select></label>
+        <label>月<input type="month" value="${esc(NC.month)}" onchange="NC.month=this.value||NC.month;renderNicchuJisseki()"></label>
+        <p><button type="button" onclick="window.print()">印刷 / PDF保存</button></p>
+        <p class="nc-pt">印刷ダイアログで A4・縦、「PDFに保存」を選べます。${sheet.lines.length ? sheet.lines.length + '日分を入れています。' : 'この月の利用はありません。'}${sheet.pages.length > 1 ? '1枚に20行までなので、次のページに続きます。' : ''}</p>
       </div>
-      <div class="nc-card"><div>署名する人 ${ncPt('Quem assina')}${ncChips('ls_kind', ['本人', 'ご家族', '署名困難'], '本人')}</div>
-        <div id="nc_ls_reason_wrap" hidden><label>署名困難の理由<textarea id="nc_ls_reason" rows="2"></textarea></label></div>
-        <div id="nc_ls_sign"><div>確認署名（選んだ記録すべてに入ります）</div><div id="prev_later" class="nc-prev" onclick="ncOpenPad('later')"></div><button type="button" class="nc-mini" onclick="ncClearSig('later')">署名を消す</button></div>
-        <button type="button" onclick="ncSignSubmit()">選んだ記録に署名する</button><p id="nc_msg" class="nc-msg"></p></div>` : `<div class="nc-card"><p class="nc-ok">署名待ちはありません。</p></div>`}`;
-    ncShowPrev('later');
+      <details class="nc-card"><summary>請求に書く情報（一度入れれば残ります）</summary>
+        <label>受給者番号<input id="nc_recv" inputmode="numeric" maxlength="10" value="${esc(user.recipient_no || '')}" placeholder="10桁までの数字"></label>
+        <label>区分<select id="nc_kubun"><option value="">未設定</option>${NC_KUBUN.map(k => `<option ${user.kubun === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
+        <label>支給量（回／月）<input id="nc_quota" type="number" min="1" max="31" value="${user.monthly_quota || ''}"></label>
+        <label>保護者氏名（児童と別に書くとき）<input id="nc_guard" maxlength="100" value="${esc(user.guardian_name || '')}"></label>
+        <label>事業所番号<input id="nc_offno" inputmode="numeric" maxlength="10" value="${esc(office.office_no || '')}" placeholder="10桁までの数字"></label>
+        <label>事業者及びその事業所の名称<textarea id="nc_offname" rows="2" maxlength="200">${esc(office.office_name || '')}</textarea></label>
+        <button type="button" onclick="ncSaveJissekiMaster()">この情報を保存</button>
+        <p id="nc_msg" class="nc-msg"></p>
+      </details></div>
+      <div class="nc-form">${ncJissekiDoc(sheet, { reiwa: ncReiwa(y), month: String(mo), recipientNo: user.recipient_no || '', kubun: user.kubun || '', quota: user.monthly_quota || '', guardian: user.guardian_name || '', child: user.name || '', officeNo: office.office_no || '', officeName: office.office_name || '' })}</div>`;
   } catch (e) { document.getElementById('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }

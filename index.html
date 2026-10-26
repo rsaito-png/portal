@@ -55,7 +55,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261026who"></script>
+<script src="config.js?v=20261026who2"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261026"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -63,10 +63,10 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo.js?v=20261026f"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
-<script src="kin_visit.js?v=202610162300"></script>
+<script src="kin_visit.js?v=20261026sched"></script>
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
-<script src="nicchu.js?v=20261026"></script>
+<script src="nicchu.js?v=20261026sched"></script>
 <script src="sui_render.js?v=202610170620"></script>
 <script src="sui.js?v=202610192150"></script>
 <script src="kin_contract.js?v=202610221354"></script>
@@ -76,12 +76,12 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="ht.js?v=202610161540"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
-<script src="sct.js?v=20261026sq"></script>
+<script src="sct.js?v=20261026ops"></script>
 <script src="chair.js?v=202610211310"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610262130"></script>
 <script src="leo_cal.js?v=202610261800"></script>
-<script src="leo_home_cal.js?v=20261026mine"></script>
+<script src="leo_home_cal.js?v=20261026nouse"></script>
 <script src="leo_jippi.js?v=202610201000"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
 <script src="uketsuke.js?v=202610211600"></script>
@@ -90,7 +90,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="soudan.js?v=202610211550"></script>
 <script src="banto.js?v=202610211550"></script>
 <script src="sns.js?v=202610221735"></script>
-<script src="leaderboard.js?v=202610211550"></script>
+<script src="leaderboard.js?v=20261026hold"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -210,6 +210,7 @@ async function render() {
   if (id === 'kintoun' && sub === 'check') return renderKinCheck();
   if (id === 'kintoun' && sub === 'visit') { KV.id = null; return renderKinVisit(); }
   if (id === 'nicchu' && sub === 'log' && typeof renderNicchu === 'function') return renderNicchu();
+  if (id === 'nicchu' && sub === 'jisseki' && typeof renderNicchuJisseki === 'function') return renderNicchuJisseki();
   if (id === 'nicchu' && sub === 'sign' && typeof renderNicchuSign === 'function') return renderNicchuSign();
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
@@ -236,7 +237,8 @@ async function render() {
     if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
   }
-  const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
+  // 評定所タイルは HYOJOSHO_HOLD（leaderboard.js）が true のあいだ出さない。戻すときはそのフラグを false に。
+  const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div><div id="sct_slot"></div>
     <h3>事業所</h3>
@@ -261,7 +263,7 @@ async function sctAdminTile() {
   if (!slot || slot.dataset.on) return;
   if (!(await sctIsAdmin())) return;
   slot.dataset.on = '1';
-  slot.innerHTML = `<div class="grid"><a class="tile main" href="#sct" style="border-top:4px solid #2e6b4f"><span>🩺</span>ストレスチェック実施者養成（運営）<small>開催・予約・入金・修了。受講者の入口は sct.html</small></a></div>`;
+  slot.innerHTML = `<div class="grid"><a class="tile main" href="#sct" style="border-top:4px solid #2e6b4f"><span>🩺</span>ストレスチェック実施者養成（運営）<small>開催・予約・入金・修了。手順は画面上部の運用マニュアル</small></a></div>`;
 }
 // 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
 async function accAdmin() {
