@@ -112,6 +112,8 @@ assert.ok(day.includes('利用児童'));
 assert.ok(!day.includes('sg-ev neutral'), '時刻のある利用は山吹色');
 assert.ok(day.includes('☆ 迎え'));
 assert.ok(day.includes('★ 送り'));
+assert.ok(day.includes("sgOpenMonth('2026-10-26')"), '表示中の日の月を開く');
+assert.ok(/月<\/button><button type="button" onclick="sgOpenDay\(/.test(day), '月は今日のとなり');
 assert.ok(day.includes('data-sg-now'), '今日は現在時刻の線');
 assert.ok(day.includes('終日'));
 assert.ok(day.includes('児童D'));
@@ -144,6 +146,23 @@ const useBlock = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(
 assert.ok(useBlock && useBlock[1] === '#f8b500' && useBlock[2] === '#222', '利用は山吹色に黒文字');
 const ride = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="[^"]*加藤先生"/);
 assert.ok(ride && ride[1] === '#4fc3f7', '担当が加藤先生の送迎だけ水色');
+
+const nov = sgDayHtml('2026-11-17', [], {}, { demo: false, today: '2026-10-26' });
+assert.ok(nov.includes("sgOpenMonth('2026-11-17')"), '11月17日の月ボタンはその日');
+assert.ok(nov.includes('11/17（火）'));
+vm.runInContext(`
+  location = { _h: '#leo/day/2026-11-17', get hash() { return this._h; }, set hash(v) { this._h = String(v).charAt(0) === '#' ? String(v) : '#' + v; } };
+  SG_HOME_MONTH = '2026-10';
+  sgOpenMonth('2026-11-17');
+  if (SG_HOME_MONTH !== '2026-11') throw new Error('month ' + SG_HOME_MONTH);
+  if (location.hash !== '#leo') throw new Error('hash ' + location.hash);
+  sgOpenMonth('bad');
+  if (SG_HOME_MONTH !== '2026-11') throw new Error('bad date changed month');
+  globalThis.__home = 0;
+  leoHomeCal = () => { __home += 1; };
+  sgOpenMonth('2026-11-17');
+  if (location.hash !== '#leo' || __home !== 1 || SG_HOME_MONTH !== '2026-11') throw new Error('redraw ' + __home + ' ' + SG_HOME_MONTH);
+`, sandbox);
 
 const bare = sgDayHtml('2026-10-27', evs, {}, { demo: false, today: '2026-10-26' });
 assert.ok(bare.includes('終日'), '時刻のない予定は終日');
