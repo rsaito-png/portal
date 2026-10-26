@@ -1185,7 +1185,7 @@ LEO_VIEWS.master = async function () {
     <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)"></td>`).join('')}</tr>`).join('')}</table></div>
     <button onclick="renderLeoView('master').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
 };
-// 型表などの入力欄を、見出しと入力中の文字が切れない幅にする（保存する中身は変えない）
+// 型表などの入力欄。短い列は中身（曜日は1文字、時刻は HH:MM）に合わせ、見出しは折り返す。保存する中身は変えない。
 function masterTextPx(text, font) {
   const probe = document.createElement('span');
   probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;';
@@ -1196,27 +1196,53 @@ function masterTextPx(text, font) {
   probe.remove();
   return w;
 }
+function masterFloorText(col) {
+  const c = String(col || '');
+  if (c === '曜日') return '月';
+  if (c.includes('利用週')) return '毎週';
+  if (/(開始|終了|時刻)$/.test(c)) return '00:00';
+  if (/時間\(h\)/.test(c)) return '00.00';
+  if (/(順|児童数)$/.test(c)) return '00';
+  if (c === '保護者送迎') return '○';
+  if (/署名|計画書作成/.test(c)) return '済';
+  if (c === '現在の期') return '10期';
+  if (c.includes('常勤')) return '非常勤';
+  return 'あいう';
+}
+function masterPad(cs) {
+  return (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0) + 2;
+}
+function masterBasis(col, value, font) {
+  const floor = masterFloorText(col);
+  return masterTextPx(value, font) > masterTextPx(floor, font) ? (value || floor) : floor;
+}
 function fitMasterSheet() {
   const table = document.querySelector('table.msheet');
   if (!table) return;
   const sample = table.querySelector('input');
   if (!sample) return;
   const cs = getComputedStyle(sample);
-  const extra = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0) + 16;
+  const extra = masterPad(cs);
   const byCol = {};
   table.querySelectorAll('input').forEach(inp => {
     const col = inp.dataset.c || '';
-    const w = Math.ceil(Math.max(masterTextPx(inp.value, cs.font), masterTextPx(col, cs.font)) + extra);
-    byCol[col] = Math.max(byCol[col] || 0, w, 56);
+    const basis = masterBasis(col, inp.value, cs.font);
+    byCol[col] = Math.max(byCol[col] || 0, Math.ceil(masterTextPx(basis, cs.font) + extra));
   });
   table.querySelectorAll('input').forEach(inp => { inp.style.width = byCol[inp.dataset.c] + 'px'; });
+  table.querySelectorAll('th').forEach(th => {
+    const w = byCol[th.textContent];
+    if (!w) return;
+    th.style.width = w + 'px';
+    th.style.maxWidth = w + 'px';
+  });
 }
 function fitMasterInput(el) {
   if (!el) return;
   const cs = getComputedStyle(el);
-  const extra = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0) + 16;
-  const need = Math.ceil(Math.max(masterTextPx(el.value, cs.font), masterTextPx(el.dataset.c || '', cs.font)) + extra);
-  if (need > el.getBoundingClientRect().width) el.style.width = need + 'px';
+  const basis = masterBasis(el.dataset.c || '', el.value, cs.font);
+  const need = Math.ceil(masterTextPx(basis, cs.font) + masterPad(cs));
+  if (need > el.getBoundingClientRect().width + 1) el.style.width = need + 'px';
 }
 function addMasterRow() {
   const t = document.querySelector('tr.mrow:last-child');
