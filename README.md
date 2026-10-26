@@ -33,6 +33,14 @@
 - `supabase/leo2.sql` … 型表・個別支援計画 管理表・職員配置表（`leo_sheet`、見るだけ）と、事務の「直した所」確認用の権限
 - `help.html` … 職員向け 使い方
 
+## 日中一時支援（`#nicchu`・レスパイト）
+- 星心会レスパイトスタジオの支援日誌。居宅介護（金斗雲）の訪問記録とは別の表です。
+- `nicchu.js` … 一覧・その日の記録（`#nicchu/log`）、タブレットのあとで署名（`#nicchu/sign`）。署名欄は `signpad.js`。
+- `supabase/nicchu.sql` … `nicchu_user` / `nicchu_helper` / `nicchu_day` / `nicchu_record` / `nicchu_sign_log` と `nicchu_can()`。Supabase の SQL Editor に貼って Run（再実行できる）。
+- 読み書きできる人: `staff_profiles.nicchu` が true、または所属が「レスパイト」「日中一時」、または事務・管理者・児発管・会長。担当にする例: `update public.staff_profiles set nicchu = true where user_id = '<id>';`
+- 利用者と記入者の実名はリポジトリに置かない。一覧の「利用者」から追加する。記入者は記録を保存すると次回の候補になる。
+- PDF 出力はまだない。
+
 ## 法定研修（Supabase版・`#ht`）
 - `ht.js` … 画面（ホーム／職員／研修／委員会／年間カレンダー／設定、実施記録PDF・受講証明書・議事録は印刷画面→PDF保存）。`supabase/houtei.sql` … 表（ht_）とRLS
 - 権限は `ht_access`（メール×事業所。office_id が空＝全事業所の統括）。SQLで追加: `insert into ht_access(email,office_id,can_edit) values ('xxx@…','leo',true);`
