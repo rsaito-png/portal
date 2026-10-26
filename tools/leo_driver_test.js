@@ -17,15 +17,32 @@ assert.strictEqual(D.filingDriverName('祥先生（代理）'), '祥先生（代
 assert.strictEqual(D.filingDriverName(''), '');
 assert.strictEqual(D.filingDriverName(null), null);
 
+// 宮本幸子（空白違い・呼び名）は届け出の安藤。短い名前とフルネームは分けて写す。
+assert.strictEqual(D.filingDriverName('宮本幸子'), '安藤尚子');
+assert.strictEqual(D.filingDriverName('宮本　幸子'), '安藤尚子');
+assert.strictEqual(D.filingDriverName(' 宮本 幸子 '), '安藤尚子');
+assert.strictEqual(D.filingDriverName('宮本'), '安藤');
+assert.strictEqual(D.filingDriverName('宮本さん'), '安藤');
+assert.strictEqual(D.filingDriverName('宮本　さん'), '安藤');
+assert.strictEqual(D.filingDriverName('安藤'), '安藤');
+assert.strictEqual(D.filingDriverName('安藤尚子'), '安藤尚子');
+assert.strictEqual(D.filingDriverName('安藤　尚子'), '安藤　尚子');
+assert.strictEqual(D.filingDriverName('宮本幸子（代理）'), '宮本幸子（代理）');
+assert.strictEqual(D.filingDriverName('齊藤　連'), '齊藤　連');
+
 // 定例: 月曜朝・碧音くん迎え 10:20。運転は横田祥。届け出の担当は齊藤。
 const mondayPick = { dow: '月', child: '碧音', time: '10:20', kind: '迎え', driver: '横田祥' };
 assert.strictEqual(mondayPick.driver, '横田祥');
 assert.strictEqual(D.filingDriverName(mondayPick.driver), '齊藤');
 assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '横田祥', drop_driver: '職員Y' }), { pick: '齊藤', drop: '職員Y' });
 assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '祥先生', drop_driver: '送迎なし' }), { pick: '齊藤', drop: '送迎なし' });
+assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '宮本　幸子', drop_driver: '宮本さん' }), { pick: '安藤尚子', drop: '安藤' });
+assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '安藤　尚子', drop_driver: '横田祥' }), { pick: '安藤　尚子', drop: '齊藤' });
 
 assert.strictEqual(D.nikkiShownValue('pick_driver', '横田祥'), '齊藤');
 assert.strictEqual(D.nikkiShownValue('drop_driver', '祥先生'), '齊藤');
+assert.strictEqual(D.nikkiShownValue('pick_driver', '宮本　幸子'), '安藤尚子');
+assert.strictEqual(D.nikkiShownValue('drop_driver', '宮本さん'), '安藤');
 assert.strictEqual(D.nikkiShownValue('pick_time', '10:20'), '10:20');
 assert.strictEqual(D.nikkiShownValue('pick_place', '横田祥'), '横田祥');
 
@@ -34,6 +51,10 @@ assert.strictEqual(D.nikkiEditValue('pick_driver', '横田祥', '齊藤'), null)
 assert.strictEqual(D.nikkiEditValue('pick_driver', '横田祥', '横田祥'), null);
 assert.strictEqual(D.nikkiEditValue('pick_driver', '横田祥', '祥先生'), null);
 assert.deepStrictEqual(D.nikkiEditValue('pick_driver', '横田祥', '山田'), { old_value: '横田祥', new_value: '山田' });
+assert.strictEqual(D.nikkiEditValue('pick_driver', '宮本　幸子', '安藤尚子'), null);
+assert.strictEqual(D.nikkiEditValue('pick_driver', '宮本　幸子', '宮本幸子'), null);
+assert.strictEqual(D.nikkiEditValue('drop_driver', '宮本さん', '安藤'), null);
+assert.deepStrictEqual(D.nikkiEditValue('pick_driver', '宮本　幸子', '山田'), { old_value: '宮本　幸子', new_value: '山田' });
 assert.deepStrictEqual(D.nikkiEditValue('pick_time', '10:20', '10:25'), { old_value: '10:20', new_value: '10:25' });
 assert.strictEqual(D.nikkiEditValue('pick_time', '10:20', '10:20'), null);
 
