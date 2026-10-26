@@ -6,6 +6,7 @@
 -- 修了: 対象科目ごとに必要分数を満たし、本人確認済み。確認テストは記録できるが合否は要件にしない。
 -- 全免除（労働衛生コンサルタント）は受講不要・課金なし・修了証なし。科目1免除（衛生管理者）は 10,800円で科目2と3。
 -- それ以外は3科目 12,800円（税込）。金額の正は sct_price。画面の sct_logic.js と揃える。
+-- カード決済は Square の支払いリンク。入金の確定は square-webhook だけ。旧 Stripe の列と sct_stripe_events は履歴として残す。
 
 set check_function_bodies = off;
 
@@ -126,8 +127,13 @@ create table if not exists public.sct_payments (
   user_id uuid not null references auth.users(id),
   plan text not null check (plan in ('bundle', 'exempt_s1', 'exempt_all')),
   amount_yen int not null check (amount_yen >= 0),
-  method text not null check (method in ('stripe', 'bank', 'none')),
+  method text not null check (method in ('square', 'bank', 'none', 'stripe')),
   status text not null check (status in ('pending', 'paid', 'failed', 'waived', 'refund_pending', 'refunded_full', 'refunded_half', 'refund_none')),
+  square_payment_link_id text,
+  square_order_id text,
+  square_payment_id text,
+  processor_fee_yen int,
+  -- 旧カード決済の控え。新規は書かない。適用済みの行を残すため列は消さない。
   stripe_session_id text,
   stripe_payment_intent text,
   stripe_fee_yen int,
@@ -138,7 +144,34 @@ create table if not exists public.sct_payments (
   note text,
   created_at timestamptz not null default now()
 );
+-- 既に Stripe 版の表がある場合でも足せる。supabase/sct_square.sql と同じ。
+alter table public.sct_payments add column if not exists square_payment_link_id text;
+alter table public.sct_payments add column if not exists square_order_id text;
+alter table public.sct_payments add column if not exists square_payment_id text;
+alter table public.sct_payments add column if not exists processor_fee_yen int;
+update public.sct_payments set processor_fee_yen = stripe_fee_yen
+  where processor_fee_yen is null and stripe_fee_yen is not null;
+do $$
+declare r record;
+begin
+  for r in
+    select con.conname
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace nsp on nsp.oid = rel.relnamespace
+    where nsp.nspname = 'public' and rel.relname = 'sct_payments' and con.contype = 'c'
+      and pg_get_constraintdef(con.oid) ilike '%method%'
+  loop
+    execute format('alter table public.sct_payments drop constraint %I', r.conname);
+  end loop;
+end $$;
+alter table public.sct_payments add constraint sct_payments_method_check
+  check (method in ('square', 'bank', 'none', 'stripe'));
+update public.sct_payments set method = 'square' where method = 'stripe' and status = 'pending';
 create unique index if not exists sct_pay_stripe on public.sct_payments (stripe_session_id) where stripe_session_id is not null;
+create unique index if not exists sct_pay_square_link on public.sct_payments (square_payment_link_id) where square_payment_link_id is not null;
+create unique index if not exists sct_pay_square_order on public.sct_payments (square_order_id) where square_order_id is not null;
+create unique index if not exists sct_pay_square_payment on public.sct_payments (square_payment_id) where square_payment_id is not null;
 create unique index if not exists sct_pay_active on public.sct_payments (user_id)
   where status in ('pending', 'paid', 'waived', 'refund_pending', 'refunded_half', 'refund_none');
 
@@ -174,6 +207,14 @@ create table if not exists public.sct_meet_events (
 create unique index if not exists sct_meet_msg on public.sct_meet_events (message_id) where message_id is not null;
 
 create table if not exists public.sct_stripe_events (
+  id text primary key,
+  type text,
+  payment_id uuid,
+  note text,
+  received_at timestamptz not null default now()
+);
+
+create table if not exists public.sct_square_events (
   id text primary key,
   type text,
   payment_id uuid,
@@ -375,6 +416,9 @@ create trigger sct_meet_no_delete before delete on public.sct_meet_events
 drop trigger if exists sct_stripe_no_delete on public.sct_stripe_events;
 create trigger sct_stripe_no_delete before delete on public.sct_stripe_events
   for each row execute function public.sct_no_delete();
+drop trigger if exists sct_square_no_delete on public.sct_square_events;
+create trigger sct_square_no_delete before delete on public.sct_square_events
+  for each row execute function public.sct_no_delete();
 drop trigger if exists sct_profile_no_delete on public.sct_profiles;
 create trigger sct_profile_no_delete before delete on public.sct_profiles
   for each row execute function public.sct_no_delete();
@@ -524,7 +568,7 @@ begin
   return cid;
 end $$;
 
--- 受講者の決済開始。金額はプロフィールから決め、クライアントの指定は使わない。
+-- 受講者の決済開始。金額はプロフィールから決め、クライアントの指定は使わない。カードは Square。
 create or replace function public.sct_begin_payment()
 returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -561,11 +605,11 @@ begin
     return jsonb_build_object('payment_id', existing.id, 'status', existing.status, 'amount_yen', existing.amount_yen, 'plan', existing.plan, 'already', true);
   end if;
   if found and existing.id is not null then
-    return jsonb_build_object('payment_id', existing.id, 'status', 'pending', 'amount_yen', existing.amount_yen, 'plan', existing.plan, 'stripe_session_id', existing.stripe_session_id, 'already', false);
+    return jsonb_build_object('payment_id', existing.id, 'status', 'pending', 'amount_yen', existing.amount_yen, 'plan', existing.plan, 'square_payment_link_id', existing.square_payment_link_id, 'square_order_id', existing.square_order_id, 'already', false);
   end if;
   st := case when v_amt = 0 then 'waived' else 'pending' end;
   insert into public.sct_payments (user_id, plan, amount_yen, method, status)
-  values (auth.uid(), v_plan, v_amt, case when v_amt = 0 then 'none' else 'stripe' end, st)
+  values (auth.uid(), v_plan, v_amt, case when v_amt = 0 then 'none' else 'square' end, st)
   returning id into nid;
   return jsonb_build_object('payment_id', nid, 'status', st, 'amount_yen', v_amt, 'plan', v_plan, 'already', false);
 end $$;
@@ -582,6 +626,7 @@ alter table public.sct_payments enable row level security;
 alter table public.sct_attendance enable row level security;
 alter table public.sct_meet_events enable row level security;
 alter table public.sct_stripe_events enable row level security;
+alter table public.sct_square_events enable row level security;
 alter table public.sct_certificates enable row level security;
 alter table public.sct_quiz enable row level security;
 
@@ -658,6 +703,8 @@ drop policy if exists sct_meet_r on public.sct_meet_events;
 create policy sct_meet_r on public.sct_meet_events for select to authenticated using (public.sct_is_admin());
 drop policy if exists sct_stripe_r on public.sct_stripe_events;
 create policy sct_stripe_r on public.sct_stripe_events for select to authenticated using (public.sct_is_admin());
+drop policy if exists sct_square_r on public.sct_square_events;
+create policy sct_square_r on public.sct_square_events for select to authenticated using (public.sct_is_admin());
 
 drop policy if exists sct_cert_r on public.sct_certificates;
 create policy sct_cert_r on public.sct_certificates for select to authenticated using (user_id = auth.uid() or public.sct_is_admin());

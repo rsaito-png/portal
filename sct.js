@@ -61,7 +61,7 @@ function sctDemo() {
       { id: 'a3', booking_id: 'b4', joined_at: '2026-11-22T10:00:00+09:00', left_at: '2026-11-22T11:30:00+09:00', camera_off: false, source: 'manual' },
     ],
     payments: [
-      { id: 'p1', user_id: 'u1', plan: 'bundle', amount_yen: 12800, method: 'stripe', status: 'paid', paid_at: '2026-10-01T10:00:00+09:00', stripe_session_id: 'cs_demo' },
+      { id: 'p1', user_id: 'u1', plan: 'bundle', amount_yen: 12800, method: 'square', status: 'paid', paid_at: '2026-10-01T10:00:00+09:00', square_payment_id: 'sq_demo', square_order_id: 'order_demo' },
       { id: 'p2', user_id: 'u2', plan: 'bundle', amount_yen: 12800, method: 'bank', status: 'pending' },
     ],
     certificates: [],
@@ -253,11 +253,11 @@ function sctShowCert(snap) {
 }
 function sctViewPay() {
   const policy = (SCT.D.settings && SCT.D.settings['返金']) || Sct.REFUND_POLICY;
-  const rows = SCT.D.payments.map(p => `<tr><td>${sctEsc(sctName(p.user_id))}</td><td>${SCT_PLAN[p.plan] || p.plan}</td><td>${sctYen(p.amount_yen)}</td><td>${p.method}</td><td>${SCT_PST[p.status] || p.status}</td><td>${sctEsc(p.note || '')}</td>
+  const rows = SCT.D.payments.map(p => `<tr><td>${sctEsc(sctName(p.user_id))}</td><td>${SCT_PLAN[p.plan] || p.plan}</td><td>${sctYen(p.amount_yen)}</td><td>${sctEsc(Sct.methodLabel(p.method))}</td><td>${SCT_PST[p.status] || p.status}</td><td>${sctEsc(p.note || '')}</td>
     <td>${p.status === 'pending' && p.method === 'bank' ? `<button class="sctb" onclick="sctMarkPaid('${p.id}')">入金確認</button>` : ''}${p.status === 'pending' ? `<button class="sctb g" onclick="sctFailPay('${p.id}')">無効</button>` : ''}${p.status === 'paid' ? `<button class="sctb g" onclick="sctOpenRefund('${p.id}')">返金を記録</button>` : ''}</td></tr>`).join('');
   const opts = SCT.D.profiles.map(p => `<option value="${p.user_id}">${sctEsc(p.full_name)}</option>`).join('');
   const refund = SCT.form && SCT.form.kind === 'refund' ? sctRefundForm() : '';
-  return `<p class="sctnote">${sctEsc(policy)}</p>${refund}<div class="card sctf"><h4>振込を記録</h4><label>受講者<select id="bk_user">${opts}</select></label><label>メモ<input id="bk_note" placeholder="振込人名など"></label><p><button class="sctb" onclick="sctSaveBank()">未入金として記録</button></p><p class="sctnote">金額はプロフィールの免除区分から決まります。Stripeの未完了があるときは先に無効にしてください。</p></div>
+  return `<p class="sctnote">${sctEsc(policy)}</p>${refund}<div class="card sctf"><h4>振込を記録</h4><label>受講者<select id="bk_user">${opts}</select></label><label>メモ<input id="bk_note" placeholder="振込人名など"></label><p><button class="sctb" onclick="sctSaveBank()">未入金として記録</button></p><p class="sctnote">金額はプロフィールの免除区分から決まります。Squareの未完了があるときは先に無効にしてください。</p></div>
     <div class="sctw"><table class="sctt"><tr><th>氏名</th><th>区分</th><th>金額</th><th>方法</th><th>状態</th><th>メモ</th><th></th></tr>${rows || '<tr><td colspan="7">なし</td></tr>'}</table></div>`;
 }
 function sctRefundForm() {
@@ -290,7 +290,7 @@ async function sctMarkPaid(id) { await sctPayPatch(id, { status: 'paid' }); }
 async function sctFailPay(id) { await sctPayPatch(id, { status: 'failed', note: '運営が無効化' }); }
 async function sctSaveRefund() {
   const id = SCT.form.id;
-  const row = { status: document.getElementById('rf_kind').value, refund_amount_yen: +document.getElementById('rf_amt').value, stripe_fee_yen: +document.getElementById('rf_fee').value, refund_reason: document.getElementById('rf_why').value };
+  const row = { status: document.getElementById('rf_kind').value, refund_amount_yen: +document.getElementById('rf_amt').value, processor_fee_yen: +document.getElementById('rf_fee').value, refund_reason: document.getElementById('rf_why').value };
   SCT.form = null;
   await sctPayPatch(id, row);
 }
@@ -301,9 +301,10 @@ async function sctPayPatch(id, row) {
     await sctRefresh();
   } catch (e) { alert(e.message); }
 }
+function sctPayRef(p) { return p.square_payment_id || p.square_order_id || p.stripe_session_id || ''; }
 function sctViewLedger() {
-  const rows = SCT.D.payments.map(p => `<tr><td>${sctEsc((p.paid_at || p.created_at || '').slice(0, 10))}</td><td>${sctEsc(sctName(p.user_id))}</td><td>${SCT_PLAN[p.plan] || ''}</td><td>${sctYen(p.amount_yen)}</td><td>${p.method}</td><td>${SCT_PST[p.status] || ''}</td><td>${sctYen(p.refund_amount_yen)}</td><td>${sctEsc(p.stripe_session_id || '')}</td><td>${sctEsc(p.refund_reason || p.note || '')}</td></tr>`).join('');
-  return `<p class="sctnote">この一覧は削除しません。返金も行を消さず状態を変えます。</p><div class="sctw"><table class="sctt"><tr><th>日付</th><th>氏名</th><th>区分</th><th>金額</th><th>方法</th><th>状態</th><th>返金</th><th>Stripe</th><th>メモ</th></tr>${rows || '<tr><td colspan="9">なし</td></tr>'}</table></div>`;
+  const rows = SCT.D.payments.map(p => `<tr><td>${sctEsc((p.paid_at || p.created_at || '').slice(0, 10))}</td><td>${sctEsc(sctName(p.user_id))}</td><td>${SCT_PLAN[p.plan] || ''}</td><td>${sctYen(p.amount_yen)}</td><td>${sctEsc(Sct.methodLabel(p.method))}</td><td>${SCT_PST[p.status] || ''}</td><td>${sctYen(p.refund_amount_yen)}</td><td>${sctEsc(sctPayRef(p))}</td><td>${sctEsc(p.refund_reason || p.note || '')}</td></tr>`).join('');
+  return `<p class="sctnote">この一覧は削除しません。返金も行を消さず状態を変えます。返金の実行は Square のダッシュボードで行い、ここには結果だけを残します。</p><div class="sctw"><table class="sctt"><tr><th>日付</th><th>氏名</th><th>区分</th><th>金額</th><th>方法</th><th>状態</th><th>返金</th><th>決済ID</th><th>メモ</th></tr>${rows || '<tr><td colspan="9">なし</td></tr>'}</table></div>`;
 }
 function sctViewMeet() {
   const rows = (SCT.D.meets || []).map(m => `<tr><td>${sctEsc(sctJstInput(m.received_at).replace('T', ' '))}</td><td>${sctEsc(m.event_type || '')}</td><td>${sctEsc(m.display_name || '')}</td><td>${sctEsc(sctJstInput(m.start_time).replace('T', ' '))}</td><td>${sctEsc(sctJstInput(m.end_time).replace('T', ' '))}</td><td>${sctEsc(m.space_name || '')}</td><td><button class="sctb g" onclick="sctUseMeet('${m.id}')">出席に転記</button></td></tr>`).join('');
