@@ -248,8 +248,8 @@ function sgCss() {
 .sgm td.dim button{opacity:.4}
 .sgm-err{color:#c00;font-size:13px;margin:4px}
 .sg-top{display:flex;align-items:center;gap:4px;margin:0 0 8px}
-.sg-top b{flex:1;text-align:center;font-size:18px}
-.sg-top button{padding:6px 10px;font-size:16px;font-weight:700;border:1px solid #ddd;background:#fff}
+.sg-top b{flex:1;min-width:0;text-align:center;font-size:18px;white-space:nowrap}
+.sg-top button{flex:0 0 auto;padding:6px 10px;font-size:16px;font-weight:700;border:1px solid #ddd;background:#fff}
 .sg-leg{display:flex;flex-wrap:wrap;gap:6px 10px;margin:0 0 8px;font-size:12px}
 .sg-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
 .sg-leg .other{color:#d50000;font-weight:700}
@@ -280,6 +280,8 @@ function sgCss() {
   .sgm td button{height:30px}
   .sgm td button b{font-size:12px}
   .sgm-h b{font-size:14px}
+  .sg-top b{font-size:16px}
+  .sg-top button{padding:6px 8px}
 }
 </style>`;
 }
@@ -357,7 +359,7 @@ function sgDayHtml(day, evs, care, opt) {
   }).join('');
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';
   const [, mm, dd] = day.split('-');
-  return `<div class="sg-page">${sgCss()}<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${typeof today === 'function' ? today() : day}')">今日</button></div>
+  return `<div class="sg-page">${sgCss()}<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" onclick="sgOpenDay('${typeof today === 'function' ? today() : day}')">今日</button></div>
     <div class="sg-leg">${legend}</div>
     <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px;min-width:${Math.max(240, maxCols * 132)}px">${lines.join('')}${blocks}${nowEl}</div></div></div></div>
     <p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>
@@ -424,6 +426,12 @@ function sgPlaceNow() {
   });
 }
 window.sgOpenDay = d => { if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return; SG_HOME_MONTH = sgYm(d); location.hash = 'leo/day/' + d; };
+window.sgOpenMonth = d => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return;
+  SG_HOME_MONTH = sgYm(d);
+  if (location.hash === '#leo') { if (typeof leoHomeCal === 'function') leoHomeCal(); return; }
+  location.hash = 'leo';
+};
 window.sgShiftMonth = n => {
   const cur = (SG_HOME_MONTH || sgYm(typeof today === 'function' ? today() : '2026-10-01')) + '-15';
   SG_HOME_MONTH = sgAdd(cur, 30 * n).slice(0, 7);
