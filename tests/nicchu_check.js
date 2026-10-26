@@ -46,6 +46,58 @@ assert.strictEqual(absent.activity, null);
 assert.strictEqual(absent.signature, null);
 assert.strictEqual(absent.sign_status, null);
 
+assert.strictEqual(ncReiwa(2019), '元');
+assert.strictEqual(ncReiwa(2026), '8');
+assert.strictEqual(ncJissekiMinutes('07:00', '13:00'), 360);
+assert.strictEqual(ncJissekiBand(239), 'under');
+assert.strictEqual(ncJissekiBand(240), 'over');
+assert.strictEqual(ncJissekiBand(360), 'over');
+assert.strictEqual(ncJissekiMeal('あり'), '1');
+assert.strictEqual(ncJissekiMeal('なし'), '');
+assert.strictEqual(ncJissekiTransport('往復'), '2');
+assert.strictEqual(ncJissekiTransport('迎えのみ'), '1');
+assert.strictEqual(ncJissekiTransport('送りのみ'), '1');
+assert.strictEqual(ncJissekiTransport('なし'), '');
+
+const sample = [
+  { present: true, service_date: '2019-10-01', start_time: '09:30', end_time: '16:00', meal_served: 'あり', transport: '往復' },
+  { present: true, service_date: '2019-10-03', start_time: '09:30', end_time: '16:00', meal_served: 'あり', transport: '往復' },
+  { present: true, service_date: '2019-10-05', start_time: '09:30', end_time: '16:00', meal_served: 'あり', transport: '往復' },
+  { present: true, service_date: '2019-10-13', start_time: '09:30', end_time: '12:00', meal_served: 'なし', transport: '迎えのみ' },
+  { present: true, service_date: '2019-10-27', start_time: '09:30', end_time: '16:00', meal_served: 'あり', transport: '往復' },
+  { present: false, service_date: '2019-10-02', start_time: '09:30', end_time: '16:00', meal_served: 'あり', transport: '往復' }
+];
+const sheet = ncJissekiSheet(sample);
+assert.strictEqual(sheet.lines.length, 5);
+assert.strictEqual(sheet.lines[0].weekday, '火');
+assert.strictEqual(sheet.lines[0].dayLabel, '1日');
+assert.strictEqual(sheet.lines[3].band, 'under');
+assert.strictEqual(sheet.lines[3].minutes, 150);
+assert.strictEqual(sheet.lines[3].meal, '');
+assert.strictEqual(sheet.lines[3].transport, '1');
+assert.deepStrictEqual(sheet.totals, { under: 1, over: 4, meal: 4, transport: 9 });
+assert.strictEqual(sheet.pages.length, 1);
+assert.strictEqual(sheet.pages[0].length, 20);
+assert.strictEqual(sheet.pages[0][5], null);
+
+const sunday = ncJissekiSheet([{ present: true, service_date: '2026-10-25', start_time: '07:00', end_time: '13:00', meal_served: 'あり', transport: '往復' }]);
+assert.strictEqual(sunday.lines[0].weekday, '日');
+assert.strictEqual(sunday.lines[0].band, 'over');
+assert.strictEqual(sunday.totals.meal, 1);
+assert.strictEqual(sunday.totals.transport, 2);
+
+const many = [];
+for (let d = 1; d <= 21; d++) many.push({ present: true, service_date: '2026-10-' + String(d).padStart(2, '0'), start_time: '07:00', end_time: '11:00', meal_served: 'なし', transport: 'なし' });
+const long = ncJissekiSheet(many);
+assert.strictEqual(long.pages.length, 2);
+assert.strictEqual(long.pages[1][0].dayLabel, '21日');
+assert.strictEqual(long.totals.over, 21);
+
+assert.deepStrictEqual(ncJissekiMasterErrors({ recipient_no: '0000099999', office_no: '2460200999', kubun: '区分３', monthly_quota: '5' }), []);
+assert.ok(ncJissekiMasterErrors({ recipient_no: '12a' }).some(e => e.includes('受給者番号')));
+assert.ok(ncJissekiMasterErrors({ monthly_quota: '0' }).some(e => e.includes('支給量')));
+assert.ok(ncJissekiMasterErrors({ kubun: '区分９' }).some(e => e.includes('区分')));
+
 assert.ok(!src.includes('あとで署名'));
 assert.ok(!src.includes('createSignPad'));
 assert.ok(!src.includes('__other'));
@@ -58,6 +110,7 @@ assert.ok(src.includes('星心会レスパイトスタジオ'));
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 assert.ok(html.includes('nicchu.js'));
 assert.ok(html.includes("id === 'nicchu' && sub === 'log'"));
+assert.ok(html.includes("id === 'nicchu' && sub === 'jisseki'"));
 assert.ok(html.includes("id === 'nicchu' && sub === 'sign'"));
 const win = {};
 vm.runInNewContext(fs.readFileSync(path.join(root, 'config.js'), 'utf8'), { window: win });
@@ -66,9 +119,11 @@ assert.ok(office);
 assert.strictEqual(office.id, 'nicchu');
 assert.strictEqual(office.name, '日中一時支援');
 assert.strictEqual(office.kind, '星心会レスパイトスタジオ');
-assert.strictEqual(office.tiles.length, 1);
+assert.strictEqual(office.tiles.length, 2);
 assert.strictEqual(String(office.tiles[0][1]), '支援記録');
 assert.strictEqual(String(office.tiles[0][2]), '#nicchu/log');
+assert.strictEqual(String(office.tiles[1][1]), '実績記録票（印刷）');
+assert.strictEqual(String(office.tiles[1][2]), '#nicchu/jisseki');
 assert.strictEqual(win.PORTAL_CONFIG.esign.officeDefaults['日中一時支援'].place, '星心会レスパイトスタジオ');
 const kin = fs.readFileSync(path.join(root, 'kin_visit.js'), 'utf8');
 assert.ok(!kin.includes('nicchu'));
@@ -77,6 +132,11 @@ const sql = fs.readFileSync(path.join(root, 'supabase/nicchu.sql'), 'utf8');
 assert.ok(sql.includes("office in ('日中一時支援', 'レスパイト', '日中一時')"));
 assert.ok(sql.includes('drop constraint if exists nicchu_record_when_present'));
 assert.ok(sql.includes('drop constraint if exists nicchu_record_sign_shape'));
+assert.ok(sql.includes('nicchu_office'));
+assert.ok(sql.includes('recipient_no'));
+assert.ok(src.includes('四日市市障害者（児）日中一時支援サービス提供実績記録票'));
+assert.ok(src.includes('利用者確認印'));
+assert.ok(!src.includes('nc-ring">入浴'));
 assert.ok(!/signer_kind is not null/.test(sql));
 assert.ok(!/alter table public\.kin_/i.test(sql));
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');

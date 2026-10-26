@@ -224,3 +224,34 @@ end $$;
 
 revoke all on function public.nicchu_sign_later(bigint[], text, text, text) from public, anon;
 grant execute on function public.nicchu_sign_later(bigint[], text, text, text) to authenticated;
+
+-- 第８号様式（実績記録票）に書く受給者情報。実名や番号はこのファイルに置かない。
+alter table public.nicchu_user add column if not exists recipient_no text;
+alter table public.nicchu_user add column if not exists kubun text;
+alter table public.nicchu_user add column if not exists monthly_quota int;
+alter table public.nicchu_user add column if not exists guardian_name text;
+alter table public.nicchu_user drop constraint if exists nicchu_user_recipient_no_chk;
+alter table public.nicchu_user add constraint nicchu_user_recipient_no_chk check (recipient_no is null or recipient_no ~ '^[0-9]{1,10}$');
+alter table public.nicchu_user drop constraint if exists nicchu_user_kubun_chk;
+alter table public.nicchu_user add constraint nicchu_user_kubun_chk check (kubun is null or kubun in ('区分１', '区分２', '区分３'));
+alter table public.nicchu_user drop constraint if exists nicchu_user_quota_chk;
+alter table public.nicchu_user add constraint nicchu_user_quota_chk check (monthly_quota is null or monthly_quota between 1 and 31);
+alter table public.nicchu_user drop constraint if exists nicchu_user_guardian_chk;
+alter table public.nicchu_user add constraint nicchu_user_guardian_chk check (char_length(guardian_name) <= 100);
+
+create table if not exists public.nicchu_office (
+  id int primary key check (id = 1),
+  office_no text check (office_no is null or office_no ~ '^[0-9]{1,10}$'),
+  office_name text check (char_length(office_name) <= 200),
+  updated_at timestamptz not null default now()
+);
+insert into public.nicchu_office(id, office_name)
+values (1, E'一般社団法人 心理社会的リハビリテーション・星心会\n星心会レスパイトスタジオ')
+on conflict (id) do nothing;
+
+alter table public.nicchu_office enable row level security;
+drop policy if exists nicchu_office_rw on public.nicchu_office;
+create policy nicchu_office_rw on public.nicchu_office for all to authenticated
+  using (public.nicchu_can()) with check (public.nicchu_can());
+revoke all on public.nicchu_office from anon, public;
+grant select, insert, update, delete on public.nicchu_office to authenticated;

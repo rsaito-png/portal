@@ -71,6 +71,77 @@ function ncRecordBody(u) {
     activity: ncClip(u.activity, 2000), state: ncClip(u.state, 2000), ...blank
   };
 }
+const NC_KUBUN = ['区分１', '区分２', '区分３'];
+const NC_JISSEKI_ROWS = 20;
+function ncReiwa(year) {
+  const y = +year;
+  if (y === 2019) return '元';
+  if (y > 2019) return String(y - 2018);
+  return '';
+}
+function ncJissekiMinutes(start, end) {
+  const s = ncMin(start), e = ncMin(end);
+  if (Number.isNaN(s) || Number.isNaN(e) || e <= s) return null;
+  return e - s;
+}
+function ncJissekiBand(minutes) {
+  if (minutes == null) return '';
+  return minutes < 240 ? 'under' : 'over';
+}
+function ncJissekiMeal(v) { return v === 'あり' ? '1' : ''; }
+function ncJissekiTransport(v) {
+  if (v === '往復') return '2';
+  if (v === '迎えのみ' || v === '送りのみ') return '1';
+  return '';
+}
+function ncJissekiLines(records) {
+  return (records || []).filter(r => r && r.present !== false && r.service_date).map(r => {
+    const minutes = ncJissekiMinutes(r.start_time, r.end_time);
+    return {
+      date: r.service_date,
+      dayLabel: (+String(r.service_date).slice(8, 10)) + '日',
+      weekday: ncWeekday(r.service_date),
+      start: String(r.start_time || '').slice(0, 5),
+      end: String(r.end_time || '').slice(0, 5),
+      minutes,
+      band: ncJissekiBand(minutes),
+      meal: ncJissekiMeal(r.meal_served),
+      transport: ncJissekiTransport(r.transport)
+    };
+  }).filter(r => r.weekday).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+}
+function ncJissekiSheet(records) {
+  const lines = ncJissekiLines(records);
+  const totals = { under: 0, over: 0, meal: 0, transport: 0 };
+  lines.forEach(r => {
+    if (r.band === 'under') totals.under++;
+    if (r.band === 'over') totals.over++;
+    if (r.meal) totals.meal += +r.meal;
+    if (r.transport) totals.transport += +r.transport;
+  });
+  const pages = [];
+  const n = Math.max(1, Math.ceil(lines.length / NC_JISSEKI_ROWS));
+  for (let p = 0; p < n; p++) {
+    const slice = lines.slice(p * NC_JISSEKI_ROWS, (p + 1) * NC_JISSEKI_ROWS);
+    while (slice.length < NC_JISSEKI_ROWS) slice.push(null);
+    pages.push(slice);
+  }
+  return { lines, totals, pages };
+}
+function ncJissekiMasterErrors(p) {
+  const err = [];
+  const no = String((p && p.recipient_no) || '').trim();
+  const ono = String((p && p.office_no) || '').trim();
+  const kubun = String((p && p.kubun) || '').trim();
+  const quota = String((p && p.monthly_quota) == null ? '' : p.monthly_quota).trim();
+  if (no && !/^[0-9]{1,10}$/.test(no)) err.push('受給者番号は10桁までの数字にしてください');
+  if (ono && !/^[0-9]{1,10}$/.test(ono)) err.push('事業所番号は10桁までの数字にしてください');
+  if (kubun && NC_KUBUN.indexOf(kubun) < 0) err.push('区分を選んでください');
+  if (quota && (!/^\d+$/.test(quota) || +quota < 1 || +quota > 31)) err.push('支給量は1から31の回数にしてください');
+  if (String((p && p.guardian_name) || '').trim().length > 100) err.push('保護者氏名は100文字以内にしてください');
+  if (String((p && p.office_name) || '').trim().length > 200) err.push('事業所名は200文字以内にしてください');
+  return err;
+}
 /* /nc-pure */
 
 function ncIsDemo() { return typeof DEMO !== 'undefined' && DEMO; }
@@ -89,6 +160,7 @@ function ncDemoInit() {
       { id: 2, name: '利用者B', kana: 'りようしゃ びー', active: true, sort: 2 }
     ],
     helpers: NC_HELPERS.map((name, i) => ({ id: i + 1, name, active: true, sort: i + 1 })),
+    office: { office_no: '', office_name: '一般社団法人 心理社会的リハビリテーション・星心会\n星心会レスパイトスタジオ' },
     days: [], recs: [], seq: 10
   };
 }
@@ -109,6 +181,27 @@ button.nc-chip.on{background:var(--main);color:#fff;border-color:var(--main)}
 .nc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .nc-msg{white-space:pre-wrap;color:#c00}
 .nc-ok{color:#2e6b4f}
+.nc-form{font-family:"Hiragino Mincho ProN","Yu Mincho","MS PMincho",serif;color:#000;background:#fff;padding:8px 4px;overflow-x:auto}
+.nc-form h2{font-size:16px;text-align:center;margin:4px 0 8px;font-weight:normal}
+.nc-form .nc-era{text-align:right;font-size:14px;margin:0 0 6px}
+.nc-form .nc-sub{font-size:11px;margin:0}
+.nc-form table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;background:#fff}
+.nc-form td{border:1px solid #222;padding:2px 3px;text-align:center;vertical-align:middle;line-height:1.25}
+.nc-form td.lab{font-size:10px;background:#fff}
+.nc-form td.nm{text-align:left;white-space:pre-wrap}
+.nc-form .digits{display:flex}
+.nc-form .digits i{flex:1;border-left:1px solid #222;font-style:normal;min-height:1.4em}
+.nc-form .digits i:first-child{border-left:0}
+.nc-ring{border:1.5px solid #000;border-radius:10px;padding:0 3px}
+.nc-sheet{margin:0 0 16px}
+@media print{
+  header,.noprint,#out{display:none!important}
+  body{background:#fff!important}
+  main,#home,#view{max-width:none!important;padding:0!important;margin:0!important}
+  .nc-sheet{page-break-after:always}
+  .nc-sheet:last-child{page-break-after:auto}
+}
+@page{size:A4 portrait;margin:8mm}
 `;
   document.head.appendChild(st);
 }
@@ -138,7 +231,7 @@ function ncDenied() {
 function ncDemoNote() { return ncIsDemo() ? `<p class="nc-pt">見本モードです。この端末の中だけに残り、サーバには保存しません。</p>` : ''; }
 async function ncUsers(all) {
   if (ncIsDemo()) { ncDemoInit(); return NC.mem.users.filter(u => all || u.active).slice().sort((a, b) => a.sort - b.sort || a.id - b.id); }
-  return await ncRest('nicchu_user?' + (all ? '' : 'active=eq.true&') + 'select=id,name,kana,active,sort&order=sort.asc,id.asc');
+  return await ncRest('nicchu_user?' + (all ? '' : 'active=eq.true&') + 'select=id,name,kana,active,sort,recipient_no,kubun,monthly_quota,guardian_name&order=sort.asc,id.asc');
 }
 async function ncHelpers() {
   if (ncIsDemo()) { ncDemoInit(); return NC.mem.helpers.filter(h => h.active).slice(); }
@@ -365,4 +458,132 @@ async function renderNicchuSign() {
   document.getElementById('view').innerHTML = `${back}<h3 style="color:#1f7a6b">日中一時支援</h3>
     <div class="nc-card"><p>署名はポータルでは受け付けていません。記録を印刷して、市役所へ提出します。</p>
     <p><button type="button" class="nc-mini" onclick="location.hash='nicchu/log'">支援記録へ</button></p></div>`;
+}
+function ncDemoOffice() {
+  ncDemoInit();
+  if (!NC.mem.office) NC.mem.office = { office_no: '', office_name: '一般社団法人 心理社会的リハビリテーション・星心会\n星心会レスパイトスタジオ' };
+  return NC.mem.office;
+}
+async function ncOffice() {
+  if (ncIsDemo()) return ncDemoOffice();
+  const rows = await ncRest('nicchu_office?id=eq.1&select=office_no,office_name');
+  return (rows && rows[0]) || { office_no: '', office_name: '' };
+}
+async function ncJissekiRecords(month, userId) {
+  const next = ncNextMonth(month);
+  if (ncIsDemo()) {
+    ncDemoInit();
+    return NC.mem.recs.filter(r => r.user_id === userId && r.present).map(r => {
+      const day = NC.mem.days.find(d => d.id === r.day_id);
+      return day ? { service_date: day.service_date, start_time: r.start_time, end_time: r.end_time, transport: r.transport, meal_served: r.meal_served, present: true } : null;
+    }).filter(r => r && r.service_date >= month + '-01' && r.service_date < next);
+  }
+  const rows = await ncRest('nicchu_record?user_id=eq.' + userId + '&present=eq.true&select=start_time,end_time,transport,meal_served,nicchu_day!inner(service_date)&nicchu_day.service_date=gte.' + month + '-01&nicchu_day.service_date=lt.' + next);
+  return (rows || []).map(r => ({ service_date: (r.nicchu_day || {}).service_date, start_time: r.start_time, end_time: r.end_time, transport: r.transport, meal_served: r.meal_served, present: true }));
+}
+function ncHm(t) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
+  return m ? [String(+m[1]), m[2]] : ['', ''];
+}
+function ncFw(s) { return String(s == null ? '' : s).replace(/\d/g, d => '０１２３４５６７８９'[d]); }
+function ncDigits(s) {
+  const chars = String(s || '').replace(/\D/g, '').slice(0, 10).split('');
+  while (chars.length < 10) chars.push('');
+  return `<div class="digits">${chars.map(c => `<i>${esc(c)}</i>`).join('')}</div>`;
+}
+function ncBandCell(band) {
+  const under = band === 'under' ? 'nc-ring' : '', over = band === 'over' ? 'nc-ring' : '';
+  return `<span class="${under}">4時間未満</span>　／　<span class="${over}">4時間以上</span>`;
+}
+function ncJissekiDoc(sheet, head) {
+  const names = (head.guardian ? head.guardian + '\n' : '') + (head.child || '');
+  const quota = head.quota ? `${ncFw(head.quota)}　回／月` : '　　回／月';
+  const totalBand = sheet.lines.length ? `${ncFw(sheet.totals.under)}　／　${ncFw(sheet.totals.over)}` : '／';
+  return sheet.pages.map((page, pi) => `<section class="nc-sheet">
+    <p class="nc-sub">第８号様式（第１０条関係）${sheet.pages.length > 1 ? '　' + (pi + 1) + '／' + sheet.pages.length : ''}</p>
+    <h2>四日市市障害者（児）日中一時支援サービス提供実績記録票</h2>
+    <p class="nc-era">令和 ${esc(ncFw(head.reiwa))} 年　${esc(ncFw(head.month))}　月 分</p>
+    <table>
+      <colgroup><col style="width:18%"><col style="width:28%"><col style="width:10%"><col style="width:14%"><col style="width:12%"><col style="width:18%"></colgroup>
+      <tr><td class="lab">受給者番号</td><td>${ncDigits(head.recipientNo)}</td><td class="lab">区分</td><td>${esc(head.kubun || '')}</td><td class="lab">事業所番号</td><td>${ncDigits(head.officeNo)}</td></tr>
+      <tr><td class="lab">支給決定障害者（保護者）氏名（児童氏名）</td><td class="nm">${esc(names)}</td><td class="lab">支給量</td><td>${esc(quota)}</td><td class="lab">事業者及びその事業所の名称</td><td class="nm">${esc(head.officeName || '')}</td></tr>
+    </table>
+    <table style="margin-top:6px">
+      <colgroup><col style="width:8%"><col style="width:6%"><col style="width:7%"><col style="width:3%"><col style="width:7%"><col style="width:7%"><col style="width:3%"><col style="width:7%"><col style="width:28%"><col style="width:8%"><col style="width:6%"><col style="width:5%"><col style="width:5%"></colgroup>
+      <tr><td class="lab" colspan="2">実施日</td><td class="lab" colspan="6">利用時間</td><td class="lab">時間数（いずれかに○）</td><td class="lab">食事提供</td><td class="lab">送迎</td><td class="lab">入浴</td><td class="lab">利用者確認印</td></tr>
+      <tr><td class="lab">日付</td><td class="lab">曜日</td><td class="lab" colspan="3">開始時間</td><td class="lab" colspan="3">終了時間</td><td></td><td></td><td></td><td></td><td></td></tr>
+      ${page.map(r => {
+        const sh = ncHm(r && r.start), eh = ncHm(r && r.end);
+        return `<tr><td>${r ? esc(ncFw(r.dayLabel)) : ''}</td><td>${r ? esc(r.weekday) : ''}</td><td>${esc(ncFw(sh[0]))}</td><td>：</td><td>${esc(ncFw(sh[1]))}</td><td>${esc(ncFw(eh[0]))}</td><td>：</td><td>${esc(ncFw(eh[1]))}</td><td>${ncBandCell(r && r.band)}</td><td>${r ? esc(r.meal) : ''}</td><td>${r ? esc(r.transport) : ''}</td><td></td><td></td></tr>`;
+      }).join('')}
+      <tr><td class="lab" colspan="8">合　　計</td><td>${esc(totalBand)}</td><td>${sheet.totals.meal ? esc(ncFw(sheet.totals.meal)) : ''}</td><td>${sheet.totals.transport ? esc(ncFw(sheet.totals.transport)) : ''}</td><td></td><td></td></tr>
+    </table>
+  </section>`).join('');
+}
+async function ncSaveJissekiMaster() {
+  const msg = document.getElementById('nc_msg');
+  const profile = {
+    recipient_no: document.getElementById('nc_recv').value.trim(),
+    kubun: document.getElementById('nc_kubun').value,
+    monthly_quota: document.getElementById('nc_quota').value.trim(),
+    guardian_name: document.getElementById('nc_guard').value.trim(),
+    office_no: document.getElementById('nc_offno').value.trim(),
+    office_name: document.getElementById('nc_offname').value.trim()
+  };
+  const errs = ncJissekiMasterErrors(profile);
+  if (errs.length) { msg.textContent = errs.join('\n'); return; }
+  const quota = profile.monthly_quota ? +profile.monthly_quota : null;
+  try {
+    if (ncIsDemo()) {
+      ncDemoInit();
+      const u = NC.mem.users.find(x => x.id === NC.jissekiUid);
+      if (u) Object.assign(u, { recipient_no: profile.recipient_no, kubun: profile.kubun, monthly_quota: quota, guardian_name: profile.guardian_name });
+      Object.assign(ncDemoOffice(), { office_no: profile.office_no, office_name: profile.office_name });
+    } else {
+      await ncRest('nicchu_user?id=eq.' + NC.jissekiUid, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ recipient_no: profile.recipient_no || null, kubun: profile.kubun || null, monthly_quota: quota, guardian_name: profile.guardian_name || null, updated_at: new Date().toISOString() }) });
+      await ncRest('nicchu_office?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 1, office_no: profile.office_no || null, office_name: profile.office_name || null, updated_at: new Date().toISOString() }) });
+    }
+    NC.flash = '請求の情報を保存しました';
+    renderNicchuJisseki();
+  } catch (e) { msg.textContent = e.message; }
+}
+async function renderNicchuJisseki() {
+  ncEnsureStyle();
+  document.body.classList.add('wide-sheet');
+  const back = `<button class="back noprint" type="button" onclick="location.hash='nicchu'">← 日中一時支援へ</button>`;
+  document.getElementById('view').innerHTML = back + '<p>読み込み中…</p>';
+  try {
+    if (!ncIsDemo() && !(await ncCan())) { document.getElementById('view').innerHTML = back + ncDenied(); return; }
+    const users = (await ncUsers(true)).slice().sort((a, b) => a.sort - b.sort || a.id - b.id);
+    if (!users.length) { document.getElementById('view').innerHTML = back + '<div class="nc-card"><p>利用者がまだいません。支援記録の一覧から追加してください。</p></div>'; return; }
+    if (!users.some(u => u.id === NC.jissekiUid)) NC.jissekiUid = (users.find(u => u.active) || users[0]).id;
+    const user = users.find(u => u.id === NC.jissekiUid);
+    const office = await ncOffice();
+    const records = await ncJissekiRecords(NC.month, user.id);
+    const sheet = ncJissekiSheet(records);
+    const y = +NC.month.slice(0, 4), mo = +NC.month.slice(5, 7);
+    const flash = NC.flash ? `<p class="nc-ok">${esc(NC.flash)}</p>` : '';
+    NC.flash = '';
+    document.getElementById('view').innerHTML = `${back}
+      <div class="noprint"><h3 style="color:#1f7a6b">実績記録票（第８号様式）</h3>
+      <p class="nc-pt">紙に印刷して、市役所へ郵送します。電子提出でも、ポータル上の署名でもありません。利用者確認印は空欄です（あとから押します）。入浴の欄は記録にないので空欄です。</p>
+      ${ncDemoNote()}${flash}
+      <div class="nc-card">
+        <label>利用者<select id="nc_ju" onchange="NC.jissekiUid=+this.value;renderNicchuJisseki()">${users.map(u => `<option value="${u.id}" ${u.id === user.id ? 'selected' : ''}>${esc(u.name)}${u.active ? '' : '（休止）'}</option>`).join('')}</select></label>
+        <label>月<input type="month" value="${esc(NC.month)}" onchange="NC.month=this.value||NC.month;renderNicchuJisseki()"></label>
+        <p><button type="button" onclick="window.print()">印刷 / PDF保存</button></p>
+        <p class="nc-pt">印刷ダイアログで A4・縦、「PDFに保存」を選べます。${sheet.lines.length ? sheet.lines.length + '日分を入れています。' : 'この月の利用はありません。'}${sheet.pages.length > 1 ? '1枚に20行までなので、次のページに続きます。' : ''}</p>
+      </div>
+      <details class="nc-card"><summary>請求に書く情報（一度入れれば残ります）</summary>
+        <label>受給者番号<input id="nc_recv" inputmode="numeric" maxlength="10" value="${esc(user.recipient_no || '')}" placeholder="10桁までの数字"></label>
+        <label>区分<select id="nc_kubun"><option value="">未設定</option>${NC_KUBUN.map(k => `<option ${user.kubun === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
+        <label>支給量（回／月）<input id="nc_quota" type="number" min="1" max="31" value="${user.monthly_quota || ''}"></label>
+        <label>保護者氏名（児童と別に書くとき）<input id="nc_guard" maxlength="100" value="${esc(user.guardian_name || '')}"></label>
+        <label>事業所番号<input id="nc_offno" inputmode="numeric" maxlength="10" value="${esc(office.office_no || '')}" placeholder="10桁までの数字"></label>
+        <label>事業者及びその事業所の名称<textarea id="nc_offname" rows="2" maxlength="200">${esc(office.office_name || '')}</textarea></label>
+        <button type="button" onclick="ncSaveJissekiMaster()">この情報を保存</button>
+        <p id="nc_msg" class="nc-msg"></p>
+      </details></div>
+      <div class="nc-form">${ncJissekiDoc(sheet, { reiwa: ncReiwa(y), month: String(mo), recipientNo: user.recipient_no || '', kubun: user.kubun || '', quota: user.monthly_quota || '', guardian: user.guardian_name || '', child: user.name || '', officeNo: office.office_no || '', officeName: office.office_name || '' })}</div>`;
+  } catch (e) { document.getElementById('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }

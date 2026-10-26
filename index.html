@@ -53,7 +53,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261026nicchu2"></script>
+<script src="config.js?v=20261026nicchu3"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261026"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -64,7 +64,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_visit.js?v=202610162300"></script>
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
-<script src="nicchu.js?v=20261026b"></script>
+<script src="nicchu.js?v=20261026c"></script>
 <script src="sui_render.js?v=202610170620"></script>
 <script src="sui.js?v=202610192150"></script>
 <script src="kin_contract.js?v=202610221354"></script>
@@ -195,6 +195,7 @@ async function render() {
   if (id === 'kintoun' && sub === 'check') return renderKinCheck();
   if (id === 'kintoun' && sub === 'visit') { KV.id = null; return renderKinVisit(); }
   if (id === 'nicchu' && sub === 'log' && typeof renderNicchu === 'function') return renderNicchu();
+  if (id === 'nicchu' && sub === 'jisseki' && typeof renderNicchuJisseki === 'function') return renderNicchuJisseki();
   if (id === 'nicchu' && sub === 'sign' && typeof renderNicchuSign === 'function') return renderNicchuSign();
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);

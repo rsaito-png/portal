@@ -35,11 +35,11 @@
 
 ## 日中一時支援（`#nicchu`）
 - 星心会レスパイトスタジオの支援日誌。画面の事業所名は「日中一時支援」。居宅介護（金斗雲）の訪問記録とは別の表です。
-- `nicchu.js` … 一覧とその日の記録（`#nicchu/log`）。署名欄はない。記録は印刷して市役所へ提出する。`#nicchu/sign` は、その説明だけを出す。
+- `nicchu.js` … 一覧とその日の記録（`#nicchu/log`）。署名欄はない。`#nicchu/jisseki` は四日市市の第８号様式（サービス提供実績記録票）を、保存した記録から作って印刷する。紙を市役所へ郵送する（電子提出ではない）。`#nicchu/sign` は、署名を受け取らない旨だけを出す。
 - `supabase/nicchu.sql` … `nicchu_user` / `nicchu_helper` / `nicchu_day` / `nicchu_record` / `nicchu_sign_log` と `nicchu_can()`。Supabase の SQL Editor に貼って Run（再実行できる）。署名の列は残しているが、画面では使わない。利用ありの行は時刻・送迎・食事・活動・ご様子だけで保存できる。
 - 読み書きできる人: `staff_profiles.nicchu` が true、または所属が「日中一時支援」「レスパイト」「日中一時」、または事務・管理者・児発管・会長。担当にする例: `update public.staff_profiles set nicchu = true where user_id = '<id>';`
 - 利用者の実名はリポジトリに置かない。一覧の「利用者」から追加する。記入者は `nicchu_helper` の有効な行だけ（山川美恵子、大坪シズカ、齊藤連）。手入力では増えない。
-- PDF 出力はまだない。
+- 受給者番号・区分・支給量・保護者氏名は利用者ごと、事業所番号・事業所名は1件だけ。画面の「請求に書く情報」から入れる（空のままでも様式は出る）。第６号（請求書）と第７号（請求明細書）はまだない。
 
 ## 法定研修（Supabase版・`#ht`）
 - `ht.js` … 画面（ホーム／職員／研修／委員会／年間カレンダー／設定、実施記録PDF・受講証明書・議事録は印刷画面→PDF保存）。`supabase/houtei.sql` … 表（ht_）とRLS
