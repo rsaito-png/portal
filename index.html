@@ -53,7 +53,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261026nicchu"></script>
+<script src="config.js?v=20261026sctops"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261026"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -74,7 +74,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="ht.js?v=202610161540"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
-<script src="sct.js?v=20261026sq"></script>
+<script src="sct.js?v=20261026ops"></script>
 <script src="chair.js?v=202610211310"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610261800"></script>
@@ -248,7 +248,7 @@ async function sctAdminTile() {
   if (!slot || slot.dataset.on) return;
   if (!(await sctIsAdmin())) return;
   slot.dataset.on = '1';
-  slot.innerHTML = `<div class="grid"><a class="tile main" href="#sct" style="border-top:4px solid #2e6b4f"><span>🩺</span>ストレスチェック実施者養成（運営）<small>開催・予約・入金・修了。受講者の入口は sct.html</small></a></div>`;
+  slot.innerHTML = `<div class="grid"><a class="tile main" href="#sct" style="border-top:4px solid #2e6b4f"><span>🩺</span>ストレスチェック実施者養成（運営）<small>開催・予約・入金・修了。手順は画面上部の運用マニュアル</small></a></div>`;
 }
 // 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
 async function accAdmin() {
