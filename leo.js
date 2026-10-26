@@ -124,6 +124,115 @@ function leoPlanJobs(events) {
   jobs.sort((a, b) => (a.day || '').localeCompare(b.day || '') || (a.t || '99').localeCompare(b.t || '99') || (a.k === b.k ? 0 : a.k === '迎え' ? -1 : 1));
   return jobs;
 }
+const LEO_CAL_DEL = 'カレンダーで削除';
+function leoCalHidden(e) {
+  return !!(e && e.source === 'portal' && (e.title === LEO_CAL_DEL || e.note === LEO_CAL_DEL));
+}
+function leoAbsLabel(e) {
+  if (!e) return '';
+  const title = String(e.title || ''), note = String(e.note || '');
+  if (title === '欠席（欠席時対応加算）' || note.includes('区分:欠席（欠席時対応加算）') || note.includes('区分：欠席（欠席時対応加算）')) return '欠席（欠席時対応加算）';
+  if (title === 'キャンセル' || note.includes('区分:キャンセル') || note.includes('区分：キャンセル')) return 'キャンセル';
+  return '';
+}
+function leoAbsContact(e) {
+  const m = String((e && e.note) || '').match(/連絡日[:：]\s*(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : '';
+}
+function leoEvNewer(a, b) {
+  const ta = Date.parse(a && a.updated_at), tb = Date.parse(b && b.updated_at);
+  const na = Number.isFinite(ta) ? ta : 0, nb = Number.isFinite(tb) ? tb : 0;
+  if (na !== nb) return na > nb;
+  return (Number(a && a.id) || 0) >= (Number(b && b.id) || 0);
+}
+function leoPortalHits(events) {
+  const best = new Map();
+  const consider = (day, kind, name, e) => {
+    if (!day || !name) return;
+    const key = day + '|' + kind + '|' + ldNN(name);
+    const prev = best.get(key);
+    if (!prev || leoEvNewer(e, prev.e)) best.set(key, { e, name });
+  };
+  for (const e of events || []) {
+    if (!e || e.source !== 'portal') continue;
+    if (e.kind === '利用') consider(e.day, '利用', e.child, e);
+    else if (e.kind === '迎え' || e.kind === '送り') {
+      const kids = (e.kids && e.kids.length) ? e.kids : (e.child ? [e.child] : []);
+      kids.forEach(k => consider(e.day, e.kind, k, e));
+    }
+  }
+  return best;
+}
+function leoMergeNikki(rows, events) {
+  const hits = leoPortalHits(events);
+  const out = (rows || []).map(r => ({ ...r }));
+  const use = new Map();
+  out.forEach(r => { if (r.kind === '利用') use.set(r.day + '|' + ldNN(r.child), r); });
+  const ensure = (day, name, create) => {
+    const k = day + '|' + ldNN(name);
+    let row = use.get(k);
+    if (!row && create) {
+      row = { day, kind: '利用', child: name, service: '', start_time: '', end_time: '', pick_time: '', pick_place: '', pick_driver: '', pick_car: '', drop_time: '', drop_place: '', drop_driver: '', drop_car: '', _added: true };
+      out.push(row);
+      use.set(k, row);
+    }
+    return row || null;
+  };
+  for (const [key, hit] of hits) {
+    const kind = key.split('|')[1];
+    const e = hit.e, name = hit.name, hidden = leoCalHidden(e);
+    const row = ensure(e.day, name, !hidden);
+    if (!row) continue;
+    if (kind === '利用') {
+      if (hidden) { row._hide = true; row._calUse = 'del'; }
+      else {
+        row._hide = false;
+        row.start_time = e.start_time || '';
+        row.end_time = e.end_time || '';
+        row._calUse = true;
+        if (e.child) row.child = e.child;
+      }
+    } else if (kind === '迎え') {
+      if (hidden) { row._calPick = 'del'; row._pickWas = e.staff || row.pick_driver || ''; row.pick_time = ''; row.pick_place = ''; row.pick_driver = ''; }
+      else {
+        row.pick_time = leoKidVal(e.kid_times, name) || e.start_time || '';
+        row.pick_place = leoKidVal(e.kid_places, name) || e.place || '';
+        row.pick_driver = e.staff || '';
+        row._calPick = true;
+      }
+    } else if (kind === '送り') {
+      if (hidden) { row._calDrop = 'del'; row._dropWas = e.staff || row.drop_driver || ''; row.drop_time = ''; row.drop_place = ''; row.drop_driver = ''; }
+      else {
+        row.drop_time = leoKidVal(e.kid_times, name) || e.start_time || '';
+        row.drop_place = leoKidVal(e.kid_places, name) || e.place || '';
+        row.drop_driver = e.staff || '';
+        row._calDrop = true;
+      }
+    }
+  }
+  for (const e of events || []) {
+    if (!e || e.source !== 'portal' || e.kind !== '休み' || !e.child) continue;
+    const label = leoAbsLabel(e);
+    if (!label) continue;
+    const useHit = hits.get(e.day + '|利用|' + ldNN(e.child));
+    if (useHit && !leoCalHidden(useHit.e) && leoEvNewer(useHit.e, e)) continue;
+    const row = ensure(e.day, e.child, true);
+    if (!row) continue;
+    row._hide = true;
+    row._abs = label;
+    row._absContact = leoAbsContact(e);
+    row._calUse = 'del';
+  }
+  return out;
+}
+function demoCalEdits() {
+  const d = typeof today === 'function' ? today() : '';
+  return [
+    { id: 9001, day: d, kind: '迎え', kids: ['児童A'], staff: '職員X', start_time: '14:50', place: '見本公園', kid_times: { '児童A': '14:50' }, kid_places: { '児童A': '見本公園' }, source: 'portal', updated_at: '2099-01-01T00:00:00.000Z' },
+    { id: 9002, day: d, kind: '休み', child: '児童C', title: '欠席（欠席時対応加算）', note: '連絡日:' + d + '\n区分:欠席（欠席時対応加算）', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z' },
+  ];
+}
+function leoCalMark(on) { return on ? '<br><small>カレンダーで変更</small>' : ''; }
 function leoPlanTableHtml(events, care) {
   const CARE = care || {}, jobs = leoPlanJobs(events), map = {}, days = [];
   jobs.forEach(j => { if (!map[j.day]) { map[j.day] = []; days.push(j.day); } map[j.day].push(j); });
@@ -133,16 +242,18 @@ function leoPlanTableHtml(events, care) {
 }
 function leoTileStatus(nikkiRows, events, day) {
   const all = (nikkiRows || []).filter(r => r.day === day);
-  const rs = all.filter(r => r.kind === '利用');
+  const ev = (events || []).filter(e => e.day === day);
   if (all.length) {
-    if (!rs.length) return '日誌なし';
-    const bad = rs.reduce((n, r) => n + (!r.pick_driver || !r.pick_car ? 1 : 0) + (!r.drop_driver || !r.drop_car ? 1 : 0), 0);
+    const merged = leoMergeNikki(all, ev);
+    const rs = merged.filter(r => r.kind === '利用' && !r._hide);
+    if (!rs.length) return merged.some(r => r._hide) ? '0人' : '日誌なし';
+    const bad = rs.reduce((n, r) => n + (r._calPick === 'del' ? 0 : (!r.pick_driver || !r.pick_car ? 1 : 0)) + (r._calDrop === 'del' ? 0 : (!r.drop_driver || !r.drop_car ? 1 : 0)), 0);
     return bad ? `<b style="color:#c00">未確定 ${bad}件</b>（${rs.length}人）` : `${rs.length}人・確定`;
   }
-  const ev = (events || []).filter(e => e.day === day);
+  const live = ev.filter(e => !leoCalHidden(e));
   const names = new Set();
-  ev.filter(e => e.kind === '利用' && e.child).forEach(e => names.add(String(e.child).replace(/\s/g, '')));
-  if (!names.size) ev.filter(e => e.kind === '迎え' || e.kind === '送り').forEach(e => {
+  live.filter(e => e.kind === '利用' && e.child).forEach(e => names.add(String(e.child).replace(/\s/g, '')));
+  if (!names.size) live.filter(e => e.kind === '迎え' || e.kind === '送り').forEach(e => {
     const kids = (e.kids && e.kids.length) ? e.kids : (e.child ? [e.child] : []);
     kids.forEach(k => k && names.add(String(k).replace(/\s/g, '')));
   });
@@ -150,9 +261,10 @@ function leoTileStatus(nikkiRows, events, day) {
 }
 function leoKidTile(nikkiRows, events, day) {
   const all = (nikkiRows || []).filter(r => r.day === day);
-  if (all.length) return all.filter(r => r.kind === '利用').length + '人';
+  const ev = (events || []).filter(e => e.day === day);
+  if (all.length) return leoMergeNikki(all, ev).filter(r => r.kind === '利用' && !r._hide).length + '人';
   const names = new Set();
-  (events || []).filter(e => e.day === day && e.kind === '利用' && e.child).forEach(e => names.add(String(e.child).replace(/\s/g, '')));
+  ev.filter(e => e.day === day && e.kind === '利用' && e.child && !leoCalHidden(e)).forEach(e => names.add(String(e.child).replace(/\s/g, '')));
   return names.size ? `予定 ${names.size}人` : '0人';
 }
 function leoKidWarnHtml(lines) {
@@ -163,22 +275,45 @@ function leoKidPlanHtml(name, plan) {
   if (plan) return `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">📋 個別支援計画（${esc(plan.term || '')}　${esc(plan.period || '')}）を読む</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(plan.body)}</div></details>`;
   return `<button onclick="PLAN_OPEN='${key}';location.hash='leo/plan'">📋 個別支援計画を開く</button>`;
 }
+function leoSougeiMineHtml(me, rows, events, care) {
+  const CARE = care || {};
+  const logged = new Set((rows || []).map(r => r.day));
+  const days = [...logged].sort();
+  const body = days.map(d => {
+    const merged = leoMergeNikki((rows || []).filter(r => r.day === d), (events || []).filter(e => e.day === d));
+    const jobs = [];
+    merged.filter(r => r.kind === '利用' && !r._hide).forEach(r => {
+      if (r._calPick === 'del' ? same(r._pickWas, me) : same(r.pick_driver, me)) jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, car: r.pick_car, cal: r._calPick || false });
+      if (r._calDrop === 'del' ? same(r._dropWas, me) : same(r.drop_driver, me)) jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, car: r.drop_car, cal: r._calDrop || false });
+    });
+    jobs.sort((a, b) => (a.t || '99').localeCompare(b.t || '99'));
+    const tr = j => `<tr><td>${j.cal === 'del' ? '' : esc(j.t || '')}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}${leoCalMark(!!j.cal)}</td><td>${j.cal === 'del' ? '' : esc(j.p || '')}</td><td>${j.cal === 'del' ? '' : esc(j.car || '')}</td></tr>`;
+    return `<h4>${fmtDay(d)}</h4>` + (jobs.length ? `<table><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>車</th></tr>${jobs.map(tr).join('')}</table>` : '<p>担当はありません。</p>');
+  }).join('');
+  const extra = (events || []).filter(e => !logged.has(e.day) && !leoCalHidden(e) && (e.kind === '迎え' || e.kind === '送り') && same(e.staff, me));
+  const extraHtml = extra.length ? `<p class="note">${LEO_PLAN_NOTE}</p>${leoPlanTableHtml(extra, CARE)}` : '';
+  return `<h3>${PLABEL[PERIOD]}の送迎（${esc(me) || '名前未登録'} さんの担当）</h3>${periodTabs('sougei')}${demoNote()}${body}${extraHtml}<p class="note"><a href="#leo/sougeiall">みんなの送迎を見る</a></p>`;
+}
 function leoSougeiAllHtml(rows, events, care) {
   const CARE = care || {};
   const logged = new Set((rows || []).map(r => r.day));
-  const plan = (events || []).filter(e => !logged.has(e.day));
-  const days = byDay((rows || []).filter(r => r.kind === '利用'));
+  const plan = (events || []).filter(e => !logged.has(e.day) && !leoCalHidden(e));
   const cell = (v, ng) => v ? esc(v) : `<b style="color:#c00">${ng}</b>`;
-  const nikkiHtml = days.map(([d, rs]) => {
+  const nikkiHtml = [...logged].sort().map(d => {
+    const merged = leoMergeNikki((rows || []).filter(r => r.day === d), (events || []).filter(e => e.day === d));
+    const rs = merged.filter(r => r.kind === '利用' && !r._hide);
+    const gone = merged.filter(r => r.kind === '利用' && r._hide);
+    if (!rs.length) return gone.length ? `<h4>${fmtDay(d)}</h4><p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(r.child)).join('、')}</small></p>` : '';
     const jobs = [];
     rs.forEach(r => {
-      jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, dr: r.pick_driver, car: r.pick_car });
-      jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, dr: r.drop_driver, car: r.drop_car });
+      jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, dr: r.pick_driver, car: r.pick_car, cal: r._calPick || false });
+      jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, dr: r.drop_driver, car: r.drop_car, cal: r._calDrop || false });
     });
-    jobs.sort((a, b) => (a.t || '99').localeCompare(b.t || '99'));
-    const bad = jobs.filter(j => !j.dr || !j.car).length;
-    return `<h4>${fmtDay(d)}　${bad ? `<span style="color:#c00">未確定 ${bad}件</span>` : '全て確定'}</h4><div class="sheet-scroll"><table class="sougei-view"><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>担当</th><th>車</th></tr>${jobs.map(j =>
-      `<tr><td>${esc(j.t)}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}</td><td>${esc(j.p) || '自宅'}</td><td>${cell(j.dr, '未定')}</td><td>${cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`;
+    jobs.sort((a, b) => (a.t || '99').localeCompare(b.t || '99') || (a.k === '迎え' ? -1 : 1));
+    const bad = jobs.filter(j => j.cal !== 'del' && (!j.dr || !j.car)).length;
+    const goneHtml = gone.length ? `<p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(r.child)).join('、')}</small></p>` : '';
+    return `<h4>${fmtDay(d)}　${bad ? `<span style="color:#c00">未確定 ${bad}件</span>` : '全て確定'}</h4>${goneHtml}<div class="sheet-scroll"><table class="sougei-view"><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>担当</th><th>車</th></tr>${jobs.map(j =>
+      `<tr><td>${j.cal === 'del' ? '' : esc(j.t || '')}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}${leoCalMark(!!j.cal)}</td><td>${j.cal === 'del' ? '' : (esc(j.p) || '自宅')}</td><td>${j.cal === 'del' ? '' : cell(j.dr, '未定')}</td><td>${j.cal === 'del' ? '' : cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`;
   }).join('');
   const planHtml = plan.length ? `<p class="note">${LEO_PLAN_NOTE}</p>${leoPlanTableHtml(plan, CARE)}` : '';
   const body = (nikkiHtml || planHtml) ? `${nikkiHtml}${planHtml}` : noTab();
@@ -208,7 +343,7 @@ const LEO_VIEWS = {
     const [a, b] = range();
     const [rows0, ev0, cc, LEFT] = await Promise.all([
       loadNikki(),
-      DEMO ? [] : sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=in.(迎え,送り)&order=day,start_time`).catch(() => []),
+      (typeof DEMO !== 'undefined' && DEMO && typeof demoCalEdits === 'function' ? demoCalEdits() : sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=in.(利用,迎え,送り,休み)&order=day,start_time`).catch(() => [])),
       DEMO ? [] : sb('leo_child_care').catch(() => []),
       loadLeftIndex()]);
     const rows = filterByLeftDay(rows0, LEFT);
@@ -217,33 +352,52 @@ const LEO_VIEWS = {
     return leoSougeiAllHtml(rows, evs, CARE);
   },
   async kids() {
-    const [rows0, cc, ci, cp, LEFT] = await Promise.all([loadNikki(), DEMO ? [] : sb('leo_child_care').catch(() => []), DEMO ? [] : sb('leo_child_info?select=name,note').catch(() => []), DEMO ? [] : sb('leo_child_plan').catch(() => []), loadLeftIndex()]);
+    const [a, b] = range();
+    const evPromise = DEMO ? Promise.resolve(demoCalEdits()) : sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=in.(利用,迎え,送り,休み)&order=day,start_time`).catch(() => []);
+    const [rows0, cc, ci, cp, LEFT, ev0] = await Promise.all([loadNikki(), DEMO ? [] : sb('leo_child_care').catch(() => []), DEMO ? [] : sb('leo_child_info?select=name,note').catch(() => []), DEMO ? [] : sb('leo_child_plan').catch(() => []), loadLeftIndex(), evPromise]);
     const rows = filterByLeftDay(rows0, LEFT);
+    const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev0 || [], LEFT) : (ev0 || []);
     const N = s => String(s || '').replace(/\s/g, '');
     const PL = Object.fromEntries(cp.map(x => [N(x.name), x]));
     const days = byDay(rows);
     const msg = c => [...cc.filter(x => N(x.child) === N(c) && x.note).map(x => '送迎の配慮：' + x.note), ...ci.filter(x => N(x.name) === N(c) && x.note).map(x => 'メモ：' + x.note)];
     const head = `<h3>${PLABEL[PERIOD]}の利用児童</h3>${periodTabs('kids')}${demoNote()}<p><small>伝達事項は <a href="#leo/userinfo">利用者情報</a>（メモ・送迎の配慮）に書いたものです。</small></p>`;
+    const ride = (label, flag, time, place, driver) => flag === 'del' ? `${label}：カレンダーで変更` : `${label}：${esc(time)} ${esc(place || '自宅')}（${esc(driver) || '未定'}）`;
     if (!days.length && !DEMO) {
-      const [a, b] = range();
-      let ev = [];
-      try { ev = await sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=eq.利用&order=day,start_time`); } catch (e) { ev = []; }
-      ev = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev || [], LEFT) : (ev || []);
-      ev = (ev || []).filter(e => e.child);
+      let ev = evs.filter(e => e.kind === '利用' && e.child && !leoCalHidden(e));
+      if (!ev.length) {
+        try { ev = await sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=eq.利用&order=day,start_time`); } catch (e) { ev = []; }
+        ev = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev || [], LEFT) : (ev || []);
+        ev = (ev || []).filter(e => e.child && !leoCalHidden(e));
+      }
+      const absEvents = (evs || []).filter(e => e.kind === '休み' && e.child && leoAbsLabel(e));
+      const absBy = {};
+      absEvents.forEach(e => { (absBy[e.day] = absBy[e.day] || []).push(e); });
+      const absBlock = Object.keys(absBy).sort().map(d => `<h4>${fmtDay(d)}</h4><p>欠席：${absBy[d].map(e => `${esc(e.child)}（${esc(leoAbsLabel(e))}${leoAbsContact(e) ? '・連絡 ' + esc(leoAbsContact(e)) : ''}）`).join('、')}</p>`).join('');
       if (ev.length) {
         const by = {};
         ev.forEach(e => { (by[e.day] = by[e.day] || []).push(e); });
         return head + `<p class="note">予定表から表示（日誌取り込み前）</p>` + Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}（${by[d].length}人）</h4>${by[d].map(e =>
-          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}${leoKidWarnHtml(msg(e.child))}${leoKidPlanHtml(e.child, PL[N(e.child)])}</div>`).join('')}`).join('');
+          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}${leoKidWarnHtml(msg(e.child))}${leoKidPlanHtml(e.child, PL[N(e.child)])}</div>`).join('')}`).join('') + absBlock;
       }
+      if (absBlock) return head + absBlock;
     }
-    return head + (days.length ? days.map(([d, rs]) => {
-      const use = rs.filter(r => r.kind === '利用'), abs = rs.filter(r => r.kind === '欠席');
+    if (!days.length) return head + noTab();
+    return head + days.map(([d, rs]) => {
+      const merged = leoMergeNikki(rs, evs.filter(e => e.day === d));
+      const use = merged.filter(r => r.kind === '利用' && !r._hide);
+      const calAbs = merged.filter(r => r._abs);
+      const absNames = new Set(calAbs.map(r => N(r.child)));
+      const abs = merged.filter(r => r.kind === '欠席' && !absNames.has(N(r.child)));
+      const gone = merged.filter(r => r.kind === '利用' && r._hide && !r._abs);
+      const absHtml = calAbs.map(r => `${esc(r.child)}（${esc(r._abs)}${r._absContact ? '・連絡 ' + esc(r._absContact) : ''}）`).concat(abs.map(r => esc(r.child)));
       return `<h4>${fmtDay(d)}（${use.length}人）</h4>${use.map(r => { const m = msg(r.child);
-        return `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(r.child)}</b>　${esc(r.service)}　${esc(r.start_time)}〜${esc(r.end_time)}<br><small>迎え：${esc(r.pick_time)} ${esc(r.pick_place || '自宅')}（${esc(r.pick_driver) || '未定'}）／送り：${esc(r.drop_time)} ${esc(r.drop_place || '自宅')}（${esc(r.drop_driver) || '未定'}）</small>
+        const note = (r._calUse === true || r._calPick === true || r._calDrop === true) ? '<br><small>カレンダーで変更</small>' : '';
+        return `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(r.child)}</b>　${esc(r.service)}　${esc(r.start_time)}〜${esc(r.end_time)}<br><small>${ride('迎え', r._calPick, r.pick_time, r.pick_place, r.pick_driver)}／${ride('送り', r._calDrop, r.drop_time, r.drop_place, r.drop_driver)}</small>${note}
         ${leoKidWarnHtml(m)}${leoKidPlanHtml(r.child, PL[N(r.child)])}</div>`; }).join('')}
-        ${abs.length ? `<p>欠席：${abs.map(r => esc(r.child)).join('、')}</p>` : ''}`;
-    }).join('') : noTab());
+        ${gone.length ? `<p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(r.child)).join('、')}</small></p>` : ''}
+        ${absHtml.length ? `<p>欠席：${absHtml.join('、')}</p>` : ''}`;
+    }).join('');
   },
   async kata() {
     const [rows, LEFT] = await Promise.all([sheetRows('kata'), loadLeftIndex()]), tday = today();
@@ -1465,3 +1619,34 @@ async function ldCopy(id, did) {
   if (!DEMO && did) try { await sb(`leo_line_drafts?id=eq.${did}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ sent_line: true }) }); $(id + '_s').textContent = '✅ LINE送信済'; } catch (e) { }
   setTimeout(() => { cm.textContent = ''; b.textContent = 'コピー'; }, 5000);
 }
+function leoEditing() {
+  let hash = '';
+  try { hash = decodeURIComponent((typeof location !== 'undefined' && location.hash) || ''); } catch (e) { hash = (typeof location !== 'undefined' && location.hash) || ''; }
+  if (typeof window !== 'undefined' && window.SG_EDIT && /^#leo\/day\//.test(hash)) return true;
+  if (typeof CAL !== 'undefined' && CAL && CAL.edit && (hash === '#leo/cal' || /^#leo\/day\//.test(hash))) return true;
+  return false;
+}
+function leoViewsLive() {
+  if (leoEditing()) return;
+  if (typeof location === 'undefined') return;
+  let hash = '';
+  try { hash = decodeURIComponent(location.hash || ''); } catch (e) { hash = location.hash || ''; }
+  if (hash === '#leo' || hash === '#leo/') {
+    if (typeof leoHomeCal === 'function') leoHomeCal();
+    if (typeof leoHomeStatus === 'function') leoHomeStatus();
+    return;
+  }
+  const day = hash.match(/^#leo\/day\/(\d{4}-\d{2}-\d{2})$/);
+  if (day) { if (typeof renderSgDay === 'function') renderSgDay(day[1]); return; }
+  const view = hash.match(/^#leo\/(sougei|sougeiall|kids|cal)$/);
+  if (view && typeof renderLeoView === 'function') renderLeoView(view[1]);
+}
+function leoCalWatch() {
+  if (typeof document === 'undefined' || typeof window === 'undefined' || window._leoCalWatch) return;
+  window._leoCalWatch = true;
+  const kick = () => { if (document.visibilityState === 'hidden') return; leoViewsLive(); };
+  if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', kick);
+  if (typeof window.addEventListener === 'function') window.addEventListener('focus', kick);
+  if (typeof setInterval === 'function') setInterval(kick, 120000);
+}
+try { leoCalWatch(); } catch (e) { /* 画面が無いとき */ }

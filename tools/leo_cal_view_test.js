@@ -97,6 +97,23 @@ assert.ok(save.includes("leo_events?id=eq.") && save.includes('method: \'PATCH\'
 assert.ok(save.includes('parent_drop') && save.includes('parent_pick') && save.includes('source: \'portal\''));
 const del = sandbox.calDel.toString();
 assert.ok(del.includes("method: 'DELETE'") && del.includes('leo_events?id=eq.'));
+assert.ok(del.indexOf("confirm('この予定を削除しますか？')") < del.indexOf('見本モードでは削除しません'), '削除の確認が先');
+assert.ok(del.includes('カレンダーで削除'));
+assert.ok(form.includes('calCancel()') && form.includes('id="cf_contact"') && form.includes('欠席（欠席時対応加算）') && form.includes('キャンセル'));
+assert.ok(form.includes('日誌・実績記録・請求の印には書きません'));
+assert.ok(!save.includes('leo_nikki') && !save.includes('leo_edits') && !sandbox.calDropChild.toString().includes('leo_nikki'));
+sandbox.JP_HOLIDAYS = new Set(['2026-10-12', '2026-11-03', '2026-11-23']);
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-30', '2026-10-30'), '欠席');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-30', '2026-10-28'), '欠席');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-30', '2026-10-27'), 'キャンセル');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-26', '2026-10-24'), '欠席', '土曜を営業日に数える');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-26', '2026-10-22'), 'キャンセル');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-13', '2026-10-12'), '欠席', '祝日は営業日にしない');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-13', '2026-10-08'), 'キャンセル');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-30', '2026-10-31'), 'キャンセル');
+sandbox.JP_HOLIDAYS = undefined;
+assert.strictEqual(sandbox.leoBizOpen('2026-10-24'), false, '祝日一覧が無いときは月〜金');
+assert.strictEqual(sandbox.leoAbsentAuto('2026-10-26', '2026-10-22'), '欠席');
 
 const multi = calDay('2026-11-04', [
   { id: 1, day: '2026-11-04', kind: '利用', child: '児童A', start_time: '10:00', end_time: '12:00' },

@@ -130,17 +130,22 @@ async function ytCommit() {
 }
 window.ytCopyAll = ytCopyAll; window.ytPlan = ytPlan; window.ytCommit = ytCommit;
 
-// 今日の自分の送迎（スマホ）：予定表（leo_events の迎え・送り）から。予定表にまだ無い期間は、従来の日誌からの表示にもどる
+// 今日の自分の送迎。日誌がある日は日誌が正で、ポータルで直した予定だけ上書き。日誌が無い日は予定表。
 (() => {
   const old = LEO_VIEWS.sougei;
   LEO_VIEWS.sougei = async function () {
-    if (DEMO) return old.call(this);
     const [a, b] = range(), me = await myName();
-    const [ev0, nk0, cc, LEFT] = await Promise.all([sb(`leo_events?kind=in.(迎え,送り)&day=gte.${a}&day=lte.${b}&order=day,start_time`), loadNikki().catch(() => []), sb('leo_child_care').catch(() => []), loadLeftIndex()]);
-    if (!ev0.length) return old.call(this);
-    const ev = filterEventsByLeft(ev0, LEFT);
-    const planNote = !(nk0 && nk0.length) ? `<p class="note">${typeof LEO_PLAN_NOTE === 'string' ? LEO_PLAN_NOTE : '予定表から表示（日誌取り込み前）'}</p>` : '';
-    const CARE = Object.fromEntries(cc.filter(x => x.note).map(x => [x.child, x.note])), mine = ev.filter(e => same(e.staff, me)), days = {};
+    const evPromise = (typeof DEMO !== 'undefined' && DEMO) ? Promise.resolve(typeof demoCalEdits === 'function' ? demoCalEdits() : []) : sb(`leo_events?kind=in.(利用,迎え,送り,休み)&day=gte.${a}&day=lte.${b}&order=day,start_time`).catch(() => []);
+    const carePromise = (typeof DEMO !== 'undefined' && DEMO) ? Promise.resolve([]) : sb('leo_child_care').catch(() => []);
+    const [ev0, nk0, cc, LEFT] = await Promise.all([evPromise, loadNikki().catch(() => []), carePromise, loadLeftIndex()]);
+    const ev = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev0 || [], LEFT) : (ev0 || []);
+    const nk = typeof filterByLeftDay === 'function' ? filterByLeftDay(nk0 || [], LEFT) : (nk0 || []);
+    const CARE = Object.fromEntries((cc || []).filter(x => x.note).map(x => [x.child, x.note]));
+    if (nk && nk.length && typeof leoSougeiMineHtml === 'function') return leoSougeiMineHtml(me, nk, ev, CARE);
+    const plan = (ev || []).filter(e => (e.kind === '迎え' || e.kind === '送り') && !(typeof leoCalHidden === 'function' && leoCalHidden(e)));
+    if (!plan.length) return old.call(this);
+    const planNote = `<p class="note">${typeof LEO_PLAN_NOTE === 'string' ? LEO_PLAN_NOTE : '予定表から表示（日誌取り込み前）'}</p>`;
+    const mine = plan.filter(e => same(e.staff, me)), days = {};
     mine.forEach(e => (days[e.day] = days[e.day] || []).push(e));
     const card = e => { const pl = e.kid_places || {}, kt = e.kid_times || {};
       return `<div class="card" style="border-left:6px solid ${e.kind === '迎え' ? '#2a7' : '#d70'}"><div style="font-size:20px"><b>${e.kind === '迎え' ? '☆ 迎え' : '★ 送り'}　${esc(e.start_time || '')}〜${esc(e.end_time || '')}</b></div>
