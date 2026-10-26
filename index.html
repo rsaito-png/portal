@@ -74,6 +74,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610261800"></script>
 <script src="leo_cal.js?v=202610261800"></script>
+<script src="leo_home_cal.js?v=202610261600"></script>
 <script src="leo_jippi.js?v=202610201000"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
 <script src="uketsuke.js?v=202610211600"></script>
@@ -135,7 +136,7 @@ function leoHomeBody(o) {
   const g = groupList(o).map(x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`).join('');
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
   const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`).join('')}</div>` : '';
-  return `<h3 class="nx">毎日やる</h3><div class="grid">
+  return `<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#leo/sougeiall', '🚐', '今日の送迎', 'hs_today', "PERIOD='today'")}
     ${big('#leo/sougeiall', '🚐', '明日の送迎', 'hs_tomorrow', "PERIOD='tomorrow'")}
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
@@ -154,7 +155,7 @@ async function leoHomeStatus() {
   } catch (e) { }
 }
 function officeBody(o) {
-  if (o.home && o.groups) { setTimeout(leoHomeStatus, 0); return leoHomeBody(o); }
+  if (o.home && o.groups) { setTimeout(leoHomeStatus, 0); if (typeof leoHomeCal === 'function') setTimeout(leoHomeCal, 0); return leoHomeBody(o); }
   if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(t, o.color)).join('')}</div>`;
   const vis = visTiles(o);
   const nx = ((o.next || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
@@ -178,6 +179,7 @@ async function render() {
   if (typeof loadDuty === 'function') await loadDuty();
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (!(id === 'leo' && (sub === 'kata' || sub === 'master'))) document.body.classList.remove('wide-sheet');
+  if (id === 'leo' && sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '') && typeof renderSgDay === 'function') return renderSgDay(sub2);
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'suishodama' && sub === 'ledger') { SUI.edit = null; return renderSuiLedger(); }
