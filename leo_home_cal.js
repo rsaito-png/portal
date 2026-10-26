@@ -2,10 +2,10 @@
 // データは「児童の利用・送迎予定」と同じ leo_events（Googleカレンダーへは取りに行かない）。
 // 予定画面（leo_cal.js）の日・週・月の見た目はここでは変えない。
 //
-// 担当の色は Google カレンダーの予定色（colorId 1〜11）。
-// このリポジトリ（Apps Script を含む）には、職員ごとの colorId は無かった。
-// 日誌・予定に出る担当名を下の SG_STAFF_COLOR に書く。空白の全角・半角は無視して照合する。
-// ここに無い担当は Graphite（8）で、凡例に「色未設定」と出る。
+// 担当の色は Google カレンダーの予定色（colorId 1〜11）。colorId に無い色は #RRGGBB で書く。
+// 日誌・予定の担当は leo_events.staff（日誌の名前。例「山田　太郎」）。空白と「先生」「さん」は無視して照合する。
+// 色を見るのは担当欄だけ。児童名（加藤 湊など）では職員色にしない。
+// 一覧に無い担当は Tomato（11）。利用（児童の出席そのもの）は Tangerine（6）。
 const GCAL_EVENT_COLORS = {
   1: ['Lavender', '#7986cb'],
   2: ['Sage', '#33b679'],
@@ -19,9 +19,35 @@ const GCAL_EVENT_COLORS = {
   10: ['Basil', '#0b8043'],
   11: ['Tomato', '#d50000'],
 };
+const SG_USE_HEX = '#f4511e';
+const SG_OTHER_HEX = '#d50000';
+// ゆか・あや・さち・なおの漢字氏名は、公開リポジトリにも日誌の対応表（DB上の leo_sched_staff）にも無い。ひらがなの名で照合する。
+// 宮本さん・加藤先生の下の名前も同じ理由で不明。姓で始まる担当名に当てる。
 const SG_STAFF_COLOR = {
-  // '山田 太郎': 7,
+  'れん先生': 7,       // 青 Peacock
+  'ゆか先生': 2,       // 黄緑 Sage
+  'あや先生': 3,       // 紫 Grape
+  'さち先生': 4,       // 薄ピンク Flamingo
+  'なお先生': 1,       // 藤色 Lavender
+  '宮本さん': '#d81b60', // ピンク Cherry blossom（colorId には無い）
+  '加藤先生': '#4fc3f7', // 水色。Peacock より明るい青
 };
+// exact は完全一致。family は姓＋名。given は名だけ、または漢字の姓＋その名。
+const SG_STAFF_ALIAS = {
+  'れん先生': [
+    { t: 'given', s: 'れん' }, { t: 'given', s: '連' },
+    { t: 'family', s: '齊藤' }, { t: 'family', s: '斎藤' }, { t: 'family', s: '斉藤' }, { t: 'family', s: '齋藤' },
+    { t: 'exact', s: '齊藤連' }, { t: 'exact', s: '斎藤連' }, { t: 'exact', s: '斉藤連' }, { t: 'exact', s: '齋藤連' },
+  ],
+  'ゆか先生': [{ t: 'given', s: 'ゆか' }],
+  'あや先生': [{ t: 'given', s: 'あや' }],
+  'さち先生': [{ t: 'given', s: 'さち' }],
+  'なお先生': [{ t: 'given', s: 'なお' }],
+  '宮本さん': [{ t: 'family', s: '宮本' }],
+  '加藤先生': [{ t: 'family', s: '加藤' }],
+};
+// 担当欄が児童そのもののとき（加藤 湊）は加藤先生にしない。
+const SG_STAFF_NOT = new Set(['加藤湊', '加藤みなと', '加藤ミナト']);
 // 見本モードの架空の担当。施設の色ではない。
 const SG_STAFF_COLOR_DEMO = { '職員X': 7, '職員Y': 6, '職員Z': 10 };
 let SG_HOME_MONTH = '';
@@ -59,13 +85,67 @@ function sgInk(hex) {
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return (r * 299 + g * 587 + b * 114) / 1000 > 160 ? '#222' : '#fff';
 }
+function sgNormStaff(s) {
+  return String(s || '').normalize('NFKC').replace(/[\s\u3000・･]/g, '').replace(/(先生|さん|くん|ちゃん|氏)+$/u, '');
+}
+function sgHexName(hex) {
+  if (hex === '#d81b60') return 'Cherry blossom';
+  if (hex === '#4fc3f7') return 'Light blue';
+  return hex;
+}
+function sgColorOf(value) {
+  if (typeof value === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value.trim())) {
+    let hex = value.trim().toLowerCase();
+    if (hex.length === 4) hex = '#' + hex.slice(1).split('').map(c => c + c).join('');
+    return { id: null, hex, name: sgHexName(hex) };
+  }
+  const id = Number(value);
+  if (GCAL_EVENT_COLORS[id]) return { id, hex: GCAL_EVENT_COLORS[id][1], name: GCAL_EVENT_COLORS[id][0] };
+  return null;
+}
+function sgPaintFrom(value, mapped) {
+  const c = sgColorOf(value) || { id: 11, hex: SG_OTHER_HEX, name: 'Tomato' };
+  return { id: c.id, hex: c.hex, ink: sgInk(c.hex), mapped: !!mapped && !!sgColorOf(value), name: c.name };
+}
+function sgStaffLabel(name, opt) {
+  const n = sgNormStaff(name);
+  if (!n || SG_STAFF_NOT.has(n)) return '';
+  const labels = Object.keys(SG_STAFF_COLOR);
+  for (const label of labels) {
+    const aliases = [{ t: 'exact', s: sgNormStaff(label) }].concat(SG_STAFF_ALIAS[label] || []);
+    if (aliases.some(a => sgNormStaff(a.s) === n)) return label;
+  }
+  for (const label of labels) {
+    for (const a of SG_STAFF_ALIAS[label] || []) {
+      const key = sgNormStaff(a.s);
+      if (!key || n.length <= key.length) continue;
+      if (a.t === 'family' && key.length >= 2 && n.startsWith(key)) return label;
+      if (a.t === 'given' && n.endsWith(key) && /^[\u4e00-\u9fff]{1,4}$/.test(n.slice(0, n.length - key.length))) return label;
+    }
+  }
+  const demo = !!(opt && opt.demo) || (typeof DEMO !== 'undefined' && DEMO);
+  if (demo) {
+    const hit = Object.keys(SG_STAFF_COLOR_DEMO).find(k => sgSame(k, name));
+    if (hit) return hit;
+  }
+  const extra = labels.find(k => sgSame(k, name)) || Object.keys(SG_STAFF_COLOR).find(k => sgNormStaff(k) === n);
+  return extra || '';
+}
 function sgStaffPaint(name, opt) {
   const demo = !!(opt && opt.demo) || (typeof DEMO !== 'undefined' && DEMO);
-  const table = Object.assign({}, demo ? SG_STAFF_COLOR_DEMO : {}, SG_STAFF_COLOR);
-  const key = Object.keys(table).find(k => sgSame(k, name));
-  const id = key && GCAL_EVENT_COLORS[table[key]] ? table[key] : 8;
-  const hex = GCAL_EVENT_COLORS[id][1];
-  return { id, hex, ink: sgInk(hex), mapped: !!key, name: GCAL_EVENT_COLORS[id][0] };
+  const label = sgStaffLabel(name, opt);
+  if (!label) return sgPaintFrom(11, false);
+  if (Object.prototype.hasOwnProperty.call(SG_STAFF_COLOR, label)) return sgPaintFrom(SG_STAFF_COLOR[label], true);
+  if (demo && Object.prototype.hasOwnProperty.call(SG_STAFF_COLOR_DEMO, label)) return sgPaintFrom(SG_STAFF_COLOR_DEMO[label], true);
+  return sgPaintFrom(11, false);
+}
+function sgUsePaint() {
+  return { id: 6, hex: SG_USE_HEX, ink: sgInk(SG_USE_HEX), mapped: true, name: 'Tangerine', role: 'use' };
+}
+function sgEventPaint(e, opt) {
+  if (e && e.kind === '利用') return sgUsePaint();
+  if (!e || !e.staff) return null;
+  return sgStaffPaint(e.staff, opt);
 }
 function sgGrid(ym) {
   const f = ym + '-01', w = sgW(f), nx = sgAdd(f, 32).slice(0, 8) + '01';
@@ -154,6 +234,7 @@ function sgCss() {
 .sgm td button{width:100%;height:32px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:1px 0}
 .sgm td button b{font-size:13px;line-height:1.1}
 .sgm td button .sub{font-size:9px;color:#2e6b4f;font-weight:700;line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden}
+.sgm td button .sub.use{color:#f4511e}
 .sgm td button .sub.off{color:#b33}
 .sgm td button.today{background:#fff4e4;box-shadow:inset 0 0 0 2px #e8833a}
 .sgm td.dim button{opacity:.4}
@@ -163,7 +244,7 @@ function sgCss() {
 .sg-top button{padding:6px 10px;font-size:16px;font-weight:700;border:1px solid #ddd;background:#fff}
 .sg-leg{display:flex;flex-wrap:wrap;gap:6px 10px;margin:0 0 8px;font-size:12px}
 .sg-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
-.sg-leg .miss{color:#888}
+.sg-leg .other{color:#d50000;font-weight:700}
 .sg-cal{background:#fff;border:1px solid #dadce0;border-radius:12px;overflow:hidden}
 .sg-all{display:flex;gap:6px;border-bottom:1px solid #eee;background:#f8f9fa}
 .sg-all .g{flex:0 0 46px;text-align:right;font-size:10px;color:#70757a;padding:6px 4px 0 0}
@@ -203,7 +284,7 @@ function sgMonthHtml(ym, evs, todayStr) {
     const closed = es.some(e => e.kind === '休所');
     const n = es.filter(e => e.kind === '利用').length;
     const trips = es.filter(e => e.kind === '迎え' || e.kind === '送り').length;
-    const sub = closed ? '<span class="sub off">休</span>' : n ? `<span class="sub">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
+    const sub = closed ? '<span class="sub off">休</span>' : n ? `<span class="sub use">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
     const cls = [d === todayStr ? 'today' : '', sgYm(d) !== ym ? '' : ''].filter(Boolean).join(' ');
     rows += `<td class="${sgYm(d) !== ym ? 'dim' : ''}"><button type="button" class="${cls}" onclick="sgOpenDay('${d}')" aria-label="${+d.slice(5, 7)}/${+d.slice(8)} ${closed ? '休所' : '利用' + n + '人'}"><b>${+d.slice(8)}</b>${sub}</button></td>`;
     if (cell % 7 === 6) rows += '</tr>';
@@ -232,10 +313,10 @@ function sgDayHtml(day, evs, care, opt) {
   }
   const legend = staff.map(s => {
     const p = sgStaffPaint(s, { demo });
-    return `<span><i style="background:${p.hex}"></i>${sgEsc(s)}${p.mapped ? '' : ' <span class="miss">色未設定</span>'}</span>`;
-  }).join('') + `<span><i style="background:#fff;box-shadow:inset 0 0 0 1px #bbb"></i>利用</span><span>☆迎え　<u>★送り</u>（色は担当）</span>`;
+    return `<span><i style="background:${p.hex}"></i>${sgEsc(s)}${p.mapped ? '' : ' <span class="other">その他</span>'}</span>`;
+  }).join('') + `<span><i style="background:${SG_USE_HEX}"></i>利用児童</span><span>☆迎え　<u>★送り</u>（色は担当）</span>`;
   const chips = allDay.map(e => {
-    const p = e.staff ? sgStaffPaint(e.staff, { demo }) : null;
+    const p = sgEventPaint(e, { demo });
     const style = p ? ` style="background:${p.hex};color:${p.ink}"` : '';
     const who = (e.kind === '迎え' || e.kind === '送り') && !e.staff ? ' 未定' : '';
     const text = `${sgKind(e)} ${sgLines(e).filter(Boolean).join('、')}${who}`;
@@ -248,7 +329,7 @@ function sgDayHtml(day, evs, care, opt) {
   for (let t = start; t <= end; t += 60) labels.push(`<span style="top:${(t - start) / 60 * PX}px">${sgHH(t)}</span>`);
   const maxCols = timed.reduce((m, e) => Math.max(m, e.cols || 1), 1);
   const blocks = timed.map(e => {
-    const ev = e.e, p = ev.staff ? sgStaffPaint(ev.staff, { demo }) : null;
+    const ev = e.e, p = sgEventPaint(ev, { demo });
     const top = (e.start - start) / 60 * PX;
     const height = Math.max(36, (e.end - e.start) / 60 * PX - 2);
     const left = `calc((100% * ${e.col} / ${e.cols}) + 2px)`;
@@ -269,7 +350,7 @@ function sgDayHtml(day, evs, care, opt) {
     <div class="sg-leg">${legend}</div>
     <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px;min-width:${Math.max(240, maxCols * 132)}px">${lines.join('')}${blocks}${nowEl}</div></div></div></div>
     <p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>
-    <p class="sg-foot">色は担当ごとです。☆は迎え、下線の★は送りです。データは児童の利用・送迎予定と同じです。</p></div>`;
+    <p class="sg-foot">利用児童はオレンジ、送迎の色は担当ごとです。一覧に無い担当は赤です。☆は迎え、下線の★は送りです。</p></div>`;
 }
 async function sgLoad(a, b, mode, anchor) {
   let evs = [];

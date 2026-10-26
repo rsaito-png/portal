@@ -33,7 +33,7 @@ assert.strictEqual(byId.c.cols, 1, '重ならない予定は幅いっぱい');
 
 const paint = sgStaffPaint('山田\u3000太郎');
 assert.strictEqual(paint.mapped, false);
-assert.strictEqual(paint.hex, '#616161');
+assert.strictEqual(paint.hex, '#d50000', '一覧に無い担当は赤');
 SG_STAFF_COLOR['山田 太郎'] = 7;
 const hit = sgStaffPaint('山田\u3000太郎');
 assert.strictEqual(hit.mapped, true);
@@ -42,6 +42,26 @@ assert.strictEqual(hit.ink, '#fff');
 delete SG_STAFF_COLOR['山田 太郎'];
 assert.strictEqual(sgStaffPaint('職員X', { demo: true }).hex, '#039be5');
 assert.strictEqual(sgStaffPaint('職員Y', { demo: true }).hex, '#f4511e');
+
+const staffHex = {
+  'れん': '#039be5', '連': '#039be5', 'れん先生': '#039be5', '齊藤　連': '#039be5', '斎藤連': '#039be5', '斉藤 連': '#039be5', '齋藤連': '#039be5', '山田連': '#039be5',
+  'ゆか': '#33b679', 'ゆか先生': '#33b679', '鈴木　ゆか': '#33b679',
+  'あや': '#8e24aa', 'あやさん': '#8e24aa',
+  'さち': '#e67c73', 'さち先生': '#e67c73',
+  'なお': '#7986cb', 'なお先生': '#7986cb',
+  '宮本': '#d81b60', '宮本さん': '#d81b60', '宮本　花': '#d81b60',
+  '加藤': '#4fc3f7', '加藤先生': '#4fc3f7', '加藤　花': '#4fc3f7',
+};
+for (const [name, hex] of Object.entries(staffHex)) {
+  const p = sgStaffPaint(name);
+  assert.strictEqual(p.hex, hex, name);
+  assert.strictEqual(p.mapped, true, name);
+}
+assert.strictEqual(sgStaffPaint('加藤先生').ink, '#222', '水色は暗い文字');
+assert.strictEqual(sgStaffPaint('宮本さん').ink, '#fff', 'ピンクは白い文字');
+assert.strictEqual(sgStaffPaint('加藤 湊').mapped, false, '児童の加藤湊は担当でも加藤先生にしない');
+assert.strictEqual(sgStaffPaint('加藤湊').hex, '#d50000');
+assert.strictEqual(sgStaffPaint('加藤みなと').mapped, false);
 
 const evs = [
   { day: '2026-10-26', kind: '利用', child: '山根\u3000一輝', start_time: '10:30', end_time: '14:30' },
@@ -58,6 +78,7 @@ assert.ok(month.includes('2026年10月'), '月の見出し');
 assert.ok(month.includes("sgOpenDay('2026-10-26')"), '日を開ける');
 assert.ok(month.includes('>26</b>'), '今日の日付');
 assert.ok(month.includes('3人'), '利用人数');
+assert.ok(month.includes('sub use'), '利用人数はオレンジ');
 assert.ok(month.includes('class="sub off">休'), '休所');
 assert.ok(month.includes('class="today"'), '今日の印');
 assert.ok(!month.includes('毎日やる'), 'ホームのボタンはカレンダーに含めない');
@@ -71,14 +92,37 @@ const day = sgDayHtml('2026-10-26', evs, { '山根一輝': '助手席' }, { demo
 assert.ok(day.includes('山根 一輝'), '半角スペースの氏名');
 assert.ok(day.includes('下野小学校'));
 assert.ok(day.includes('#039be5'), '職員Xは Peacock');
-assert.ok(day.includes('#f4511e'), '職員Yは Tangerine');
+assert.ok(day.includes('#f4511e'), '利用児童は Tangerine');
+assert.ok(day.includes('利用児童'));
+assert.ok(!day.includes('sg-ev neutral'), '時刻のある利用はオレンジ');
 assert.ok(day.includes('☆ 迎え'));
 assert.ok(day.includes('★ 送り'));
 assert.ok(day.includes('data-sg-now'), '今日は現在時刻の線');
 assert.ok(day.includes('終日'));
 assert.ok(day.includes('児童D'));
-assert.ok(day.includes('sg-ev neutral'), '利用は担当色にしない');
 assert.ok(day.includes('class="sg-ev drop"') || day.includes('sg-ev drop'), '送りは下線で区別');
+
+const named = [
+  { day: '2026-10-26', kind: '利用', child: '加藤 湊', start_time: '10:00', end_time: '12:00' },
+  { day: '2026-10-26', kind: '迎え', staff: '加藤先生', kids: ['加藤 湊'], start_time: '09:40', end_time: '10:10', kid_places: { '加藤 湊': '小学校' } },
+  { day: '2026-10-26', kind: '迎え', staff: 'れん先生', kids: ['児童A'], start_time: '10:10', end_time: '10:40' },
+  { day: '2026-10-26', kind: '送り', staff: 'ゆか', kids: ['児童B'], start_time: '12:10', end_time: '12:40' },
+  { day: '2026-10-26', kind: '送り', staff: 'あや先生', kids: ['児童C'], start_time: '13:00', end_time: '13:30' },
+  { day: '2026-10-26', kind: '迎え', staff: 'さち', kids: ['児童D'], start_time: '14:00', end_time: '14:30' },
+  { day: '2026-10-26', kind: '送り', staff: 'なお先生', kids: ['児童E'], start_time: '15:00', end_time: '15:30' },
+  { day: '2026-10-26', kind: '迎え', staff: '宮本さん', kids: ['児童F'], start_time: '16:00', end_time: '16:30' },
+  { day: '2026-10-26', kind: '送り', staff: '外部の人', kids: ['児童G'], start_time: '17:00', end_time: '17:30' },
+];
+const colored = sgDayHtml('2026-10-26', named, {}, { demo: false, today: '2026-10-27' });
+assert.ok(colored.includes('#f4511e') && colored.includes('加藤 湊'), '加藤湊の利用はオレンジ');
+assert.ok(colored.includes('#4fc3f7'), '加藤先生の送迎は水色');
+assert.ok(colored.includes('#039be5') && colored.includes('#33b679') && colored.includes('#8e24aa'));
+assert.ok(colored.includes('#e67c73') && colored.includes('#7986cb') && colored.includes('#d81b60'));
+assert.ok(colored.includes('#d50000') && colored.includes('その他'), '一覧外の担当は赤');
+const useBlock = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="利用[^"]*加藤 湊/);
+assert.ok(useBlock && useBlock[1] === '#f4511e', '利用ブロック自体がオレンジ');
+const ride = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="[^"]*加藤先生"/);
+assert.ok(ride && ride[1] === '#4fc3f7', '担当が加藤先生の送迎だけ水色');
 
 const bare = sgDayHtml('2026-10-27', evs, {}, { demo: false, today: '2026-10-26' });
 assert.ok(bare.includes('終日'), '時刻のない予定は終日');
