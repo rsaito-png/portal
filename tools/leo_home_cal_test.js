@@ -123,7 +123,9 @@ assert.ok(!day.includes('sg-ev neutral'), '時刻のある利用は山吹色');
 assert.ok(day.includes('☆ 迎え'));
 assert.ok(day.includes('★ 送り'));
 assert.ok(day.includes("sgOpenMonth('2026-10-26')"), '表示中の日の月を開く');
-assert.ok(/月<\/button><button type="button" onclick="sgOpenDay\(/.test(day), '月は今日のとなり');
+assert.ok(/今日<\/button><button type="button" onclick="sgOpenMonth\(/.test(day), '今日のとなりは月');
+assert.ok(/月<\/button><button type="button" class="sg-mine" aria-pressed="false" onclick="sgToggleMine\(\)">自分の担当<\/button>/.test(day), '月のとなりは自分の担当');
+assert.ok(day.includes('flex-wrap:nowrap'), '見出しのボタンは折り返さない');
 assert.ok(day.includes('data-sg-now'), '今日は現在時刻の線');
 assert.ok(day.includes('終日'));
 assert.ok(day.includes('児童D'));
@@ -166,6 +168,36 @@ const useBlock = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(
 assert.ok(useBlock && useBlock[1] === '#f8b500' && useBlock[2] === '#222', '利用は山吹色に黒文字');
 const ride = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="[^"]*加藤先生"/);
 assert.ok(ride && ride[1] === '#4fc3f7', '担当が加藤先生の送迎だけ水色');
+
+const kinmuDay = [
+  { day: '2026-10-26', kind: '勤務', staff: '中村 文', title: 'あや先生 １４：００' },
+  { day: '2026-10-26', kind: '利用', child: '児童A', start_time: '10:00', end_time: '15:00' },
+  { day: '2026-10-26', kind: '利用', child: '児童B', start_time: '10:00', end_time: '15:00' },
+  { day: '2026-10-26', kind: '迎え', staff: '中村　文', kids: ['児童A'], start_time: '09:40', end_time: '10:10' },
+  { day: '2026-10-26', kind: '送り', staff: '友香先生', kids: ['児童B'], start_time: '15:00', end_time: '15:30' },
+  { day: '2026-10-26', kind: '勤務', staff: '友香先生', title: '午後' },
+  { day: '2026-10-26', kind: '休所', title: '研修' },
+];
+const kinmu = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27' });
+assert.ok(/<span class="sg-chip" style="background:#8e24aa;color:#fff">勤務 文先生 あや先生 １４：００<\/span>/.test(kinmu), '勤務の担当 中村 文は紫の文先生');
+assert.ok(!kinmu.includes('中村 文'), '凡例も予定も中村 文のままにしない');
+assert.ok(kinmu.includes('文先生') && kinmu.includes('#8e24aa'));
+const asAya = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: 'あや' });
+assert.ok(asAya.includes('aria-pressed="true"') && asAya.includes('sg-on'), '自分の担当はオンが見た目で分かる');
+assert.ok(asAya.includes('児童A') && !asAya.includes('児童B'), '送迎にいる児童の利用だけ残す');
+assert.ok(asAya.includes('文先生') && !asAya.includes('友香先生'));
+assert.ok(asAya.includes('研修'), '休所は残す');
+assert.ok(asAya.includes('自分の担当の迎え・送りだけです'));
+const asBun = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '中村 文' });
+assert.ok(asBun.includes('児童A') && !asBun.includes('児童B'), '中村 文はあやと同じ担当');
+const asFamily = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '中村' });
+assert.ok(asFamily.includes('この日の自分の担当はありません'), '中村だけでは文先生の担当にしない');
+assert.ok(!asFamily.includes('児童A') && !asFamily.includes('文先生'));
+const asChild = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '中村 亮仁' });
+assert.ok(asChild.includes('この日の自分の担当はありません'));
+const asNone = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '' });
+assert.ok(asNone.includes('担当の名前が未登録です'));
+assert.ok(!asNone.includes('児童A') && !asNone.includes('友香先生'));
 
 const nov = sgDayHtml('2026-11-17', [], {}, { demo: false, today: '2026-10-26' });
 assert.ok(nov.includes("sgOpenMonth('2026-11-17')"), '11月17日の月ボタンはその日');
