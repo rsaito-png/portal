@@ -103,6 +103,79 @@ async function myName() {
   return p[0]?.nikki_name || '';
 }
 const same = (a, b) => a && b && a.replace(/\s/g, '') === b.replace(/\s/g, '');
+const LEO_PLAN_NOTE = '予定表から表示（日誌取り込み前）。車は日誌の取り込み後に出ます。';
+function leoKidVal(obj, name) {
+  if (!obj || !name) return '';
+  if (obj[name] != null && obj[name] !== '') return obj[name];
+  const want = String(name).replace(/\s/g, '');
+  const key = Object.keys(obj).find(k => String(k).replace(/\s/g, '') === want);
+  return key && obj[key] != null ? obj[key] : '';
+}
+function leoPlanJobs(events) {
+  const jobs = [];
+  for (const e of events || []) {
+    if (e.kind !== '迎え' && e.kind !== '送り') continue;
+    const kids = (e.kids && e.kids.length) ? e.kids.slice() : (e.child ? [e.child] : ['']);
+    kids.forEach(c => jobs.push({
+      day: e.day, t: leoKidVal(e.kid_times, c) || e.start_time || '', k: e.kind, c,
+      p: leoKidVal(e.kid_places, c) || e.place || '', dr: e.staff || '', car: e.car || '',
+    }));
+  }
+  jobs.sort((a, b) => (a.day || '').localeCompare(b.day || '') || (a.t || '99').localeCompare(b.t || '99') || (a.k === b.k ? 0 : a.k === '迎え' ? -1 : 1));
+  return jobs;
+}
+function leoPlanTableHtml(events, care) {
+  const CARE = care || {}, jobs = leoPlanJobs(events), map = {}, days = [];
+  jobs.forEach(j => { if (!map[j.day]) { map[j.day] = []; days.push(j.day); } map[j.day].push(j); });
+  const cell = (v, ng) => v ? esc(v) : `<b style="color:#c00">${ng}</b>`;
+  return days.map(d => `<h4>${fmtDay(d)}　予定表</h4><div class="sheet-scroll"><table class="sougei-view"><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>担当</th><th>車</th></tr>${map[d].map(j =>
+    `<tr><td>${esc(j.t)}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}</td><td>${esc(j.p) || '自宅'}</td><td>${cell(j.dr, '未定')}</td><td>${cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`).join('');
+}
+function leoTileStatus(nikkiRows, events, day) {
+  const all = (nikkiRows || []).filter(r => r.day === day);
+  const rs = all.filter(r => r.kind === '利用');
+  if (all.length) {
+    if (!rs.length) return '日誌なし';
+    const bad = rs.reduce((n, r) => n + (!r.pick_driver || !r.pick_car ? 1 : 0) + (!r.drop_driver || !r.drop_car ? 1 : 0), 0);
+    return bad ? `<b style="color:#c00">未確定 ${bad}件</b>（${rs.length}人）` : `${rs.length}人・確定`;
+  }
+  const ev = (events || []).filter(e => e.day === day);
+  const names = new Set();
+  ev.filter(e => e.kind === '利用' && e.child).forEach(e => names.add(String(e.child).replace(/\s/g, '')));
+  if (!names.size) ev.filter(e => e.kind === '迎え' || e.kind === '送り').forEach(e => {
+    const kids = (e.kids && e.kids.length) ? e.kids : (e.child ? [e.child] : []);
+    kids.forEach(k => k && names.add(String(k).replace(/\s/g, '')));
+  });
+  return names.size ? `予定表 ${names.size}人` : '日誌なし';
+}
+function leoKidTile(nikkiRows, events, day) {
+  const all = (nikkiRows || []).filter(r => r.day === day);
+  if (all.length) return all.filter(r => r.kind === '利用').length + '人';
+  const names = new Set();
+  (events || []).filter(e => e.day === day && e.kind === '利用' && e.child).forEach(e => names.add(String(e.child).replace(/\s/g, '')));
+  return names.size ? `予定 ${names.size}人` : '0人';
+}
+function leoSougeiAllHtml(rows, events, care) {
+  const CARE = care || {};
+  const logged = new Set((rows || []).map(r => r.day));
+  const plan = (events || []).filter(e => !logged.has(e.day));
+  const days = byDay((rows || []).filter(r => r.kind === '利用'));
+  const cell = (v, ng) => v ? esc(v) : `<b style="color:#c00">${ng}</b>`;
+  const nikkiHtml = days.map(([d, rs]) => {
+    const jobs = [];
+    rs.forEach(r => {
+      jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, dr: r.pick_driver, car: r.pick_car });
+      jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, dr: r.drop_driver, car: r.drop_car });
+    });
+    jobs.sort((a, b) => (a.t || '99').localeCompare(b.t || '99'));
+    const bad = jobs.filter(j => !j.dr || !j.car).length;
+    return `<h4>${fmtDay(d)}　${bad ? `<span style="color:#c00">未確定 ${bad}件</span>` : '全て確定'}</h4><div class="sheet-scroll"><table class="sougei-view"><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>担当</th><th>車</th></tr>${jobs.map(j =>
+      `<tr><td>${esc(j.t)}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}</td><td>${esc(j.p) || '自宅'}</td><td>${cell(j.dr, '未定')}</td><td>${cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`;
+  }).join('');
+  const planHtml = plan.length ? `<p class="note">${LEO_PLAN_NOTE}</p>${leoPlanTableHtml(plan, CARE)}` : '';
+  const body = (nikkiHtml || planHtml) ? `${nikkiHtml}${planHtml}` : noTab();
+  return `<h3>${PLABEL[PERIOD]}の送迎（全員分）</h3>${periodTabs('sougeiall')}${demoNote()}<p><a href="#leo/sougei">自分の担当だけ見る</a>　<small>変更はカレンダー・日誌が正です。赤字は未確定（担当者か車が空）。</small></p>${body}`;
+}
 const ldNN = s => String(s || '').replace(/\s/g, '');
 const demoNote = () => DEMO ? '<p class="note">見本データです（架空）</p>' : '';
 
@@ -124,22 +197,16 @@ const LEO_VIEWS = {
     }).join('') : noTab());
   },
   async sougeiall() {
-    const [rows0, cc, LEFT] = await Promise.all([loadNikki(), DEMO ? [] : sb('leo_child_care').catch(() => []), loadLeftIndex()]);
+    const [a, b] = range();
+    const [rows0, ev0, cc, LEFT] = await Promise.all([
+      loadNikki(),
+      DEMO ? [] : sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=in.(迎え,送り)&order=day,start_time`).catch(() => []),
+      DEMO ? [] : sb('leo_child_care').catch(() => []),
+      loadLeftIndex()]);
     const rows = filterByLeftDay(rows0, LEFT);
+    const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev0 || [], LEFT) : (ev0 || []);
     const CARE = Object.fromEntries(cc.filter(x => x.note).map(x => [x.child, x.note]));
-    const days = byDay(rows.filter(r => r.kind === '利用'));
-    const cell = (v, ng) => v ? esc(v) : `<b style="color:#c00">${ng}</b>`;
-    return `<h3>${PLABEL[PERIOD]}の送迎（全員分）</h3>${periodTabs('sougeiall')}${demoNote()}<p><a href="#leo/sougei">自分の担当だけ見る</a>　<small>変更はカレンダー・日誌が正です。赤字は未確定（担当者か車が空）。</small></p>` + (days.length ? days.map(([d, rs]) => {
-      const jobs = [];
-      rs.forEach(r => {
-        jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, dr: r.pick_driver, car: r.pick_car });
-        jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, dr: r.drop_driver, car: r.drop_car });
-      });
-      jobs.sort((a, b) => (a.t || '99').localeCompare(b.t || '99'));
-      const bad = jobs.filter(j => !j.dr || !j.car).length;
-      return `<h4>${fmtDay(d)}　${bad ? `<span style="color:#c00">未確定 ${bad}件</span>` : '全て確定'}</h4><table><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>担当</th><th>車</th></tr>${jobs.map(j =>
-        `<tr><td>${esc(j.t)}</td><td>${j.k}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}</td><td>${esc(j.p) || '自宅'}</td><td>${cell(j.dr, '未定')}</td><td>${cell(j.car, '未定')}</td></tr>`).join('')}</table>`;
-    }).join('') : noTab());
+    return leoSougeiAllHtml(rows, evs, CARE);
   },
   async kids() {
     const [rows0, cc, ci, cp, LEFT] = await Promise.all([loadNikki(), DEMO ? [] : sb('leo_child_care').catch(() => []), DEMO ? [] : sb('leo_child_info?select=name,note').catch(() => []), DEMO ? [] : sb('leo_child_plan').catch(() => []), loadLeftIndex()]);
@@ -148,7 +215,21 @@ const LEO_VIEWS = {
     const PL = Object.fromEntries(cp.map(x => [N(x.name), x]));
     const days = byDay(rows);
     const msg = c => [...cc.filter(x => N(x.child) === N(c) && x.note).map(x => '送迎の配慮：' + x.note), ...ci.filter(x => N(x.name) === N(c) && x.note).map(x => 'メモ：' + x.note)];
-    return `<h3>${PLABEL[PERIOD]}の利用児童</h3>${periodTabs('kids')}${demoNote()}<p><small>伝達事項は <a href="#leo/userinfo">利用者情報</a>（メモ・送迎の配慮）に書いたものです。</small></p>` + (days.length ? days.map(([d, rs]) => {
+    const head = `<h3>${PLABEL[PERIOD]}の利用児童</h3>${periodTabs('kids')}${demoNote()}<p><small>伝達事項は <a href="#leo/userinfo">利用者情報</a>（メモ・送迎の配慮）に書いたものです。</small></p>`;
+    if (!days.length && !DEMO) {
+      const [a, b] = range();
+      let ev = [];
+      try { ev = await sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=eq.利用&order=day,start_time`); } catch (e) { ev = []; }
+      ev = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev || [], LEFT) : (ev || []);
+      ev = (ev || []).filter(e => e.child);
+      if (ev.length) {
+        const by = {};
+        ev.forEach(e => { (by[e.day] = by[e.day] || []).push(e); });
+        return head + `<p class="note">予定表から表示（日誌取り込み前）</p>` + Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}（${by[d].length}人）</h4>${by[d].map(e =>
+          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}</div>`).join('')}`).join('');
+      }
+    }
+    return head + (days.length ? days.map(([d, rs]) => {
       const use = rs.filter(r => r.kind === '利用'), abs = rs.filter(r => r.kind === '欠席');
       return `<h4>${fmtDay(d)}（${use.length}人）</h4>${use.map(r => { const m = msg(r.child);
         return `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(r.child)}</b>　${esc(r.service)}　${esc(r.start_time)}〜${esc(r.end_time)}<br><small>迎え：${esc(r.pick_time)} ${esc(r.pick_place || '自宅')}（${esc(r.pick_driver) || '未定'}）／送り：${esc(r.drop_time)} ${esc(r.drop_place || '自宅')}（${esc(r.drop_driver) || '未定'}）</small>

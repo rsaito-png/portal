@@ -108,15 +108,16 @@ window.ytCopyAll = ytCopyAll; window.ytPlan = ytPlan; window.ytCommit = ytCommit
   LEO_VIEWS.sougei = async function () {
     if (DEMO) return old.call(this);
     const [a, b] = range(), me = await myName();
-    const [ev0, cc, LEFT] = await Promise.all([sb(`leo_events?kind=in.(迎え,送り)&day=gte.${a}&day=lte.${b}&order=day,start_time`), sb('leo_child_care').catch(() => []), loadLeftIndex()]);
+    const [ev0, nk0, cc, LEFT] = await Promise.all([sb(`leo_events?kind=in.(迎え,送り)&day=gte.${a}&day=lte.${b}&order=day,start_time`), loadNikki().catch(() => []), sb('leo_child_care').catch(() => []), loadLeftIndex()]);
     if (!ev0.length) return old.call(this);
     const ev = filterEventsByLeft(ev0, LEFT);
+    const planNote = !(nk0 && nk0.length) ? `<p class="note">${typeof LEO_PLAN_NOTE === 'string' ? LEO_PLAN_NOTE : '予定表から表示（日誌取り込み前）'}</p>` : '';
     const CARE = Object.fromEntries(cc.filter(x => x.note).map(x => [x.child, x.note])), mine = ev.filter(e => same(e.staff, me)), days = {};
     mine.forEach(e => (days[e.day] = days[e.day] || []).push(e));
     const card = e => { const pl = e.kid_places || {}, kt = e.kid_times || {};
       return `<div class="card" style="border-left:6px solid ${e.kind === '迎え' ? '#2a7' : '#d70'}"><div style="font-size:20px"><b>${e.kind === '迎え' ? '☆ 迎え' : '★ 送り'}　${esc(e.start_time || '')}〜${esc(e.end_time || '')}</b></div>
-        ${(e.kids || []).map((k, i) => `<div style="font-size:18px;margin-top:6px">${i + 1}. <b>${esc(k)}</b>　${esc(kt[k] || '')}　${esc(pl[k] || '自宅')}${CARE[k] ? `<br><small style="color:#c60">⚠ ${esc(CARE[k])}</small>` : ''}</div>`).join('')}</div>`; };
-    return `<h3>${PLABEL[PERIOD]}の送迎（${esc(me) || '名前未登録'} さんの担当）</h3>${periodTabs('sougei')}` + (Object.keys(days).length ? Object.keys(days).sort().map(d => `<h4>${fmtDay(d)}</h4>${days[d].sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).map(card).join('')}`).join('') : '<p style="font-size:18px">担当はありません。</p>')
+        ${(e.kids || []).map((k, i) => `<div style="font-size:18px;margin-top:6px">${i + 1}. <b>${esc(k)}</b>　${esc(kt[k] || '')}　${esc(pl[k] || '自宅')}${CARE[k] ? `<br><small style="color:#c60">⚠ ${esc(CARE[k])}</small>` : ''}</div>`).join('')}${e.car ? `<div style="margin-top:6px">車：${esc(e.car)}</div>` : ''}</div>`; };
+    return `<h3>${PLABEL[PERIOD]}の送迎（${esc(me) || '名前未登録'} さんの担当）</h3>${periodTabs('sougei')}${planNote}` + (Object.keys(days).length ? Object.keys(days).sort().map(d => `<h4>${fmtDay(d)}</h4>${days[d].sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).map(card).join('')}`).join('') : '<p style="font-size:18px">担当はありません。</p>')
       + `<p class="note"><a href="#leo/sougeiall">みんなの送迎を見る</a></p>`;
   };
 })();
