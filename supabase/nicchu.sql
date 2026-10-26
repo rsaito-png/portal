@@ -1,5 +1,6 @@
 -- 日中一時支援（星心会レスパイトスタジオ）。居宅介護の kin_visit とは別テーブル。kin_* は変更しない。
--- 読む・書く: nicchu_can()（担当フラグ / 所属がレスパイトか日中一時 / 事務・管理者・児発管 / 会長）
+-- 読む・書く: nicchu_can()（担当フラグ / 所属が日中一時支援・レスパイト・日中一時 / 事務・管理者・児発管 / 会長）
+-- 署名の列は残す。画面は署名を受け取らない（印刷して市役所へ出す）。利用ありは時刻・送迎・食事・活動・ご様子だけで保存できる。
 -- 適用: Supabase SQL Editor にこのファイルを貼って Run（再実行できる）
 -- 利用者・記入者の実名はこのファイルに置かない。画面の「利用者を追加」か、次の形で登録する:
 --   insert into public.nicchu_user(name, kana, sort) values ('氏名', 'ふりがな', 1);
@@ -23,7 +24,7 @@ as $$
       select 1 from public.staff_profiles
       where user_id = auth.uid()
         and active
-        and (nicchu or office in ('レスパイト', '日中一時'))
+        and (nicchu or office in ('日中一時支援', 'レスパイト', '日中一時'))
     ),
     false)
 $$;
@@ -86,13 +87,13 @@ create table if not exists public.nicchu_record (
     and transport is not null and meal_served is not null
     and char_length(btrim(coalesce(activity, ''))) > 0
     and char_length(btrim(coalesce(state, ''))) > 0
-    and signer_kind is not null and sign_status is not null
   )),
-  constraint nicchu_record_sign_shape check (not present or (
-    (signer_kind = 'あとで署名' and sign_status = '署名待ち' and signature is null and signed_at is null)
+  constraint nicchu_record_sign_shape check (
+    (signer_kind is null and sign_status is null and signature is null and sign_reason is null and signed_at is null)
+    or (signer_kind = 'あとで署名' and sign_status = '署名待ち' and signature is null and signed_at is null)
     or (signer_kind = '署名困難' and sign_status = '署名済' and signature is null and char_length(btrim(coalesce(sign_reason, ''))) > 0)
     or (signer_kind in ('本人', 'ご家族') and sign_status = '署名済' and signature is not null and signed_at is not null)
-  )),
+  ),
   constraint nicchu_record_when_absent check (present or (
     start_time is null and end_time is null and transport is null and meal_served is null
     and activity is null and state is null and signer_kind is null and sign_reason is null
@@ -112,6 +113,22 @@ create table if not exists public.nicchu_sign_log (
     (signer_kind = '署名困難' and signature is null and char_length(btrim(coalesce(sign_reason, ''))) > 0)
     or (signer_kind in ('本人', 'ご家族') and signature is not null)
   )
+);
+
+-- すでに作った表の制約を、署名なしでも保存できる形に揃える（再実行できる）
+alter table public.nicchu_record drop constraint if exists nicchu_record_when_present;
+alter table public.nicchu_record add constraint nicchu_record_when_present check (not present or (
+  start_time is not null and end_time is not null and end_time > start_time
+  and transport is not null and meal_served is not null
+  and char_length(btrim(coalesce(activity, ''))) > 0
+  and char_length(btrim(coalesce(state, ''))) > 0
+));
+alter table public.nicchu_record drop constraint if exists nicchu_record_sign_shape;
+alter table public.nicchu_record add constraint nicchu_record_sign_shape check (
+  (signer_kind is null and sign_status is null and signature is null and sign_reason is null and signed_at is null)
+  or (signer_kind = 'あとで署名' and sign_status = '署名待ち' and signature is null and signed_at is null)
+  or (signer_kind = '署名困難' and sign_status = '署名済' and signature is null and char_length(btrim(coalesce(sign_reason, ''))) > 0)
+  or (signer_kind in ('本人', 'ご家族') and sign_status = '署名済' and signature is not null and signed_at is not null)
 );
 
 create index if not exists nicchu_day_date on public.nicchu_day(service_date desc);
