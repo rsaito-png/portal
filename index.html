@@ -77,7 +77,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
 <script src="sct.js?v=20261026ops"></script>
-<script src="chair.js?v=202610211310"></script>
+<script src="chair.js?v=20261026top"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610262130"></script>
 <script src="leo_cal.js?v=202610261800"></script>
@@ -238,9 +238,10 @@ async function render() {
   // 評定所タイルは HYOJOSHO_HOLD（leaderboard.js）が true のあいだ出さない。戻すときはそのフラグを false に。
   const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
-  $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div><div id="sct_slot"></div>
-    <h3>事業所</h3>
+  $('view').innerHTML = `<h3>事業所</h3>
     <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
+    <h3>共通</h3>
+    <div class="grid">${topT.map(t => tileHtml(t)).join('')}</div><div id="sct_slot"></div>
     <div id="soumu_slot">${ROLE === C.clerk.role ? soumuTile() : ''}</div>
     <h3 id="misc_h">未整理</h3>
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
