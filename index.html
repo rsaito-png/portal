@@ -72,6 +72,9 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_jisseki.js?v=202610162340"></script>
 <script src="report.js?v=202610200935"></script>
 <script src="ht.js?v=202610161540"></script>
+<script src="sct_logic.js?v=20261026"></script>
+<script src="sct_cert.js?v=20261026"></script>
+<script src="sct.js?v=20261026"></script>
 <script src="chair.js?v=202610211310"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=202610261800"></script>
@@ -196,6 +199,7 @@ async function render() {
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
   if (id === 'ht') return renderHt();
+  if (id === 'sct' && typeof renderSct === 'function') return renderSct();
   if (id === 'chair') return renderChair();
   if (id === 'banto' && typeof renderBanto === 'function') return renderBanto();
   if (id === 'sns' && typeof renderSns === 'function') return renderSns();
@@ -219,7 +223,7 @@ async function render() {
   }
   const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']];
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
-  $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
+  $('view').innerHTML = `<div class="grid">${topT.map(t => tileHtml(t)).join('')}</div><div id="sct_slot"></div>
     <h3>事業所</h3>
     <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
     <div id="soumu_slot">${ROLE === C.clerk.role ? soumuTile() : ''}</div>
@@ -227,7 +231,22 @@ async function render() {
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof lbBadge === 'function') lbBadge();
-  chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); 
+  chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); sctAdminTile();
+}
+async function sctIsAdmin() {
+  if (DEMO) return ROLE === '事務' || ROLE === 'sct_admin';
+  try {
+    const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (!s) return false;
+    const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/sct_is_admin', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' });
+    return r.ok && (await r.json()) === true;
+  } catch (e) { return false; }
+}
+async function sctAdminTile() {
+  const slot = document.getElementById('sct_slot');
+  if (!slot || slot.dataset.on) return;
+  if (!(await sctIsAdmin())) return;
+  slot.dataset.on = '1';
+  slot.innerHTML = `<div class="grid"><a class="tile main" href="#sct" style="border-top:4px solid #2e6b4f"><span>🩺</span>ストレスチェック実施者養成（運営）<small>開催・予約・入金・修了。受講者の入口は sct.html</small></a></div>`;
 }
 // 会計（簡易）への入口。法人管理者(acc_is_admin)にだけ出す。入れる画面は acc.html
 async function accAdmin() {

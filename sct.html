@@ -1,0 +1,291 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>実施者養成研修</title>
+<style>
+:root{--main:#2e6b4f}
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222}
+header{background:var(--main);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}
+header a,header button{color:#fff;background:none;border:1px solid #fff;border-radius:8px;padding:6px 10px}
+main{max-width:720px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin-bottom:12px}
+input,select,button,textarea{font-size:16px;box-sizing:border-box;padding:10px;margin:4px 0;border-radius:8px;border:1px solid #bbb;width:100%}
+button{background:var(--main);color:#fff;border:0;cursor:pointer;width:auto}
+button.g{background:#fff;color:var(--main);border:1px solid var(--main)}
+nav button{margin-right:6px}
+label{display:block;font-size:14px;color:#555;margin-top:8px}
+.note{color:#666;font-size:14px}.ng{color:#a00}.ok{background:#dff3e4;padding:8px;border-radius:8px}
+table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #eee;padding:6px 4px;text-align:left}
+.sct-cert{background:#fff;border:1px solid #ddd;padding:16px;margin-top:12px}
+</style></head><body>
+<header><span>実施者養成研修</span><span><a href="index.html">職員ポータル</a> <button id="out" hidden onclick="logout()">ログアウト</button></span></header>
+<main>
+<div id="login" class="card"><p>受講者の入口です。歯科医師・看護師・精神保健福祉士・公認心理師の方が、日時の決まった研修を申し込みます。</p>
+<input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
+<input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
+<button onclick="login()">ログイン</button>
+<button class="g" onclick="showBox('signup')">アカウントを作る</button>
+<button class="g" onclick="showBox('forgot')">パスワードを忘れた方</button>
+<p id="msg" class="ng"></p></div>
+<div id="signup" class="card" hidden><p>メールアドレスとパスワード（8文字以上）でアカウントを作ります。</p>
+<input id="sem" type="email" placeholder="メールアドレス" autocomplete="username">
+<input id="spw" type="password" placeholder="パスワード" autocomplete="new-password">
+<button onclick="signup()">アカウントを作る</button>
+<button class="g" onclick="showBox('login')">ログインへ</button><p id="smsg" class="ng"></p></div>
+<div id="forgot" class="card" hidden><p>パスワードを決めるメールを送ります。</p>
+<input id="fem" type="email" placeholder="メールアドレス">
+<button onclick="sendReset()">メールを送る</button>
+<button class="g" onclick="showBox('login')">もどる</button><p id="fmsg" class="ng"></p></div>
+<div id="setpw" class="card" hidden><p>新しいパスワードを決めてください（8文字以上）。</p>
+<input id="npw" type="password" placeholder="新しいパスワード" autocomplete="new-password">
+<button onclick="setPassword()">パスワードを決める</button><p id="pmsg" class="ng"></p></div>
+<div id="app" hidden>
+<nav><button id="t_profile" onclick="tab('profile')">プロフィール</button><button id="t_sessions" onclick="tab('sessions')">開催と予約</button><button id="t_status" onclick="tab('status')">受講状況</button></nav>
+<div id="view"></div>
+</div>
+</main>
+<script src="config.js?v=20261026"></script>
+<script src="sct_logic.js?v=20261026"></script>
+<script src="sct_cert.js?v=20261026"></script>
+<script>
+const C = window.PORTAL_CONFIG, $ = id => document.getElementById(id);
+const DEMO = new URLSearchParams(location.search).get('demo') === '1';
+const esc = Sct.esc;
+let TAB = 'profile', ME = null, D = null;
+function showBox(name) { ['login', 'signup', 'forgot', 'setpw'].forEach(id => $(id).hidden = id !== name); }
+function sess() {
+  const s = JSON.parse(localStorage.getItem('sess') || 'null');
+  if (!s) return null;
+  if (!s.uid && s.token) { try { s.uid = JSON.parse(atob(s.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { /* 古いセッションはログインし直す */ } }
+  return s;
+}
+function saveSess(j) {
+  localStorage.setItem('sess', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email, role: (j.user.app_metadata || {}).role || '', exp: Date.now() + j.expires_in * 1000, uid: j.user.id }));
+}
+async function login() {
+  $('msg').textContent = '';
+  const r = await fetch(C.supabaseUrl + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: $('em').value.trim(), password: $('pw').value }) });
+  const j = await r.json();
+  if (!r.ok) { $('msg').textContent = 'ログインできませんでした。'; return; }
+  saveSess(j); bootApp();
+}
+async function signup() {
+  const email = $('sem').value.trim(), password = $('spw').value;
+  if (password.length < 8) { $('smsg').textContent = '8文字以上にしてください。'; return; }
+  const r = await fetch(C.supabaseUrl + '/auth/v1/signup', { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+  const j = await r.json();
+  if (!r.ok) { $('smsg').textContent = '作成できませんでした。すでに登録がある場合はログインしてください。'; return; }
+  if (!j.access_token) { $('smsg').textContent = '確認メールを送りました。メールのリンクを開いてからログインしてください。'; return; }
+  saveSess(j); bootApp();
+}
+async function sendReset() {
+  const email = $('fem').value.trim();
+  await fetch(C.supabaseUrl + '/auth/v1/recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname), { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+  $('fmsg').textContent = '登録されているアドレスなら、メールを送りました。';
+}
+const AUTH_HASH = new URLSearchParams(location.hash.slice(1));
+async function setPassword() {
+  const pw = $('npw').value;
+  if (pw.length < 8) { $('pmsg').textContent = '8文字以上にしてください。'; return; }
+  const r = await fetch(C.supabaseUrl + '/auth/v1/user', { method: 'PUT', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + AUTH_HASH.get('access_token'), 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+  $('pmsg').textContent = r.ok ? 'パスワードを決めました。ログインしてください。' : 'リンクの期限が切れているかもしれません。';
+  if (r.ok) { history.replaceState(null, '', location.pathname); showBox('login'); }
+}
+function logout() { localStorage.removeItem('sess'); location.href = location.pathname; }
+async function api(path, opt = {}) {
+  const s = sess();
+  const r = await fetch(C.supabaseUrl + '/rest/v1/' + path, { ...opt, headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json', ...(opt.headers || {}) } });
+  const tx = await r.text();
+  if (!r.ok) { let msg = tx; try { msg = JSON.parse(tx).message || tx; } catch (e) {} throw new Error(msg || ('エラー ' + r.status)); }
+  return tx ? JSON.parse(tx) : null;
+}
+function demoData() {
+  const uid = 'demo';
+  return {
+    profile: { user_id: uid, full_name: '見本 花子', license_type: '看護師', exemption: 'none', exemption_status: 'none', identity_status: 'verified', email: 'demo@example.com' },
+    subjects: Sct.SUBJECTS.map(s => ({ id: s.id, name: s.name, min_minutes: s.minMinutes })),
+    sessions: [
+      { id: 's1', subject_id: 1, instructor_name: '西岡愛梨', starts_at: '2026-11-20T10:00:00+09:00', ends_at: '2026-11-20T12:00:00+09:00', capacity: 20, status: 'open' },
+      { id: 's2', subject_id: 2, instructor_name: '西岡愛梨', starts_at: '2026-11-21T10:00:00+09:00', ends_at: '2026-11-21T11:30:00+09:00', capacity: 20, status: 'open' },
+      { id: 's3', subject_id: 3, instructor_name: '西岡愛梨', starts_at: '2026-11-22T10:00:00+09:00', ends_at: '2026-11-22T11:30:00+09:00', capacity: 20, status: 'open' },
+      { id: 's4', subject_id: 2, instructor_name: '西岡愛梨', starts_at: '2026-12-05T10:00:00+09:00', ends_at: '2026-12-05T11:30:00+09:00', capacity: 20, status: 'open' },
+    ],
+    access: { s1: { meet_url: 'https://meet.google.com/demo-sct-sub1' }, s2: { meet_url: 'https://meet.google.com/demo-sct-sub2' }, s3: { meet_url: 'https://meet.google.com/demo-sct-sub3' } },
+    bookings: [
+      { id: 'b1', user_id: uid, session_id: 's1', status: 'attended' },
+      { id: 'b2', user_id: uid, session_id: 's2', status: 'attended' },
+      { id: 'b3', user_id: uid, session_id: 's3', status: 'attended' },
+    ],
+    attendance: [
+      { booking_id: 'b1', joined_at: '2026-11-20T10:00:00+09:00', left_at: '2026-11-20T12:00:00+09:00', camera_off: false },
+      { booking_id: 'b2', joined_at: '2026-11-21T10:00:00+09:00', left_at: '2026-11-21T11:30:00+09:00', camera_off: false },
+      { booking_id: 'b3', joined_at: '2026-11-22T10:00:00+09:00', left_at: '2026-11-22T11:30:00+09:00', camera_off: false },
+    ],
+    payments: [{ status: 'paid', plan: 'bundle', amount_yen: 12800, method: 'stripe' }],
+    certificates: [], quiz: [], settings: {},
+  };
+}
+async function load() {
+  if (DEMO) { D = demoData(); ME = { id: 'demo', email: 'demo@example.com' }; return; }
+  const s = sess();
+  const [profile, subjects, sessions, bookings, attendance, payments, certificates, quiz, settings, instructors] = await Promise.all([
+    api('sct_profiles?user_id=eq.' + s.uid), api('sct_subjects?order=id'), api('sct_sessions?order=starts_at'),
+    api('sct_bookings?order=created_at'), api('sct_attendance?order=created_at'), api('sct_payments?order=created_at.desc'),
+    api('sct_certificates?order=issued_at.desc'), api('sct_quiz?order=taken_at.desc'), api('sct_settings'),
+    api('sct_instructors?select=id,name'),
+  ]);
+  const names = Object.fromEntries((instructors || []).map(i => [i.id, i.name]));
+  sessions.forEach(x => { x.instructor_name = names[x.instructor_id] || ''; });
+  let access = [];
+  if (bookings.length) access = await api('sct_session_access?session_id=in.(' + bookings.map(b => b.session_id).join(',') + ')');
+  D = { profile: profile[0] || null, subjects, sessions, bookings, attendance, payments, certificates, quiz, settings: Object.fromEntries(settings.map(x => [x.key, x.value])), access: Object.fromEntries(access.map(a => [a.session_id, a])) };
+  ME = { id: s.uid, email: s.email };
+}
+function prog() {
+  const p = D.profile || { user_id: ME.id };
+  return Sct.progress({ profile: { ...p, user_id: ME.id }, subjects: (D.subjects || []).map(s => ({ id: s.id, name: s.name, minMinutes: s.min_minutes })), sessions: (D.sessions || []).map(s => ({ ...s, instructor_name: s.instructor_name || '' })), bookings: D.bookings || [], attendance: D.attendance || [] });
+}
+function payRow() { return (D.payments || []).find(p => p.status !== 'failed' && p.status !== 'refunded_full') || null; }
+function tab(name) { TAB = name; draw(); }
+function draw() {
+  ['profile', 'sessions', 'status'].forEach(t => { const b = $('t_' + t); if (b) b.className = t === TAB ? '' : 'g'; });
+  $('view').innerHTML = { profile: viewProfile, sessions: viewSessions, status: viewStatus }[TAB]();
+}
+function viewProfile() {
+  const p = D.profile || {};
+  const plan = Sct.pricePlan(p.exemption || 'none', p.exemption_status || 'none');
+  const pay = payRow();
+  const opts = Sct.LICENSES.map(l => `<option ${p.license_type === l ? 'selected' : ''}>${l}</option>`).join('');
+  const ex = [['none', '免除なし（3科目 12,800円）'], ['subject1', '科目1を免除（衛生管理者・10,800円）'], ['all', '全免除（労働衛生コンサルタント・受講不要）']];
+  return `<div class="card"><h2>プロフィール</h2><p class="note">${esc(ME.email)} ${DEMO ? '（見本）' : ''}</p>
+    <label>氏名<input id="full_name" value="${esc(p.full_name || '')}"></label>
+    <label>ふりがな<input id="kana" value="${esc(p.kana || '')}"></label>
+    <label>資格種別<select id="license"><option value="">選んでください</option>${opts}</select></label>
+    <label>資格の番号<input id="license_no" value="${esc(p.license_no || '')}"></label>
+    <label>免除${ex.map(([k, l]) => `<span style="display:block;color:#222"><input type="radio" name="ex" value="${k}" ${(p.exemption || 'none') === k ? 'checked' : ''} style="width:auto"> ${l}</span>`).join('')}</label>
+    <label>免除の証明（PDFか画像）<input id="exfile" type="file" accept="application/pdf,image/*"></label>
+    <label>本人確認書類<input id="idfile" type="file" accept="application/pdf,image/*"></label>
+    <p><button onclick="saveProfile()">保存</button></p>
+    <p id="pstat" class="note"></p>
+    <p>いまの料金: ${plan.blocked ? esc(plan.blocked) : (plan.amountYen ? plan.amountYen.toLocaleString('ja-JP') + '円（税込）' : '課金なし')}</p>
+    <p>免除の確認: ${esc(p.exemption_status || 'none')} ／ 本人確認: ${esc(p.identity_status || 'unverified')}</p>
+    <p class="note">${esc((D.settings && D.settings['返金']) || Sct.REFUND_POLICY)}</p>
+    ${pay && (pay.status === 'paid' || pay.status === 'waived') ? `<p class="ok">お支払い: ${pay.status === 'waived' ? '不要' : '済み'}（${esc(pay.method)}）</p>` : `<p><button onclick="payNow()">支払いへ進む</button></p><p class="note">カードは Stripe の画面で扱います。番号はこのページに入力しません。振込をご希望の場合は運営へ連絡してください。</p>`}
+    ${new URLSearchParams(location.search).get('paid') === '1' ? '<p class="note">決済画面から戻りました。反映まで少しかかる場合があります。下の受講状況を開き直してください。</p>' : ''}
+  </div>`;
+}
+async function saveProfile() {
+  const exemption = (document.querySelector('input[name=ex]:checked') || {}).value || 'none';
+  const row = { full_name: $('full_name').value.trim(), kana: $('kana').value.trim() || null, license_type: $('license').value || null, license_no: $('license_no').value.trim() || null, exemption };
+  if (!row.full_name || !row.license_type) { $('pstat').textContent = '氏名と資格種別は必須です。'; return; }
+  try {
+    if (DEMO) { D.profile = { ...(D.profile || {}), ...row, user_id: ME.id, exemption_status: exemption === 'none' ? 'none' : 'pending' }; if ($('exfile').files[0]) D.profile.exemption_proof_path = 'demo'; if ($('idfile').files[0]) { D.profile.identity_proof_path = 'demo'; D.profile.identity_status = 'pending'; } draw(); return; }
+    if ($('exfile').files[0]) row.exemption_proof_path = await upload('exemption', $('exfile').files[0]);
+    if ($('idfile').files[0]) row.identity_proof_path = await upload('identity', $('idfile').files[0]);
+    if (D.profile) await api('sct_profiles?user_id=eq.' + ME.id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    else await api('sct_profiles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    await load(); draw();
+  } catch (e) { $('pstat').textContent = e.message; }
+}
+async function upload(kind, file) {
+  if (file.size > 10 * 1024 * 1024) throw new Error('ファイルは10MBまでです');
+  const ext = (file.name.split('.').pop() || 'bin').replace(/[^\w]/g, '').slice(0, 8) || 'bin';
+  const path = ME.id + '/' + kind + '/' + crypto.randomUUID() + '.' + ext;
+  const s = sess();
+  const r = await fetch(C.supabaseUrl + '/storage/v1/object/sct-proofs/' + path, { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+  if (!r.ok) throw new Error('ファイルを送れませんでした');
+  return path;
+}
+async function payNow() {
+  if (DEMO) { D.payments = [{ status: 'paid', plan: 'bundle', amount_yen: 12800, method: 'stripe' }]; alert('見本では決済しません。入金済みにします。'); draw(); return; }
+  const s = sess();
+  const r = await fetch(C.supabaseUrl + '/functions/v1/sct-checkout', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ return_to: location.origin + location.pathname }) });
+  const j = await r.json().catch(() => ({}));
+  if (j.url) { location.href = j.url; return; }
+  if (j.status === 'waived' || j.status === 'paid') { await load(); draw(); return; }
+  alert(j.error || '決済に進めません。振込の場合は運営へ連絡してください。');
+}
+function viewSessions() {
+  const pay = payRow();
+  const ready = pay && (pay.status === 'paid' || pay.status === 'waived');
+  const g = prog();
+  const rows = (D.sessions || []).filter(s => (s.status === 'open' && new Date(s.starts_at) > Date.now()) || (D.bookings || []).some(b => b.session_id === s.id)).map(s => {
+    const b = (D.bookings || []).find(x => x.session_id === s.id && x.status !== 'cancelled');
+    const sub = (D.subjects || []).find(x => x.id === s.subject_id) || {};
+    const need = g.required.includes(s.subject_id);
+    const link = b && D.access[s.id] && Sct.safeUrl(D.access[s.id].meet_url);
+    const when = new Date(s.starts_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    return `<div class="card"><b>${esc(sub.name || '')}</b> ${need ? '' : '<span class="note">（対象外）</span>'}<p>${esc(when)} ／ ${esc(s.instructor_name || '講師は開催画面を参照')} ／ ${sub.min_minutes || ''}分以上</p>
+      <p class="note">リアルタイムのみです。カメラはオンにしてください。運営が画面共有で録画を流します。</p>
+      ${b ? `<p>予約: ${esc(b.status)}</p>${link ? `<p><a href="${link}">Google Meet を開く</a></p>` : ''}${b.status === 'reserved' ? `<button class="g" onclick="cancelBook('${b.id}')">予約を取り消す</button>` : ''}` : (ready && need && s.status === 'open' ? `<button onclick="book('${s.id}')">予約する</button>` : '<p class="note">予約には、入金（または課金なしの確認）と対象科目であることが必要です。</p>')}
+    </div>`;
+  }).join('') || '<p>募集中の開催はまだありません。</p>';
+  return `<p class="note">オンデマンド受講はありません。定員に達した回は予約できません。</p>` + rows;
+}
+async function book(id) {
+  try {
+    if (DEMO) { D.bookings.push({ id: 'b' + Date.now(), user_id: ME.id, session_id: id, status: 'reserved' }); D.access[id] = { meet_url: 'https://meet.google.com/demo-sct-live' }; draw(); return; }
+    await api('sct_bookings', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ session_id: id }) });
+    await load(); draw();
+  } catch (e) { alert(e.message); }
+}
+async function cancelBook(id) {
+  try {
+    if (DEMO) { const b = D.bookings.find(x => x.id === id); if (b) b.status = 'cancelled'; draw(); return; }
+    await api('sct_bookings?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'cancelled' }) });
+    await load(); draw();
+  } catch (e) { alert(e.message); }
+}
+function viewStatus() {
+  const g = prog();
+  const lines = g.subjects.map(s => `<tr><td>${esc(s.name)}</td><td>${s.required ? '対象' : '対象外'}</td><td>${s.minutes} / ${s.min_minutes}分</td><td>${s.met ? '足りている' : '不足'}</td></tr>`).join('');
+  const cert = (D.certificates || [])[0];
+  const quiz = `<div class="card"><h3>確認テスト（任意）</h3><p class="note">合否は修了の条件にしません。受けなくても修了できます。</p>
+    <label>科目<select id="qz">${(D.subjects || []).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></label>
+    <label>点数（0〜100）<input id="qscore" type="number" min="0" max="100"></label>
+    <button onclick="saveQuiz()">記録する</button></div>`;
+  return `<div class="card"><h2>受講状況</h2><p>${g.complete ? '修了の条件を満たしています。' : esc(g.blocked_reason || '')}</p>
+    <table><tr><th>科目</th><th></th><th>視聴</th><th></th></tr>${lines}</table>
+    <p><button onclick="downloadCert()">修了証を表示（PDF保存）</button></p>
+    <div id="certbox">${cert ? SctCert.fragment(cert.snapshot || cert) : ''}</div></div>${quiz}`;
+}
+async function saveQuiz() {
+  const score = +$('qscore').value;
+  if (!(score >= 0 && score <= 100)) return alert('0から100で入れてください');
+  try {
+    if (DEMO) { D.quiz.push({ subject_id: +$('qz').value, score }); alert('記録しました。修了判定は変わりません。'); return; }
+    await api('sct_quiz', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ subject_id: +$('qz').value, score }) });
+    alert('記録しました。修了判定には使いません。');
+  } catch (e) { alert(e.message); }
+}
+async function downloadCert() {
+  try {
+    let snap = (D.certificates[0] || {}).snapshot;
+    if (!DEMO) {
+      const s = sess();
+      const r = await fetch(C.supabaseUrl + '/functions/v1/sct-certificate', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.snapshot) snap = j.snapshot;
+      else if (!snap) {
+        const id = await api('rpc/sct_issue_certificate', { method: 'POST', body: '{}' });
+        const rows = await api('sct_certificates?id=eq.' + id + '&select=snapshot');
+        snap = rows[0].snapshot;
+      }
+      await load();
+    } else {
+      const g = prog();
+      if (!g.complete) return alert(g.blocked_reason);
+      snap = snap || { full_name: g.full_name, issued_on: Sct.jstDate(new Date()), subjects: g.subjects.filter(s => s.required), instructors: [...new Set(g.subjects.flatMap(s => s.instructors))], org: '一般社団法人 心理社会的リハビリテーション・星心会', signer: '代表理事 齊藤連', license_type: g.license_type };
+      D.certificates = [{ snapshot: snap }];
+    }
+    $('certbox').innerHTML = SctCert.fragment(snap);
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(SctCert.html(snap)); w.document.close(); }
+  } catch (e) { alert(e.message); }
+}
+async function bootApp() {
+  $('login').hidden = true; $('signup').hidden = true; $('forgot').hidden = true; $('app').hidden = false; $('out').hidden = false;
+  try { await load(); draw(); } catch (e) { $('view').innerHTML = `<p class="ng">${esc(e.message)}</p><p class="note">supabase/sct.sql を適用したあとに、もう一度開いてください。</p>`; }
+}
+if (AUTH_HASH.get('access_token') && ['recovery', 'invite', 'signup'].includes(AUTH_HASH.get('type'))) showBox('setpw');
+else if (DEMO) bootApp();
+else if (sess() && sess().exp > Date.now() && sess().uid) bootApp();
+</script></body></html>

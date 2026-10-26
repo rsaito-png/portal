@@ -46,6 +46,11 @@
 - 権限は `ht_access`（メール×事業所。office_id が空＝全事業所の統括）。SQLで追加: `insert into ht_access(email,office_id,can_edit) values ('xxx@…','leo',true);`
 - 職員・受講記録などの個人データはDBにだけある（このリポジトリには入れない）。テストモード（ht_settings）中も、このページはメール・チャットを送らない
 
+## ストレスチェック実施者養成研修（`sct_`）
+- 受講者の入口は `sct.html`（アカウント作成・資格・免除証明・開催の予約・Stripe・修了証）。職員ポータルの運営画面は `#sct`（事務または `sct_admin`）。
+- `supabase/sct.sql` … 表・RLS・修了判定。`sct_logic.js` は画面と `node tools/sct_check.js` が共有する規則。詳しい適用手順とシークレットは `docs/sct.md`。
+- ホームページのLP、顔認証、ジョブメドレー、エデン連携はこの範囲に入っていない。
+
 ## 会計「申告」タブ（acc.html#tax、法人管理者のみ）
 - ファイル: `tax.js`（画面）、`taxcalc.js`（計算。node でも検証可）、`supabase/acc_tax.sql`（`acc_tax_inputs` 期ごとの入力値。RLS=`acc_is_admin()`）。
 - 内容: 決算書（BS/PL/販管費内訳/社員資本等変動計算書/個別注記表）、勘定科目内訳明細書、別表一・二・四・五(一)・十五・十六と法人税・地方法人税・防衛特別法人税・事業税・特別法人事業税・住民税（三重県・四日市市）の概算、消費税（原則課税と簡易課税の比較）、freee照合。

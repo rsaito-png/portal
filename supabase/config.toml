@@ -1,0 +1,8 @@
+# Edge Function の verify_jwt だけをここで指定する。
+# db や auth の設定は Supabase ダッシュボード側を正とする。このファイルは functions deploy が読む。
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.meet-events]
+verify_jwt = false
