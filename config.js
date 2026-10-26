@@ -72,6 +72,7 @@ window.PORTAL_CONFIG = {
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'nicchu', name: '日中一時支援', kind: '星心会レスパイトスタジオ', color: '#1f7a6b', tiles: [
+      ['📅', '土日スケジュール', 'gl:g23', '金斗雲の土日（居宅介護・日中一時）。別タブで開く', 'main'],
       ['☀️', '支援記録', '#nicchu/log', '日ごとの支援日誌（金斗雲の訪問記録とは別）', 'main'],
       ['🖨️', '実績記録票（印刷）', '#nicchu/jisseki', '第８号様式。紙に印刷して市役所へ郵送', 'main'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f', tiles: [
@@ -84,6 +85,8 @@ window.PORTAL_CONFIG = {
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227', tiles: [
+      // 土日スケジュールのURLは portal_links の g23（公開ページには置かない。金斗雲システムと同じ）
+      ['📅', '土日スケジュール', 'gl:g23', '居宅介護・日中一時の土日。別タブで開く', 'main'],
       ['🏯', '金斗雲システム', 'gl:g10', '@psr-seishinkai.org のアカウントで開く'],
       ['✅', '実績記録一覧', 'gl:g11', 'GAS Webアプリから入力'],
       ['⏰', '出退勤記録', 'gl:g12', 'GAS＋手動'],
