@@ -46,7 +46,7 @@ assert.strictEqual(sgStaffPaint('職員Y', { demo: true }).hex, '#f4511e');
 const staffHex = {
   'れん': '#1a237e', '連': '#1a237e', 'れん先生': '#1a237e', '齊藤　連': '#1a237e', '斎藤連': '#1a237e', '斉藤 連': '#1a237e', '齋藤連': '#1a237e', '山田連': '#1a237e',
   'ゆか': '#33b679', 'ゆか先生': '#33b679', '友香': '#33b679', '鈴木　友香': '#33b679',
-  'あや': '#8e24aa', 'あやさん': '#8e24aa',
+  'あや': '#8e24aa', 'あやさん': '#8e24aa', '文': '#8e24aa', '文先生': '#8e24aa', '中村文': '#8e24aa', '中村 文': '#8e24aa', '中村\u3000文': '#8e24aa',
   'さち': '#e67c73', 'さち先生': '#e67c73', '祥': '#e67c73', '鈴木祥': '#e67c73',
   'なお': '#7986cb', 'なお先生': '#7986cb', '尚': '#7986cb', '尚先生': '#7986cb',
   '宮本': '#d81b60', '宮本さん': '#d81b60', '宮本　花': '#d81b60',
@@ -68,8 +68,18 @@ assert.strictEqual(sgStaffShow('さち'), '祥先生');
 assert.strictEqual(sgStaffShow('祥'), '祥先生');
 assert.strictEqual(sgStaffShow('なお先生'), '尚先生');
 assert.strictEqual(sgStaffShow('尚'), '尚先生');
-assert.strictEqual(sgStaffShow('あや'), 'あや', 'あやは漢字にしない');
-assert.strictEqual(sgStaffShow('あや先生'), 'あや先生');
+assert.strictEqual(sgStaffShow('あや'), '文先生');
+assert.strictEqual(sgStaffShow('あや先生'), '文先生');
+assert.strictEqual(sgStaffShow('文'), '文先生');
+assert.strictEqual(sgStaffShow('中村文'), '文先生');
+assert.strictEqual(sgStaffShow('中村 文'), '文先生');
+assert.strictEqual(sgStaffShow('中村\u3000文'), '文先生');
+assert.strictEqual(sgStaffPaint('中村').mapped, false, '中村だけでは文先生にしない');
+assert.strictEqual(sgStaffPaint('中村').hex, '#d50000');
+assert.strictEqual(sgStaffShow('中村'), '中村');
+assert.strictEqual(sgStaffPaint('中村 亮仁').mapped, false, '児童の中村 亮仁は担当欄でも文先生にしない');
+assert.strictEqual(sgStaffPaint('中村\u3000亮仁').hex, '#d50000');
+assert.strictEqual(sgStaffShow('中村 亮仁'), '中村 亮仁');
 assert.strictEqual(sgStaffPaint('加藤先生').ink, '#222', '水色は暗い文字');
 assert.strictEqual(sgStaffPaint('宮本さん').ink, '#fff', 'ピンクは白い文字');
 assert.strictEqual(sgStaffPaint('加藤 湊').mapped, false, '児童の加藤湊は担当でも加藤先生にしない');
@@ -113,7 +123,9 @@ assert.ok(!day.includes('sg-ev neutral'), '時刻のある利用は山吹色');
 assert.ok(day.includes('☆ 迎え'));
 assert.ok(day.includes('★ 送り'));
 assert.ok(day.includes("sgOpenMonth('2026-10-26')"), '表示中の日の月を開く');
-assert.ok(/月<\/button><button type="button" onclick="sgOpenDay\(/.test(day), '月は今日のとなり');
+assert.ok(/今日<\/button><button type="button" onclick="sgOpenMonth\(/.test(day), '今日のとなりは月');
+assert.ok(/月<\/button><button type="button" class="sg-mine" aria-pressed="false" onclick="sgToggleMine\(\)">自分の担当<\/button>/.test(day), '月のとなりは自分の担当');
+assert.ok(day.includes('flex-wrap:nowrap'), '見出しのボタンは折り返さない');
 assert.ok(day.includes('data-sg-now'), '今日は現在時刻の線');
 assert.ok(day.includes('終日'));
 assert.ok(day.includes('児童D'));
@@ -125,7 +137,10 @@ const named = [
   { day: '2026-10-26', kind: '迎え', staff: '斉藤　連', kids: ['児童A'], start_time: '10:10', end_time: '10:40' },
   { day: '2026-10-26', kind: '送り', staff: 'れん', kids: ['児童A'], start_time: '10:45', end_time: '11:10' },
   { day: '2026-10-26', kind: '送り', staff: 'ゆか', kids: ['児童B'], start_time: '12:10', end_time: '12:40' },
+  { day: '2026-10-26', kind: '利用', child: '中村 亮仁', start_time: '11:00', end_time: '12:00' },
+  { day: '2026-10-26', kind: '送り', staff: '中村\u3000文', kids: ['中村 亮仁'], start_time: '12:10', end_time: '12:40' },
   { day: '2026-10-26', kind: '送り', staff: 'あや先生', kids: ['児童C'], start_time: '13:00', end_time: '13:30' },
+  { day: '2026-10-26', kind: '迎え', staff: '中村', kids: ['児童C'], start_time: '13:40', end_time: '14:00' },
   { day: '2026-10-26', kind: '迎え', staff: 'さち', kids: ['児童D'], start_time: '14:00', end_time: '14:30' },
   { day: '2026-10-26', kind: '送り', staff: 'なお先生', kids: ['児童E'], start_time: '15:00', end_time: '15:30' },
   { day: '2026-10-26', kind: '迎え', staff: '宮本さん', kids: ['児童F'], start_time: '16:00', end_time: '16:30' },
@@ -136,16 +151,53 @@ assert.ok(colored.includes('#f8b500') && colored.includes('加藤 湊'), '加藤
 assert.ok(colored.includes('#4fc3f7'), '加藤先生の送迎は水色');
 assert.ok(colored.includes('#1a237e') && colored.includes('#33b679') && colored.includes('#8e24aa'));
 assert.ok(colored.includes('#e67c73') && colored.includes('#7986cb') && colored.includes('#d81b60'));
-assert.ok(colored.includes('連先生') && colored.includes('友香先生') && colored.includes('祥先生') && colored.includes('尚先生'));
+assert.ok(colored.includes('連先生') && colored.includes('友香先生') && colored.includes('文先生') && colored.includes('祥先生') && colored.includes('尚先生'));
+assert.ok(!colored.includes('>あや'), 'あやの表記は文先生にそろえる');
+const ayaUse = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6});color:(#[0-9a-f]{3,6})[^"]*" title="利用[^"]*中村 亮仁/);
+assert.ok(ayaUse && ayaUse[1] === '#f8b500' && ayaUse[2] === '#222', '中村 亮仁の利用は山吹色');
+const ayaRide = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="[^"]*文先生"/);
+assert.ok(ayaRide && ayaRide[1] === '#8e24aa', '担当が中村文の送迎は紫');
+assert.ok(/その他/.test(colored) && colored.includes('中村 <span class="other">その他</span>'), '中村だけでは赤のその他');
 assert.ok(!colored.includes('斉藤'), '斉藤　連は連先生と出す');
 assert.ok(!colored.includes('ゆか'), 'ゆかは友香先生と出す');
 const legend = colored.slice(colored.indexOf('class="sg-leg"'), colored.indexOf('class="sg-cal"'));
 assert.strictEqual((legend.match(/連先生/g) || []).length, 1, 'れんの表記ゆれは凡例で1つ');
+assert.strictEqual((legend.match(/文先生/g) || []).length, 1, 'あやと中村文は凡例で文先生1つ');
 assert.ok(colored.includes('#d50000') && colored.includes('その他'), '一覧外の担当は赤');
 const useBlock = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6});color:(#[0-9a-f]{3,6})[^"]*" title="利用[^"]*加藤 湊/);
 assert.ok(useBlock && useBlock[1] === '#f8b500' && useBlock[2] === '#222', '利用は山吹色に黒文字');
 const ride = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="[^"]*加藤先生"/);
 assert.ok(ride && ride[1] === '#4fc3f7', '担当が加藤先生の送迎だけ水色');
+
+const kinmuDay = [
+  { day: '2026-10-26', kind: '勤務', staff: '中村 文', title: 'あや先生 １４：００' },
+  { day: '2026-10-26', kind: '利用', child: '児童A', start_time: '10:00', end_time: '15:00' },
+  { day: '2026-10-26', kind: '利用', child: '児童B', start_time: '10:00', end_time: '15:00' },
+  { day: '2026-10-26', kind: '迎え', staff: '中村　文', kids: ['児童A'], start_time: '09:40', end_time: '10:10' },
+  { day: '2026-10-26', kind: '送り', staff: '友香先生', kids: ['児童B'], start_time: '15:00', end_time: '15:30' },
+  { day: '2026-10-26', kind: '勤務', staff: '友香先生', title: '午後' },
+  { day: '2026-10-26', kind: '休所', title: '研修' },
+];
+const kinmu = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27' });
+assert.ok(/<span class="sg-chip" style="background:#8e24aa;color:#fff">勤務 文先生 あや先生 １４：００<\/span>/.test(kinmu), '勤務の担当 中村 文は紫の文先生');
+assert.ok(!kinmu.includes('中村 文'), '凡例も予定も中村 文のままにしない');
+assert.ok(kinmu.includes('文先生') && kinmu.includes('#8e24aa'));
+const asAya = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: 'あや' });
+assert.ok(asAya.includes('aria-pressed="true"') && asAya.includes('sg-on'), '自分の担当はオンが見た目で分かる');
+assert.ok(asAya.includes('児童A') && !asAya.includes('児童B'), '送迎にいる児童の利用だけ残す');
+assert.ok(asAya.includes('文先生') && !asAya.includes('友香先生'));
+assert.ok(asAya.includes('研修'), '休所は残す');
+assert.ok(asAya.includes('自分の担当の迎え・送りだけです'));
+const asBun = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '中村 文' });
+assert.ok(asBun.includes('児童A') && !asBun.includes('児童B'), '中村 文はあやと同じ担当');
+const asFamily = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '中村' });
+assert.ok(asFamily.includes('この日の自分の担当はありません'), '中村だけでは文先生の担当にしない');
+assert.ok(!asFamily.includes('児童A') && !asFamily.includes('文先生'));
+const asChild = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '中村 亮仁' });
+assert.ok(asChild.includes('この日の自分の担当はありません'));
+const asNone = sgDayHtml('2026-10-26', kinmuDay, {}, { demo: false, today: '2026-10-27', mine: true, me: '' });
+assert.ok(asNone.includes('担当の名前が未登録です'));
+assert.ok(!asNone.includes('児童A') && !asNone.includes('友香先生'));
 
 const nov = sgDayHtml('2026-11-17', [], {}, { demo: false, today: '2026-10-26' });
 assert.ok(nov.includes("sgOpenMonth('2026-11-17')"), '11月17日の月ボタンはその日');

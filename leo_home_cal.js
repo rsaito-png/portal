@@ -21,7 +21,8 @@ const GCAL_EVENT_COLORS = {
 };
 const SG_USE_HEX = '#f8b500';
 const SG_OTHER_HEX = '#d50000';
-// ゆか＝友香、さち＝祥、なお＝尚。あやの漢字は未指定なので、あやのまま出す。
+// ゆか＝友香、さち＝祥、なお＝尚、あや＝文。表示は文先生。
+// 中村だけでは当てない（児童の中村 亮仁と重なる）。担当欄に名の「文」があるときだけ。
 // 宮本さん・加藤先生の下の名前は、公開リポジトリにも日誌の対応表にも無い。姓で始まる担当名に当てる。
 const SG_NAVY = '#1a237e';
 const SG_STAFF_COLOR = {
@@ -34,7 +35,7 @@ const SG_STAFF_COLOR = {
   '加藤先生': '#4fc3f7', // 水色。Peacock より明るい青
 };
 // 凡例と予定に出す名前。ここにある人だけ、日誌の表記をこの表示にそろえる。
-const SG_STAFF_SHOW = { '連先生': '連先生', '友香先生': '友香先生', '祥先生': '祥先生', '尚先生': '尚先生' };
+const SG_STAFF_SHOW = { '連先生': '連先生', '友香先生': '友香先生', 'あや先生': '文先生', '祥先生': '祥先生', '尚先生': '尚先生' };
 // exact は完全一致。family は姓＋名。given は名だけ、または漢字の姓＋その名。
 const SG_STAFF_ALIAS = {
   '連先生': [
@@ -43,7 +44,7 @@ const SG_STAFF_ALIAS = {
     { t: 'exact', s: '齊藤連' }, { t: 'exact', s: '斎藤連' }, { t: 'exact', s: '斉藤連' }, { t: 'exact', s: '齋藤連' },
   ],
   '友香先生': [{ t: 'given', s: 'ゆか' }, { t: 'given', s: '友香' }],
-  'あや先生': [{ t: 'given', s: 'あや' }],
+  'あや先生': [{ t: 'given', s: 'あや' }, { t: 'given', s: '文' }],
   '祥先生': [{ t: 'given', s: 'さち' }, { t: 'given', s: '祥' }],
   '尚先生': [{ t: 'given', s: 'なお' }, { t: 'given', s: '尚' }],
   '宮本さん': [{ t: 'family', s: '宮本' }],
@@ -155,6 +156,29 @@ function sgEventPaint(e, opt) {
   if (!e || !e.staff) return null;
   return sgStaffPaint(e.staff, opt);
 }
+// 今日の送迎の「自分の担当」と同じく、ログイン職員は myName()。空白は無視する。
+// 色の別名（中村文＝文＝あや＝あや先生）も同一人物。姓だけの「中村」は文先生にしない。
+function sgStaffMine(staff, me, opt) {
+  if (!staff || !me) return false;
+  if (sgSame(staff, me) || sgNormStaff(staff) === sgNormStaff(me)) return true;
+  const a = sgStaffLabel(staff, opt), b = sgStaffLabel(me, opt);
+  return !!(a && b && a === b);
+}
+function sgMineEvents(es, me, opt) {
+  if (!me) return { events: [], empty: true, unnamed: true };
+  const rides = (es || []).filter(e => (e.kind === '迎え' || e.kind === '送り') && sgStaffMine(e.staff, me, opt));
+  const kids = new Set();
+  rides.forEach(e => ((e.kids && e.kids.length) ? e.kids : (e.child ? [e.child] : [])).forEach(k => k && kids.add(sgNk(k))));
+  const events = (es || []).filter(e => {
+    if (e.kind === '迎え' || e.kind === '送り') return sgStaffMine(e.staff, me, opt);
+    // 利用に担当は無い。残した送迎にいる児童だけ出す。関係の無い児童は隠す。
+    if (e.kind === '利用') return !!(e.child && kids.has(sgNk(e.child)));
+    if (e.kind === '休所') return true;
+    if (e.kind === '勤務' || e.kind === '不在' || e.kind === 'その他') return sgStaffMine(e.staff, me, opt);
+    return false;
+  });
+  return { events, empty: rides.length === 0, unnamed: false };
+}
 function sgGrid(ym) {
   const f = ym + '-01', w = sgW(f), nx = sgAdd(f, 32).slice(0, 8) + '01';
   return { start: sgAdd(f, -w), end: sgAdd(nx, (7 - sgW(nx)) % 7 - 1), ym };
@@ -247,9 +271,12 @@ function sgCss() {
 .sgm td button.today{background:#fff4e4;box-shadow:inset 0 0 0 2px #e8833a}
 .sgm td.dim button{opacity:.4}
 .sgm-err{color:#c00;font-size:13px;margin:4px}
-.sg-top{display:flex;align-items:center;gap:4px;margin:0 0 8px}
-.sg-top b{flex:1;min-width:0;text-align:center;font-size:18px;white-space:nowrap}
-.sg-top button{flex:0 0 auto;padding:6px 10px;font-size:16px;font-weight:700;border:1px solid #ddd;background:#fff}
+.sg-top{display:flex;align-items:center;flex-wrap:nowrap;gap:3px;margin:0 0 8px}
+.sg-top b{flex:1 1 auto;min-width:0;text-align:center;font-size:15px;white-space:nowrap;overflow:hidden}
+.sg-top button{flex:0 0 auto;width:auto;padding:5px 7px;font-size:14px;font-weight:700;border:1px solid #ddd;background:#fff;white-space:nowrap;line-height:1.2}
+.sg-top button.sg-on{background:#e8833a;color:#fff;border-color:#e8833a}
+.sg-mine-note{font-size:12px;color:#555;margin:0 0 8px;line-height:1.4}
+.sg-empty{font-size:14px;background:#fff6e5;border-left:4px solid #e8833a;padding:8px 10px;border-radius:6px;margin:0 0 8px}
 .sg-leg{display:flex;flex-wrap:wrap;gap:6px 10px;margin:0 0 8px;font-size:12px}
 .sg-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
 .sg-leg .other{color:#d50000;font-weight:700}
@@ -280,8 +307,9 @@ function sgCss() {
   .sgm td button{height:30px}
   .sgm td button b{font-size:12px}
   .sgm-h b{font-size:14px}
-  .sg-top b{font-size:16px}
-  .sg-top button{padding:6px 8px}
+  .sg-top{gap:2px}
+  .sg-top b{font-size:13px}
+  .sg-top button{padding:4px 5px;font-size:12px}
 }
 </style>`;
 }
@@ -301,8 +329,19 @@ function sgMonthHtml(ym, evs, todayStr) {
   }
   return `<div class="sgm">${sgCss()}<div class="sgm-h"><button type="button" onclick="sgShiftMonth(-1)" aria-label="前の月">◀</button><b>${y}年${m}月</b><button type="button" onclick="sgShiftMonth(1)" aria-label="次の月">▶</button><button type="button" class="sg-today" onclick="sgThisMonth()">今月</button></div><table>${rows}</table></div>`;
 }
+let SG_MINE = false;
 function sgDayHtml(day, evs, care, opt) {
-  const es = (evs || []).filter(e => e.day === day);
+  let es = (evs || []).filter(e => e.day === day);
+  const mineOn = !!(opt && opt.mine);
+  const me = opt && opt.me != null ? String(opt.me) : '';
+  let mineNote = '';
+  if (mineOn) {
+    const picked = sgMineEvents(es, me, opt);
+    es = picked.events;
+    mineNote = picked.unnamed
+      ? '<p class="sg-empty">担当の名前が未登録です。自分の担当は出せません。</p>'
+      : (picked.empty ? '<p class="sg-empty">この日の自分の担当はありません。</p>' : '<p class="sg-mine-note">自分の担当の迎え・送りだけです。利用は、その送迎にいる児童だけ出します。</p>');
+  }
   const { allDay, timed } = sgSplit(es);
   const demo = (opt && opt.demo) || (typeof DEMO !== 'undefined' && DEMO);
   const now = opt && opt.nowMin != null ? opt.nowMin : sgNowMin();
@@ -359,8 +398,9 @@ function sgDayHtml(day, evs, care, opt) {
   }).join('');
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';
   const [, mm, dd] = day.split('-');
-  return `<div class="sg-page">${sgCss()}<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" onclick="sgOpenDay('${typeof today === 'function' ? today() : day}')">今日</button></div>
-    <div class="sg-leg">${legend}</div>
+  const todayArg = typeof today === 'function' ? today() : day;
+  return `<div class="sg-page">${sgCss()}<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${todayArg}')">今日</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" class="sg-mine${mineOn ? ' sg-on' : ''}" aria-pressed="${mineOn ? 'true' : 'false'}" onclick="sgToggleMine()">自分の担当</button></div>
+    ${mineNote}<div class="sg-leg">${legend}</div>
     <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px;min-width:${Math.max(240, maxCols * 132)}px">${lines.join('')}${blocks}${nowEl}</div></div></div></div>
     <p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>
     <p class="sg-foot">利用児童は山吹色、送迎の色は担当ごとです。一覧に無い担当は赤です。☆は迎え、下線の★は送りです。</p></div>`;
@@ -406,7 +446,8 @@ async function renderSgDay(day) {
         care = Object.fromEntries((cc || []).filter(x => x.note).map(x => [sgNk(x.child), x.note]));
       } catch (e) { /* 配慮が読めなくても予定は出す */ }
     }
-    $('view').innerHTML = back + sgDayHtml(day, evs, care);
+    const me = typeof myName === 'function' ? await myName().catch(() => '') : '';
+    $('view').innerHTML = back + sgDayHtml(day, evs, care, { me: me || '', mine: SG_MINE });
     sgArmNow();
   } catch (e) { $('view').innerHTML = back + `<p>${sgEsc(e.message)}</p>`; }
 }
@@ -439,6 +480,11 @@ window.sgShiftMonth = n => {
 };
 window.sgThisMonth = () => { SG_HOME_MONTH = sgYm(typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10)); leoHomeCal(); };
 window.sgShiftDay = (d, n) => sgOpenDay(sgAdd(d, n));
+window.sgToggleMine = () => {
+  SG_MINE = !SG_MINE;
+  const m = decodeURIComponent(location.hash || '').match(/leo\/day\/(\d{4}-\d{2}-\d{2})/);
+  if (m) renderSgDay(m[1]);
+};
 window.sgOpenCal = d => { if (typeof CAL !== 'undefined') { CAL.d = d; CAL.mode = 'day'; } location.hash = 'leo/cal'; };
 window.leoHomeCal = leoHomeCal;
 window.renderSgDay = renderSgDay;

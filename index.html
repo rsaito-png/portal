@@ -24,6 +24,8 @@ table.msheet th{font-size:14px;font-weight:700;line-height:1.3}
 table.msheet input{field-sizing:content;width:auto;min-width:4.5em;max-width:none;margin:0;padding:6px 8px;font-size:16px;box-sizing:border-box;display:inline-block}
 table.kata-view{width:max-content;min-width:100%;font-size:18px}
 table.kata-view th,table.kata-view td{white-space:nowrap;vertical-align:top}
+table.sougei-view{width:max-content;min-width:100%;font-size:18px}
+table.sougei-view th,table.sougei-view td{white-space:nowrap;vertical-align:top}
 .note{color:#888;font-size:23px}.rec{margin:10px 0}.rec label{display:block;font-size:23px;color:#555}.rec textarea{width:100%;box-sizing:border-box;font-size:26px;padding:8px;border:1px solid #bbb;border-radius:8px;margin:2px 0 6px}.rec input{margin:2px 0 6px;padding:8px}
 .ptabs button{width:auto;margin-right:6px;padding:8px 16px;background:#fff;color:#333;border:1px solid #bbb}.ptabs .on{background:var(--main);color:#fff}
 h4{margin:14px 0 6px;font-size:25px}.kk.over{border-left:6px solid #d33}.kk.soon{border-left:6px solid #e6b800}.kk.ok{opacity:.6}.badge{background:#d33;color:#fff;border-radius:6px;padding:1px 6px;font-size:22px}.kk.soon .badge{background:#e6b800}.kk.ok .badge{background:#888}
@@ -53,18 +55,18 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261026sctops3"></script>
+<script src="config.js?v=20261026nicchu4sct"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261026"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261026b"></script>
-<script src="leo.js?v=20261026d"></script>
+<script src="leo.js?v=20261026f"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=202610162300"></script>
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
-<script src="nicchu.js?v=20261026"></script>
+<script src="nicchu.js?v=20261026c"></script>
 <script src="sui_render.js?v=202610170620"></script>
 <script src="sui.js?v=202610192150"></script>
 <script src="kin_contract.js?v=202610221354"></script>
@@ -77,9 +79,9 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="sct.js?v=20261026ops"></script>
 <script src="chair.js?v=202610211310"></script>
 <script src="mgr.js?v=202610161458"></script>
-<script src="leo_yotei.js?v=202610261800"></script>
+<script src="leo_yotei.js?v=202610262130"></script>
 <script src="leo_cal.js?v=202610261800"></script>
-<script src="leo_home_cal.js?v=202610261845"></script>
+<script src="leo_home_cal.js?v=20261026mine"></script>
 <script src="leo_jippi.js?v=202610201000"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
 <script src="uketsuke.js?v=202610211600"></script>
@@ -152,11 +154,17 @@ function leoHomeBody(o) {
 }
 async function leoHomeStatus() {
   try { if (DEMO || typeof sb !== 'function') return;
-    const t = today(), tm = addDays(t, 1), rows = await sb(`leo_nikki?day=gte.${t}&day=lte.${tm}&kind=eq.利用&select=day,pick_driver,pick_car,drop_driver,drop_car,child`);
-    const f = (id, d) => { const rs = rows.filter(r => r.day === d), bad = rs.reduce((n, r) => n + (!r.pick_driver || !r.pick_car ? 1 : 0) + (!r.drop_driver || !r.drop_car ? 1 : 0), 0), el = document.getElementById(id); if (!el) return;
-      el.innerHTML = !rs.length ? '日誌なし' : bad ? `<b style="color:#c00">未確定 ${bad}件</b>（${rs.length}人）` : `${rs.length}人・確定`; };
-    f('hs_today', t); f('hs_tomorrow', tm);
-    const k = document.getElementById('hs_kids'); if (k) k.textContent = rows.filter(r => r.day === t).length + '人';
+    const t = today(), tm = addDays(t, 1);
+    const [rows, evs0, LEFT] = await Promise.all([
+      sb(`leo_nikki?day=gte.${t}&day=lte.${tm}&select=day,kind,pick_driver,pick_car,drop_driver,drop_car,child`),
+      sb(`leo_events?day=gte.${t}&day=lte.${tm}&kind=in.(利用,迎え,送り)&select=day,kind,child,kids,staff,start_time,place,kid_places,kid_times`).catch(() => []),
+      loadLeftIndex().catch(() => ({})),
+    ]);
+    const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(evs0 || [], LEFT) : (evs0 || []);
+    const put = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    put('hs_today', leoTileStatus(rows, evs, t));
+    put('hs_tomorrow', leoTileStatus(rows, evs, tm));
+    put('hs_kids', leoKidTile(rows, evs, t));
   } catch (e) { }
 }
 function officeBody(o) {
@@ -197,6 +205,7 @@ async function render() {
   if (id === 'kintoun' && sub === 'check') return renderKinCheck();
   if (id === 'kintoun' && sub === 'visit') { KV.id = null; return renderKinVisit(); }
   if (id === 'nicchu' && sub === 'log' && typeof renderNicchu === 'function') return renderNicchu();
+  if (id === 'nicchu' && sub === 'jisseki' && typeof renderNicchuJisseki === 'function') return renderNicchuJisseki();
   if (id === 'nicchu' && sub === 'sign' && typeof renderNicchuSign === 'function') return renderNicchuSign();
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
