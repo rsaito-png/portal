@@ -5,7 +5,7 @@
 // 担当の色は Google カレンダーの予定色（colorId 1〜11）。colorId に無い色は #RRGGBB で書く。
 // 日誌・予定の担当は leo_events.staff（日誌の名前。例「山田　太郎」）。空白と「先生」「さん」は無視して照合する。
 // 色を見るのは担当欄だけ。児童名（加藤 湊など）では職員色にしない。
-// 一覧に無い担当は Tomato（11）。利用（児童の出席そのもの）は Tangerine（6）。
+// 一覧に無い担当は Tomato（11）。利用（児童の出席そのもの）は山吹色。
 const GCAL_EVENT_COLORS = {
   1: ['Lavender', '#7986cb'],
   2: ['Sage', '#33b679'],
@@ -19,7 +19,7 @@ const GCAL_EVENT_COLORS = {
   10: ['Basil', '#0b8043'],
   11: ['Tomato', '#d50000'],
 };
-const SG_USE_HEX = '#f4511e';
+const SG_USE_HEX = '#f8b500';
 const SG_OTHER_HEX = '#d50000';
 // ゆか＝友香、さち＝祥、なお＝尚。あやの漢字は未指定なので、あやのまま出す。
 // 宮本さん・加藤先生の下の名前は、公開リポジトリにも日誌の対応表にも無い。姓で始まる担当名に当てる。
@@ -148,7 +148,7 @@ function sgStaffShow(name, opt) {
   return String(name ?? '').replace(/[ \t\u3000]+/g, ' ').trim();
 }
 function sgUsePaint() {
-  return { id: 6, hex: SG_USE_HEX, ink: sgInk(SG_USE_HEX), mapped: true, name: 'Tangerine', role: 'use' };
+  return { id: null, hex: SG_USE_HEX, ink: sgInk(SG_USE_HEX), mapped: true, name: 'Yamabuki', role: 'use' };
 }
 function sgEventPaint(e, opt) {
   if (e && e.kind === '利用') return sgUsePaint();
@@ -242,7 +242,7 @@ function sgCss() {
 .sgm td button{width:100%;height:32px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:1px 0}
 .sgm td button b{font-size:13px;line-height:1.1}
 .sgm td button .sub{font-size:9px;color:#2e6b4f;font-weight:700;line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden}
-.sgm td button .sub.use{color:#f4511e}
+.sgm td button .sub.use{color:#222;background:#f8b500;border-radius:3px;padding:0 3px}
 .sgm td button .sub.off{color:#b33}
 .sgm td button.today{background:#fff4e4;box-shadow:inset 0 0 0 2px #e8833a}
 .sgm td.dim button{opacity:.4}
@@ -361,7 +361,7 @@ function sgDayHtml(day, evs, care, opt) {
     <div class="sg-leg">${legend}</div>
     <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px;min-width:${Math.max(240, maxCols * 132)}px">${lines.join('')}${blocks}${nowEl}</div></div></div></div>
     <p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>
-    <p class="sg-foot">利用児童はオレンジ、送迎の色は担当ごとです。一覧に無い担当は赤です。☆は迎え、下線の★は送りです。</p></div>`;
+    <p class="sg-foot">利用児童は山吹色、送迎の色は担当ごとです。一覧に無い担当は赤です。☆は迎え、下線の★は送りです。</p></div>`;
 }
 async function sgLoad(a, b, mode, anchor) {
   let evs = [];
