@@ -465,23 +465,99 @@ const ASSESS_SECTIONS = [
 
 const WD = ['月', '火', '水', '木', '金', '土', '日'], TMODE = ['送迎あり', '迎えのみ', '送りのみ', '保護者送迎', 'なし'];
 const INFO_F = [['guardian_name', '保護者氏名'], ['guardian_phone', '保護者 電話'], ['guardian_phone2', '予備の電話'], ['emergency_contact', '緊急連絡先（続柄・電話）'], ['home_address', '自宅住所']];
+const UI_NAME_TABLES = [['leo_child_plan', 'name'], ['leo_child_assess', 'name'], ['leo_child_info', 'name'], ['leo_child_care', 'child'], ['leo_children', 'name']];
+function uiCanon(s) {
+  return typeof canonChildName === 'function' ? canonChildName(s) : String(s ?? '').replace(/\s+/g, ' ').trim();
+}
+function uiClustersOf(names) {
+  if (typeof clusterChildNames === 'function') return clusterChildNames(names);
+  return [...new Set((names || []).filter(n => n && !String(n).startsWith('※') && uiCanon(n)))].map(n => ({ label: uiCanon(n), raws: [n] }));
+}
+function uiNameRank(raw) {
+  const c = uiCanon(raw);
+  const n = typeof childTokens === 'function' ? childTokens(raw).length : (c ? c.split(' ').length : 0);
+  return n * 10 + (String(raw) === c ? 1 : 0);
+}
+function uiFilled(v) {
+  if (v == null || v === '') return false;
+  if (Array.isArray(v)) return v.length > 0;
+  return true;
+}
+function uiMergeObj(base, extra) {
+  const out = { ...(base || {}) };
+  for (const [k, v] of Object.entries(extra || {})) {
+    if (k === 'data' && v && typeof v === 'object' && !Array.isArray(v)) {
+      const d = { ...(out.data || {}) };
+      for (const [dk, dv] of Object.entries(v)) if (uiFilled(dv)) d[dk] = dv;
+      out.data = d;
+    } else if (uiFilled(v)) out[k] = v;
+  }
+  return out;
+}
+function uiMergeByCluster(rows, key, clusters) {
+  const map = {};
+  for (const c of clusters) {
+    const mine = (rows || []).filter(r => r && c.raws.includes(r[key]));
+    mine.sort((a, b) => uiNameRank(a[key]) - uiNameRank(b[key]));
+    let merged = null;
+    for (const row of mine) merged = uiMergeObj(merged, row);
+    if (merged) { merged[key] = c.label; map[c.label] = merged; }
+  }
+  return map;
+}
+function uiClusterLeftOn(idx, cluster) {
+  let best = null;
+  for (const r of [cluster.label, ...(cluster.raws || [])]) {
+    const d = leftOnOf(idx, r);
+    if (d && (!best || d < best)) best = d;
+  }
+  return best;
+}
+function uiClusterLeftDone(idx, cluster, todayStr) {
+  return (cluster.raws || []).some(r => leftDone(idx, r, todayStr)) || leftDone(idx, cluster.label, todayStr);
+}
+function uiClusterMark(idx, cluster, todayStr) {
+  const d = uiClusterLeftOn(idx, cluster);
+  return d ? leftMark({ [cluster.label]: d }, cluster.label, todayStr) : '';
+}
+function uiAliasAttr(raws, label) {
+  return esc(JSON.stringify((raws || []).filter(r => r !== label)));
+}
+function uiReadAliases(w) {
+  try { const a = JSON.parse((w && w.dataset.aliases) || '[]'); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+async function uiDropSpaceAliases(w, name) {
+  for (const raw of uiReadAliases(w)) {
+    if (!raw || raw === name || uiCanon(raw) !== name) continue;
+    for (const [t, c] of UI_NAME_TABLES)
+      await sb(`${t}?${c}=eq.${encodeURIComponent(raw)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  }
+}
 LEO_VIEWS.userinfo = async function () {
   const mg = canManage();
   const safeSheet = async kind => { try { return await sheetRows(kind); } catch (e) { return []; } };
   const [kids, infos, cares, nk, asses, plans, kataRows, keiRows] = DEMO ? [DEMO_BILL.kids, DEMO_LEFT_INFOS, [], DEMO_BILL.nikki, [], [], DEMO_DATA.kata, DEMO_DATA.keikaku] : await Promise.all([mg ? sb('leo_children?order=name') : [], sb('leo_child_info?order=name').catch(() => []), sb('leo_child_care').catch(() => []), billData().then(d => d.nikki).catch(() => []), sb('leo_child_assess?order=name').catch(() => []), sb('leo_child_plan').catch(() => []), safeSheet('kata'), safeSheet('keikaku')]);
-  const PLN = Object.fromEntries(plans.map(x => [x.name, x]));
-  const A = Object.fromEntries(asses.map(x => [x.name, x]));
-  const I = Object.fromEntries(infos.map(x => [x.name, x])), K = Object.fromEntries(kids.map(x => [x.name, x])), C = Object.fromEntries(cares.map(x => [x.child, x.note]));
   const LEFT = leftIndex(infos), tday = today();
-  const names = [...new Set([...kids.map(x => x.name), ...infos.map(x => x.name), ...cares.map(x => x.child), ...asses.map(x => x.name), ...nk.map(n => n.child), ...kataRows.map(r => r['児童名']), ...keiRows.map(r => r['児童名'])])].filter(n => n && !String(n).startsWith('※')).sort((a, b) => a.localeCompare(b, 'ja'));
+  const rawNames = [...new Set([...kids.map(x => x.name), ...infos.map(x => x.name), ...cares.map(x => x.child), ...asses.map(x => x.name), ...plans.map(x => x.name), ...nk.map(n => n.child), ...kataRows.map(r => r['児童名']), ...keiRows.map(r => r['児童名'])])].filter(n => n && !String(n).startsWith('※'));
+  const clusters = uiClustersOf(rawNames);
+  if (UI.sel) { const hit = clusters.find(c => c.label === UI.sel || c.raws.includes(UI.sel)); if (hit) UI.sel = hit.label; }
+  const PLN = uiMergeByCluster(plans, 'name', clusters);
+  const A = uiMergeByCluster(asses, 'name', clusters);
+  const I = uiMergeByCluster(infos, 'name', clusters), K = uiMergeByCluster(kids, 'name', clusters);
+  const C = Object.fromEntries(Object.entries(uiMergeByCluster(cares.map(x => ({ ...x, name: x.child })), 'name', clusters)).map(([k, v]) => [k, v.note]));
   const css = `<style>.ui-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}.ui-list a{display:block;border:1px solid #ccd;border-radius:8px;padding:10px;background:#fff;text-decoration:none;color:#222}.ui-list a small{display:block;color:#666}.uic{border:1px solid #ccd;border-radius:8px;margin:8px 0;background:#fff}.uic h4{margin:0;padding:8px 10px;background:#eef;border-radius:8px 8px 0 0}.uig{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 12px;padding:8px 10px}.uig label span{display:block;font-size:.8em;color:#555}.uig input:not([type=checkbox]),.uig select,.uig textarea{width:100%;box-sizing:border-box;margin:2px 0;padding:8px}.uig .wide{grid-column:1/-1}.uil a{margin-right:10px}</style>`;
   const nm = UI.sel;
+  const cur = clusters.find(c => c.label === nm) || (nm ? { label: nm, raws: [nm] } : null);
+  const mark = cur ? uiClusterMark(LEFT, cur, tday) : '';
+  const aliasAttr = ` data-aliases="${uiAliasAttr(cur ? cur.raws : [], nm || '')}"`;
+  const clusterLeft = cur ? (uiClusterLeftOn(LEFT, cur) || '') : '';
   if (!nm && !UI.adding) {
-    const shown = names.filter(n => UI.roster === 'left' ? leftDone(LEFT, n, tday) : !leftDone(LEFT, n, tday));
-    const nLeft = names.filter(n => leftDone(LEFT, n, tday)).length;
-    return `<h3>利用者情報</h3>${demoNote()}${css}<p class="note">児童ごとの受給者証・送迎・連絡先・Googleフォト・個別支援計画を、ここ1か所にまとめています。児童を選んでください。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
-      <p class="ptabs"><button class="${UI.roster === 'active' ? 'on' : ''}" onclick="uiRoster('active')">在籍（${names.length - nLeft}）</button><button class="${UI.roster === 'left' ? 'on' : ''}" onclick="uiRoster('left')">退所児童（${nLeft}）</button></p>
-      <div class="ui-list">${shown.map(n => `<a href="#" onclick="uiOpen(${esc(JSON.stringify(n))});return false" style="${leftDone(LEFT, n, tday) ? 'background:#f3f3f3;border-style:dashed' : ''}"><b>${esc(n)}</b>${leftMark(LEFT, n, tday)}<small>${[K[n] ? '受給者証' + (K[n].jukyusha_no ? '○' : '未') : '', I[n] ? (I[n].transport_mode || '') : '送迎未入力'].filter(Boolean).join(' ／ ')}</small></a>`).join('') || `<p>${UI.roster === 'left' ? '退所した児童はいません。' : '在籍の児童はいません。'}</p>`}</div>
+    const shown = clusters.filter(c => UI.roster === 'left' ? uiClusterLeftDone(LEFT, c, tday) : !uiClusterLeftDone(LEFT, c, tday));
+    const nLeft = clusters.filter(c => uiClusterLeftDone(LEFT, c, tday)).length;
+    return `<h3>利用者情報</h3>${demoNote()}${css}<p class="note">児童ごとの受給者証・送迎・連絡先・Googleフォト・個別支援計画を、ここ1か所にまとめています。児童を選んでください。空白の違い（全角・半角・連続）と、一人に定まる「名前だけ／姓つき」は同じ児童として表示します。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
+      <p class="ptabs"><button class="${UI.roster === 'active' ? 'on' : ''}" onclick="uiRoster('active')">在籍（${clusters.length - nLeft}）</button><button class="${UI.roster === 'left' ? 'on' : ''}" onclick="uiRoster('left')">退所児童（${nLeft}）</button></p>
+      <div class="ui-list">${shown.map(c => `<a href="#" onclick="uiOpen(${esc(JSON.stringify(c.label))});return false" style="${uiClusterLeftDone(LEFT, c, tday) ? 'background:#f3f3f3;border-style:dashed' : ''}"><b>${esc(c.label)}</b>${uiClusterMark(LEFT, c, tday)}<small>${[K[c.label] ? '受給者証' + (K[c.label].jukyusha_no ? '○' : '未') : '', I[c.label] ? (I[c.label].transport_mode || '') : '送迎未入力'].filter(Boolean).join(' ／ ')}${c.raws.length > 1 ? ' ／ 表記 ' + c.raws.map(esc).join('、') : ''}</small></a>`).join('') || `<p>${UI.roster === 'left' ? '退所した児童はいません。' : '在籍の児童はいません。'}</p>`}</div>
       ${mg ? `<button onclick="uiAdd()">＋ 児童を追加</button>` : ''}
       <p class="note">退所にしても記録は消えません。退所日の翌日以降、利用予定・カレンダー・送迎に出なくなります。型表の保存は不要です。請求CSVは <a href="#leo/seikyu">請求</a> から（ここの受給者証の内容が使われます）。</p>`;
   }
@@ -489,9 +565,9 @@ LEO_VIEWS.userinfo = async function () {
   if (UI.tab === 'plan' && nm) {
     const p = PLN[nm] || {};
     const tabs = `<p><button class="back" onclick="uiTab('basic')">基本</button> <button class="back" onclick="uiTab('assess')">アセスメント</button> <b style="padding:6px 10px;border-bottom:3px solid #36c">個別支援計画</b></p>`;
-    return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${leftMark(LEFT, nm, tday)}${demoNote()}</h3>${tabs}
+    return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${mark}${demoNote()}</h3>${tabs}
       <p class="note">現行の個別支援計画の本文です。今日の利用児童のカードから読めます。${p.updated_at ? '更新：' + esc(String(p.updated_at).slice(0, 10)) + '。' : 'まだ入っていません。'}${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
-      <div id="uiw" data-name="${esc(nm)}"><div class="uic"><div class="uig">
+      <div id="uiw" data-name="${esc(nm)}"${aliasAttr}><div class="uic"><div class="uig">
         <label><span>期（例：第2期）</span><input data-t="pl" data-f="term" value="${esc(p.term || '')}" ${ro}></label>
         <label><span>計画期間</span><input data-t="pl" data-f="period" value="${esc(p.period || '')}" ${ro}></label>
         <label class="wide"><span>元の計画書（Googleドキュメント等）のリンク　https://…</span><input data-t="pl" data-f="source_url" type="url" value="${esc(p.source_url || '')}" ${ro}></label>
@@ -502,18 +578,19 @@ LEO_VIEWS.userinfo = async function () {
   if (UI.tab === 'assess' && nm) {
     const a = A[nm] || {}, d = a.data || {};
     const tabs = `<p><button class="back" onclick="uiTab('basic')">基本</button> <b style="padding:6px 10px;border-bottom:3px solid #36c">アセスメント</b> <button class="back" onclick="uiTab('plan')">個別支援計画</button></p>`;
-    return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${leftMark(LEFT, nm, tday)}${demoNote()}</h3>${tabs}
+    return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${mark}${demoNote()}</h3>${tabs}
       <p class="note">${a.source ? '取り込み元：' + esc(a.source) + '。' : 'まだ入力がありません。'}診断名・服薬などの機微情報を含みます。レオ職員だけが見られます。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
-      <div id="uiw" data-name="${esc(nm)}">${ASSESS_SECTIONS.map(([t, fs]) => `<div class="uic"><h4>${t}</h4><div class="uig">${fs.map(([f, l, w]) => `<label${w ? ' class="wide"' : ''}><span>${l}</span>${w ? `<textarea data-t="as" data-f="${f}" rows="2" ${ro}>${esc(d[f] || '')}</textarea>` : `<input data-t="as" data-f="${f}" value="${esc(d[f] || '')}" ${ro}>`}</label>`).join('')}</div></div>`).join('')}</div>
+      <div id="uiw" data-name="${esc(nm)}"${aliasAttr}>${ASSESS_SECTIONS.map(([t, fs]) => `<div class="uic"><h4>${t}</h4><div class="uig">${fs.map(([f, l, w]) => `<label${w ? ' class="wide"' : ''}><span>${l}</span>${w ? `<textarea data-t="as" data-f="${f}" rows="2" ${ro}>${esc(d[f] || '')}</textarea>` : `<input data-t="as" data-f="${f}" value="${esc(d[f] || '')}" ${ro}>`}</label>`).join('')}</div></div>`).join('')}</div>
       ${mg ? `<button onclick="uiSaveAssess()">保存</button> <span id="ui_msg"></span>` : ''}`;
   }
   const kin = (f, l, v, extra = '') => `<label><span>${l}</span><input data-t="info" data-f="${f}" value="${esc(v ?? '')}" ${extra} ${ro}></label>`;
   const jk = mg ? `<div class="uic"><h4>① 受給者証（請求に使います）</h4><div class="uig">${KID_F.filter(([f]) => f !== 'name').map(([f, l]) => `<label><span>${l}</span>${kidInput(k, f, k[f])}</label>`).join('')}</div></div>` : '';
   const leaveBox = nm ? `<div class="uic"><h4>退所</h4><p class="note">退所日を入れると、その日までは今まで通り、翌日以降は利用予定・カレンダー・送迎に出なくなります。記録は消えません。型表は変更しません（型表の「保存」は押さないでください）。日付を空にして「保存」しても、すでに入っている退所日は消えません。取り消すときは「復帰する」を押します。</p>
-      ${mg ? `<div class="uig"><label><span>退所日（この日まで在籍）</span><input type="date" id="ui_left" data-was="${i.left_on ? '1' : ''}" value="${esc((i.left_on || '').slice(0, 10))}"></label></div>
-        <p style="padding:0 10px 10px"><button type="button" onclick="uiLeave()">退所にする</button>${i.left_on ? ` <button type="button" onclick="uiReturn()">復帰する</button>` : ''}</p>` : `<p style="padding:0 10px 10px">${i.left_on ? `退所日：${esc(String(i.left_on).slice(0, 10).replace(/-/g, '/'))}` : '在籍中'}</p>`}</div>` : '';
-  return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${nm ? esc(nm) : '（新しい児童）'}${nm ? leftMark(LEFT, nm, tday) : ''}${demoNote()}</h3>
-    <div id="uiw" data-name="${esc(nm || '')}">
+      ${mg ? `<div class="uig"><label><span>退所日（この日まで在籍）</span><input type="date" id="ui_left" data-was="${clusterLeft ? '1' : ''}" value="${esc(String(clusterLeft).slice(0, 10))}"></label></div>
+        <p style="padding:0 10px 10px"><button type="button" onclick="uiLeave()">退所にする</button>${clusterLeft ? ` <button type="button" onclick="uiReturn()">復帰する</button>` : ''}</p>` : `<p style="padding:0 10px 10px">${clusterLeft ? `退所日：${esc(String(clusterLeft).slice(0, 10).replace(/-/g, '/'))}` : '在籍中'}</p>`}</div>` : '';
+  return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${nm ? esc(nm) : '（新しい児童）'}${nm ? mark : ''}${demoNote()}</h3>
+    ${cur && cur.raws.length > 1 ? `<p class="note">同じ児童としてまとめています（${cur.raws.map(esc).join('、')}）。保存すると、空白だけ違う表記は「${esc(nm)}」に揃えます。</p>` : ''}
+    <div id="uiw" data-name="${esc(nm || '')}"${aliasAttr}>
     ${UI.adding ? `<div class="uic"><div class="uig"><label><span>児童名（日誌と同じ表記）</span><input id="ui_newname" data-t="new"></label></div></div>` : ''}
     ${nm ? `<p><b style="padding:6px 10px;border-bottom:3px solid #36c">基本</b> <button class="back" onclick="uiTab('assess')">アセスメント${A[nm] ? '' : '（未入力）'}</button> <button class="back" onclick="uiTab('plan')">個別支援計画${PLN[nm] ? '' : '（未入力）'}</button></p>` : ''}
     <p class="uil">${i.album_url ? `<a href="${esc(i.album_url)}" target="_blank" rel="noopener">📷 Googleフォト アルバム</a>` : ''}</p>
@@ -531,8 +608,10 @@ LEO_VIEWS.userinfo = async function () {
 };
 window.uiRoster = mode => { UI.roster = mode; renderLeoView('userinfo'); };
 async function uiWriteLeft(name, day) {
-  const row = { name, left_on: day, updated_at: new Date().toISOString() };
-  await sb('leo_child_info?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([row]) });
+  const w = $('uiw');
+  const names = [...new Set([uiCanon(name), name, ...uiReadAliases(w)].filter(Boolean))];
+  const rows = names.map(n => ({ name: n, left_on: day, updated_at: new Date().toISOString() }));
+  await sb('leo_child_info?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) });
 }
 window.uiLeave = async () => {
   const w = $('uiw'), name = w && w.dataset.name, m = $('ui_msg'), day = ($('ui_left') && $('ui_left').value || '').trim();
@@ -553,11 +632,14 @@ window.uiReturn = async () => {
 };
 window.uiDelete = async () => {
   const w = $('uiw'), name = w && w.dataset.name, m = $('ui_msg'); if (!name) return;
-  if (!confirm(`「${name}」を削除します。\n\n消えるもの：受給者証・送迎・連絡先・アセスメント（利用者情報の全項目）\n消えないもの：日誌などの記録\n\n元に戻せません。よろしいですか？`)) return;
+  const aliases = uiReadAliases(w).filter(n => n && n !== name);
+  const extra = aliases.length ? `\n同じ児童の別表記も消します：${aliases.join('、')}` : '';
+  if (!confirm(`「${name}」を削除します。${extra}\n\n消えるもの：受給者証・送迎・連絡先・アセスメント（利用者情報の全項目）\n消えないもの：日誌などの記録\n\n元に戻せません。よろしいですか？`)) return;
   if (DEMO) { alert('見本モードなので削除しません。'); return; }
   try {
-    for (const [t, c] of [['leo_child_plan', 'name'], ['leo_child_assess', 'name'], ['leo_child_info', 'name'], ['leo_child_care', 'child'], ['leo_children', 'name']])
-      await sb(`${t}?${c}=eq.${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    const names = [...new Set([name, ...uiReadAliases(w)])];
+    for (const n of names) for (const [t, c] of UI_NAME_TABLES)
+      await sb(`${t}?${c}=eq.${encodeURIComponent(n)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     UI.sel = null; UI.adding = false; await renderLeoView('userinfo'); const mm = $('ui_msg'); if (mm) mm.textContent = '削除しました。';
   } catch (e) { (m || { }).textContent = e.message; alert('削除できませんでした：' + e.message); }
 };
@@ -570,26 +652,28 @@ const kidInput = (k, f, v) => { const h = document.createElement('div'); return 
     : f === 'gensan' ? `<select data-t="kid" data-f="gensan">${[['', 'なし'], ['未計画', '未作成（1〜2月目）'], ['未計画2', '未作成（3月目以降）']].map(([o, l]) => `<option value="${o}" ${(v || [])[0] === o || (!o && !(v || []).length) ? 'selected' : ''}>${l}</option>`).join('')}</select>`
     : `<input data-t="kid" data-f="${f}" value="${esc(v ?? '')}" ${/contract_start|contract_end|first_date/.test(f) ? 'type="date"' : ''}>`); };
 async function uiSavePlan() {
-  const w = $('uiw'), m = $('ui_msg'), name = w.dataset.name, o = {};
+  const w = $('uiw'), m = $('ui_msg'), name = uiCanon(w.dataset.name), o = {};
   w.querySelectorAll('[data-t="pl"]').forEach(x => o[x.dataset.f] = x.value.trim() || null);
   if (o.source_url && !/^https:\/\//.test(o.source_url)) { m.textContent = 'リンクは https:// で始まるものを入れてください。'; return; }
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try {
     await sb('leo_child_plan?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ name, ...o, updated_at: new Date().toISOString() }]) });
-    await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
+    await uiDropSpaceAliases(w, name);
+    UI.sel = name; await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
   } catch (e) { m.textContent = e.message; }
 }
 async function uiSaveAssess() {
-  const w = $('uiw'), m = $('ui_msg'), name = w.dataset.name, data = {};
+  const w = $('uiw'), m = $('ui_msg'), name = uiCanon(w.dataset.name), data = {};
   w.querySelectorAll('[data-t="as"]').forEach(x => { if (x.value.trim()) data[x.dataset.f] = x.value.trim(); });
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try {
     await sb('leo_child_assess?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ name, data, source: 'ポータル入力', updated_at: new Date().toISOString() }]) });
-    await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
+    await uiDropSpaceAliases(w, name);
+    UI.sel = name; await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
   } catch (e) { m.textContent = e.message; }
 }
 async function uiSave() {
-  const w = $('uiw'), m = $('ui_msg'), name = (UI.adding ? $('ui_newname').value : w.dataset.name).trim();
+  const w = $('uiw'), m = $('ui_msg'), name = uiCanon(UI.adding ? $('ui_newname').value : w.dataset.name);
   if (!name) { m.textContent = '児童名を入れてください。'; return; }
   const get = t => { const o = {}; w.querySelectorAll(`[data-t="${t}"][data-f]`).forEach(x => o[x.dataset.f] = x.type === 'checkbox' ? x.checked : x.value.trim()); return o; };
   const kid = get('kid'), info = get('info'), care = get('care');
@@ -613,6 +697,7 @@ async function uiSave() {
     if (hasKid) await up('leo_children', 'name', kid);
     await up('leo_child_info', 'name', info);
     await up('leo_child_care', 'child', { child: name, note: care.note || null });
+    await uiDropSpaceAliases(w, name);
     UI.sel = name; UI.adding = false; await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
   } catch (e) { m.textContent = e.message + (info.left_on ? '（退所日を保存できないときは、管理者が supabase/leo_left.sql を実行したか確認してください）' : ''); }
 }
