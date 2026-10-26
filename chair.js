@@ -10,11 +10,13 @@ async function chairCheck() {
     CH.ok = r.ok && (await r.json()) === true; } catch (e) { CH.ok = false; }
   return CH.ok;
 }
-// 事業所えらびの一番上に、会長だけに出すタイル
+// 事業所えらびの一番上に、会長だけに出すタイル（事業所カードより前）
 async function chairTile() {
   if (!(await chairCheck())) return;
-  const g = document.querySelector('#view .grid'); if (!g || document.getElementById('chair_tile')) return;
-  g.insertAdjacentHTML('beforebegin', `<a id="chair_tile" class="tile big" href="#chair" style="display:block;border-top:4px solid #b8860b;margin-bottom:12px"><span>👑</span>会長ページ<small>思いつきを入れる・今日やる3つ</small></a>`);
+  const v = document.getElementById('view'); if (!v || document.getElementById('chair_tile')) return;
+  const html = `<a id="chair_tile" class="tile big" href="#chair" style="display:block;border-top:4px solid #b8860b;margin-bottom:12px"><span>👑</span>会長ページ<small>思いつきを入れる・今日やる3つ</small></a>`;
+  const msg = document.getElementById('chair_msg');
+  if (msg) msg.insertAdjacentHTML('afterend', html); else v.insertAdjacentHTML('afterbegin', html);
 }
 // 会長からの一言（職員向け表示）
 async function chairMsgHtml() {
