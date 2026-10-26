@@ -43,7 +43,7 @@ table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #eee;pad
 </div>
 </main>
 <script src="config.js?v=20261026"></script>
-<script src="sct_logic.js?v=20261026"></script>
+<script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
 <script>
 const C = window.PORTAL_CONFIG, $ = id => document.getElementById(id);
@@ -119,7 +119,7 @@ function demoData() {
       { booking_id: 'b2', joined_at: '2026-11-21T10:00:00+09:00', left_at: '2026-11-21T11:30:00+09:00', camera_off: false },
       { booking_id: 'b3', joined_at: '2026-11-22T10:00:00+09:00', left_at: '2026-11-22T11:30:00+09:00', camera_off: false },
     ],
-    payments: [{ status: 'paid', plan: 'bundle', amount_yen: 12800, method: 'stripe' }],
+    payments: [{ status: 'paid', plan: 'bundle', amount_yen: 12800, method: 'square' }],
     certificates: [], quiz: [], settings: {},
   };
 }
@@ -168,7 +168,7 @@ function viewProfile() {
     <p>いまの料金: ${plan.blocked ? esc(plan.blocked) : (plan.amountYen ? plan.amountYen.toLocaleString('ja-JP') + '円（税込）' : '課金なし')}</p>
     <p>免除の確認: ${esc(p.exemption_status || 'none')} ／ 本人確認: ${esc(p.identity_status || 'unverified')}</p>
     <p class="note">${esc((D.settings && D.settings['返金']) || Sct.REFUND_POLICY)}</p>
-    ${pay && (pay.status === 'paid' || pay.status === 'waived') ? `<p class="ok">お支払い: ${pay.status === 'waived' ? '不要' : '済み'}（${esc(pay.method)}）</p>` : `<p><button onclick="payNow()">支払いへ進む</button></p><p class="note">カードは Stripe の画面で扱います。番号はこのページに入力しません。振込をご希望の場合は運営へ連絡してください。</p>`}
+    ${pay && (pay.status === 'paid' || pay.status === 'waived') ? `<p class="ok">お支払い: ${pay.status === 'waived' ? '不要' : '済み'}（${esc(Sct.methodLabel(pay.method))}）</p>` : `<p><button onclick="payNow()">支払いへ進む</button></p><p class="note">カードは Square の画面で扱います。番号はこのページに入力しません。振込をご希望の場合は運営へ連絡してください。</p>`}
     ${new URLSearchParams(location.search).get('paid') === '1' ? '<p class="note">決済画面から戻りました。反映まで少しかかる場合があります。下の受講状況を開き直してください。</p>' : ''}
   </div>`;
 }
@@ -195,7 +195,7 @@ async function upload(kind, file) {
   return path;
 }
 async function payNow() {
-  if (DEMO) { D.payments = [{ status: 'paid', plan: 'bundle', amount_yen: 12800, method: 'stripe' }]; alert('見本では決済しません。入金済みにします。'); draw(); return; }
+  if (DEMO) { D.payments = [{ status: 'paid', plan: 'bundle', amount_yen: 12800, method: 'square' }]; alert('見本では決済しません。入金済みにします。'); draw(); return; }
   const s = sess();
   const r = await fetch(C.supabaseUrl + '/functions/v1/sct-checkout', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ return_to: location.origin + location.pathname }) });
   const j = await r.json().catch(() => ({}));
