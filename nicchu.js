@@ -403,6 +403,7 @@ async function ncPaintList() {
   document.getElementById('view').innerHTML = `<button class="back" type="button" onclick="location.hash='nicchu'">← 日中一時支援へ</button>
     <h3 style="color:#1f7a6b">日中一時支援</h3>
     <p class="nc-pt">${esc(NC_PLACE)}　ふだん 7:00–13:00。どの曜日でも記録できます。金斗雲の訪問記録とは別です。署名は受け取らず、印刷して市役所へ出します。</p>
+    <p><a class="back" href="gl:g23" style="display:inline-block;text-decoration:none">📅 土日スケジュール</a></p>
     ${ncDemoNote()}${flash}
     <div class="nc-card"><label>月<input type="month" id="nc_month" value="${esc(NC.month)}" onchange="NC.month=this.value||NC.month;renderNicchu()"></label>
       <label>この日を書く<input type="date" id="nc_open_date" value="${esc(ncToday())}"></label>
