@@ -55,7 +55,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261026menu"></script>
+<script src="config.js?v=20261026who"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261026"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -141,8 +141,13 @@ function leoHomeBody(o) {
   const mine = ((o.mine || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
   const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
   const g = groupList(o).map(x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`).join('');
+  const tileBig = t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`;
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
-  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`).join('')}</div>` : '';
+  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(tileBig).join('')}</div>` : '';
+  const who = (o.who || []).map(([title, names]) => {
+    const tiles = (names || []).flatMap(n => vis.filter(t => t[1] === n));
+    return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid">${tiles.map(tileBig).join('')}</div>` : '';
+  }).join('');
   return `<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#leo/sougeiall', '🚐', '今日の送迎', 'hs_today', "PERIOD='today'")}
     ${big('#leo/sougeiall', '🚐', '明日の送迎', 'hs_tomorrow', "PERIOD='tomorrow'")}
@@ -150,7 +155,7 @@ function leoHomeBody(o) {
     ${big('#leo/linedraft', '✉️', 'LINEの下書き', '', '')}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}</div>
     <h3 class="nx">${myDuty() === '事務' ? '情報' : myDuty() + 'の仕事'}</h3><div class="grid">${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}</div>
-    ${rt}`;
+    ${who}${rt}`;
 }
 async function leoHomeStatus() {
   try { if (DEMO || typeof sb !== 'function') return;
