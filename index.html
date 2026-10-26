@@ -242,6 +242,7 @@ async function render() {
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   $('view').innerHTML = `<h3>事業所</h3>
     <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
+    <h3>共通</h3>
     <div class="grid">${topT.map(t => tileHtml(t)).join('')}</div><div id="sct_slot"></div>
     <div id="soumu_slot">${ROLE === C.clerk.role ? soumuTile() : ''}</div>
     <h3 id="misc_h">未整理</h3>
