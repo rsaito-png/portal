@@ -72,9 +72,8 @@ window.PORTAL_CONFIG = {
       ['📊', '実績記録（請求元）', 'gl:g2', '日誌から自動転記', '', null, '事務'],
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
-    { id: 'nicchu', name: 'レスパイト', kind: '日中一時支援', color: '#1f7a6b', tiles: [
-      ['☀️', '支援記録', '#nicchu/log', '日ごとの支援日誌（金斗雲の訪問記録とは別）', 'main'],
-      ['✍️', 'あとで署名', '#nicchu/sign', 'タブレットで、署名待ちの記録に署名', 'main'] ] },
+    { id: 'nicchu', name: '日中一時支援', kind: '星心会レスパイトスタジオ', color: '#1f7a6b', tiles: [
+      ['☀️', '支援記録', '#nicchu/log', '日ごとの支援日誌（金斗雲の訪問記録とは別。署名は印刷して市役所へ）', 'main'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f', tiles: [
       ['📋', '日報システム', 'gl:g6', 'Googleフォーム'],
       ['📓', '日誌 Registro Diário', 'gl:g7', 'フォーム回答（手入力）'],
@@ -138,6 +137,6 @@ window.PORTAL_CONFIG = {
       pay: '毎月末日締切、翌月15日支払、銀行振込', bonus: '無', raise: '無', retirement_pay: '無',
       insurance: '社会保険の加入 （　）／雇用保険の適用 （　）', remarks: '' },
     // 事業所ごとの既定（就業場所・仕事内容）。例を書いておく
-    officeDefaults: { 'レオ': { place: 'レオ', job: '' }, '茶夢': { place: '茶夢', job: '' }, '金斗雲': { place: '金斗雲', job: '' }, 'レスパイト': { place: '星心会レスパイトスタジオ', job: '' } },
+    officeDefaults: { 'レオ': { place: 'レオ', job: '' }, '茶夢': { place: '茶夢', job: '' }, '金斗雲': { place: '金斗雲', job: '' }, '日中一時支援': { place: '星心会レスパイトスタジオ', job: '' }, 'レスパイト': { place: '星心会レスパイトスタジオ', job: '' }, '日中一時': { place: '星心会レスパイトスタジオ', job: '' } },
   },
 };
