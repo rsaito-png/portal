@@ -18,7 +18,7 @@ assert.deepStrictEqual([...ctx.orderKataCols(demo)], [
 
 // 別名だけの列は、その枠に入れる。知らない列は今の順でうしろ。
 assert.deepStrictEqual([...ctx.orderKataCols(['メモ', '送り時間', '曜日', '学校お迎え時刻（基準）※空欄なら迎え開始', '送り場所'])], [
-  '曜日', '送り時間', '送り場所', 'メモ', '学校お迎え時刻（基準）※空欄なら迎え開始',
+  '曜日', '学校お迎え時刻（基準）※空欄なら迎え開始', '送り時間', '送り場所', 'メモ',
 ]);
 
 // 正式名と別名が両方あるときは正式名を枠に入れ、別名はうしろ（今の順）。
@@ -30,6 +30,12 @@ assert.strictEqual(ctx.kataColLabel('迎え開始'), '迎え時間');
 assert.strictEqual(ctx.kataColLabel('送り終了'), '送り時間');
 assert.strictEqual(ctx.kataColLabel('迎え場所'), '迎え場所');
 assert.strictEqual(ctx.kataColLabel('送り場所（空欄なら自宅）'), '送り場所（空欄なら自宅）');
+assert.strictEqual(ctx.kataColLabel('学校お迎え時刻（基準）※空欄なら迎え開始'), '学校お迎え時刻');
+
+const school = '学校お迎え時刻（基準）※空欄なら迎え開始';
+assert.deepStrictEqual([...ctx.orderKataCols([...demo, school])], [
+  '曜日', '児童名', '利用週', '利用開始', '利用終了', '迎え順', '迎え開始', '迎え場所', school, '迎え担当', '送り順', '送り終了', '送り場所（空欄なら自宅）', '送り担当', '保護者送迎',
+]);
 
 const master = leo.slice(leo.indexOf('LEO_VIEWS.master'), leo.indexOf('async function saveMaster'));
 assert.ok(master.includes("if (MASTER_KIND === 'kata') cols = orderKataCols(cols)"));
