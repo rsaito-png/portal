@@ -255,6 +255,6 @@ const cfg = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
 assert.ok(!/'事務': \[[^\]]*児童の利用・送迎予定/.test(cfg), '事務の仕事から予定タイルを外す');
 assert.ok(!/中村 友香がする', \[[^\]]*児童の利用・送迎予定/.test(cfg), '中村の欄から予定タイルを外す');
 assert.ok(cfg.includes("'#leo/cal'"), '予定の画面は残す');
-assert.ok(cfg.includes("その他', ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定'"));
+assert.ok(cfg.includes("全ての画面', ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定'"));
 
 console.log('leo_home_cal_test ok');
