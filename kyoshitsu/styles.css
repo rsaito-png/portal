@@ -73,6 +73,14 @@ section[id] { scroll-margin-top: 84px; }
   background: #fff;
   box-shadow: var(--shadow);
 }
+.lines {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.lines li { font-size: clamp(18px, 2.6vw, 22px); font-weight: 700; }
 .facts, .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .facts { margin: 18px 0 0; padding: 0; list-style: none; }
 .facts li {
