@@ -8,7 +8,6 @@ const root = path.join(__dirname, '..');
 const dir = path.join(root, 'kyoshitsu');
 const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
 const portal = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const beforeFoot = html.split('<footer')[0];
 const pages = fs.readdirSync(dir).filter(name => name.endsWith('.html'));
 
 assert.deepStrictEqual(pages, ['index.html'], 'one landing page only');
@@ -18,17 +17,15 @@ assert.ok(html.includes('<title>AIエージェントを教える教室｜四日�
 assert.ok(html.includes('name="description"'), 'description');
 assert.ok(html.includes('https://rsaito-png.github.io/portal/kyoshitsu/'), 'public path');
 assert.ok(html.includes('<h1 id="hero-title">AIエージェントを教える教室</h1>'), 'h1');
-assert.ok(html.includes('個人経営・会社経営者向け。一般向けではない。'), 'audience');
-assert.ok(html.includes('優秀すぎて、普通の人は使わなくてもいい。'), 'not for everyone');
-assert.ok(html.includes('はっきり言っとく。ハイレベルの人だけ使え。'), 'high level');
-assert.ok(html.includes('マジで人生変わる。'), 'life');
-assert.ok(html.includes('短い言葉で伝えられる'), 'short words');
-assert.ok(html.includes('すべて汲み取ってくれる'), 'reads you');
-assert.ok(html.includes('1を聞いて10までやってくれる'), 'one to ten');
-assert.ok(html.includes('忙しい人ほどやってね'), 'busy people');
-assert.ok(!html.includes('中高年'), 'no middle-age reassurance');
-assert.ok(!html.includes('安心'), 'no reassurance tone');
-assert.ok(html.includes('夢のバイブコーディングが、初めてここに実現しました'), 'vibe');
+assert.ok(html.includes('個人経営。会社の経営者。'), 'audience');
+assert.ok(html.includes('短い言葉で伝わる'), 'short words');
+assert.ok(html.includes('汲み取る。'), 'reads you');
+assert.ok(html.includes('1を聞いて、10までやる。'), 'one to ten');
+assert.ok(html.includes('忙しい人ほど、向く。'), 'busy people');
+assert.ok(html.includes('齊藤 連'), 'name');
+for (const banned of ['普通の人は使わなくてもいい', 'ハイレベルの人だけ使え', 'マジで人生変わる', 'はっきり言っとく', '優秀すぎて', '教授', '中高年']) {
+  assert.ok(!html.includes(banned), 'banned: ' + banned);
+}
 assert.ok(html.includes('ホームページのまとめ'), 'homepage');
 assert.ok(html.includes('手作業だったことが全部自動化できる'), 'automation claim');
 assert.ok(html.includes('ポータルも作れる'), 'portal claim');
@@ -51,8 +48,7 @@ assert.ok(html.includes('alt="机でパソコンに向かう女性の宇宙人"'
 ['基礎', '仕事接続', '仕組み化', '卒業制作'].forEach(word => assert.ok(html.includes(word), word));
 assert.ok(!html.includes('教授'), 'no 教授');
 assert.ok(!html.includes('伝授'), 'no 伝授');
-assert.ok(!beforeFoot.includes('Grok'), 'name stays out of the front');
-assert.ok(html.includes('Grok Bot教室'), 'name remains in the footer');
+assert.ok(!html.includes('Grok'), 'product name stays off the page');
 assert.ok(!/supabase|password|パスワード|カード番号/i.test(html), 'no portal auth or payment fields');
 assert.ok(!html.includes('https://cdn.'), 'no image cdn');
 assert.ok(!portal.includes('kyoshitsu'), 'staff portal home does not link the classroom');
