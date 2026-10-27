@@ -17,25 +17,29 @@ assert.ok(html.includes('<title>AIエージェントを教える教室｜四日�
 assert.ok(html.includes('name="description"'), 'description');
 assert.ok(html.includes('https://rsaito-png.github.io/portal/kyoshitsu/'), 'public path');
 assert.ok(html.includes('<h1 id="hero-title">AIエージェントを教える教室</h1>'), 'h1');
-assert.ok(html.includes('個人経営。会社の経営者。'), 'audience');
-assert.ok(html.includes('短い言葉で伝わる'), 'short words');
-assert.ok(html.includes('汲み取る。'), 'reads you');
-assert.ok(html.includes('1を聞いて、10までやる。'), 'one to ten');
-assert.ok(html.includes('忙しい人ほど、向く。'), 'busy people');
-assert.ok(html.includes('齊藤 連'), 'name');
-for (const banned of ['普通の人は使わなくてもいい', 'ハイレベルの人だけ使え', 'マジで人生変わる', 'はっきり言っとく', '優秀すぎて', '教授', '中高年']) {
+assert.ok(html.includes('四日市市あさけが丘。個人経営・会社経営者向け。'), 'audience');
+assert.ok(html.includes('短く言えば、伝わる。'), 'short words');
+assert.ok(html.includes('一つ頼めば、十まで進む。'), 'one to ten');
+assert.ok(html.includes('二日で、これだけ動いた。'), 'two days');
+assert.ok(html.includes('ポータル改修。約三十本。'), 'portal revisions');
+assert.ok(html.includes('教室の準備。同時。'), 'class prep');
+assert.ok(html.includes('全体で、約四十五件。'), 'total count');
+assert.ok(!html.includes('自慢'), 'no boast');
+assert.ok(html.includes('SNS、ホームページ、事務。'), 'work');
+assert.ok(html.includes('手で回していた仕事を渡す。'), 'hand over');
+assert.ok(html.includes('月3万円'), 'price');
+assert.ok(html.includes('対面週1回、あいだはチャットと通話。'), 'format');
+assert.ok(html.includes('講師 齊藤 連'), 'name');
+for (const banned of ['普通の人は', 'ハイレベル', 'マジで', 'はっきり言っとく', '優秀すぎて', 'やってね', '一緒に', '丁寧', '安心', '教授', 'すごい', '圧倒', '最速']) {
   assert.ok(!html.includes(banned), 'banned: ' + banned);
 }
 assert.ok(html.includes('ホームページのまとめ'), 'homepage');
-assert.ok(html.includes('手作業だったことが全部自動化できる'), 'automation claim');
-assert.ok(html.includes('ポータルも作れる'), 'portal claim');
+assert.ok(html.includes('手で回していた仕事を渡す。'), 'automation claim');
 assert.ok(html.includes('できたサイトのサンプル'), 'portal mock is a sample, not this site');
 assert.ok(!html.includes('会員'), 'no member area');
 assert.ok(!html.includes('ダッシュボード'), 'no dashboard');
 assert.ok(html.includes('来週の午後、空いてるとこで'), 'calendar');
-assert.ok(html.includes('月額3万円'), 'price');
 assert.ok(html.includes('1か月で卒業'), 'term');
-assert.ok(html.includes('対面は週1回、あとはチャット・通話'), 'format');
 assert.ok(html.includes('三重県四日市市あさけが丘2-1-42（〒512-8055）'), 'address');
 assert.ok(html.includes('090-6708-2837'), 'phone');
 assert.ok(html.includes('tel:09067082837'), 'tel link');
