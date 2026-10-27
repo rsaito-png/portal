@@ -48,12 +48,15 @@ assert.ok(html.includes('1か月で卒業'), 'term');
 assert.ok(html.includes('三重県四日市市あさけが丘2-1-42（〒512-8055）'), 'address');
 assert.ok(html.includes('090-6708-2837'), 'phone');
 assert.ok(html.includes('tel:09067082837'), 'tel link');
-assert.ok(html.includes('src="img/hero.jpg"'), 'hero path');
-assert.ok(html.includes('src="img/speed.jpg"'), 'speed path');
-assert.ok(html.includes('src="img/weekly.jpg"'), 'weekly path');
-assert.ok(html.includes('alt="低い机の教室で、宇宙人が女性と禿げた男性に向かっている"'), 'hero alt');
-assert.ok(html.includes('alt="宇宙人が、顎に手を当てた女性に話している"'), 'speed alt');
-assert.ok(html.includes('alt="宇宙人がペンを持ち、花柄の服の女性に話している"'), 'weekly alt');
+assert.ok(html.includes('src="img/scene-classroom.jpg"'), 'hero path');
+assert.ok(html.includes('src="img/scene-manager-pc.jpg"'), 'speed path');
+assert.ok(html.includes('src="img/scene-chat-outside.jpg"'), 'weekly path');
+assert.ok(!html.includes('img/hero.jpg'), 'old hero path gone');
+assert.ok(!html.includes('img/speed.jpg'), 'old speed path gone');
+assert.ok(!html.includes('img/weekly.jpg'), 'old weekly path gone');
+assert.ok(html.includes('alt="教室の机で、宇宙人が男性と二人の女性にパソコンを見せている"'), 'hero alt');
+assert.ok(html.includes('alt="エプロンの店長がパソコンを操作し、宇宙人が画面を指さしている"'), 'speed alt');
+assert.ok(html.includes('alt="夜の店先で、女性がスマホを見せ、宇宙人が親指を立てている"'), 'weekly alt');
 ['基礎', '仕事接続', '仕組み化', '卒業制作'].forEach(word => assert.ok(html.includes(word), word));
 assert.ok(!html.includes('教授'), 'no 教授');
 assert.ok(!html.includes('伝授'), 'no 伝授');
@@ -63,9 +66,9 @@ assert.ok(!html.includes('https://cdn.'), 'no image cdn');
 assert.ok(!portal.includes('kyoshitsu'), 'staff portal home does not link the classroom');
 
 const images = {
-  'hero.jpg': '3831ebe66c5cf338963711fa319f4bf9f409c71b913d36d06bd1a0100b4361ac',
-  'speed.jpg': '6de598c12f04cdf542c3055a2229d75986e3f904470fe569979ca3441ff605e5',
-  'weekly.jpg': '2d1d49dde65dfd8a11f510629ccf5e8ca8f054a66b31d810676ca3b54d93a50d',
+  'scene-classroom.jpg': '616fdf4b9afbf1594a93cc6130212856261b8187e919cfb917309c2cc23b3eea',
+  'scene-manager-pc.jpg': 'cdc019f498b504210d5ec88606b8fb94204e94ce1b4f13caed08c4d88ff35970',
+  'scene-chat-outside.jpg': '984618f27f47aaf37c8ae05927b12ee47d50c12095be83b927424c1c6b0c5c3b',
 };
 for (const [name, hash] of Object.entries(images)) {
   const buf = fs.readFileSync(path.join(dir, 'img', name));
