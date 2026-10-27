@@ -49,8 +49,8 @@ assert.ok(html.includes('1か月で卒業'), 'term');
 assert.ok(html.includes('三重県四日市市あさけが丘2-1-42（〒512-8055）'), 'address');
 assert.ok(html.includes('090-6708-2837'), 'phone');
 assert.ok(html.includes('tel:09067082837'), 'tel link');
-assert.ok(html.includes('src="img/scene-classroom.jpg"'), 'hero path');
-assert.ok(html.includes('src="img/scene-manager-solo.jpg"'), 'speed path');
+assert.ok(/src="img\/scene-classroom\.jpg(?:\?v=[^"]*)?"/.test(html), 'hero path');
+assert.ok(/src="img\/scene-manager-solo\.jpg(?:\?v=[^"]*)?"/.test(html), 'speed path');
 assert.ok(html.includes('src="img/scene-chat-solo.jpg"'), 'weekly path');
 assert.ok(!html.includes('img/scene-manager-pc.jpg'), 'alien manager path gone');
 assert.ok(!html.includes('img/scene-chat-outside.jpg'), 'alien chat path gone');
@@ -73,8 +73,8 @@ assert.ok(css.includes('.hero-copy'), 'hero copy sits on the picture');
 assert.ok(css.includes('.plate'), 'picture and lines share a plate');
 
 const images = {
-  'scene-classroom.jpg': '984618f27f47aaf37c8ae05927b12ee47d50c12095be83b927424c1c6b0c5c3b',
-  'scene-manager-solo.jpg': '9c4d295e3a4d72cf334804f520460645eb2526ce7cd7108c5dc9824c2a00b684',
+  'scene-classroom.jpg': '0059856f58daaa7d690ba5c35a7ceaae786625a59258e70c55d50deca7150dcd',
+  'scene-manager-solo.jpg': 'b8c1140b6f18677d3d6b0a8b36f0e02df3167c01373a2aaecc3eb89d67a9e005',
   'scene-chat-solo.jpg': '8cb5f9c6edcb6edb26186db82c0e27e8fc12a0e679fe2c901a9aa2a730e03df3',
 };
 for (const [name, hash] of Object.entries(images)) {
