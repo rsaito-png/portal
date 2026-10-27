@@ -2,7 +2,7 @@
 -- 写真は非公開バケット sns-material（公開用 sns-public とは別）。パスは <user_id>/<uuid>.<ext>
 create extension if not exists pg_net;
 create table if not exists public.sns_office (name text primary key, sort int not null default 100, active boolean not null default true);
-insert into public.sns_office (name, sort) values ('レオ',10),('茶夢',20),('その他',90) on conflict do nothing;
+insert into public.sns_office (name, sort) values ('レオ',10),('茶夢',20),('梁山泊',30),('その他',90) on conflict do nothing;
 alter table public.sns_office enable row level security;
 drop policy if exists so_sel on public.sns_office;
 create policy so_sel on public.sns_office for select to authenticated using (true);
@@ -53,9 +53,11 @@ end $$;
 drop trigger if exists sns_material_kick on public.sns_material;
 create trigger sns_material_kick after insert on public.sns_material for each row execute function public.sns_material_kick();
 
--- 茶夢はGoogleマップ掲載なし
+-- 茶夢・梁山泊はGoogleマップ掲載なし（Instagramのみ）
 alter table public.sns_material drop constraint if exists sns_material_chamu_no_gmap;
 alter table public.sns_material add constraint sns_material_chamu_no_gmap check (not (office='茶夢' and purpose='Googleマップ'));
+alter table public.sns_material drop constraint if exists sns_material_ryozan_no_gmap;
+alter table public.sns_material add constraint sns_material_ryozan_no_gmap check (not (office='梁山泊' and purpose='Googleマップ'));
 
 -- 職員会議（文字起こし）の入稿（原文は個人情報：本人と会長のみ閲覧。RLSは既存 sm_sel のまま）
 alter table public.sns_material add column if not exists kind text not null default '写真';

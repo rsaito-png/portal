@@ -14,7 +14,7 @@ async function renderSns() {
   const td = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   const inp = 'display:block;width:100%;box-sizing:border-box;font-size:16px;margin:6px 0';
   $('view').innerHTML = back + `<h3>📸 SNS投稿素材</h3>
-    <p style="font-size:13px">法人のSNS（Instagram・Googleマップ）に使う写真とひとことを送ってください。会長の確認のあとで投稿します。（茶夢はInstagramのみ）<br>例）茶夢：利用者さんの絵、クッキングの様子　／　レオ：活動の写真（Googleマップ用）</p>
+    <p style="font-size:13px">法人のSNS（Instagram・Googleマップ）に使う写真とひとことを送ってください。会長の確認のあとで投稿します。（茶夢・梁山泊はInstagramのみ）<br>例）茶夢：利用者さんの絵、クッキングの様子　／　梁山泊：活動の写真（Instagramのみ）　／　レオ：活動の写真（Googleマップ用）</p>
     <p style="font-size:13px;color:#b00">⚠️ 児童・利用者さんの顔や名前（名札・作品の署名など）が写らないようにしてください。</p>
     <div class="card">
       <label>事業所<select id="sn_o" style="${inp}">${offs.map(o => `<option>${snE(o.name)}</option>`).join('')}</select></label>
@@ -28,7 +28,7 @@ async function renderSns() {
     <h4>自分が送った分</h4><div id="sn_list">${rows.map(r => `<div class="card" style="margin:8px 0;padding:10px"><div style="font-size:12px;color:#666">${snE(r.shot_on || '')}　${snE(r.office)}／${snE(r.purpose)}　${r.kind === '職員会議（文字起こし）' ? '📝文字起こし ' + (r.transcript || '').length + '字' : '📷' + (r.photos || []).length + '枚'}　<b>${snE(r.status)}</b></div><div style="white-space:pre-wrap">${snE(r.memo || '')}</div><div id="sn_th${r.id}"></div></div>`).join('') || '<p>まだありません。</p>'}</div>`;
   rows.forEach(r => snThumbs(r));
   $('sn_k').onchange = () => { const t = $('sn_k').value !== '写真'; $('sn_tw').style.display = t ? '' : 'none'; $('sn_fw').style.display = t ? 'none' : ''; };
-  if ($('sn_p') && $('sn_o')) { const snSync = () => { const o = $('sn_o').value, g = $('sn_p').querySelector('option[value="Googleマップ"],option:nth-child(2)'); const cha = o === '茶夢'; if (g) { g.disabled = cha; g.hidden = cha; } if (cha && $('sn_p').value === 'Googleマップ') $('sn_p').value = 'Instagram'; else if (o === 'レオ') $('sn_p').value = 'Googleマップ'; }; $('sn_o').onchange = snSync; snSync(); }
+  if ($('sn_p') && $('sn_o')) { const snSync = () => { const o = $('sn_o').value, g = $('sn_p').querySelector('option[value="Googleマップ"],option:nth-child(2)'); const ig = o === '茶夢' || o === '梁山泊'; if (g) { g.disabled = ig; g.hidden = ig; } if (ig) $('sn_p').value = 'Instagram'; else if (o === 'レオ') $('sn_p').value = 'Googleマップ'; }; $('sn_o').onchange = snSync; snSync(); }
 }
 async function snThumbs(r) {
   const el = document.getElementById('sn_th' + r.id); if (!el || !(r.photos || []).length) return;
