@@ -49,9 +49,9 @@ assert.ok(html.includes('1か月で卒業'), 'term');
 assert.ok(html.includes('三重県四日市市あさけが丘2-1-42（〒512-8055）'), 'address');
 assert.ok(html.includes('090-6708-2837'), 'phone');
 assert.ok(html.includes('tel:09067082837'), 'tel link');
-assert.ok(html.includes('src="img/scene-classroom.jpg"'), 'hero path');
-assert.ok(html.includes('src="img/scene-manager-solo.jpg"'), 'speed path');
-assert.ok(html.includes('src="img/scene-chat-solo.jpg"'), 'weekly path');
+assert.ok(/src="img\/scene-classroom\.jpg(?:\?v=[^"]*)?"/.test(html), 'hero path');
+assert.ok(/src="img\/scene-manager-solo\.jpg(?:\?v=[^"]*)?"/.test(html), 'speed path');
+assert.ok(/src="img\/scene-chat-solo\.jpg(?:\?v=[^"]*)?"/.test(html), 'weekly path');
 assert.ok(!html.includes('img/scene-manager-pc.jpg'), 'alien manager path gone');
 assert.ok(!html.includes('img/scene-chat-outside.jpg'), 'alien chat path gone');
 assert.ok(html.includes('alt="教室の机で、宇宙人が男性と二人の女性にパソコンを見せている"'), 'hero alt');
@@ -73,9 +73,9 @@ assert.ok(css.includes('.hero-copy'), 'hero copy sits on the picture');
 assert.ok(css.includes('.plate'), 'picture and lines share a plate');
 
 const images = {
-  'scene-classroom.jpg': '984618f27f47aaf37c8ae05927b12ee47d50c12095be83b927424c1c6b0c5c3b',
-  'scene-manager-solo.jpg': '9c4d295e3a4d72cf334804f520460645eb2526ce7cd7108c5dc9824c2a00b684',
-  'scene-chat-solo.jpg': '8cb5f9c6edcb6edb26186db82c0e27e8fc12a0e679fe2c901a9aa2a730e03df3',
+  'scene-classroom.jpg': '0059856f58daaa7d690ba5c35a7ceaae786625a59258e70c55d50deca7150dcd',
+  'scene-manager-solo.jpg': 'e78070a8772b4f3fce8fedd922441f7d4ad2358ae5c3536f39021967268faa5a',
+  'scene-chat-solo.jpg': 'd1ed7cfe41b403c6ad3aafbb83a1d8b8b1acd106652cf4f8aca9f186bf996834',
 };
 for (const [name, hash] of Object.entries(images)) {
   const buf = fs.readFileSync(path.join(dir, 'img', name));
