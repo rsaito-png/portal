@@ -20,11 +20,15 @@ assert.ok(html.includes('<h1 id="hero-title">AIエージェントを教える教
 assert.ok(html.includes('四日市市あさけが丘。個人経営・会社経営者向け。'), 'audience');
 assert.ok(html.includes('短く言えば、伝わる。'), 'short words');
 assert.ok(html.includes('一つ頼めば、十まで進む。'), 'one to ten');
-assert.ok(html.includes('二日で、これだけ動いた。'), 'two days');
-assert.ok(html.includes('ポータル改修。約三十本。'), 'portal revisions');
-assert.ok(html.includes('教室の準備。同時。'), 'class prep');
-assert.ok(html.includes('全体で、約四十五件。'), 'total count');
+assert.ok(html.includes('二日で、動いた。'), 'two days');
+assert.ok(html.includes('改修が、三十本。'), 'revision count');
+assert.ok(html.includes('教室の準備も、同時。'), 'class prep');
+assert.ok(html.includes('四十五件。'), 'total count');
 assert.ok(!html.includes('自慢'), 'no boast');
+const record = html.slice(html.indexOf('id="record"'), html.indexOf('id="format"'));
+for (const name of ['レオ', '金斗雲', '送迎', 'ストレスチェック', 'GBP', 'LP', 'ポータル', '授業', '約三十', '約四十五', 'これだけ']) {
+  assert.ok(!record.includes(name), 'record stays abstract: ' + name);
+}
 assert.ok(html.includes('SNS、ホームページ、事務。'), 'work');
 assert.ok(html.includes('手で回していた仕事を渡す。'), 'hand over');
 assert.ok(html.includes('月3万円'), 'price');
