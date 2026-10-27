@@ -67,7 +67,7 @@ assert.ok(!html.includes('https://cdn.'), 'no image cdn');
 assert.ok(!portal.includes('kyoshitsu'), 'staff portal home does not link the classroom');
 
 const images = {
-  'scene-classroom.jpg': '616fdf4b9afbf1594a93cc6130212856261b8187e919cfb917309c2cc23b3eea',
+  'scene-classroom.jpg': '984618f27f47aaf37c8ae05927b12ee47d50c12095be83b927424c1c6b0c5c3b',
   'scene-manager-solo.jpg': '9c4d295e3a4d72cf334804f520460645eb2526ce7cd7108c5dc9824c2a00b684',
   'scene-chat-solo.jpg': '8cb5f9c6edcb6edb26186db82c0e27e8fc12a0e679fe2c901a9aa2a730e03df3',
 };
