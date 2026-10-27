@@ -55,7 +55,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261027noseikyu"></script>
+<script src="config.js?v=20261027allpage"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261026"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -132,7 +132,9 @@ const myDuty = () => DUTY === '管理者' ? '管理者' : DUTY === '児発管' ?
 function groupList(o) {
   const vis = visTiles(o), used = new Set(); o.groups.forEach(g => g[2].forEach(n => used.add(n)));
   const rest = vis.filter(t => !used.has(t[1]));
-  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(g[1] === 'その他' || (i === o.groups.length - 1 && !o.groups.some(x => x[1] === 'その他')) ? rest : []) })).filter(g => g.tiles.length);
+  const catchAll = n => n === 'その他' || n === '全ての画面';
+  const anyCatch = o.groups.some(x => catchAll(x[1]));
+  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(catchAll(g[1]) || (i === o.groups.length - 1 && !anyCatch) ? rest : []) })).filter(g => g.tiles.length);
 }
 const tl = (t, name, cls, color) => { const link = t[2] ? `href="${t[2]}"${/^https?:/.test(t[2]) ? ' target="_blank" rel="noopener"' : ''}` : 'style="opacity:.5"';
   return `<a class="tile ${cls}" ${link} style="border-top:4px solid ${color}"><span>${t[0]}</span>${name}<small>${t[3]}</small></a>`; };
@@ -140,7 +142,10 @@ function leoHomeBody(o) {
   const vis = visTiles(o), col = o.color;
   const mine = ((o.mine || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
   const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
-  const g = groupList(o).map(x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`).join('');
+  const groups = groupList(o);
+  const pageG = groups.filter(x => x.label === '全ての画面' || x.label === 'その他');
+  const gbtn = x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`;
+  const g = groups.filter(x => !pageG.includes(x)).map(gbtn).join('');
   const tileBig = t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`;
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
   const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(tileBig).join('')}</div>` : '';
@@ -148,12 +153,16 @@ function leoHomeBody(o) {
     const tiles = (names || []).flatMap(n => vis.filter(t => t[1] === n));
     return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid">${tiles.map(tileBig).join('')}</div>` : '';
   }).join('');
+  const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
+  const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}`;
+  const duty = dutyName === '児発管の仕事' ? (dutyInner ? `<div class="grid">${dutyInner}</div>` : '') : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`;
+  const pages = pageG.length ? `<h3 class="nx">レオのページ</h3><div class="grid">${pageG.map(gbtn).join('')}</div>` : '';
   return `<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/linedraft', '✉️', 'LINEの下書き', '', '')}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}</div>
-    <h3 class="nx">${myDuty() === '事務' ? '情報' : myDuty() + 'の仕事'}</h3><div class="grid">${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}</div>
-    ${who}${rt}`;
+    ${duty}
+    ${who}${rt}${pages}`;
 }
 async function leoHomeStatus() {
   try { if (DEMO || typeof sb !== 'function') return;
