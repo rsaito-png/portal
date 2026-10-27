@@ -8,6 +8,7 @@ const { kyoshitsuInquiry } = require('../kyoshitsu/inquiry.js');
 const root = path.join(__dirname, '..');
 const dir = path.join(root, 'kyoshitsu');
 const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+const css = fs.readFileSync(path.join(dir, 'styles.css'), 'utf8');
 const portal = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const pages = fs.readdirSync(dir).filter(name => name.endsWith('.html'));
 
@@ -65,6 +66,11 @@ assert.ok(!html.includes('Grok'), 'product name stays off the page');
 assert.ok(!/supabase|password|パスワード|カード番号/i.test(html), 'no portal auth or payment fields');
 assert.ok(!html.includes('https://cdn.'), 'no image cdn');
 assert.ok(!portal.includes('kyoshitsu'), 'staff portal home does not link the classroom');
+assert.ok(!css.includes('#12110e'), 'dark page background is gone');
+assert.ok(css.includes('#efe4d2'), 'warm paper');
+assert.ok(!css.includes('padding-top: 104px'), 'huge section padding is gone');
+assert.ok(css.includes('.hero-copy'), 'hero copy sits on the picture');
+assert.ok(css.includes('.plate'), 'picture and lines share a plate');
 
 const images = {
   'scene-classroom.jpg': '984618f27f47aaf37c8ae05927b12ee47d50c12095be83b927424c1c6b0c5c3b',
