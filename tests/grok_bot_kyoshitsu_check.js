@@ -1,5 +1,6 @@
 // AIエージェントを教える教室は、1枚のLPだけ。福祉ポータルのログインには繋がない。
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { kyoshitsuInquiry } = require('../kyoshitsu/inquiry.js');
@@ -26,23 +27,23 @@ assert.ok(html.includes('教室の準備も、同時。'), 'class prep');
 assert.ok(html.includes('四十五件。'), 'total count');
 assert.ok(!html.includes('自慢'), 'no boast');
 const record = html.slice(html.indexOf('id="record"'), html.indexOf('id="format"'));
-for (const name of ['レオ', '金斗雲', '送迎', 'ストレスチェック', 'GBP', 'LP', 'ポータル', '授業', '約三十', '約四十五', 'これだけ']) {
+for (const name of ['レオ', '金斗雲', '送迎', 'ストレスチェック', 'GBP', 'LP', 'ポータル', '授業', '茶夢', '約三十', '約四十五', 'これだけ']) {
   assert.ok(!record.includes(name), 'record stays abstract: ' + name);
 }
+assert.ok(html.includes('茶夢の教室。'), 'venue');
+assert.ok(!html.includes('パン'), 'no bakery');
+assert.ok(!html.includes('<span>1</span>'), 'no doubled week number');
 assert.ok(html.includes('SNS、ホームページ、事務。'), 'work');
 assert.ok(html.includes('手で回していた仕事を渡す。'), 'hand over');
 assert.ok(html.includes('月3万円'), 'price');
 assert.ok(html.includes('対面週1回、あいだはチャットと通話。'), 'format');
 assert.ok(html.includes('講師 齊藤 連'), 'name');
-for (const banned of ['普通の人は', 'ハイレベル', 'マジで', 'はっきり言っとく', '優秀すぎて', 'やってね', '一緒に', '丁寧', '安心', '教授', 'すごい', '圧倒', '最速']) {
+for (const banned of ['普通の人は', 'ハイレベル', 'マジで', 'はっきり言っとく', '優秀すぎて', 'やってね', '一緒に', '丁寧', '安心', '教授', 'すごい', '圧倒', '最速', 'かわいい', 'オタク']) {
   assert.ok(!html.includes(banned), 'banned: ' + banned);
 }
-assert.ok(html.includes('ホームページのまとめ'), 'homepage');
 assert.ok(html.includes('手で回していた仕事を渡す。'), 'automation claim');
-assert.ok(html.includes('できたサイトのサンプル'), 'portal mock is a sample, not this site');
 assert.ok(!html.includes('会員'), 'no member area');
 assert.ok(!html.includes('ダッシュボード'), 'no dashboard');
-assert.ok(html.includes('来週の午後、空いてるとこで'), 'calendar');
 assert.ok(html.includes('1か月で卒業'), 'term');
 assert.ok(html.includes('三重県四日市市あさけが丘2-1-42（〒512-8055）'), 'address');
 assert.ok(html.includes('090-6708-2837'), 'phone');
@@ -50,9 +51,9 @@ assert.ok(html.includes('tel:09067082837'), 'tel link');
 assert.ok(html.includes('src="img/hero.jpg"'), 'hero path');
 assert.ok(html.includes('src="img/speed.jpg"'), 'speed path');
 assert.ok(html.includes('src="img/weekly.jpg"'), 'weekly path');
-assert.ok(html.includes('alt="紫がかった髪の女性の宇宙人"'), 'hero alt');
-assert.ok(html.includes('alt="画面を指さす女性の宇宙人"'), 'speed alt');
-assert.ok(html.includes('alt="机でパソコンに向かう女性の宇宙人"'), 'weekly alt');
+assert.ok(html.includes('alt="低い机の教室で、宇宙人が女性と禿げた男性に向かっている"'), 'hero alt');
+assert.ok(html.includes('alt="宇宙人が、顎に手を当てた女性に話している"'), 'speed alt');
+assert.ok(html.includes('alt="宇宙人がペンを持ち、花柄の服の女性に話している"'), 'weekly alt');
 ['基礎', '仕事接続', '仕組み化', '卒業制作'].forEach(word => assert.ok(html.includes(word), word));
 assert.ok(!html.includes('教授'), 'no 教授');
 assert.ok(!html.includes('伝授'), 'no 伝授');
@@ -61,11 +62,17 @@ assert.ok(!/supabase|password|パスワード|カード番号/i.test(html), 'no 
 assert.ok(!html.includes('https://cdn.'), 'no image cdn');
 assert.ok(!portal.includes('kyoshitsu'), 'staff portal home does not link the classroom');
 
-for (const name of ['hero.jpg', 'speed.jpg', 'weekly.jpg']) {
+const images = {
+  'hero.jpg': '3831ebe66c5cf338963711fa319f4bf9f409c71b913d36d06bd1a0100b4361ac',
+  'speed.jpg': '6de598c12f04cdf542c3055a2229d75986e3f904470fe569979ca3441ff605e5',
+  'weekly.jpg': '2d1d49dde65dfd8a11f510629ccf5e8ca8f054a66b31d810676ca3b54d93a50d',
+};
+for (const [name, hash] of Object.entries(images)) {
   const buf = fs.readFileSync(path.join(dir, 'img', name));
   assert.ok(buf.length > 50000, name + ' is a real image');
   assert.strictEqual(buf[0], 0xff);
   assert.strictEqual(buf[1], 0xd8);
+  assert.strictEqual(crypto.createHash('sha256').update(buf).digest('hex'), hash, name);
 }
 
 const ok = kyoshitsuInquiry({ name: '山田', purpose: '申し込み', note: '小売です' });
