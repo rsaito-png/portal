@@ -64,6 +64,19 @@ assert.deepStrictEqual(labels(['市川\u3000碧音', '碧音']), [
 ]);
 assert.strictEqual(N.clusterChildNames(['市川', '市川 碧音']).length, 2);
 
+// 一覧の並び順（sort_order）：数のある児童が小さい順に先頭、無い児童は後ろに今の順のまま
+{
+  const cl = N.clusterChildNames(['児童A 一', '児童B 二', '児童C 三', '児童D 四', '児童E\u3000五']);
+  const base = cl.map(c => c.label);
+  const ord = { '児童C 三': 1, '児童A 一': 2, '児童E 五': 3 };
+  const got = N.sortChildClusters(cl, c => ord[c.label]).map(c => c.label);
+  assert.deepStrictEqual(got, ['児童C 三', '児童A 一', '児童E 五', ...base.filter(x => !(x in ord))]);
+  assert.deepStrictEqual(N.sortChildClusters(cl, () => null).map(c => c.label), base, '数が無ければ今の順');
+  assert.deepStrictEqual(N.sortChildClusters(cl, c => ({ '児童D 四': '0' })[c.label]).map(c => c.label)[0], '児童D 四', '文字の数も読む');
+  assert.deepStrictEqual(N.sortChildClusters(cl, c => ({ '児童D 四': 'x' })[c.label]).map(c => c.label), base, '数でない値は無視');
+  assert.deepStrictEqual(cl.map(c => c.label), base, '元の配列は変えない');
+}
+
 function block(text, a, b) {
   const i = text.indexOf(a), j = text.indexOf(b);
   assert.ok(i >= 0 && j > i, a);

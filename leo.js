@@ -807,6 +807,8 @@ LEO_VIEWS.userinfo = async function () {
   const PLN = uiMergeByCluster(plans, 'name', clusters);
   const A = uiMergeByCluster(asses, 'name', clusters);
   const I = uiMergeByCluster(infos, 'name', clusters), K = uiMergeByCluster(kids, 'name', clusters);
+  // 一覧の並び：leo_child_info.sort_order（小さい順）。無い児童は後ろに、あいうえお順のまま（supabase/leo_child_order.sql）
+  const clustersOrdered = typeof sortChildClusters === 'function' ? sortChildClusters(clusters, c => (I[c.label] || {}).sort_order) : clusters;
   const C = Object.fromEntries(Object.entries(uiMergeByCluster(cares.map(x => ({ ...x, name: x.child })), 'name', clusters)).map(([k, v]) => [k, v.note]));
   const css = `<style>.ui-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}.ui-list a{display:block;border:1px solid #ccd;border-radius:8px;padding:10px;background:#fff;text-decoration:none;color:#222}.ui-list a small{display:block;color:#666}.uic{border:1px solid #ccd;border-radius:8px;margin:8px 0;background:#fff}.uic h4{margin:0;padding:8px 10px;background:#eef;border-radius:8px 8px 0 0}.uig{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 12px;padding:8px 10px}.uig label span{display:block;font-size:.8em;color:#555}.uig input:not([type=checkbox]),.uig select,.uig textarea{width:100%;box-sizing:border-box;margin:2px 0;padding:8px}.uig .wide{grid-column:1/-1}.uil a{margin-right:10px}</style>`;
   const nm = UI.sel;
@@ -815,7 +817,7 @@ LEO_VIEWS.userinfo = async function () {
   const aliasAttr = ` data-aliases="${uiAliasAttr(cur ? cur.raws : [], nm || '')}"`;
   const clusterLeft = cur ? (uiClusterLeftOn(LEFT, cur) || '') : '';
   if (!nm && !UI.adding) {
-    const shown = clusters.filter(c => UI.roster === 'left' ? uiClusterLeftDone(LEFT, c, tday) : !uiClusterLeftDone(LEFT, c, tday));
+    const shown = clustersOrdered.filter(c => UI.roster === 'left' ? uiClusterLeftDone(LEFT, c, tday) : !uiClusterLeftDone(LEFT, c, tday));
     const nLeft = clusters.filter(c => uiClusterLeftDone(LEFT, c, tday)).length;
     return `<h3>利用者情報</h3>${demoNote()}${css}<p class="note">児童ごとの受給者証・送迎・連絡先・Googleフォト・個別支援計画を、ここ1か所にまとめています。児童を選んでください。空白の違い（全角・半角・連続）と、一人に定まる「名前だけ／姓つき」は同じ児童として表示します。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
       <p class="ptabs"><button class="${UI.roster === 'active' ? 'on' : ''}" onclick="uiRoster('active')">在籍（${clusters.length - nLeft}）</button><button class="${UI.roster === 'left' ? 'on' : ''}" onclick="uiRoster('left')">退所児童（${nLeft}）</button></p>
