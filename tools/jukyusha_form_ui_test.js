@@ -42,7 +42,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     if (staff) await p.evaluateOnNewDocument(() => localStorage.setItem('sess', JSON.stringify({ token: 'fake', refresh: 'fake', email: 'test@example.com', role: '事務', exp: Date.now() + 3600e3 })));
     return p;
   }
-  const type = async (p, sel, v) => { await p.click(sel, { clickCount: 3 }); await p.type(sel, v); };
+  // 3回クリックでは選択されないことがある（Chrome では maxlength の欄に文字が足される）。一度空にしてから打つ。
+  const type = async (p, sel, v) => {
+    await p.click(sel);
+    await p.evaluate(s => { const e = document.querySelector(s); e.focus(); e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); }, sel);
+    await p.type(sel, v);
+  };
   const date = async (p, k, era, y, m, d) => { await p.select(`#f_${k}_era`, era); await type(p, `#f_${k}_y`, y); await type(p, `#f_${k}_m`, m); await type(p, `#f_${k}_d`, d); };
   // ===== 保護者ページ（スマホ幅）=====
   const g = await mkPage(390, 844, false);
