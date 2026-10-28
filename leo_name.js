@@ -87,7 +87,20 @@
     clusters.sort((a, b) => a.label.localeCompare(b.label, 'ja'));
     return clusters;
   }
-  const api = { canonChildName, childTokens, sameChildName, resolveChildNames, clusterChildNames };
+  // 並び順。orderOf(cluster) が数（sort_order）を返す児童を、小さい順に先頭へ。数が無い児童（これから増える児童など）は、その後ろに今の順のまま。
+  // 同じ数どうしも今の順のまま。clusters は書き換えず、並べ替えた新しい配列を返す。
+  function sortChildClusters(clusters, orderOf) {
+    const num = c => {
+      const v = orderOf ? orderOf(c) : null;
+      if (v == null || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    return (clusters || []).map((c, i) => ({ c, i, n: num(c) }))
+      .sort((a, b) => (a.n == null) - (b.n == null) || (a.n != null && a.n - b.n) || a.i - b.i)
+      .map(x => x.c);
+  }
+  const api = { canonChildName, childTokens, sameChildName, resolveChildNames, clusterChildNames, sortChildClusters };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   Object.assign(g, api);
 })(typeof window !== 'undefined' ? window : globalThis);
