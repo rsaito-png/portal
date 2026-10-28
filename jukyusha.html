@@ -22,6 +22,9 @@ input:focus,select:focus,textarea:focus{border-color:#e8833a;outline:0}.bad inpu
 .priv{font-size:14px;line-height:1.7;background:#fafafa;border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px}.priv ul{padding-left:1.2em;margin:6px 0}
 .agree{display:flex;gap:10px;align-items:flex-start;font-size:17px;margin:12px 0 0}.agree input{width:26px;height:26px;flex:none;margin-top:2px}
 table.sm{width:100%;border-collapse:collapse;font-size:16px}table.sm td,table.sm th{border-top:1px solid #e5e5e5;padding:7px 4px;text-align:left;vertical-align:top}table.sm th{width:42%;color:#555;font-weight:normal}
+.pf{border:3px solid #2e6b4f;background:#f2faf5}.pf b.h{font-size:19px;color:#2e6b4f}
+.f.chg{background:#fff4e8;border:2px solid #e8833a;border-radius:10px;padding:12px;margin:14px -4px}.chgtag{background:#e8833a;color:#fff;border-radius:6px;padding:4px 8px;font-size:15px;font-weight:bold;margin:4px 0 8px;display:inline-block}
+.chgm{background:#e8833a;color:#fff;border-radius:4px;padding:1px 6px;font-size:13px;margin-left:6px;white-space:nowrap}
 .warn{background:#fde8e8;color:#b00;padding:10px;border-radius:8px;font-weight:bold;margin:10px 0}
 </style></head><body><header>レオ　受給者証の入力</header><main id="m"><p>読み込み中…</p></main>
 <script src="config.js"></script><script src="jukyusha_lib.js"></script>
@@ -36,13 +39,16 @@ const bad = msg => $m().innerHTML = `<div class="card">${msg || 'リンクが正
 const dt = s => new Date(s).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
 async function load() {
   let d;
-  if (DEMO) d = { child: '児童A（見本）', expired: false, last: null };
+  if (DEMO) d = { child: '児童A（見本）', expired: false, last: q.get('prefill') === '1' ? { at: '2025-04-10T01:00:00Z', status: 'applied' } : null,
+    prefill: q.get('prefill') === '1' ? { jukyusha_no: '0123456789', city_name: '見本市', guardian_name: '見本 花子', child_name: '見本 太郎', child_birth: '2019-04-02', issue_date: '2025-03-20', kind: '放デイ', contract_days: '20', amount_text: '児童発達支援加算サポートⅠ', period_from: '2025-04-01', period_to: '2026-03-31', soudan_office: '見本相談支援センター', soudan_person: '見本 相談員', cap_monthly: '4600', cap_mgmt: '非該当', mushouka: 'yes', other: '特記事項：見本です' } : null };
   else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); const r = await rpc('leo_jf_get', { p_token: T }); d = r.ok ? await r.json() : null; if (!d) return bad(); }
   if (d.expired) return bad('このリンクは期限が切れています。お手数ですがレオまでご連絡ください。');
   $m().innerHTML = `<div id="pg_form">
     <div class="card"><b>${esc(d.child)}</b> さんの受給者証（障害児通所受給者証）の内容を、入力してください。
       <p class="note">利用者負担額や支給量の確認、請求の手続きに使います。<b>写真は送りません。</b>入力は5分ほどです。</p>
-      ${d.last ? `<p class="ok">${dt(d.last.at)} に入力をいただいています。受給者証が新しくなったときなど、もう一度入れるときは、このまま入力して送ってください。</p>` : ''}</div>
+      ${d.prefill ? '' : d.last ? `<p class="ok">${dt(d.last.at)} に入力をいただいています。受給者証が新しくなったときなど、もう一度入れるときは、このまま入力して送ってください。</p>` : ''}</div>
+    ${d.prefill ? `<div class="card pf"><b class="h">✔ 前回の内容が入っています</b><p style="margin:6px 0"><b>変わったところだけ直してください（多くは有効期間です）。</b>色のついた「給付決定期間」の2か所は、新しい受給者証を見て、入れなおしてください。そのほかも、受給者証と見くらべて、ちがうところがあれば直してください。</p>
+      <p class="note">前回確認ずみの入力と、いま登録されている内容が入っています。このページには、お子さんの前回の内容が表示されます。リンクはほかの方に送らないでください。</p></div>` : ''}
     <div class="card unfold"><div class="uf-h">📖 受給者証を、ぜんぶ広げて見ながら入れてください</div>
       <p style="margin:8px 0">折りたたんだままだと、支給量・期間・<b>負担上限月額</b>が見えません。広げると、<b>6つの面（横に3つ×たてに2つ）</b>があります。下の入力欄に「①の面」「②の面」と書いてあるので、その面を見て入れてください。</p>
       ${J.svg(0)}<p class="note" style="text-align:center">↑ 広げたところの見本の図です（実際の内容ではありません）</p></div>
@@ -58,8 +64,23 @@ async function load() {
       <button id="review" type="button" disabled>入力内容を確認する</button><p id="r_err" class="err"></p></div>
     <p class="note">このページはご家庭ごとの専用リンクです。ほかの方には送らないでください。${DEMO ? '（見本です。送信しても、何も送られません）' : ''}</p></div>
     <div id="pg_sum" hidden></div>`;
-  buildFields(); $('agree').onchange = () => $('review').disabled = !$('agree').checked; $('review').onclick = review;
+  buildFields(); PF = d.prefill && typeof d.prefill === 'object' ? d.prefill : null; if (PF) applyPrefill(PF); $('agree').onchange = () => $('review').disabled = !$('agree').checked; $('review').onclick = review;
 }
+// ---- 前回の内容を入れる（職員が「前回の内容を入れておく」でリンクを作ったときだけ）----
+let PF = null;
+function applyPrefill(pf) {
+  J.FIELDS.forEach(f => {
+    const id = 'f_' + f.k, v = f.k === 'cap_monthly' ? (pf.cap_monthly != null ? String(pf.cap_monthly) : (pf.cap_other ? 'other' : '')) : pf[f.k];
+    if (v == null || v === '') return;
+    if (f.type === 'date') { const x = J.fromIso(v); if (!x) return; ['era', 'y', 'm', 'd'].forEach(p => $(`${id}_${p}`).value = x[p]); datePv(f); }
+    else if (f.type === 'radio' || f.type === 'cap') {
+      const r = document.querySelector(`input[name="${id}"][value="${CSS.escape(v)}"]`); if (!r) return; r.checked = true; r.onchange();
+      if (f.type === 'cap' && v === 'other') $(id + '_other').value = String(pf.cap_other || '');
+    } else { $(id).value = v; if ($(id).oninput) $(id).oninput(); }
+  });
+  ['period_from', 'period_to'].forEach(k => { const w = $('w_' + k); if (!w) return; w.classList.add('chg'); const tg = document.createElement('div'); tg.className = 'chgtag'; tg.textContent = '⚠ ここが新しくなっていることが多いです。受給者証を見て直してください'; w.querySelector('.h').after(tg); });
+}
+const changed = (f, vals) => !!PF && (f.k === 'cap_monthly' ? (vals.cap_monthly != null ? String(vals.cap_monthly) : 'other:' + vals.cap_other) !== (PF.cap_monthly != null ? String(PF.cap_monthly) : 'other:' + PF.cap_other) : String(vals[f.k] ?? '') !== String(PF[f.k] ?? ''));
 // ---- 入力欄を作る ----
 function inputHtml(f) {
   const id = 'f_' + f.k;
@@ -110,8 +131,8 @@ function review() {
   $('r_err').textContent = ''; SUBMIT = vals;
   const show = (f, v) => f.type === 'date' ? `${esc(J.jaDate(v))}（西暦 ${esc(J.seiDate(v))}）` : f.k === 'mushouka' ? ({ yes: 'はい', no: 'いいえ', unknown: '分からない' })[v] : f.type === 'radio' && f.k === 'kind' ? esc(f.opts.find(o => o[0] === v)[1]) : f.k === 'contract_days' ? `${esc(v)}日/月` : esc(v);
   const rows = J.FIELDS.map(f => {
-    if (f.k === 'cap_monthly') return `<tr><th>${f.label}</th><td>${vals.cap_monthly != null ? (+vals.cap_monthly).toLocaleString() + '円' : (+vals.cap_other).toLocaleString() + '円（その他）'}</td></tr>`;
-    const v = vals[f.k]; return v ? `<tr><th>${esc(f.label)}</th><td style="white-space:pre-wrap">${show(f, v)}</td></tr>` : (f.req ? '' : `<tr><th>${esc(f.label)}</th><td class="note">（入れていません）</td></tr>`);
+    if (f.k === 'cap_monthly') return `<tr><th>${f.label}${changed(f, vals) ? '<span class="chgm">前回から変更</span>' : ''}</th><td>${vals.cap_monthly != null ? (+vals.cap_monthly).toLocaleString() + '円' : (+vals.cap_other).toLocaleString() + '円（その他）'}</td></tr>`;
+    const v = vals[f.k], cm = changed(f, vals) ? '<span class="chgm">前回から変更</span>' : ''; return v ? `<tr><th>${esc(f.label)}${cm}</th><td style="white-space:pre-wrap">${show(f, v)}</td></tr>` : (f.req ? '' : `<tr><th>${esc(f.label)}${cm}</th><td class="note">（入れていません）</td></tr>`);
   }).join('');
   $('pg_sum').innerHTML = `<div class="card"><h2>この内容で送ってよいですか？</h2><p class="note">受給者証と見くらべて、まちがいがないか確認してください。</p><table class="sm">${rows}</table>
     <button id="send" type="button">この内容で送る</button><button class="sub" id="back" type="button">← 直す</button><p id="r"></p></div>`;

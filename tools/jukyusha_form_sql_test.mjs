@@ -113,7 +113,7 @@ await sub(tok, FREE);
 const idF = await pend();
 await t('自由記入4項目が入力の記録に入る（そのまま・500文字まで）', async () => { const v = (await q(`select vals from leo_jf_subs where id=$1`, [idF])).rows[0].vals; if (v.amount_text !== FREE.amount_text || v.other.length !== 500 || v.soudan_office !== FREE.soudan_office || v.soudan_person !== FREE.soudan_person) throw new Error(JSON.stringify(v).slice(0, 200)); });
 await t('自由記入は利用者情報の列に直接は反映できない（other など）', () => as('authenticated', true, `select leo_jf_apply($1, '{"other":"x"}')`, [idF]), /反映できない項目/);
-await t('自由記入は利用者情報の列に直接は反映できない（soudan_office）', () => as('authenticated', true, `select leo_jf_apply($1, '{"soudan_office":"x"}')`, [idF]), /反映できない項目/);
+await t("自由記入は利用者情報の列に直接は反映できない（amount_text）", () => as("authenticated", true, `select leo_jf_apply($1, '{"amount_text":"x"}')`, [idF]), /反映できない項目/);
 await t('備考への追記が1000文字を超えると拒否（何も書かれない）', async () => { await q(`update leo_child_info set note = $1`, ['い'.repeat(900)]); await as('authenticated', true, `select leo_jf_apply($1, $2)`, [idF, JSON.stringify({ note_add: 'あ'.repeat(200) })]); }, /1000文字/);
 await t('1000文字で止めたあとも確認待ちで、備考は変わらない', async () => { const r = (await q(`select (select note from leo_child_info)::text n, (select status from leo_jf_subs where id=$1) s`, [idF])).rows[0]; if (r.s !== 'pending' || r.n.length !== 900) throw new Error(JSON.stringify([r.s, r.n.length])); });
 await q(`update leo_child_info set note = '前からの備考'`);
@@ -129,6 +129,44 @@ const id5 = await pend();
 await t('職員でない人は「反映しない」にできない', () => as('authenticated', false, `select leo_jf_reject($1, 'x')`, [id5]), /のみ/);
 await t('反映しない：状態とメモ', async () => { await as('authenticated', true, `select leo_jf_reject($1, '別の児童')`, [id5]); const r = (await q(`select status, note from leo_jf_subs where id=$1`, [id5])).rows[0]; if (r.status !== 'rejected' || r.note !== '別の児童') throw new Error(JSON.stringify(r)); });
 await t('反映しなかったあと、反映もできない', () => as('authenticated', true, `select leo_jf_apply($1, '{"cap_monthly":"0"}')`, [id5]), /処理済み/);
+// 相談支援事業所・担当者：利用者情報（leo_child_info）の列に反映する／前回の内容（prefill）
+await t('leo_child_info に相談支援の列がある（足した列）', async () => { const r = await q(`select column_name from information_schema.columns where table_name='leo_child_info' and column_name in ('soudan_office','soudan_person')`); if (r.rows.length !== 2) throw new Error('列なし'); });
+await t('leo_jf_make_link は1つだけ（古い版が残らない）', async () => { const r = await q(`select count(*)::int n from pg_proc where proname='leo_jf_make_link'`); if (r.rows[0].n !== 1) throw new Error('n=' + r.rows[0].n); });
+await q(`update leo_jf_links set expires_at = now() + interval '30 days'`);
+await q(`delete from leo_jf_subs where child = '見本 太郎'`); await q(`delete from leo_children`); await q(`delete from leo_child_info`);
+await q(`insert into leo_children (name, jukyusha_no, kind, cap_monthly, contract_days, contract_end, mushouka) values ('見本 太郎', '0123456789', '放デイ', 4600, 20, '2026-03-31', true), ('別の児童', '9999999999', '児発', 37200, 10, '2026-03-31', false)`);
+await q(`insert into leo_child_info (name, guardian_name, home_address, note, soudan_office) values ('見本 太郎', '見本 花子', '見本県見本市1-2-3', '前からの備考', '古い事業所'), ('別の児童', '別の保護者', '別の住所', 'べつ', 'べつ事業所')`);
+const getJ = async tk => (await as('anon', false, `select leo_jf_get($1) j`, [tk])).rows[0].j;
+await t('prefill をつけないリンクの get には prefill が出ない', async () => { await as('authenticated', true, `select leo_jf_make_link('見本 太郎', false)`); const j = await getJ(tok); if ('prefill' in j) throw new Error(JSON.stringify(j)); });
+await t('prefill をつけると、前の入力がなくても、いまの利用者情報が入る（備考・住所は入らない）', async () => { await as('authenticated', true, `select leo_jf_make_link('見本 太郎', true)`); const j = await getJ(tok), p = j.prefill; const ks = Object.keys(p).sort().join(); if (p.jukyusha_no !== '0123456789' || p.kind !== '放デイ' || p.contract_days !== '20' || p.period_to !== '2026-03-31' || p.cap_monthly !== '4600' || p.guardian_name !== '見本 花子' || p.soudan_office !== '古い事業所' || p.mushouka !== 'yes') throw new Error(JSON.stringify(p)); if (/note|address|備考|住所/.test(JSON.stringify(j))) throw new Error('余計な情報：' + JSON.stringify(j)); });
+await t('別の児童の情報は返らない', async () => { const j = await getJ(tok); const x = JSON.stringify(j); if (/9999999999|別の|べつ/.test(x)) throw new Error(x); });
+const PV = { amount_text: '児童発達支援加算サポートⅠ', other: '特記事項：見本です', soudan_office: '見本相談支援センター', soudan_person: '見本 相談員', city_name: '見本市', issue_date: '2025-03-20', period_from: '2025-04-01', period_to: '2026-03-31', cap_other: '', cap_monthly: '4600' };
+await sub(tok, PV); const idP = await pend();
+await t('反映の前は、送られてきた入力は prefill に使われない（確認ずみだけ）', async () => { const p = (await getJ(tok)).prefill; if (p.amount_text !== undefined) throw new Error(JSON.stringify(p)); });
+await t('職員でない人は反映できない（相談支援）', () => as('authenticated', false, `select leo_jf_apply($1, '{"soudan_office":"x"}')`, [idP]), /のみ/);
+await t('相談支援の長すぎる値は反映できない', () => as('authenticated', true, `select leo_jf_apply($1, $2)`, [idP, JSON.stringify({ soudan_office: 'あ'.repeat(101) })]), /長すぎ/);
+await t('担当者が60字を超えると反映できない', () => as('authenticated', true, `select leo_jf_apply($1, $2)`, [idP, JSON.stringify({ soudan_person: 'あ'.repeat(61) })]), /長すぎ/);
+await t('相談支援を反映：leo_child_info に入り、前の値が before に残る。ほかの列（備考・住所）は変わらない', async () => {
+  await as('authenticated', true, `select leo_jf_apply($1, $2)`, [idP, JSON.stringify({ soudan_office: '見本相談支援センター', soudan_person: '見本 相談員' })]);
+  const i = (await q(`select * from leo_child_info where name='見本 太郎'`)).rows[0], r = (await q(`select before, applied from leo_jf_subs where id=$1`, [idP])).rows[0];
+  if (i.soudan_office !== '見本相談支援センター' || i.soudan_person !== '見本 相談員' || i.note !== '前からの備考' || i.home_address !== '見本県見本市1-2-3' || i.guardian_name !== '見本 花子') throw new Error(JSON.stringify(i));
+  if (r.before.info.soudan_office !== '古い事業所' || r.before.info.soudan_person !== null || r.applied.soudan_person !== '見本 相談員') throw new Error(JSON.stringify(r)); });
+await t('相談支援だけの反映でも、別の児童は変わらない', async () => { const i = (await q(`select soudan_office from leo_child_info where name='別の児童'`)).rows[0]; if (i.soudan_office !== 'べつ事業所') throw new Error(JSON.stringify(i)); });
+await t('反映ずみの入力は prefill に入る（支給量等・その他・相談支援・期間のはじめ）。いまの利用者情報が優先される', async () => {
+  const p = (await getJ(tok)).prefill;
+  if (p.amount_text !== PV.amount_text || p.other !== PV.other || p.soudan_office !== '見本相談支援センター' || p.soudan_person !== '見本 相談員' || p.period_from !== '2025-04-01' || p.period_to !== '2026-03-31' || p.issue_date !== '2025-03-20' || p.city_name !== '見本市') throw new Error(JSON.stringify(p));
+  await q(`update leo_child_info set soudan_office = '直した事業所' where name='見本 太郎'`); await q(`update leo_children set contract_end = '2027-03-31' where name='見本 太郎'`);
+  const p2 = (await getJ(tok)).prefill; if (p2.soudan_office !== '直した事業所' || p2.period_to !== '2027-03-31') throw new Error(JSON.stringify(p2)); });
+await t('prefill に出るのは決まった項目だけ（備考・住所・電話・別の児童の名前は出ない）', async () => { const keys = Object.keys((await getJ(tok)).prefill); const okk = ['jukyusha_no','city_name','city_no','guardian_name','child_name','child_birth','issue_date','kind','contract_days','period_from','period_to','cap_monthly','cap_other','cap_mgmt','mushouka','amount_text','other','soudan_office','soudan_person']; const bad2 = keys.filter(k => !okk.includes(k)); if (bad2.length) throw new Error(bad2.join()); });
+await t('その他の上限額（9300円など）を前に入れていたとき、職員の列で上書きされない', async () => {
+  await q(`update leo_jf_subs set vals = (vals - 'cap_monthly') || '{"cap_other":"9300"}'::jsonb where id=$1`, [idP]);
+  const p = (await getJ(tok)).prefill; if (p.cap_other !== '9300' || p.cap_monthly !== undefined) throw new Error(JSON.stringify(p)); });
+await t('期限切れのリンクには prefill を返さない', async () => { await q(`update leo_jf_links set expires_at = now() - interval '1 day' where token=$1`, [tok]); const j = await getJ(tok); if (!j.expired || 'prefill' in j) throw new Error(JSON.stringify(j)); await q(`update leo_jf_links set expires_at = now() + interval '30 days' where token=$1`, [tok]); });
+await t('取り消したリンクには prefill を返さない', async () => { await q(`update leo_jf_links set revoked = true where token=$1`, [tok]); const j = await getJ(tok); if (!j.expired || 'prefill' in j) throw new Error(JSON.stringify(j)); await q(`update leo_jf_links set revoked = false where token=$1`, [tok]); });
+await t('リンクを作りなおして prefill をはずすと、prefill が出なくなる', async () => { await as('authenticated', true, `select leo_jf_make_link('見本 太郎', false)`); const j = await getJ(tok); if ('prefill' in j) throw new Error('出る'); });
+await t('職員でない人は prefill つきのリンクを作れない', () => as('authenticated', false, `select leo_jf_make_link('見本 太郎', true)`), /のみ/);
+await t('匿名は prefill つきのリンクを作れない', () => as('anon', false, `select leo_jf_make_link('見本 太郎', true)`), /permission denied/);
+await t('prefill の列が leo_jf_links にある（0個の別トークンでは何も出ない）', async () => { const j = (await as('anon', false, `select leo_jf_get($1) j`, ['0'.repeat(48)])).rows[0].j; if (j !== null) throw new Error('null でない'); });
 // 期限・回数
 await t('期限切れリンクの get は expired=true', async () => { await q(`update leo_jf_links set expires_at = now() - interval '1 day'`); const r = await as('anon', false, `select leo_jf_get($1) j`, [tok]); if (!r.rows[0].j.expired) throw new Error('expired でない'); });
 await t('期限切れリンクでは送れない', () => sub(tok, {}), /期限/);

@@ -29,6 +29,14 @@
     if (cmp(t, ERAS['平成'].from) >= 0) return `平成${t[0] - 1988 === 1 ? '元' : t[0] - 1988}年${t[1]}月${t[2]}日`;
     return `${t[0]}年${t[1]}月${t[2]}日`;
   }
+  // 西暦ISO → 入力欄に入れる {era, y, m, d}（令和・平成の期間に入る日付はその元号で、それ以外は西暦）。不正な値は null
+  function fromIso(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); if (!m) return null;
+    const t = [+m[1], +m[2], +m[3]]; const u = new Date(Date.UTC(t[0], t[1] - 1, t[2])); if (u.getUTCFullYear() !== t[0] || u.getUTCMonth() !== t[1] - 1 || u.getUTCDate() !== t[2]) return null;
+    if (cmp(t, ERAS['令和'].from) >= 0) return { era: '令和', y: String(t[0] - 2018), m: String(t[1]), d: String(t[2]) };
+    if (cmp(t, ERAS['平成'].from) >= 0) return { era: '平成', y: String(t[0] - 1988), m: String(t[1]), d: String(t[2]) };
+    return { era: '西暦', y: String(t[0]), m: String(t[1]), d: String(t[2]) };
+  }
   const seiDate = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? `${+m[1]}年${+m[2]}月${+m[3]}日` : ''; };
   // 項目の定義。panel＝広げた受給者証の面（①〜⑥）。map＝利用者情報（既存の列）。map のない項目は「参考」で、反映しない。
   //   map の行き先：leo_children（jukyusha_no, city_no, kind, cap_monthly, contract_days, contract_end, mushouka）／leo_child_info（guardian_name）
@@ -122,5 +130,5 @@
       if (i !== 5) s += `<g stroke="#bbb" stroke-width="3" stroke-linecap="round"><path d="M${x + 10} ${y + 32}h${pw - 24}M${x + 10} ${y + 44}h${pw - 40}M${x + 10} ${y + 56}h${pw - 24}M${x + 10} ${y + 68}h${pw - 52}"/></g>`; }
     return s + '</svg>';
   }
-  return { ERAS, DB_CAPS, FIELDS, PANELS, PANEL_NAMES, byKey, DATE_KEYS, MAP, toIso, jaDate, seiDate, validate, toDb, svg, nameClean };
+  return { ERAS, DB_CAPS, FIELDS, PANELS, PANEL_NAMES, byKey, DATE_KEYS, MAP, toIso, fromIso, jaDate, seiDate, validate, toDb, svg, nameClean };
 });

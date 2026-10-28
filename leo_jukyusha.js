@@ -32,7 +32,9 @@ LEO_VIEWS.jukyusha = async function () {
     <p class="note">保護者が、広げた受給者証を見ながら入力した内容を、いまの利用者情報と見くらべて確認し、利用者情報（受給者証番号・負担上限月額など）に入れる画面です。<b>職員が確認して「確認して反映」を押すまで、利用者情報は変わりません。</b>写真は受け取りません。入力した内容は、事務・管理者・児発管だけが見られます。</p>
     <div class="jf-card"><h4>1. 保護者にリンクを送る</h4>
       <p class="note">児童を選んでリンクをコピーし、公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。リンクは30日有効です。児童が一覧にいないときは、先に<a href="#leo/userinfo">利用者情報</a>で追加してください。</p>
-      <select id="jf_child"><option value="">児童を選ぶ</option>${names.map(n => `<option>${esc(n)}</option>`).join('')}</select>
+      <select id="jf_child" onchange="jfPrior()"><option value="">児童を選ぶ</option>${names.map(n => `<option>${esc(n)}</option>`).join('')}</select>
+      <div style="margin:2px 0 4px"><label><input type="checkbox" id="jf_prefill"> 前回の内容を入れておく</label> <small id="jf_prefill_note">（2回め以降のとき。児童を選ぶと、前の入力や利用者情報があれば自動でチェックが入ります）</small></div>
+      <p class="note" style="margin:4px 0 0">チェックを入れたリンクは、<b>開いた人に、お子さんの前回の内容（お名前・受給者証番号・保護者名・相談支援事業所名など）がそのまま見えます</b>。リンクは、その家庭の保護者の1対1のLINEにだけ送ってください。ほかの児童の情報や、住所・電話・備考は出ません。</p>
       <button onclick="jfLink()">リンクをコピー</button></div>
     <div class="jf-card"><h4>2. 届いた入力（${pend ? `<span style="color:#e8833a">確認待ち ${pend}件</span>` : '確認待ちはありません'}）</h4>
       ${JF.err ? `<p class="note" style="color:#c00">一覧を読み込めませんでした。管理者が supabase/leo_jukyusha_form.sql を実行したか確認してください。</p>` : ''}
@@ -41,24 +43,34 @@ LEO_VIEWS.jukyusha = async function () {
 };
 window.jfOpen = id => { JF.sel = id; JF.msg = ''; renderLeoView('jukyusha'); window.scrollTo(0, 0); };
 window.jfBack = () => { JF.sel = null; renderLeoView('jukyusha'); };
+window.jfPrior = async () => {   // 前の入力（反映ずみ）か、受給者証番号の入った利用者情報があれば「前回の内容を入れておく」を自動でON
+  const child = $('jf_child').value, cb = $('jf_prefill'), nt = $('jf_prefill_note'); if (!cb) return;
+  if (!child) { cb.checked = false; return; }
+  let has = false;
+  if (DEMO) has = child === '見本 太郎';
+  else { const q = encodeURIComponent(child); try { const [a, b] = await Promise.all([sb(`leo_jf_subs?child=eq.${q}&status=eq.applied&select=id&limit=1`).catch(() => []), sb(`leo_children?name=eq.${q}&select=jukyusha_no`).catch(() => [])]); has = a.length > 0 || b.some(r => r.jukyusha_no); } catch (e) { has = false; } }
+  cb.checked = has; if (nt) nt.textContent = has ? '（前の入力・利用者情報があるので、チェックを入れました。はずすと、空の入力ページになります）' : '（前の入力・利用者情報がないので、空の入力ページです）';
+};
 window.jfLink = async () => {
   const child = $('jf_child').value, B = copyBtnEl();
   if (!child) { copyNote(B, '<p class="note">児童を選んでください。</p>', ''); return; }
   if (DEMO) { copyNote(B, `<p class="note">見本：${JF_BASE()}jukyusha.html?demo=1</p>`, child); return; }
-  try { const tok = await jfRpc('leo_jf_make_link', { p_child: child }), url = `${JF_BASE()}jukyusha.html?t=${tok}`, ok = await copyUrl(url);
-    copyResult(B, url, ok, child, `${esc(child)} さんの専用リンクです。ほかの家庭には送らないでください。30日で期限が切れます。`); }
+  try { const tok = await jfRpc('leo_jf_make_link', { p_child: child, p_prefill: !!($('jf_prefill') && $('jf_prefill').checked) }), url = `${JF_BASE()}jukyusha.html?t=${tok}`, ok = await copyUrl(url);
+    copyResult(B, url, ok, child, `${esc(child)} さんの専用リンクです。${$('jf_prefill') && $('jf_prefill').checked ? '前回の内容が入った状態で開きます（開いた人に内容が見えます）。' : ''}ほかの家庭には送らないでください。30日で期限が切れます。`); }
   catch (e) { copyError(B, e.message, child); }
 };
 // ----- 確認画面 -----
 async function jfCurrent(child) {   // いまの利用者情報（比べるため）
   if (DEMO) return JF_DEMO.cur;
-  const q = encodeURIComponent(child), [k, i] = await Promise.all([sb(`leo_children?name=eq.${q}`).catch(() => []), sb(`leo_child_info?name=eq.${q}&select=guardian_name,note`).catch(() => [])]);
+  const q = encodeURIComponent(child), [k, i] = await Promise.all([sb(`leo_children?name=eq.${q}`).catch(() => []), sb(`leo_child_info?name=eq.${q}&select=guardian_name,note,soudan_office,soudan_person`).catch(() => sb(`leo_child_info?name=eq.${q}&select=guardian_name,note`).catch(() => []))]);
   return { kid: k[0] || null, info: i[0] || null };
 }
-const jfCurOf = c => { const k = (c && c.kid) || {}, i = (c && c.info) || {}; return { jukyusha_no: k.jukyusha_no, city_no: k.city_no, kind: k.kind, cap_monthly: k.cap_monthly, contract_days: k.contract_days, contract_end: k.contract_end, guardian_name: i.guardian_name, note_add: i.note, mushouka: k.mushouka == null ? null : String(!!k.mushouka) }; };
+const jfCurOf = c => { const k = (c && c.kid) || {}, i = (c && c.info) || {}; return { jukyusha_no: k.jukyusha_no, city_no: k.city_no, kind: k.kind, cap_monthly: k.cap_monthly, contract_days: k.contract_days, contract_end: k.contract_end, guardian_name: i.guardian_name, soudan_office: i.soudan_office, soudan_person: i.soudan_person, note_add: i.note, mushouka: k.mushouka == null ? null : String(!!k.mushouka) }; };
 // 反映できる項目（入力の項目 → 利用者情報の列）と、画面での名前
 const JF_ROWS = [['jukyusha_no', 'jukyusha_no', '受給者証番号'], ['city_no', 'city_no', '市町村番号'], ['guardian_name', 'guardian_name', '保護者名'], ['kind', 'kind', 'サービスの種類'], ['contract_days', 'contract_days', '支給量（日/月）'],
-  ['period_to', 'contract_end', '受給者証の有効期限（給付決定期間の終わり）'], ['cap_monthly', 'cap_monthly', '負担上限月額'], ['mushouka', 'mushouka', '無償化対象児童']];
+  ['period_to', 'contract_end', '受給者証の有効期限（給付決定期間の終わり）'], ['cap_monthly', 'cap_monthly', '負担上限月額'], ['mushouka', 'mushouka', '無償化対象児童'],
+  ['soudan_office', 'soudan_office', '相談支援事業所名'], ['soudan_person', 'soudan_person', '担当の相談支援専門員']];
+const JF_INFO_COLS = ['guardian_name', 'soudan_office', 'soudan_person'];   // leo_child_info の列（そのほかは leo_children）
 const JF_NOTE = ['note_add', 'note_add', '利用者情報「備考」に追記（任意）'];   // 備考欄のある場合だけ。初期はチェックなし
 const jfNoteText = (v, at) => { const d = new Date(at || Date.now()), t = `${d.getMonth() + 1}/${d.getDate()}`, o = []; if (v.amount_text) o.push(`【受給者証 ${t} 支給量等】${v.amount_text}`); if (v.other) o.push(`【受給者証 ${t} その他】${v.other}`); return o.join('\n'); };
 const jfShow = (col, v) => v == null || v === '' ? '（未入力）' : col === 'mushouka' ? (String(v) === 'true' ? 'はい' : 'いいえ') : col === 'cap_monthly' ? (+v).toLocaleString() + '円' : col === 'note_add' ? String(v) : col === 'contract_days' ? v + '日' : col === 'contract_end' ? v : String(v);
@@ -80,11 +92,11 @@ async function jfReview() {
       : k === 'cap_monthly' ? `<select data-jf="${col}" ${dis}><option value=""></option>${JukyushaForm.DB_CAPS.map(o => `<option value="${o}" ${String(o) === String(inVal) ? 'selected' : ''}>${o.toLocaleString()}円</option>`).join('')}</select>${v.cap_other ? `<div class="jf-cur"><small>保護者の入力：${(+v.cap_other).toLocaleString()}円（いまの請求の設定にない金額のため、反映できません）</small></div>` : ''}`
       : k === 'period_to' ? `<input type="date" data-jf="${col}" value="${esc(inVal)}" ${dis}><small>${inVal ? esc(JukyushaForm.jaDate(inVal)) : ''}</small>`
       : `<input type="text" data-jf="${col}" value="${esc(inVal)}" ${dis} ${k === 'jukyusha_no' || k === 'city_no' || k === 'contract_days' ? 'inputmode="numeric"' : ''}>`;
-    const lastCol = !done ? '' : s.status === 'applied' ? `<td>${col in ap ? `<b>${esc(jfShow(col, ap[col]))}</b>` : '<small>反映せず</small>'}</td><td>${col in ap ? esc(jfShow(col, col === 'guardian_name' ? bfInfo.guardian_name : col === 'note_add' ? bfInfo.note : bfKid[col])) : ''}</td>` : '<td></td><td></td>';
+    const lastCol = !done ? '' : s.status === 'applied' ? `<td>${col in ap ? `<b>${esc(jfShow(col, ap[col]))}</b>` : '<small>反映せず</small>'}</td><td>${col in ap ? esc(jfShow(col, col === 'note_add' ? bfInfo.note : JF_INFO_COLS.includes(col) ? bfInfo[col] : bfKid[col])) : ''}</td>` : '<td></td><td></td>';
     return `<tr class="${diff && !done ? 'jf-diff' : ''}"><td>${done ? '' : `<input type="checkbox" data-jfc="${col}" ${on ? 'checked' : ''} title="チェックした項目だけ反映します">`}</td><th>${label}</th>
       <td>${inp}</td><td class="jf-cur">${esc(jfShow(col, c))}${k !== 'note_add' && inVal !== '' && !diff ? ' <span class="jf-same">✔ 同じ</span>' : ''}</td>${lastCol}</tr>`;
   }).join('');
-  const J = JukyushaForm, ref = [['amount_text', '支給量等（日数以外に書かれていること）', v.amount_text], ['soudan_office', '相談支援事業所（④の面）　※利用者情報にこの項目の列がないので、反映しません', v.soudan_office], ['soudan_person', '担当の相談支援専門員　※同上（利用者情報に列がないので反映しません）', v.soudan_person], ['other', 'その他（特記事項など）', v.other], ['child_name', 'お子さんの名前（入力）', v.child_name], ['city_name', '支給市町村', v.city_name], ['child_birth', 'お子さんの生年月日', v.child_birth && J.jaDate(v.child_birth) + `（${J.seiDate(v.child_birth)}）`], ['issue_date', '交付年月日', v.issue_date && J.jaDate(v.issue_date)],
+  const J = JukyushaForm, ref = [['amount_text', '支給量等（日数以外に書かれていること）', v.amount_text], ['other', 'その他（特記事項など）', v.other], ['child_name', 'お子さんの名前（入力）', v.child_name], ['city_name', '支給市町村', v.city_name], ['child_birth', 'お子さんの生年月日', v.child_birth && J.jaDate(v.child_birth) + `（${J.seiDate(v.child_birth)}）`], ['issue_date', '交付年月日', v.issue_date && J.jaDate(v.issue_date)],
     ['period_from', '給付決定期間（はじめ）', v.period_from && J.jaDate(v.period_from) + '　※請求の「契約開始日」とは別なので、反映しません'], ['cap_mgmt', '上限額管理', v.cap_mgmt], ['cap_other', '負担上限月額（その他の金額）', v.cap_other && (+v.cap_other).toLocaleString() + '円'], ].filter(r => r[2]);
   document.body.classList.add('wide-sheet');
   return `<div class="jf"><style>${JF_CSS}</style><button onclick="jfBack()">← 一覧へ</button><h3>${esc(s.child)} さんの受給者証の入力${demoNote()}</h3>
@@ -101,7 +113,7 @@ async function jfReview() {
 function jfCollect() {   // チェックが入っている項目だけ（数字は全角→半角・空白とハイフンを除く）
   const o = {};
   document.querySelectorAll('[data-jfc]:checked').forEach(c => {
-    const col = c.dataset.jfc, e = document.querySelector(`[data-jf="${col}"]`), x = e ? (col === 'note_add' ? e.value.trim() : e.value.normalize('NFKC').trim()) : ''; if (x === '') return;
+    const col = c.dataset.jfc, e = document.querySelector(`[data-jf="${col}"]`), x = e ? (col === 'note_add' || col === 'soudan_office' || col === 'soudan_person' ? e.value.trim() : e.value.normalize('NFKC').trim()) : ''; if (x === '') return;
     o[col] = col === 'jukyusha_no' || col === 'city_no' ? x.replace(/[\s-]/g, '') : col === 'guardian_name' ? JukyushaForm.nameClean(x) : x;
   });
   return o;
@@ -112,6 +124,7 @@ function jfValidate(v) {
   if ('contract_days' in v && !(/^\d+$/.test(v.contract_days) && +v.contract_days >= 1 && +v.contract_days <= 31)) return '支給量は1〜31日で入れてください。';
   if ('contract_end' in v && !/^\d{4}-\d{2}-\d{2}$/.test(v.contract_end)) return '有効期限（終わりの日）を日付で入れてください。';
   if ('note_add' in v && ((JF.cur && JF.cur.note_add ? JF.cur.note_add + '\n' : '') + v.note_add).length > 1000) return '備考が1000文字を超えます。追記する文を短くしてください。';
+  if (('soudan_office' in v && v.soudan_office.length > 100) || ('soudan_person' in v && v.soudan_person.length > 60)) return '相談支援事業所名は100字、担当者は60字までです。';
   if ('kind' in v && !['児発', '放デイ'].includes(v.kind)) return 'サービスの種類は 児発 か 放デイ です。';
   if ('cap_monthly' in v && !JukyushaForm.DB_CAPS.includes(+v.cap_monthly)) return '負担上限月額は 0・4,600・37,200円 のどれかです。';
   return '';

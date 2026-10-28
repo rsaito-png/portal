@@ -3,7 +3,7 @@
 --      → 職員が「受給者証の入力」画面で、保護者の入力と今の利用者情報を並べて確認・直す → 「確認して反映」を押したときだけ leo_children / leo_child_info に書く
 -- 保護者の画面：jukyusha.html ／ 職員の画面：#leo/jukyusha（leo_jukyusha.js）／ 項目の定義・検証：jukyusha_lib.js
 -- 前提：leo_billing.sql（leo_children・can_manage）と leo_userinfo.sql（leo_child_info）が実行済みであること。
--- 既存の表・関数は変更しない（新しい物だけ作る・何度実行しても同じ）。写真は受け取らない・保管しない（Storage は使わない）。
+-- 既存のデータは変更しない。leo_child_info には列を2つ足すだけ（soudan_office, soudan_person）。何度実行しても同じ。写真は受け取らない・保管しない（Storage は使わない）。
 
 -- 1. 児童ごとの専用リンク（leo_confirm_links と同じ作り。トークンは推測できない48桁の16進）
 create table if not exists public.leo_jf_links (
@@ -12,6 +12,12 @@ create table if not exists public.leo_jf_links (
   created_at timestamptz not null default now(), created_by uuid default auth.uid(),
   expires_at timestamptz not null default now() + interval '30 days',
   revoked boolean not null default false);
+-- 2回め以降：リンクを作るとき「前回の内容を入れておく」を選べる（後から足した列。何度実行しても同じ）
+alter table public.leo_jf_links add column if not exists prefill boolean not null default false;
+-- 相談支援事業所・担当の相談支援専門員：利用者情報（leo_child_info）に列を足す（既存の列・データは変えない。何度実行しても同じ）
+--   書く・読む権限は leo_child_info のいまの設定（読む：レオ職員・事務／書く：can_manage）のまま。利用者情報の画面で見て・直せる。
+alter table public.leo_child_info add column if not exists soudan_office text check (char_length(soudan_office) <= 100);
+alter table public.leo_child_info add column if not exists soudan_person text check (char_length(soudan_person) <= 60);
 -- 2. 保護者の入力（1回の送信＝1行）。反映の前の値（before）も残す
 create table if not exists public.leo_jf_subs (
   id bigint generated always as identity primary key,
@@ -39,27 +45,64 @@ revoke all on public.leo_jf_links, public.leo_jf_subs from anon, authenticated;
 grant select on public.leo_jf_links, public.leo_jf_subs to authenticated;
 
 -- 3. 職員：児童の専用リンクを作る（あれば同じものを返し、期限を30日先に延ばす）
-create or replace function public.leo_jf_make_link(p_child text) returns text
+--    p_prefill = true：保護者のページを「前回の内容」を入れた状態で開く（4. 参照）。リンクを作り直すたびに、この選択も更新される。
+drop function if exists public.leo_jf_make_link(text);      -- 古い版（引数が児童名だけ）。同じ名前が2つ残らないように
+create or replace function public.leo_jf_make_link(p_child text, p_prefill boolean default false) returns text
 language plpgsql security definer set search_path = public, extensions as $$
 declare t text; c text := btrim(coalesce(p_child, ''));
 begin
   if not public.can_manage() then raise exception '事務・管理者・児発管のみ'; end if;
   if c = '' or char_length(c) > 100 then raise exception '児童名が正しくありません'; end if;
-  insert into leo_jf_links (token, child) values (encode(gen_random_bytes(24), 'hex'), c)
-    on conflict (child) do update set expires_at = now() + interval '30 days', revoked = false
+  insert into leo_jf_links (token, child, prefill) values (encode(gen_random_bytes(24), 'hex'), c, coalesce(p_prefill, false))
+    on conflict (child) do update set expires_at = now() + interval '30 days', revoked = false, prefill = coalesce(p_prefill, false)
     returning token into t;
   return t;
 end $$;
 revoke all on function public.leo_jf_make_link from public;
 grant execute on function public.leo_jf_make_link to authenticated;
 
--- 4. 保護者：リンクから、その児童の名前と「送信ずみか」だけを返す（利用者情報の中身は返さない）
+-- 4. 保護者：リンクから、その児童の名前と「送信ずみか」を返す。
+--    prefill つきのリンクのときだけ、その児童1人分の「前回の内容」（prefill）も返す（期限切れ・取り消しのリンクには返さない）：
+--      ① 最後に職員が反映した（applied）入力の値（受給者証の項目だけ。相談支援・支給量等の文字・その他も含む）
+--      ② その上に、いまの利用者情報の値（受給者証番号・市町村番号・サービス種類・支給量・保護者名・相談支援事業所名・担当者名・負担上限月額・給付決定期間の終わり・無償化が「はい」のとき）
+--    ほかの児童の情報・住所・電話・送迎・備考などは返さない（備考の列は読みもしない）。リンク（トークン）を持っている人には、この内容が見える。
 create or replace function public.leo_jf_get(p_token text) returns jsonb
-language sql stable security definer set search_path = public as $$
-  select jsonb_build_object('child', l.child, 'expired', (l.revoked or l.expires_at <= now()),
-    'last', (select jsonb_build_object('at', s.created_at, 'status', s.status)
-             from leo_jf_subs s where s.token = l.token order by s.id desc limit 1))
-  from leo_jf_links l where l.token = p_token and length(p_token) = 48 $$;
+language plpgsql stable security definer set search_path = public as $$
+declare l leo_jf_links; sv jsonb; src timestamptz; pf jsonb := '{}'::jsonb; c leo_children; i leo_child_info; k text; r jsonb;
+  keys text[] := array['jukyusha_no','city_name','city_no','guardian_name','child_name','child_birth','issue_date','kind','contract_days','period_from','period_to','cap_monthly','cap_other','cap_mgmt','mushouka','amount_text','other','soudan_office','soudan_person'];
+begin
+  if length(coalesce(p_token, '')) <> 48 then return null; end if;
+  select * into l from leo_jf_links where token = p_token;
+  if not found then return null; end if;
+  r := jsonb_build_object('child', l.child, 'expired', (l.revoked or l.expires_at <= now()),
+    'last', (select jsonb_build_object('at', s.created_at, 'status', s.status) from leo_jf_subs s where s.token = l.token order by s.id desc limit 1));
+  if l.prefill and not (l.revoked or l.expires_at <= now()) then
+    select s.vals, s.created_at into sv, src from leo_jf_subs s where s.token = l.token and s.status = 'applied' order by s.id desc limit 1;
+    if sv is not null then
+      for k in select jsonb_object_keys(sv) loop
+        if k = any (keys) and jsonb_typeof(sv -> k) = 'string' then pf := pf || jsonb_build_object(k, sv ->> k); end if;
+      end loop;
+    end if;
+    select * into c from leo_children where name = l.child;
+    select * into i from leo_child_info where name = l.child;
+    if c.name is not null then
+      if nullif(c.jukyusha_no, '') is not null then pf := pf || jsonb_build_object('jukyusha_no', c.jukyusha_no); end if;
+      if nullif(c.city_no, '') is not null then pf := pf || jsonb_build_object('city_no', c.city_no); end if;
+      if c.kind in ('児発', '放デイ') then pf := pf || jsonb_build_object('kind', c.kind); end if;
+      if c.contract_days between 1 and 31 then pf := pf || jsonb_build_object('contract_days', c.contract_days::text); end if;
+      if c.contract_end is not null then pf := pf || jsonb_build_object('period_to', to_char(c.contract_end, 'YYYY-MM-DD')); end if;
+      if c.mushouka is true then pf := pf || jsonb_build_object('mushouka', 'yes'); end if;
+      -- 負担上限月額：保護者が前に「その他の金額」を入れていたときは、職員の列（4,600などの3つだけ）で上書きしない
+      if c.cap_monthly in (0, 4600, 37200) and (sv is null or sv ? 'cap_monthly' or not (sv ? 'cap_other')) then
+        pf := (pf - 'cap_other' - 'cap_monthly') || jsonb_build_object('cap_monthly', c.cap_monthly::text); end if;
+    end if;
+    if nullif(i.guardian_name, '') is not null then pf := pf || jsonb_build_object('guardian_name', i.guardian_name); end if;
+    if nullif(i.soudan_office, '') is not null then pf := pf || jsonb_build_object('soudan_office', i.soudan_office); end if;
+    if nullif(i.soudan_person, '') is not null then pf := pf || jsonb_build_object('soudan_person', i.soudan_person); end if;
+    if pf <> '{}'::jsonb then r := r || jsonb_build_object('prefill', pf, 'prefill_at', src); end if;
+  end if;
+  return r;
+end $$;
 revoke all on function public.leo_jf_get from public;
 grant execute on function public.leo_jf_get to anon, authenticated;
 
@@ -109,13 +152,13 @@ revoke all on function public.leo_jf_submit from public;
 grant execute on function public.leo_jf_submit to anon, authenticated;
 
 -- 6. 職員：「確認して反映」。職員が確認・修正した値（p_vals に入っているキーだけ）を、既存の利用者情報に書く。
---    書けるキー：jukyusha_no, city_no, kind, cap_monthly, contract_days, contract_end, mushouka → leo_children ／ guardian_name → leo_child_info
+--    書けるキー：jukyusha_no, city_no, kind, cap_monthly, contract_days, contract_end, mushouka → leo_children ／ guardian_name, soudan_office, soudan_person → leo_child_info
 --    note_add（任意）：leo_child_info.note（備考）の末尾に追記する。いまの備考は消さない（合計1000文字まで）。
 --    ない児童は新しく作る。反映前の値は before に残す。1回の送信につき1回だけ（pending のときだけ）。
 create or replace function public.leo_jf_apply(p_id bigint, p_vals jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare s leo_jf_subs; v jsonb := '{}'::jsonb; k text; b jsonb;
-  allowed text[] := array['jukyusha_no','city_no','kind','cap_monthly','contract_days','contract_end','guardian_name','mushouka','note_add'];
+  allowed text[] := array['jukyusha_no','city_no','kind','cap_monthly','contract_days','contract_end','guardian_name','soudan_office','soudan_person','mushouka','note_add'];
 begin
   if not public.can_manage() then raise exception '事務・管理者・児発管のみ'; end if;
   select * into s from leo_jf_subs where id = p_id for update;
@@ -127,12 +170,13 @@ begin
   end loop;
   if v = '{}'::jsonb then raise exception '反映する項目がありません'; end if;
   if v ? 'kind' and (v ->> 'kind') not in ('児発', '放デイ') then raise exception '種別は 児発 か 放デイ です'; end if;
+  if char_length(coalesce(v ->> 'soudan_office', '')) > 100 or char_length(coalesce(v ->> 'soudan_person', '')) > 60 then raise exception '相談支援の入力が長すぎます'; end if;
   if v ? 'mushouka' and (v ->> 'mushouka') not in ('true', 'false') then raise exception '無償化は true か false です'; end if;
   if v ? 'note_add' and char_length(concat_ws(E'\n', nullif((select i.note from leo_child_info i where i.name = s.child), ''), v ->> 'note_add')) > 1000 then raise exception '備考が1000文字を超えます（追記する文を短くしてください）'; end if;
   if v ? 'cap_monthly' and (v ->> 'cap_monthly')::int not in (0, 4600, 37200) then raise exception '負担上限月額は 0・4600・37200 のいずれかです'; end if;
   -- 反映の前の値
   select jsonb_build_object('children', (select to_jsonb(c) from leo_children c where c.name = s.child),
-                            'info', (select jsonb_build_object('guardian_name', i.guardian_name, 'note', i.note) from leo_child_info i where i.name = s.child)) into b;
+                            'info', (select jsonb_build_object('guardian_name', i.guardian_name, 'note', i.note, 'soudan_office', i.soudan_office, 'soudan_person', i.soudan_person) from leo_child_info i where i.name = s.child)) into b;
   if v ?| array['jukyusha_no','city_no','kind','cap_monthly','contract_days','contract_end','mushouka'] then
     insert into leo_children (name, jukyusha_no, city_no, kind, cap_monthly, contract_days, contract_end, mushouka)
     values (s.child, v ->> 'jukyusha_no', v ->> 'city_no', coalesce(v ->> 'kind', '放デイ'), coalesce((v ->> 'cap_monthly')::int, 4600), (v ->> 'contract_days')::int, (v ->> 'contract_end')::date, coalesce((v ->> 'mushouka')::boolean, false))
@@ -146,10 +190,12 @@ begin
       mushouka = case when v ? 'mushouka' then excluded.mushouka else leo_children.mushouka end,
       updated_by = auth.uid(), updated_at = now();
   end if;
-  if v ?| array['guardian_name','note_add'] then
-    insert into leo_child_info (name, guardian_name, note) values (s.child, v ->> 'guardian_name', v ->> 'note_add')
+  if v ?| array['guardian_name','note_add','soudan_office','soudan_person'] then
+    insert into leo_child_info (name, guardian_name, note, soudan_office, soudan_person) values (s.child, v ->> 'guardian_name', v ->> 'note_add', v ->> 'soudan_office', v ->> 'soudan_person')
     on conflict (name) do update set
       guardian_name = case when v ? 'guardian_name' then excluded.guardian_name else leo_child_info.guardian_name end,
+      soudan_office = case when v ? 'soudan_office' then excluded.soudan_office else leo_child_info.soudan_office end,
+      soudan_person = case when v ? 'soudan_person' then excluded.soudan_person else leo_child_info.soudan_person end,
       note = case when v ? 'note_add' then concat_ws(E'\n', nullif(leo_child_info.note, ''), v ->> 'note_add') else leo_child_info.note end,
       updated_by = auth.uid(), updated_at = now();
   end if;
