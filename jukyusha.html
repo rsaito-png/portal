@@ -58,7 +58,7 @@ async function load() {
         <li><b>使う目的：</b>利用者負担額・支給量・有効期間の確認と、請求の手続きのためだけに使います。</li>
         <li><b>見る人：</b>レオの職員のうち、事務・管理者・児発管だけです。</li>
         <li><b>保管：</b>入力いただいた内容だけを、外から見られない専用の保管場所（国内）に置きます。<b>受給者証の写真は、受け取りません・保管しません。</b></li>
-        <li>入力いただいた内容は、レオの職員が受給者証と見くらべて確認してから、利用者情報に反映します（確認するまでは反映されません）。</li>
+        <li>入力いただいた内容は、レオの職員が確認してから利用者情報に反映します（確認するまでは反映されません）。必要に応じて、受給者証の原本を見せていただくことがあります。</li>
         <li>入力が難しいときや、ご同意いただけないときは、入力せずに受給者証を直接お持ちください（利用には影響しません）。</li></ul></div>
       <label class="agree"><input type="checkbox" id="agree"><span>上の内容を読み、受給者証の内容を入力して送ることに同意します</span></label>
       <button id="review" type="button" disabled>入力内容を確認する</button><p id="r_err" class="err"></p></div>
@@ -146,7 +146,7 @@ async function send() {
   try {
     const r = await rpc('leo_jf_submit', { p_token: T, p_vals: SUBMIT, p_consent: true });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'submit ' + r.status); }
-    $('pg_sum').innerHTML = '<div class="card"><h2 class="ok">送信しました。ありがとうございました。</h2><p>レオの職員が、受給者証と見くらべて確認します。内容にまちがいに気づいたときは、もう一度このページから入力して送ってください（新しい入力が優先されます）。</p></div>'; SUBMIT = null; window.scrollTo(0, 0);
+    $('pg_sum').innerHTML = '<div class="card"><h2 class="ok">送信しました。ありがとうございました。</h2><p>レオの職員が確認します。必要に応じて、受給者証の原本を見せていただくことがあります。内容にまちがいに気づいたときは、もう一度このページから入力して送ってください（新しい入力が優先されます）。</p></div>'; SUBMIT = null; window.scrollTo(0, 0);
   } catch (e) {
     const m = String(e.message || ''); out.innerHTML = `<span class="err">${/多すぎ/.test(m) ? '送信が多すぎます。しばらくしてからお試しください。' : /同意|正しくありません|期限|けた|日数|期間|金額|項目|選んで|入れて/.test(m) ? esc(m) : '送信できませんでした。電波のよい場所で、もう一度お試しください。うまくいかないときはレオまでご連絡ください。'}</span>`; btn.disabled = false;
   }
