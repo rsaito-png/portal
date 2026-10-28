@@ -11,8 +11,9 @@ button.sub{background:#fff;color:#333;border:2px solid #bbb;font-weight:normal}
 .note{color:#666;font-size:14px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00;font-size:15px;font-weight:bold;margin:4px 0 0}
 .f{margin:18px 0;padding-top:14px;border-top:1px solid #eee}.f:first-of-type{border-top:0;padding-top:0}
 .f label.t{display:block;font-weight:bold;font-size:18px}.f .h{color:#666;font-size:14px;margin:2px 0 6px}.req{color:#c00;font-size:13px;margin-left:6px}.opt{color:#888;font-size:13px;margin-left:6px;font-weight:normal}
-input[type=text],input[type=tel],input[type=number],select{width:100%;box-sizing:border-box;font-size:20px;padding:12px;border:2px solid #bbb;border-radius:8px;background:#fff;min-height:52px}
-input:focus,select:focus{border-color:#e8833a;outline:0}.bad input,.bad select{border-color:#c00}
+input[type=text],input[type=tel],input[type=number],select,textarea{width:100%;box-sizing:border-box;font-size:20px;padding:12px;border:2px solid #bbb;border-radius:8px;background:#fff;min-height:52px}
+textarea{line-height:1.5;min-height:84px;font-family:inherit;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:#e8833a;outline:0}.bad input,.bad select,.bad textarea{border-color:#c00}
 .dt{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.dt select{width:auto;min-width:5.2em}.dt input{width:3.6em;text-align:center}.dt span{font-size:18px}.pv{color:#2e6b4f;font-size:14px;margin-top:4px;min-height:1.2em}
 .opts label{display:flex;align-items:center;gap:10px;border:2px solid #ccc;border-radius:10px;padding:12px;margin:6px 0;font-size:18px;background:#fff}.opts input{width:24px;height:24px;flex:none;margin:0}
 .opts label.on{border-color:#e8833a;background:#fff4e8}
@@ -66,6 +67,7 @@ function inputHtml(f) {
   if (f.type === 'radio') return `<div class="opts" id="${id}">${f.opts.map(([v, l]) => `<label><input type="radio" name="${id}" value="${esc(v)}"><span>${esc(l)}</span></label>`).join('')}</div>`;
   if (f.type === 'cap') return `<div class="opts" id="${id}">${[['0', '0円'], ['4600', '4,600円'], ['37200', '37,200円'], ['other', 'その他（金額を入れる）']].map(([v, l]) => `<label><input type="radio" name="${id}" value="${v}"><span>${l}</span></label>`).join('')}</div>
     <input type="text" inputmode="numeric" id="${id}_other" placeholder="金額（例：9300）" aria-label="その他の金額" hidden style="margin-top:6px">`;
+  if (f.type === 'area') return `<textarea id="${id}" rows="${f.rows || 3}" maxlength="${f.max + 100}" autocomplete="off"></textarea>`;
   const mode = f.type === 'digits' || f.type === 'days' ? 'inputmode="numeric"' : '';
   return `<input type="text" id="${id}" ${mode} ${f.len ? `maxlength="${f.len + 4}"` : ''} autocomplete="off" ${f.ex ? `placeholder="例：${esc(f.ex)}"` : ''}>${f.type === 'digits' && f.len ? `<div class="pv" id="${id}_pv" aria-live="polite"></div>` : ''}`;
 }
@@ -76,6 +78,8 @@ function buildFields() {
     h += `<div class="f" id="w_${f.k}"><label class="t" for="f_${f.k}${f.type === 'date' ? '_era' : ''}">${esc(f.label)}${f.req ? '<span class="req">必ず</span>' : '<span class="opt">わかれば</span>'}</label><div class="h">${esc(f.help)}</div>${inputHtml(f)}<div class="err" id="e_${f.k}" role="alert"></div></div>`;
   });
   $('fields').innerHTML = h;
+  const clr = e => { const w = e.target.closest && e.target.closest('.f'); if (w && w.classList.contains('bad')) { w.classList.remove('bad'); const m = $('e_' + w.id.slice(2)); if (m) m.textContent = ''; } };
+  $('fields').addEventListener('input', clr); $('fields').addEventListener('change', clr);
   J.FIELDS.forEach(f => {
     const id = 'f_' + f.k;
     if (f.type === 'date') ['era', 'y', 'm', 'd'].forEach(p => $(`${id}_${p}`).oninput = $(`${id}_${p}`).onchange = () => datePv(f));
@@ -107,7 +111,7 @@ function review() {
   const show = (f, v) => f.type === 'date' ? `${esc(J.jaDate(v))}（西暦 ${esc(J.seiDate(v))}）` : f.k === 'mushouka' ? ({ yes: 'はい', no: 'いいえ', unknown: '分からない' })[v] : f.type === 'radio' && f.k === 'kind' ? esc(f.opts.find(o => o[0] === v)[1]) : f.k === 'contract_days' ? `${esc(v)}日/月` : esc(v);
   const rows = J.FIELDS.map(f => {
     if (f.k === 'cap_monthly') return `<tr><th>${f.label}</th><td>${vals.cap_monthly != null ? (+vals.cap_monthly).toLocaleString() + '円' : (+vals.cap_other).toLocaleString() + '円（その他）'}</td></tr>`;
-    const v = vals[f.k]; return v ? `<tr><th>${esc(f.label)}</th><td>${show(f, v)}</td></tr>` : (f.req ? '' : `<tr><th>${esc(f.label)}</th><td class="note">（入れていません）</td></tr>`);
+    const v = vals[f.k]; return v ? `<tr><th>${esc(f.label)}</th><td style="white-space:pre-wrap">${show(f, v)}</td></tr>` : (f.req ? '' : `<tr><th>${esc(f.label)}</th><td class="note">（入れていません）</td></tr>`);
   }).join('');
   $('pg_sum').innerHTML = `<div class="card"><h2>この内容で送ってよいですか？</h2><p class="note">受給者証と見くらべて、まちがいがないか確認してください。</p><table class="sm">${rows}</table>
     <button id="send" type="button">この内容で送る</button><button class="sub" id="back" type="button">← 直す</button><p id="r"></p></div>`;

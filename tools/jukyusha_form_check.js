@@ -22,7 +22,7 @@ eq([J.jaDate('2026-09-01'), J.jaDate('2019-05-01'), J.jaDate('2019-04-30'), J.ja
 // --- 入力の検証 ---
 const good = () => ({ jukyusha_no: '0123456789', city_name: '見本市', city_no: '', guardian_name: '見本　花子', child_name: '見本 太郎',
   child_birth: { era: '西暦', y: 2019, m: 4, d: 2 }, issue_date: { era: '令和', y: 8, m: 3, d: 20 }, kind: '放デイ', contract_days: '20.0日/月',
-  period_from: { era: '令和', y: 8, m: 4, d: 1 }, period_to: { era: '令和', y: 9, m: 3, d: 31 }, cap_monthly: { sel: '4600', other: '' }, cap_mgmt: '非該当', mushouka: 'unknown', memo: '' });
+  period_from: { era: '令和', y: 8, m: 4, d: 1 }, period_to: { era: '令和', y: 9, m: 3, d: 31 }, cap_monthly: { sel: '4600', other: '' }, cap_mgmt: '非該当', mushouka: 'unknown', other: '', amount_text: '', soudan_office: '', soudan_person: '' });
 const v0 = J.validate(good(), T);
 eq(v0.errors, {}, '正しい入力はエラーなし');
 eq(v0.vals, { jukyusha_no: '0123456789', city_name: '見本市', guardian_name: '見本 花子', child_name: '見本 太郎', child_birth: '2019-04-02', issue_date: '2026-03-20', kind: '放デイ', contract_days: '20', period_from: '2026-04-01', period_to: '2027-03-31', cap_monthly: '4600', cap_mgmt: '非該当', mushouka: 'unknown' }, '送る値（空は入れない・全角空白は半角・20.0日/月→20）');
@@ -51,7 +51,16 @@ ok(mod(g => g.cap_monthly = { sel: 'other', other: '' }).errors.cap_monthly, '�
 ok(mod(g => g.cap_monthly = { sel: '', other: '' }).errors.cap_monthly, '負担上限 未選択はエラー');
 ok(mod(g => g.cap_monthly = { sel: '1234', other: '' }).errors.cap_monthly, '負担上限 一覧にない値はエラー');
 ok(mod(g => g.cap_mgmt = '？').errors.cap_mgmt, '上限額管理 ほかの値はエラー'); ok(mod(g => g.mushouka = 'maybe').errors.mushouka, '無償化 ほかの値はエラー');
-ok(mod(g => g.memo = 'あ'.repeat(201)).errors.memo, 'メモ 201文字はエラー');
+ok(mod(g => g.other = 'あ'.repeat(501)).errors.other, 'その他 501文字はエラー');
+ok(!mod(g => g.other = 'あ'.repeat(500)).errors.other, 'その他 500文字はOK');
+ok(mod(g => g.amount_text = 'あ'.repeat(201)).errors.amount_text, '支給量等の文字 201文字はエラー');
+ok(mod(g => g.soudan_office = 'あ'.repeat(101)).errors.soudan_office, '相談支援事業所 101文字はエラー');
+ok(mod(g => g.soudan_person = 'あ'.repeat(61)).errors.soudan_person, '相談支援専門員 61文字はエラー');
+ok(mod(g => { g.amount_text = '児童発達支援加算サポートⅠ'; g.other = '特記事項\r\n無償化対象児童'; g.soudan_office = '㈱見本 相談支援'; g.soudan_person = ''; }).vals.amount_text === '児童発達支援加算サポートⅠ', '支給量等の文字は「Ⅰ」もそのまま（半角に直さない）');
+ok(mod(g => { g.other = '特記事項\r\n無償化対象児童'; }).vals.other === '特記事項\n無償化対象児童', 'その他：改行は残る');
+ok(mod(g => g.soudan_office = '㈱見本 相談支援').vals.soudan_office === '㈱見本 相談支援', '相談支援事業所名は書いたとおりに残る');
+ok(!('soudan_person' in mod(g => g.soudan_person = '').vals) && !('other' in mod(g => g.other = '  ').vals), '空欄は値に入らない');
+ok(!('amount_text' in J.toDb(mod(g => g.amount_text = 'x').vals)) && !('other' in J.toDb(mod(g => g.other = 'x').vals)) && !('soudan_office' in J.toDb(mod(g => g.soudan_office = 'x').vals)) && !('soudan_person' in J.toDb(mod(g => g.soudan_person = 'x').vals)), '新しい4項目は利用者情報の列に自動では対応しない（toDb に出ない）');
 eq(J.validate({}, T).errors && Object.keys(J.validate({}, T).errors).sort(), ['cap_monthly', 'child_name', 'contract_days', 'guardian_name', 'jukyusha_no', 'kind', 'period_from', 'period_to'], '空のとき「必ず」の項目だけがエラー');
 // --- 利用者情報の列への対応 ---
 eq(J.toDb(v0.vals), { jukyusha_no: '0123456789', guardian_name: '見本 花子', kind: '放デイ', contract_days: 20, contract_end: '2027-03-31', cap_monthly: 4600 }, '列への対応（無償化「分からない」は入れない・period_from は入れない）');

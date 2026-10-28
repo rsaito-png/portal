@@ -68,7 +68,7 @@ grant execute on function public.leo_jf_get to anon, authenticated;
 create or replace function public.leo_jf_submit(p_token text, p_vals jsonb, p_consent boolean) returns text
 language plpgsql security definer set search_path = public as $$
 declare l leo_jf_links; v jsonb := '{}'::jsonb; k text; x text;
-  keys text[] := array['jukyusha_no','city_name','city_no','guardian_name','child_name','child_birth','issue_date','kind','contract_days','period_from','period_to','cap_monthly','cap_other','cap_mgmt','mushouka','memo'];
+  keys text[] := array['jukyusha_no','city_name','city_no','guardian_name','child_name','child_birth','issue_date','kind','contract_days','period_from','period_to','cap_monthly','cap_other','cap_mgmt','mushouka','amount_text','other','soudan_office','soudan_person'];
   dates text[] := array['child_birth','issue_date','period_from','period_to'];
 begin
   select * into l from leo_jf_links where token = p_token and length(p_token) = 48;
@@ -98,7 +98,7 @@ begin
   elsif coalesce(v ->> 'cap_other', '') !~ '^\d{1,7}$' then raise exception '負担上限月額を選ぶか、その他の金額を入れてください'; end if;
   if v ? 'cap_mgmt' and (v ->> 'cap_mgmt') not in ('該当', '非該当', '分からない') then raise exception '上限額管理が正しくありません'; end if;
   if v ? 'mushouka' and (v ->> 'mushouka') not in ('yes', 'no', 'unknown') then raise exception '無償化が正しくありません'; end if;
-  if exists (select 1 from jsonb_each_text(v) e where char_length(e.value) > 200) then raise exception '入力が長すぎます'; end if;
+  if exists (select 1 from jsonb_each_text(v) e where char_length(e.value) > case when e.key = 'other' then 500 else 200 end) then raise exception '入力が長すぎます'; end if;
   if (select count(*) from leo_jf_subs where token = p_token and created_at > now() - interval '1 hour') >= 5
     then raise exception '送信が多すぎます。時間をおいてください'; end if;
   update leo_jf_subs set status = 'superseded' where token = p_token and status = 'pending';
@@ -110,11 +110,12 @@ grant execute on function public.leo_jf_submit to anon, authenticated;
 
 -- 6. 職員：「確認して反映」。職員が確認・修正した値（p_vals に入っているキーだけ）を、既存の利用者情報に書く。
 --    書けるキー：jukyusha_no, city_no, kind, cap_monthly, contract_days, contract_end, mushouka → leo_children ／ guardian_name → leo_child_info
+--    note_add（任意）：leo_child_info.note（備考）の末尾に追記する。いまの備考は消さない（合計1000文字まで）。
 --    ない児童は新しく作る。反映前の値は before に残す。1回の送信につき1回だけ（pending のときだけ）。
 create or replace function public.leo_jf_apply(p_id bigint, p_vals jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare s leo_jf_subs; v jsonb := '{}'::jsonb; k text; b jsonb;
-  allowed text[] := array['jukyusha_no','city_no','kind','cap_monthly','contract_days','contract_end','guardian_name','mushouka'];
+  allowed text[] := array['jukyusha_no','city_no','kind','cap_monthly','contract_days','contract_end','guardian_name','mushouka','note_add'];
 begin
   if not public.can_manage() then raise exception '事務・管理者・児発管のみ'; end if;
   select * into s from leo_jf_subs where id = p_id for update;
@@ -127,10 +128,11 @@ begin
   if v = '{}'::jsonb then raise exception '反映する項目がありません'; end if;
   if v ? 'kind' and (v ->> 'kind') not in ('児発', '放デイ') then raise exception '種別は 児発 か 放デイ です'; end if;
   if v ? 'mushouka' and (v ->> 'mushouka') not in ('true', 'false') then raise exception '無償化は true か false です'; end if;
+  if v ? 'note_add' and char_length(concat_ws(E'\n', nullif((select i.note from leo_child_info i where i.name = s.child), ''), v ->> 'note_add')) > 1000 then raise exception '備考が1000文字を超えます（追記する文を短くしてください）'; end if;
   if v ? 'cap_monthly' and (v ->> 'cap_monthly')::int not in (0, 4600, 37200) then raise exception '負担上限月額は 0・4600・37200 のいずれかです'; end if;
   -- 反映の前の値
   select jsonb_build_object('children', (select to_jsonb(c) from leo_children c where c.name = s.child),
-                            'info', (select jsonb_build_object('guardian_name', i.guardian_name) from leo_child_info i where i.name = s.child)) into b;
+                            'info', (select jsonb_build_object('guardian_name', i.guardian_name, 'note', i.note) from leo_child_info i where i.name = s.child)) into b;
   if v ?| array['jukyusha_no','city_no','kind','cap_monthly','contract_days','contract_end','mushouka'] then
     insert into leo_children (name, jukyusha_no, city_no, kind, cap_monthly, contract_days, contract_end, mushouka)
     values (s.child, v ->> 'jukyusha_no', v ->> 'city_no', coalesce(v ->> 'kind', '放デイ'), coalesce((v ->> 'cap_monthly')::int, 4600), (v ->> 'contract_days')::int, (v ->> 'contract_end')::date, coalesce((v ->> 'mushouka')::boolean, false))
@@ -144,9 +146,12 @@ begin
       mushouka = case when v ? 'mushouka' then excluded.mushouka else leo_children.mushouka end,
       updated_by = auth.uid(), updated_at = now();
   end if;
-  if v ? 'guardian_name' then
-    insert into leo_child_info (name, guardian_name) values (s.child, v ->> 'guardian_name')
-    on conflict (name) do update set guardian_name = excluded.guardian_name, updated_by = auth.uid(), updated_at = now();
+  if v ?| array['guardian_name','note_add'] then
+    insert into leo_child_info (name, guardian_name, note) values (s.child, v ->> 'guardian_name', v ->> 'note_add')
+    on conflict (name) do update set
+      guardian_name = case when v ? 'guardian_name' then excluded.guardian_name else leo_child_info.guardian_name end,
+      note = case when v ? 'note_add' then concat_ws(E'\n', nullif(leo_child_info.note, ''), v ->> 'note_add') else leo_child_info.note end,
+      updated_by = auth.uid(), updated_at = now();
   end if;
   update leo_jf_subs set status = 'applied', applied = v, before = b, reviewed_by = auth.uid(), reviewed_at = now() where id = p_id;
   return v;

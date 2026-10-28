@@ -21,7 +21,7 @@ create table public.leo_children (name text primary key, kana text, jukyusha_no 
   kind text not null default '放デイ' check (kind in ('児発','放デイ')), cap_monthly int not null default 4600 check (cap_monthly in (0,4600,37200)),
   mushouka boolean not null default false, contract_days int check (contract_days between 1 and 31), contract_start date, contract_end date,
   updated_by uuid default auth.uid(), updated_at timestamptz not null default now());
-create table public.leo_child_info (name text primary key, guardian_name text, home_address text, use_transport boolean not null default true, updated_by uuid default auth.uid(), updated_at timestamptz not null default now());
+create table public.leo_child_info (name text primary key, guardian_name text, home_address text, note text check (char_length(note) <= 1000), use_transport boolean not null default true, updated_by uuid default auth.uid(), updated_at timestamptz not null default now());
 grant select, insert, update on public.leo_children, public.leo_child_info to authenticated;
 -- 本物の Supabase と同じく、public に作る表には anon / authenticated の権限が自動で付く（SQL がそれを外していることを確かめる）
 alter default privileges in schema public grant all on tables to anon, authenticated;
@@ -52,7 +52,7 @@ await t('違うトークンは不可', () => sub('1'.repeat(48), {}), /リンク
 await t('受給者証番号が10けたでないと不可', () => sub(tok, { jukyusha_no: '12345' }), /10けた/);
 await t('受給者証番号なしは不可', () => sub(tok, {}, true, ['jukyusha_no']), /10けた/);
 await t('決まった項目以外は不可', () => sub(tok, { name: 'x' }), /受け付けられない項目/);
-await t('配列・オブジェクトの値は不可', () => sub(tok, { memo: ['a'] }), /正しくありません/);
+await t('配列・オブジェクトの値は不可', () => sub(tok, { other: ['a'] }), /正しくありません/);
 await t('市町村番号は6けた', () => sub(tok, { city_no: '1234' }), /6けた/);
 await t('名前なしは不可', () => sub(tok, { guardian_name: ' ' }), /お名前/);
 await t('種類が児発・放デイ以外は不可', () => sub(tok, { kind: '就労' }), /児発/);
@@ -67,7 +67,9 @@ await t('負担上限なし（その他もなし）は不可', () => sub(tok, {}
 await t('その他 9,300 円は受け付ける（cap_other）', () => sub(tok, { cap_other: '9300' }, true, ['cap_monthly']));
 await t('上限額管理がちがう値は不可', () => sub(tok, { cap_mgmt: '？' }), /上限額管理/);
 await t('無償化がちがう値は不可', () => sub(tok, { mushouka: 'maybe' }), /無償化/);
-await t('200文字を超える値は不可', () => sub(tok, { memo: 'あ'.repeat(201) }), /長すぎ/);
+await t('200文字を超える値は不可', () => sub(tok, { amount_text: 'あ'.repeat(201) }), /長すぎ/);
+await t('その他は501文字で不可', () => sub(tok, { other: 'あ'.repeat(501) }), /長すぎ/);
+await t('相談支援事業所は201文字で不可', () => sub(tok, { soudan_office: 'あ'.repeat(201) }), /長すぎ/);
 await t('検証に落ちた送信は何も残らない（その他9,300の1件だけ）', async () => { const r = await q(`select count(*)::int n from leo_jf_subs`); if (r.rows[0].n !== 1) throw new Error('n=' + r.rows[0].n); });
 // 送信：成功
 await t('正しい入力は受け付ける', () => sub(tok, {}));
@@ -75,7 +77,7 @@ await t('前の確認待ち（その他9,300）は「置き換え」になる', 
 await t('送信しても利用者情報は書かれていない', async () => { const r = await q(`select (select count(*) from leo_children)::int a, (select count(*) from leo_child_info)::int b`); if (r.rows[0].a || r.rows[0].b) throw new Error('書かれている'); });
 await t('匿名：get に最後の送信が出る', async () => { const r = await as('anon', false, `select leo_jf_get($1) j`, [tok]); if (r.rows[0].j.last.status !== 'pending') throw new Error(JSON.stringify(r.rows[0].j)); });
 await t('職員でない認証ユーザーは入力が見えない', async () => { const r = await as('authenticated', false, `select * from leo_jf_subs`); if (r.rows.length) throw new Error('見えてしまう'); });
-await t('職員は入力が見える（値の空欄は入らない）', async () => { const r = await as('authenticated', true, `select * from leo_jf_subs where status='pending'`); if (r.rows.length !== 1 || r.rows[0].vals.jukyusha_no !== '0123456789' || 'memo' in r.rows[0].vals || !r.rows[0].consent_at) throw new Error(JSON.stringify(r.rows)); });
+await t('職員は入力が見える（値の空欄は入らない）', async () => { const r = await as('authenticated', true, `select * from leo_jf_subs where status='pending'`); if (r.rows.length !== 1 || r.rows[0].vals.jukyusha_no !== '0123456789' || 'other' in r.rows[0].vals || !r.rows[0].consent_at) throw new Error(JSON.stringify(r.rows)); });
 const pend = async () => (await q(`update leo_jf_subs set created_at = created_at - interval '2 hours'`), await q(`select id from leo_jf_subs where status='pending' order by id desc limit 1`)).rows[0].id;
 const id1 = await pend();
 // 反映
@@ -105,6 +107,22 @@ await t('保護者名だけ反映 → 利用者情報の住所は残る', async 
 await sub(tok, {});
 const id4 = await pend();
 await t('無償化(true)だけ反映', async () => { await as('authenticated', true, `select leo_jf_apply($1, '{"mushouka":"false"}')`, [id4]); const c = (await q(`select * from leo_children`)).rows[0]; if (c.mushouka !== false || c.cap_monthly !== 0 || c.jukyusha_no !== '0123456789') throw new Error(JSON.stringify(c)); });
+// 新しい自由記入の項目（支給量等の文字・その他・相談支援）
+const FREE = { amount_text: '児童発達支援加算サポートⅠ\n児童発達支援基本決定', other: 'あ'.repeat(500), soudan_office: '見本相談支援センター', soudan_person: '見本 相談員' };
+await sub(tok, FREE);
+const idF = await pend();
+await t('自由記入4項目が入力の記録に入る（そのまま・500文字まで）', async () => { const v = (await q(`select vals from leo_jf_subs where id=$1`, [idF])).rows[0].vals; if (v.amount_text !== FREE.amount_text || v.other.length !== 500 || v.soudan_office !== FREE.soudan_office || v.soudan_person !== FREE.soudan_person) throw new Error(JSON.stringify(v).slice(0, 200)); });
+await t('自由記入は利用者情報の列に直接は反映できない（other など）', () => as('authenticated', true, `select leo_jf_apply($1, '{"other":"x"}')`, [idF]), /反映できない項目/);
+await t('自由記入は利用者情報の列に直接は反映できない（soudan_office）', () => as('authenticated', true, `select leo_jf_apply($1, '{"soudan_office":"x"}')`, [idF]), /反映できない項目/);
+await t('備考への追記が1000文字を超えると拒否（何も書かれない）', async () => { await q(`update leo_child_info set note = $1`, ['い'.repeat(900)]); await as('authenticated', true, `select leo_jf_apply($1, $2)`, [idF, JSON.stringify({ note_add: 'あ'.repeat(200) })]); }, /1000文字/);
+await t('1000文字で止めたあとも確認待ちで、備考は変わらない', async () => { const r = (await q(`select (select note from leo_child_info)::text n, (select status from leo_jf_subs where id=$1) s`, [idF])).rows[0]; if (r.s !== 'pending' || r.n.length !== 900) throw new Error(JSON.stringify([r.s, r.n.length])); });
+await q(`update leo_child_info set note = '前からの備考'`);
+await t('備考に追記（任意）：いまの備考は消えず、下に付け足される。ほかの列は変わらない', async () => { await as('authenticated', true, `select leo_jf_apply($1, $2)`, [idF, JSON.stringify({ note_add: '【受給者証 10/28 支給量等】児童発達支援加算サポートⅠ' })]); const i = (await q(`select * from leo_child_info`)).rows[0]; if (i.note !== '前からの備考\n【受給者証 10/28 支給量等】児童発達支援加算サポートⅠ' || i.guardian_name !== '見本 花' || i.home_address !== '見本町1-1') throw new Error(JSON.stringify(i)); });
+await t('追記前の備考が before に残る', async () => { const r = (await q(`select before, applied from leo_jf_subs where id=$1`, [idF])).rows[0]; if (r.before.info.note !== '前からの備考' || !r.applied.note_add) throw new Error(JSON.stringify(r)); });
+await t('備考の追記だけでも、児童（leo_children）は変わらない', async () => { const c = (await q(`select * from leo_children`)).rows[0]; if (c.cap_monthly !== 0 || c.jukyusha_no !== '0123456789') throw new Error(JSON.stringify(c)); });
+await q(`update leo_child_info set note = null`);
+await sub(tok, FREE); const idG = await pend();
+await t('備考が空のときの追記は、追記した文だけになる（先頭に空行が入らない）', async () => { await as('authenticated', true, `select leo_jf_apply($1, '{"note_add":"追記"}')`, [idG]); const i = (await q(`select note from leo_child_info`)).rows[0]; if (i.note !== '追記') throw new Error(JSON.stringify(i)); });
 // 反映しない
 await sub(tok, {});
 const id5 = await pend();
