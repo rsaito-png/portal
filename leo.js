@@ -85,7 +85,7 @@ const noTab = () => '<p>この期間の日誌タブがまだありません（�
 const sheetRows = async kind => { if (DEMO) return (MASTER_DEMO[kind] || DEMO_DATA[kind]);
   const m = await sb(`leo_master?kind=eq.${kind}&order=row_no`); return m.length ? m.map(r => r.data) : (await sb(`leo_sheet?kind=eq.${kind}&order=row_no`)).map(r => r.data); };
 // 見本：児童Bは10月末の退所予定、児童Dは退所済み。本番の退所日は leo_child_info.left_on（型表は触らない）
-const DEMO_LEFT_INFOS = [{ name: '児童B', left_on: '2026-10-31', transport_mode: '送迎あり' }, { name: '児童D', left_on: '2026-09-30' }];
+const DEMO_LEFT_INFOS = [{ name: '児童B', left_on: '2026-10-31', transport_mode: '送迎あり', soudan_office: '見本相談支援センター', soudan_person: '見本 相談員' }, { name: '児童D', left_on: '2026-09-30' }];
 async function loadLeftIndex() {
   if (DEMO) return leftIndex(DEMO_LEFT_INFOS);
   try { const rows = await sb('leo_child_info?select=name,left_on&left_on=not.is.null'); return leftIndex(rows || []); }
@@ -826,6 +826,7 @@ LEO_VIEWS.userinfo = async function () {
       <p class="note">退所にしても記録は消えません。退所日の翌日以降、利用予定・カレンダー・送迎に出なくなります。型表の保存は不要です。請求CSVは <a href="#leo/seikyu">請求</a> から（ここの受給者証の内容が使われます）。</p>`;
   }
   const k = K[nm] || {}, i = I[nm] || {}, ro = mg ? '' : 'disabled';
+  const SC = DEMO || infos.some(r => r && 'soudan_office' in r);   // 相談支援の列がある（supabase/leo_jukyusha_form.sql を実行ずみ）ときだけ欄を出す・保存する
   if (UI.tab === 'plan' && nm) {
     const p = PLN[nm] || {};
     const tabs = `<p><button class="back" onclick="uiTab('basic')">基本</button> <button class="back" onclick="uiTab('assess')">アセスメント</button> <b style="padding:6px 10px;border-bottom:3px solid #36c">個別支援計画</b></p>`;
@@ -865,7 +866,7 @@ LEO_VIEWS.userinfo = async function () {
       ${kin('pickup_place', '乗る場所（迎え）', i.pickup_place)}${kin('dropoff_place', '降りる場所（送り）', i.dropoff_place)}
       <label class="wide"><span>送迎の配慮（座席・チャイルドシート・引き渡し相手・アレルギー等）※送迎画面にも出ます</span><textarea data-t="care" data-f="note" rows="3" ${ro}>${esc(C[nm] || '')}</textarea></label>
       <label class="wide"><span>送迎のメモ</span><textarea data-t="info" data-f="transport_note" rows="2" ${ro}>${esc(i.transport_note || '')}</textarea></label></div></div>
-    <div class="uic"><h4>${mg ? '③' : '②'} 保護者・連絡先</h4><div class="uig">${INFO_F.map(([f, l]) => kin(f, l, i[f])).join('')}</div></div>
+    <div class="uic"><h4>${mg ? '③' : '②'} 保護者・連絡先・相談支援</h4><div class="uig">${INFO_F.map(([f, l]) => kin(f, l, i[f])).join('')}${SC ? kin('soudan_office', '相談支援事業所名', i.soudan_office, 'maxlength="100"') + kin('soudan_person', '担当の相談支援専門員', i.soudan_person, 'maxlength="60"') : '<p class="note wide">相談支援事業所・担当者の欄は、管理者が supabase/leo_jukyusha_form.sql を実行すると出ます。</p>'}</div></div>
     <div class="uic"><h4>${mg ? '④' : '③'} Googleフォト・メモ</h4><div class="uig">${kin('album_url', '共有アルバムのリンク（https://…）', i.album_url, 'type="url"')}<label class="wide"><span>メモ</span><textarea data-t="info" data-f="note" rows="3" ${ro}>${esc(i.note || '')}</textarea></label></div></div>
     ${leaveBox}
     </div>${mg ? `<button onclick="uiSave()">保存</button> <span id="ui_msg"></span>` : ''}${mg && nm ? `<p style="margin-top:28px"><button onclick="uiDelete()" style="color:#c00;border-color:#c00">この児童を削除</button></p>` : ''}`;

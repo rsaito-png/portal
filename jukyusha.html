@@ -1,0 +1,155 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>受給者証の入力｜レオ</title>
+<style>
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222;font-size:17px;line-height:1.6}
+header{background:#e8833a;color:#fff;padding:14px 16px;font-size:19px;font-weight:bold}
+main{max-width:560px;margin:auto;padding:12px 14px 40px}.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin:14px 0}
+h2{font-size:19px;margin:0 0 4px;color:#b4540f}
+button{font-size:19px;width:100%;padding:15px;border:0;border-radius:10px;background:#e8833a;color:#fff;margin-top:10px;font-weight:bold}button:disabled{background:#ccc}
+button.sub{background:#fff;color:#333;border:2px solid #bbb;font-weight:normal}
+.note{color:#666;font-size:14px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00;font-size:15px;font-weight:bold;margin:4px 0 0}
+.f{margin:18px 0;padding-top:14px;border-top:1px solid #eee}.f:first-of-type{border-top:0;padding-top:0}
+.f label.t{display:block;font-weight:bold;font-size:18px}.f .h{color:#666;font-size:14px;margin:2px 0 6px}.req{color:#c00;font-size:13px;margin-left:6px}.opt{color:#888;font-size:13px;margin-left:6px;font-weight:normal}
+input[type=text],input[type=tel],input[type=number],select,textarea{width:100%;box-sizing:border-box;font-size:20px;padding:12px;border:2px solid #bbb;border-radius:8px;background:#fff;min-height:52px}
+textarea{line-height:1.5;min-height:84px;font-family:inherit;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:#e8833a;outline:0}.bad input,.bad select,.bad textarea{border-color:#c00}
+.dt{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.dt select{width:auto;min-width:5.2em}.dt input{width:3.6em;text-align:center}.dt span{font-size:18px}.pv{color:#2e6b4f;font-size:14px;margin-top:4px;min-height:1.2em}
+.opts label{display:flex;align-items:center;gap:10px;border:2px solid #ccc;border-radius:10px;padding:12px;margin:6px 0;font-size:18px;background:#fff}.opts input{width:24px;height:24px;flex:none;margin:0}
+.opts label.on{border-color:#e8833a;background:#fff4e8}
+.sec{display:flex;gap:10px;align-items:center;border-bottom:3px solid #e8833a;padding-bottom:6px;margin-bottom:6px}.sec svg{flex:none;width:96px;margin:0}
+.unfold{border:3px solid #e8833a;background:#fff8f0}.uf-h{font-size:20px;font-weight:bold;color:#b4540f}
+.priv{font-size:14px;line-height:1.7;background:#fafafa;border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px}.priv ul{padding-left:1.2em;margin:6px 0}
+.agree{display:flex;gap:10px;align-items:flex-start;font-size:17px;margin:12px 0 0}.agree input{width:26px;height:26px;flex:none;margin-top:2px}
+table.sm{width:100%;border-collapse:collapse;font-size:16px}table.sm td,table.sm th{border-top:1px solid #e5e5e5;padding:7px 4px;text-align:left;vertical-align:top}table.sm th{width:42%;color:#555;font-weight:normal}
+.pf{border:3px solid #2e6b4f;background:#f2faf5}.pf b.h{font-size:19px;color:#2e6b4f}
+.f.chg{background:#fff4e8;border:2px solid #e8833a;border-radius:10px;padding:12px;margin:14px -4px}.chgtag{background:#e8833a;color:#fff;border-radius:6px;padding:4px 8px;font-size:15px;font-weight:bold;margin:4px 0 8px;display:inline-block}
+.chgm{background:#e8833a;color:#fff;border-radius:4px;padding:1px 6px;font-size:13px;margin-left:6px;white-space:nowrap}
+.warn{background:#fde8e8;color:#b00;padding:10px;border-radius:8px;font-weight:bold;margin:10px 0}
+</style></head><body><header>レオ　受給者証の入力</header><main id="m"><p>読み込み中…</p></main>
+<script src="config.js"></script><script src="jukyusha_lib.js"></script>
+<script>
+// 保護者向け（ログインなし）：児童ごとの専用リンク（jukyusha.html?t=…）から、広げた受給者証を見ながら項目を入力して送る。写真は送らない・保管しない。
+// 送った内容は、レオの職員（事務・管理者・児発管）が確認し、利用者情報と見くらべて「確認して反映」を押すまで、利用者情報には入らない。
+const C = window.PORTAL_CONFIG, J = window.JukyushaForm, q = new URLSearchParams(location.search), DEMO = q.get('demo') === '1', T = q.get('t') || '';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const $ = id => document.getElementById(id), $m = () => $('m');
+const bad = msg => $m().innerHTML = `<div class="card">${msg || 'リンクが正しくないか、期限が切れています。お手数ですがレオまでご連絡ください。'}</div>`;
+const dt = s => new Date(s).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+async function load() {
+  let d;
+  if (DEMO) d = { child: '児童A（見本）', expired: false, last: q.get('prefill') === '1' ? { at: '2025-04-10T01:00:00Z', status: 'applied' } : null,
+    prefill: q.get('prefill') === '1' ? { jukyusha_no: '0123456789', city_name: '見本市', guardian_name: '見本 花子', child_name: '見本 太郎', child_birth: '2019-04-02', issue_date: '2025-03-20', kind: '放デイ', contract_days: '20', amount_text: '児童発達支援加算サポートⅠ', period_from: '2025-04-01', period_to: '2026-03-31', soudan_office: '見本相談支援センター', soudan_person: '見本 相談員', cap_monthly: '4600', cap_mgmt: '非該当', mushouka: 'yes', other: '特記事項：見本です' } : null };
+  else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); const r = await rpc('leo_jf_get', { p_token: T }); d = r.ok ? await r.json() : null; if (!d) return bad(); }
+  if (d.expired) return bad('このリンクは期限が切れています。お手数ですがレオまでご連絡ください。');
+  $m().innerHTML = `<div id="pg_form">
+    <div class="card"><b>${esc(d.child)}</b> さんの受給者証（障害児通所受給者証）の内容を、入力してください。
+      <p class="note">利用者負担額や支給量の確認、請求の手続きに使います。<b>写真は送りません。</b>入力は5分ほどです。</p>
+      ${d.prefill ? '' : d.last ? `<p class="ok">${dt(d.last.at)} に入力をいただいています。受給者証が新しくなったときなど、もう一度入れるときは、このまま入力して送ってください。</p>` : ''}</div>
+    ${d.prefill ? `<div class="card pf"><b class="h">✔ 前回の内容が入っています</b><p style="margin:6px 0"><b>変わったところだけ直してください（多くは有効期間です）。</b>色のついた「給付決定期間」の2か所は、新しい受給者証を見て、入れなおしてください。そのほかも、受給者証と見くらべて、ちがうところがあれば直してください。</p>
+      <p class="note">前回確認ずみの入力と、いま登録されている内容が入っています。このページには、お子さんの前回の内容が表示されます。リンクはほかの方に送らないでください。</p></div>` : ''}
+    <div class="card unfold"><div class="uf-h">📖 受給者証を、ぜんぶ広げて見ながら入れてください</div>
+      <p style="margin:8px 0">折りたたんだままだと、支給量・期間・<b>負担上限月額</b>が見えません。広げると、<b>6つの面（横に3つ×たてに2つ）</b>があります。下の入力欄に「①の面」「②の面」と書いてあるので、その面を見て入れてください。</p>
+      ${J.svg(0)}<p class="note" style="text-align:center">↑ 広げたところの見本の図です（実際の内容ではありません）</p></div>
+    <div class="card" id="fields"></div>
+    <div class="card"><h2>個人情報の取り扱い</h2>
+      <div class="priv">受給者証には、お子さんと保護者の方のお名前・受給者証番号などが書かれています。<ul>
+        <li><b>使う目的：</b>利用者負担額・支給量・有効期間の確認と、請求の手続きのためだけに使います。</li>
+        <li><b>見る人：</b>レオの職員のうち、事務・管理者・児発管だけです。</li>
+        <li><b>保管：</b>入力いただいた内容だけを、外から見られない専用の保管場所（国内）に置きます。<b>受給者証の写真は、受け取りません・保管しません。</b></li>
+        <li>入力いただいた内容は、レオの職員が受給者証と見くらべて確認してから、利用者情報に反映します（確認するまでは反映されません）。</li>
+        <li>入力が難しいときや、ご同意いただけないときは、入力せずに受給者証を直接お持ちください（利用には影響しません）。</li></ul></div>
+      <label class="agree"><input type="checkbox" id="agree"><span>上の内容を読み、受給者証の内容を入力して送ることに同意します</span></label>
+      <button id="review" type="button" disabled>入力内容を確認する</button><p id="r_err" class="err"></p></div>
+    <p class="note">このページはご家庭ごとの専用リンクです。ほかの方には送らないでください。${DEMO ? '（見本です。送信しても、何も送られません）' : ''}</p></div>
+    <div id="pg_sum" hidden></div>`;
+  buildFields(); PF = d.prefill && typeof d.prefill === 'object' ? d.prefill : null; if (PF) applyPrefill(PF); $('agree').onchange = () => $('review').disabled = !$('agree').checked; $('review').onclick = review;
+}
+// ---- 前回の内容を入れる（職員が「前回の内容を入れておく」でリンクを作ったときだけ）----
+let PF = null;
+function applyPrefill(pf) {
+  J.FIELDS.forEach(f => {
+    const id = 'f_' + f.k, v = f.k === 'cap_monthly' ? (pf.cap_monthly != null ? String(pf.cap_monthly) : (pf.cap_other ? 'other' : '')) : pf[f.k];
+    if (v == null || v === '') return;
+    if (f.type === 'date') { const x = J.fromIso(v); if (!x) return; ['era', 'y', 'm', 'd'].forEach(p => $(`${id}_${p}`).value = x[p]); datePv(f); }
+    else if (f.type === 'radio' || f.type === 'cap') {
+      const r = document.querySelector(`input[name="${id}"][value="${CSS.escape(v)}"]`); if (!r) return; r.checked = true; r.onchange();
+      if (f.type === 'cap' && v === 'other') $(id + '_other').value = String(pf.cap_other || '');
+    } else { $(id).value = v; if ($(id).oninput) $(id).oninput(); }
+  });
+  ['period_from', 'period_to'].forEach(k => { const w = $('w_' + k); if (!w) return; w.classList.add('chg'); const tg = document.createElement('div'); tg.className = 'chgtag'; tg.textContent = '⚠ ここが新しくなっていることが多いです。受給者証を見て直してください'; w.querySelector('.h').after(tg); });
+}
+const changed = (f, vals) => !!PF && (f.k === 'cap_monthly' ? (vals.cap_monthly != null ? String(vals.cap_monthly) : 'other:' + vals.cap_other) !== (PF.cap_monthly != null ? String(PF.cap_monthly) : 'other:' + PF.cap_other) : String(vals[f.k] ?? '') !== String(PF[f.k] ?? ''));
+// ---- 入力欄を作る ----
+function inputHtml(f) {
+  const id = 'f_' + f.k;
+  if (f.type === 'date') return `<div class="dt"><select id="${id}_era" aria-label="元号"><option>令和</option><option>平成</option><option>西暦</option></select><input id="${id}_y" inputmode="numeric" maxlength="4" aria-label="年" placeholder="年"><span>年</span><input id="${id}_m" inputmode="numeric" maxlength="2" aria-label="月" placeholder="月"><span>月</span><input id="${id}_d" inputmode="numeric" maxlength="2" aria-label="日" placeholder="日"><span>日</span></div><div class="pv" id="${id}_pv" aria-live="polite"></div>`;
+  if (f.type === 'radio') return `<div class="opts" id="${id}">${f.opts.map(([v, l]) => `<label><input type="radio" name="${id}" value="${esc(v)}"><span>${esc(l)}</span></label>`).join('')}</div>`;
+  if (f.type === 'cap') return `<div class="opts" id="${id}">${[['0', '0円'], ['4600', '4,600円'], ['37200', '37,200円'], ['other', 'その他（金額を入れる）']].map(([v, l]) => `<label><input type="radio" name="${id}" value="${v}"><span>${l}</span></label>`).join('')}</div>
+    <input type="text" inputmode="numeric" id="${id}_other" placeholder="金額（例：9300）" aria-label="その他の金額" hidden style="margin-top:6px">`;
+  if (f.type === 'area') return `<textarea id="${id}" rows="${f.rows || 3}" maxlength="${f.max + 100}" autocomplete="off"></textarea>`;
+  const mode = f.type === 'digits' || f.type === 'days' ? 'inputmode="numeric"' : '';
+  return `<input type="text" id="${id}" ${mode} ${f.len ? `maxlength="${f.len + 4}"` : ''} autocomplete="off" ${f.ex ? `placeholder="例：${esc(f.ex)}"` : ''}>${f.type === 'digits' && f.len ? `<div class="pv" id="${id}_pv" aria-live="polite"></div>` : ''}`;
+}
+function buildFields() {
+  let h = '', last = null;
+  J.FIELDS.forEach(f => {
+    if (f.panel !== last) { last = f.panel; h += f.panel ? `<div class="sec"><div>${J.svg(f.panel, true)}</div><div><h2>${esc(J.PANELS[f.panel])} の面</h2><div class="note">この面を見て入れてください</div></div></div>` : `<div class="sec" style="margin-top:20px"><h2>そのほか</h2></div>`; }
+    h += `<div class="f" id="w_${f.k}"><label class="t" for="f_${f.k}${f.type === 'date' ? '_era' : ''}">${esc(f.label)}${f.req ? '<span class="req">必ず</span>' : '<span class="opt">わかれば</span>'}</label><div class="h">${esc(f.help)}</div>${inputHtml(f)}<div class="err" id="e_${f.k}" role="alert"></div></div>`;
+  });
+  $('fields').innerHTML = h;
+  const clr = e => { const w = e.target.closest && e.target.closest('.f'); if (w && w.classList.contains('bad')) { w.classList.remove('bad'); const m = $('e_' + w.id.slice(2)); if (m) m.textContent = ''; } };
+  $('fields').addEventListener('input', clr); $('fields').addEventListener('change', clr);
+  J.FIELDS.forEach(f => {
+    const id = 'f_' + f.k;
+    if (f.type === 'date') ['era', 'y', 'm', 'd'].forEach(p => $(`${id}_${p}`).oninput = $(`${id}_${p}`).onchange = () => datePv(f));
+    if (f.type === 'radio' || f.type === 'cap') document.querySelectorAll(`input[name="${id}"]`).forEach(r => r.onchange = () => { document.querySelectorAll(`input[name="${id}"]`).forEach(x => x.parentNode.classList.toggle('on', x.checked)); if (f.type === 'cap') $(id + '_other').hidden = r.value !== 'other' || !r.checked; });
+    if (f.type === 'digits' && f.len) $(id).oninput = () => { const t = $(id).value.normalize('NFKC').replace(/[\s-]/g, ''); $(id + '_pv').textContent = t ? `${t.length}けた入っています（${f.len}けた必要）` : ''; $(id + '_pv').style.color = t.length === f.len ? '#2e6b4f' : '#b36b00'; };
+  });
+}
+function datePv(f) {
+  const x = rawDate(f), blank = !x.y && !x.m && !x.d, pv = $(`f_${f.k}_pv`);
+  if (blank) { pv.textContent = ''; return; }
+  const r = J.toIso(x); pv.style.color = r.err ? '#b00' : '#2e6b4f'; pv.textContent = r.err ? '' : `＝ 西暦 ${J.seiDate(r.iso)}`;
+}
+const rawDate = f => ({ era: $(`f_${f.k}_era`).value, y: $(`f_${f.k}_y`).value.trim(), m: $(`f_${f.k}_m`).value.trim(), d: $(`f_${f.k}_d`).value.trim() });
+function collect() {
+  const raw = {};
+  J.FIELDS.forEach(f => {
+    const id = 'f_' + f.k, ck = () => { const e = document.querySelector(`input[name="${id}"]:checked`); return e ? e.value : ''; };
+    raw[f.k] = f.type === 'date' ? rawDate(f) : f.type === 'radio' ? ck() : f.type === 'cap' ? { sel: ck(), other: $(id + '_other').value } : $(id).value;
+  });
+  return raw;
+}
+let SUBMIT = null;
+function review() {
+  const { vals, errors } = J.validate(collect());
+  J.FIELDS.forEach(f => { $('e_' + f.k).textContent = errors[f.k] || ''; $('w_' + f.k).classList.toggle('bad', !!errors[f.k]); });
+  const ks = Object.keys(errors);
+  if (ks.length) { $('r_err').textContent = `入力を直してください（${ks.length}か所）。赤い字のところです。`; $('w_' + J.FIELDS.find(f => errors[f.k]).k).scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  $('r_err').textContent = ''; SUBMIT = vals;
+  const show = (f, v) => f.type === 'date' ? `${esc(J.jaDate(v))}（西暦 ${esc(J.seiDate(v))}）` : f.k === 'mushouka' ? ({ yes: 'はい', no: 'いいえ', unknown: '分からない' })[v] : f.type === 'radio' && f.k === 'kind' ? esc(f.opts.find(o => o[0] === v)[1]) : f.k === 'contract_days' ? `${esc(v)}日/月` : esc(v);
+  const rows = J.FIELDS.map(f => {
+    if (f.k === 'cap_monthly') return `<tr><th>${f.label}${changed(f, vals) ? '<span class="chgm">前回から変更</span>' : ''}</th><td>${vals.cap_monthly != null ? (+vals.cap_monthly).toLocaleString() + '円' : (+vals.cap_other).toLocaleString() + '円（その他）'}</td></tr>`;
+    const v = vals[f.k], cm = changed(f, vals) ? '<span class="chgm">前回から変更</span>' : ''; return v ? `<tr><th>${esc(f.label)}${cm}</th><td style="white-space:pre-wrap">${show(f, v)}</td></tr>` : (f.req ? '' : `<tr><th>${esc(f.label)}${cm}</th><td class="note">（入れていません）</td></tr>`);
+  }).join('');
+  $('pg_sum').innerHTML = `<div class="card"><h2>この内容で送ってよいですか？</h2><p class="note">受給者証と見くらべて、まちがいがないか確認してください。</p><table class="sm">${rows}</table>
+    <button id="send" type="button">この内容で送る</button><button class="sub" id="back" type="button">← 直す</button><p id="r"></p></div>`;
+  $('pg_form').hidden = true; $('pg_sum').hidden = false; window.scrollTo(0, 0);
+  $('back').onclick = () => { $('pg_sum').hidden = true; $('pg_form').hidden = false; window.scrollTo(0, 0); }; $('send').onclick = send;
+}
+async function send() {
+  const out = $('r'), btn = $('send'); if (!SUBMIT) return;
+  if (DEMO) { out.innerHTML = '<span class="ok">見本なので送信しません。</span>'; return; }
+  btn.disabled = true; out.textContent = '送信しています…（そのままお待ちください）';
+  try {
+    const r = await rpc('leo_jf_submit', { p_token: T, p_vals: SUBMIT, p_consent: true });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'submit ' + r.status); }
+    $('pg_sum').innerHTML = '<div class="card"><h2 class="ok">送信しました。ありがとうございました。</h2><p>レオの職員が、受給者証と見くらべて確認します。内容にまちがいに気づいたときは、もう一度このページから入力して送ってください（新しい入力が優先されます）。</p></div>'; SUBMIT = null; window.scrollTo(0, 0);
+  } catch (e) {
+    const m = String(e.message || ''); out.innerHTML = `<span class="err">${/多すぎ/.test(m) ? '送信が多すぎます。しばらくしてからお試しください。' : /同意|正しくありません|期限|けた|日数|期間|金額|項目|選んで|入れて/.test(m) ? esc(m) : '送信できませんでした。電波のよい場所で、もう一度お試しください。うまくいかないときはレオまでご連絡ください。'}</span>`; btn.disabled = false;
+  }
+}
+load();
+</script></body></html>
