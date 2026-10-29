@@ -79,6 +79,7 @@ async function jfReview() {
   if (!s) { JF.sel = null; return '<p>見つかりません。</p>'; }
   const cur = jfCurOf(await jfCurrent(s.child)), v = s.vals || {}, done = s.status !== 'pending', ap = s.applied || {}, bf = s.before || {}, bfKid = bf.children || {}, bfInfo = bf.info || {};
   JF.s = s; JF.cur = cur;
+  const me = done ? '' : DEMO ? '職員X' : await myName().catch(() => '');   // 「原本も確認した」の確認者の初期値＝ログイン中の職員名
   const name = v.child_name, mism = name && jfKey(name) !== jfKey(s.child) && !jfKey(name).includes(jfKey(s.child)) && !jfKey(s.child).includes(jfKey(name));
   const db = JukyushaForm.toDb(v);
   const noteTxt = jfNoteText(v, s.created_at);
@@ -106,6 +107,8 @@ async function jfReview() {
     <details style="margin-top:10px" ${done ? '' : 'open'}><summary class="note">参考（利用者情報には入れません）</summary><table class="jf-tbl">${ref.map(r => `<tr><th>${r[1]}</th><td style="white-space:pre-wrap">${esc(r[2])}</td></tr>`).join('')}</table></details>
     ${done ? (s.note ? `<p class="note">メモ：${esc(s.note)}</p>` : '') : `<div class="jf-bar">
       ${mism ? '<label style="color:#b00"><input type="checkbox" id="jf_mism"> 児童名が違いますが、この受給者証でよいことを確認しました</label><br>' : ''}
+      <div style="margin:2px 0 6px"><label><input type="checkbox" id="jf_orig" onchange="$('jf_orig_w').hidden=!this.checked"> 受給者証の原本も確認した</label>
+        <div id="jf_orig_w" hidden style="margin:4px 0 0 22px">確認した職員：<input type="text" id="jf_orig_by" value="${esc(me)}" maxlength="60" style="width:11em;font-size:15px;padding:4px"> <small>（今日の日付で、利用者情報の「受給者証の原本の確認」に記録します）</small></div></div>
       <button onclick="jfApply(${mism})" style="background:#2e6b4f;color:#fff;font-size:16px;padding:10px 18px">確認して反映</button>
       <button onclick="jfReject()">反映しない</button> <span class="note">「確認して反映」を押すまで、利用者情報は変わりません。反映前の値は記録に残ります。</span></div>`}
     <p id="jf_msg" class="note">${esc(JF.msg)}</p></div>`;
@@ -134,12 +137,19 @@ window.jfApply = async mism => {
   if (mism && !($('jf_mism') && $('jf_mism').checked)) { m.textContent = '児童名が違うようです。確認して、「この受給者証でよい」にチェックを入れてください。'; return; }
   if (!Object.keys(v).length) { m.textContent = '反映する項目にチェックを入れてください（チェックが入っている項目だけが反映されます）。'; return; }
   if (bad) { m.textContent = bad; return; }
+  const orig = !!($('jf_orig') && $('jf_orig').checked), origBy = orig ? $('jf_orig_by').value.trim() : '';
+  if (orig && !origBy) { m.textContent = '「原本も確認した」には、確認した職員の名前を入れてください。'; return; }
   const cur = JF.cur || {};
   const lab = Object.fromEntries(JF_ROWS.concat([JF_NOTE]).map(r => [r[1], r[2]]));
-  if (!confirm(`「${JF.s.child}」の利用者情報に、次の内容を反映します。\n\n` + Object.entries(v).map(([col, x]) => col === 'note_add' ? `・${lab[col]}：\n${x}` : `・${lab[col]}：${jfShow(col, cur[col])} → ${jfShow(col, x)}`).join('\n') + '\n\n（反映前の値は記録に残ります）\n受給者証を見て、間違いがないことを確認しましたか？')) return;
-  if (DEMO) { m.textContent = '見本モードなので反映しません（本番では、ここで利用者情報に書き込まれます）。'; window.JF_LAST = v; return; }
-  try { await jfRpc('leo_jf_apply', { p_id: JF.s.id, p_vals: v }); JF.msg = '反映しました。'; await renderLeoView('jukyusha'); }
-  catch (e) { m.textContent = '反映できませんでした：' + e.message; }
+  if (!confirm(`「${JF.s.child}」の利用者情報に、次の内容を反映します。\n\n` + Object.entries(v).map(([col, x]) => col === 'note_add' ? `・${lab[col]}：\n${x}` : `・${lab[col]}：${jfShow(col, cur[col])} → ${jfShow(col, x)}`).join('\n') + (orig ? `\n\n・受給者証の原本の確認も記録します：${today().replace(/-/g, '/')}　${origBy}` : '') + '\n\n（反映前の値は記録に残ります）\n受給者証を見て、間違いがないことを確認しましたか？')) return;
+  if (DEMO) { m.textContent = '見本モードなので反映しません（本番では、ここで利用者情報に書き込まれます）。'; window.JF_LAST = v; window.JF_LAST_CHECK = orig ? { checked_by: origBy } : null; return; }
+  try { await jfRpc('leo_jf_apply', { p_id: JF.s.id, p_vals: v }); JF.msg = '反映しました。'; }
+  catch (e) { m.textContent = '反映できませんでした：' + e.message; return; }
+  if (orig) {   // 反映のあとに、原本確認の記録を1件足す（反映は取り消さない。足せなかったときは、利用者情報の画面から足せる）
+    try { await sb('leo_jukyusha_checks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify([{ child: JF.s.child, checked_on: today(), checked_by: origBy, note: '受給者証の入力（保護者）を確認して反映したとき' }]) }); JF.msg += '受給者証の原本の確認も記録しました。'; }
+    catch (e) { JF.msg += 'ただし、原本の確認は記録できませんでした（' + e.message + '）。利用者情報の児童ページから「原本を確認した」で記録してください。'; }
+  }
+  await renderLeoView('jukyusha');
 };
 window.jfReject = async () => {
   const m = $('jf_msg'), note = prompt('反映しない理由をメモしてください（例：別の児童・入力まちがい）。空のままでもかまいません。');

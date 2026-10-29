@@ -157,9 +157,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(state.applies.length === 1 && JSON.stringify(state.applies[0].p_vals) === JSON.stringify({ contract_end: '2027-03-31' }), '職員：反映は期間（contract_end）だけを送る'); await sr.close();
   // ===== 利用者情報の児童ページ（相談支援の欄）=====
   const ui = await mkPage(1280, 1000, true); await ui.goto(BASE + 'index.html?demo=1#leo/userinfo', { waitUntil: 'networkidle0' }); await sleep(500);
-  await ui.evaluate(() => uiOpen('児童B')); await sleep(500);
+  await ui.evaluate(() => uiOpen('児童B')); await sleep(500); await ui.evaluate(() => uiTab('jukyusha')); await sleep(500);
   const uit = await ui.evaluate(() => ({ so: document.querySelector('[data-f="soudan_office"]')?.value, sp: document.querySelector('[data-f="soudan_person"]')?.value, lab: document.body.textContent.includes('相談支援事業所名') && document.body.textContent.includes('担当の相談支援専門員') }));
-  ok(uit.so === '見本相談支援センター' && uit.sp === '見本 相談員' && uit.lab, '利用者情報：児童の「保護者・連絡先・相談支援」に相談支援事業所名・担当者の欄があり、編集できる');
+  ok(uit.so === '見本相談支援センター' && uit.sp === '見本 相談員' && uit.lab, '利用者情報：児童の「受給者証」タブの「相談支援」に事業所名・担当者の欄があり、編集できる');
   await ui.evaluate(() => document.querySelector('[data-f="soudan_office"]').scrollIntoView({ block: 'center' })); await ui.screenshot({ path: OUT + 'userinfo_1_soudan.png' }); await ui.close();
   // ===== 職員（従来の流れ）=====
   cur.kid = { name: '見本 太郎', jukyusha_no: null, city_no: null, kind: '放デイ', cap_monthly: 4600, contract_days: 20, contract_end: '2026-03-31', mushouka: false }; cur.info = { guardian_name: null };

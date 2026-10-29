@@ -796,6 +796,40 @@ async function uiDropSpaceAliases(w, name) {
       await sb(`${t}?${c}=eq.${encodeURIComponent(raw)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   }
 }
+// 受給者証の原本確認の記録（いつ・誰が原本を見たか）。表は supabase/leo_jukyusha_check.sql。追加と読むだけ（画面から直す・消すはできない）
+const DEMO_JCHECKS = [{ id: 2, child: 'テスト 太郎', checked_on: '2026-10-20', checked_by: '職員X', note: '更新後の受給者証を保護者が持参', created_at: '2026-10-20T06:10:00Z' }, { id: 1, child: 'テスト 太郎', checked_on: '2025-04-12', checked_by: '職員Y', note: null, created_at: '2025-04-12T05:00:00Z' }];
+async function jcLoad(raws) {   // 児童の確認の履歴（新しい順）。表がまだない（SQL未実行）ときは null
+  if (DEMO) return DEMO_JCHECKS.filter(r => raws.includes(r.child));
+  const inList = raws.map(n => encodeURIComponent('"' + String(n).replace(/(["\\])/g, '\\$1') + '"')).join(',');
+  try { return await sb(`leo_jukyusha_checks?child=in.(${inList})&select=id,child,checked_on,checked_by,note,created_at&order=checked_on.desc,id.desc`); } catch (e) { return null; }
+}
+const jcDay = d => String(d || '').slice(0, 10).replace(/-/g, '/');
+function jcHtml(rows, mg, me) {
+  if (rows === null) return mg ? `<div class="uic" id="jc_box"><h4>受給者証の原本の確認</h4><p class="note" style="padding:0 10px">原本を確認した記録の欄は、管理者が supabase/leo_jukyusha_check.sql を実行すると出ます。</p></div>` : '';
+  const last = rows[0];
+  return `<div class="uic" id="jc_box"><h4>受給者証の原本の確認（いつ・だれが原本を見たか）</h4>
+    <style>.jc-t{width:calc(100% - 20px);margin:0 10px 8px;border-collapse:collapse}.jc-t th,.jc-t td{border-top:1px solid #e5e5ee;padding:5px 6px;text-align:left;font-size:14px;vertical-align:top}.jc-t th{font-size:12px;color:#5a5a70;font-weight:normal}.jc-add{border-top:1px dashed #ccd;margin:0 10px;padding:6px 0 10px}.jc-add .uig{padding:4px 0}</style>
+    <p style="margin:6px 10px">${last ? `最後に原本を確認したのは <b>${esc(jcDay(last.checked_on))}</b>（${esc(last.checked_by)}）です。` : '<b style="color:#c60">原本を確認した記録は、まだありません。</b>'}</p><p style="margin:0 10px 6px"><small style="color:#667">受給者証の写真は保管しません。確認した日と職員だけを記録します（追加だけできます。直す・消すはできません）。</small></p>
+    ${rows.length ? `<table class="jc-t"><tr><th>確認した日</th><th>確認した職員</th><th>メモ</th><th>記録した日時</th></tr>${rows.map(r => `<tr><td><b>${esc(jcDay(r.checked_on))}</b></td><td>${esc(r.checked_by)}</td><td style="white-space:pre-wrap">${esc(r.note || '')}</td><td style="color:#667;font-size:12px">${esc(new Date(r.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}</td></tr>`).join('')}</table>` : ''}
+    ${mg ? `<div class="jc-add"><div class="uig">
+      <label><span>原本確認日</span><input type="date" id="jc_on" value="${today()}" max="${today()}"></label>
+      <label><span>確認した職員</span><input id="jc_by" value="${esc(me || '')}" maxlength="60" placeholder="職員の名前"></label>
+      <label class="wide"><span>メモ（任意。例：更新後の受給者証を保護者が持参）</span><input id="jc_note" maxlength="500"></label></div>
+      <button type="button" onclick="jcAdd()">原本を確認した</button> <span id="jc_msg" class="note"></span></div>` : ''}</div>`;
+}
+window.jcAdd = async () => {
+  const w = $('uiw'), name = w && uiCanon(w.dataset.name), m = $('jc_msg'), on = ($('jc_on').value || '').trim(), by = $('jc_by').value.trim(), note = $('jc_note').value.trim();
+  if (!name) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) { m.textContent = '原本確認日を入れてください。'; return; }
+  if (on > today()) { m.textContent = '原本確認日は、今日までの日付にしてください。'; return; }
+  if (!by) { m.textContent = '確認した職員の名前を入れてください。'; return; }
+  if (!confirm(`「${name}」の受給者証の原本を、${jcDay(on)} に ${by} が確認した、と記録します。\n${note ? 'メモ：' + note + '\n' : ''}\n追加した記録は、画面から直したり消したりできません。よろしいですか？`)) return;
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try {
+    await sb('leo_jukyusha_checks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify([{ child: name, checked_on: on, checked_by: by, note: note || null }]) });
+    await renderLeoView('userinfo'); const mm = $('jc_msg'); if (mm) mm.textContent = '記録しました。';
+  } catch (e) { m.textContent = '記録できませんでした：' + e.message; }
+};
 LEO_VIEWS.userinfo = async function () {
   const mg = canManage();
   const safeSheet = async kind => { try { return await sheetRows(kind); } catch (e) { return []; } };
@@ -826,10 +860,13 @@ LEO_VIEWS.userinfo = async function () {
       <p class="note">退所にしても記録は消えません。退所日の翌日以降、利用予定・カレンダー・送迎に出なくなります。型表の保存は不要です。請求CSVは <a href="#leo/seikyu">請求</a> から（ここの受給者証の内容が使われます）。</p>`;
   }
   const k = K[nm] || {}, i = I[nm] || {}, ro = mg ? '' : 'disabled';
+  const onJk = !!nm && !UI.adding && UI.tab === 'jukyusha';
+  const JC = onJk ? await jcLoad(cur.raws) : undefined, jcMe = onJk && mg && !DEMO ? await myName().catch(() => '') : onJk && DEMO ? DEMO_DATA.me : '';   // 原本確認の履歴と、記入欄の初期値（ログイン中の職員名）
   const SC = DEMO || infos.some(r => r && 'soudan_office' in r);   // 相談支援の列がある（supabase/leo_jukyusha_form.sql を実行ずみ）ときだけ欄を出す・保存する
+  const tabBar = on => `<p>${[['basic', '基本'], ['jukyusha', '受給者証'], ['assess', 'アセスメント' + (A[nm] ? '' : '（未入力）')], ['plan', '個別支援計画' + (PLN[nm] ? '' : '（未入力）')]].map(([t, l]) => t === on ? `<b style="padding:6px 10px;border-bottom:3px solid #36c">${l}</b>` : `<button class="back" onclick="uiTab('${t}')">${l}</button>`).join(' ')}</p>`;
   if (UI.tab === 'plan' && nm) {
     const p = PLN[nm] || {};
-    const tabs = `<p><button class="back" onclick="uiTab('basic')">基本</button> <button class="back" onclick="uiTab('assess')">アセスメント</button> <b style="padding:6px 10px;border-bottom:3px solid #36c">個別支援計画</b></p>`;
+    const tabs = tabBar('plan');
     return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${mark}${demoNote()}</h3>${tabs}
       <p class="note">現行の個別支援計画の本文です。今日の利用児童のカードから読めます。${p.updated_at ? '更新：' + esc(String(p.updated_at).slice(0, 10)) + '。' : 'まだ入っていません。'}${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
       <div id="uiw" data-name="${esc(nm)}"${aliasAttr}><div class="uic"><div class="uig">
@@ -842,14 +879,21 @@ LEO_VIEWS.userinfo = async function () {
   }
   if (UI.tab === 'assess' && nm) {
     const a = A[nm] || {}, d = a.data || {};
-    const tabs = `<p><button class="back" onclick="uiTab('basic')">基本</button> <b style="padding:6px 10px;border-bottom:3px solid #36c">アセスメント</b> <button class="back" onclick="uiTab('plan')">個別支援計画</button></p>`;
+    const tabs = tabBar('assess');
     return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${mark}${demoNote()}</h3>${tabs}
       <p class="note">${a.source ? '取り込み元：' + esc(a.source) + '。' : 'まだ入力がありません。'}診断名・服薬などの機微情報を含みます。レオ職員だけが見られます。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
       <div id="uiw" data-name="${esc(nm)}"${aliasAttr}>${ASSESS_SECTIONS.map(([t, fs]) => `<div class="uic"><h4>${t}</h4><div class="uig">${fs.map(([f, l, w]) => `<label${w ? ' class="wide"' : ''}><span>${l}</span>${w ? `<textarea data-t="as" data-f="${f}" rows="2" ${ro}>${esc(d[f] || '')}</textarea>` : `<input data-t="as" data-f="${f}" value="${esc(d[f] || '')}" ${ro}>`}</label>`).join('')}</div></div>`).join('')}</div>
       ${mg ? `<button onclick="uiSaveAssess()">保存</button> <span id="ui_msg"></span>` : ''}`;
   }
   const kin = (f, l, v, extra = '') => `<label><span>${l}</span><input data-t="info" data-f="${f}" value="${esc(v ?? '')}" ${extra} ${ro}></label>`;
-  const jk = mg ? `<div class="uic"><h4>① 受給者証（請求に使います）</h4><div class="uig">${KID_F.filter(([f]) => f !== 'name').map(([f, l]) => `<label><span>${l}</span>${kidInput(k, f, k[f])}</label>`).join('')}</div></div>` : '';
+  const jk = mg ? `<div class="uic"><h4>受給者証（請求に使います）</h4><div class="uig">${KID_F.filter(([f]) => f !== 'name').map(([f, l]) => `<label><span>${l}</span>${kidInput(k, f, k[f])}</label>`).join('')}</div></div>` : '';
+  const scCard = `<div class="uic"><h4>相談支援</h4><div class="uig">${SC ? kin('soudan_office', '相談支援事業所名', i.soudan_office, 'maxlength="100"') + kin('soudan_person', '担当の相談支援専門員', i.soudan_person, 'maxlength="60"') : '<p class="note wide">相談支援事業所・担当者の欄は、管理者が supabase/leo_jukyusha_form.sql を実行すると出ます。</p>'}</div></div>`;
+  if (onJk) {   // 「受給者証」タブ：受給者証・原本の確認・相談支援（保存は uiSaveJk。送迎などの欄はこのタブにないので触りません）
+    return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${mark}${demoNote()}</h3>${tabBar('jukyusha')}
+      <p class="note">受給者証の内容（請求に使います）、原本をいつ・だれが確認したか、相談支援事業所です。保護者の入力は <a href="#leo/jukyusha">受給者証の入力（保護者）</a> で確認して反映できます。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
+      <div id="uiw" data-name="${esc(nm)}"${aliasAttr}>${jk}${JC !== undefined ? jcHtml(JC, mg, jcMe) : ''}${scCard}</div>
+      ${mg ? `<button onclick="uiSaveJk()">保存</button> <span id="ui_msg"></span><span class="note"> 上の「受給者証」と「相談支援」を保存します。「原本を確認した」は、その場で別に記録します。</span>` : ''}`;
+  }
   const leaveBox = nm ? `<div class="uic"><h4>退所</h4><p class="note">退所日を入れると、その日までは今まで通り、翌日以降は利用予定・カレンダー・送迎に出なくなります。記録は消えません。型表は変更しません（型表の「保存」は押さないでください）。日付を空にして「保存」しても、すでに入っている退所日は消えません。取り消すときは「復帰する」を押します。</p>
       ${mg ? `<div class="uig"><label><span>退所日（この日まで在籍）</span><input type="date" id="ui_left" data-was="${clusterLeft ? '1' : ''}" value="${esc(String(clusterLeft).slice(0, 10))}"></label></div>
         <p style="padding:0 10px 10px"><button type="button" onclick="uiLeave()">退所にする</button>${clusterLeft ? ` <button type="button" onclick="uiReturn()">復帰する</button>` : ''}</p>` : `<p style="padding:0 10px 10px">${clusterLeft ? `退所日：${esc(String(clusterLeft).slice(0, 10).replace(/-/g, '/'))}` : '在籍中'}</p>`}</div>` : '';
@@ -857,17 +901,17 @@ LEO_VIEWS.userinfo = async function () {
     ${cur && cur.raws.length > 1 ? `<p class="note">同じ児童としてまとめています（${cur.raws.map(esc).join('、')}）。保存すると、空白だけ違う表記は「${esc(nm)}」に揃えます。</p>` : ''}
     <div id="uiw" data-name="${esc(nm || '')}"${aliasAttr}>
     ${UI.adding ? `<div class="uic"><div class="uig"><label><span>児童名（日誌と同じ表記）</span><input id="ui_newname" data-t="new"></label></div></div>` : ''}
-    ${nm ? `<p><b style="padding:6px 10px;border-bottom:3px solid #36c">基本</b> <button class="back" onclick="uiTab('assess')">アセスメント${A[nm] ? '' : '（未入力）'}</button> <button class="back" onclick="uiTab('plan')">個別支援計画${PLN[nm] ? '' : '（未入力）'}</button></p>` : ''}
+    ${nm ? tabBar('basic') : ''}
     <p class="uil">${i.album_url ? `<a href="${esc(i.album_url)}" target="_blank" rel="noopener">📷 Googleフォト アルバム</a>` : ''}</p>
-    ${jk}
-    <div class="uic"><h4>${mg ? '②' : '①'} 送迎</h4><div class="uig">
+    ${UI.adding ? jk + scCard : ''}
+    <div class="uic"><h4>① 送迎</h4><div class="uig">
       <label><span>送迎の種類</span><select data-t="info" data-f="transport_mode" ${ro}><option value=""></option>${TMODE.map(o => `<option ${o === i.transport_mode ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
       <label class="wide"><span>送迎の曜日</span>${WD.map(w => `<label style="display:inline-block;margin-right:10px"><input type="checkbox" class="ui_wd" value="${w}" ${(i.transport_days || []).includes(w) ? 'checked' : ''} ${ro}> ${w}</label>`).join('')}</label>
       ${kin('pickup_place', '乗る場所（迎え）', i.pickup_place)}${kin('dropoff_place', '降りる場所（送り）', i.dropoff_place)}
       <label class="wide"><span>送迎の配慮（座席・チャイルドシート・引き渡し相手・アレルギー等）※送迎画面にも出ます</span><textarea data-t="care" data-f="note" rows="3" ${ro}>${esc(C[nm] || '')}</textarea></label>
       <label class="wide"><span>送迎のメモ</span><textarea data-t="info" data-f="transport_note" rows="2" ${ro}>${esc(i.transport_note || '')}</textarea></label></div></div>
-    <div class="uic"><h4>${mg ? '③' : '②'} 保護者・連絡先・相談支援</h4><div class="uig">${INFO_F.map(([f, l]) => kin(f, l, i[f])).join('')}${SC ? kin('soudan_office', '相談支援事業所名', i.soudan_office, 'maxlength="100"') + kin('soudan_person', '担当の相談支援専門員', i.soudan_person, 'maxlength="60"') : '<p class="note wide">相談支援事業所・担当者の欄は、管理者が supabase/leo_jukyusha_form.sql を実行すると出ます。</p>'}</div></div>
-    <div class="uic"><h4>${mg ? '④' : '③'} Googleフォト・メモ</h4><div class="uig">${kin('album_url', '共有アルバムのリンク（https://…）', i.album_url, 'type="url"')}<label class="wide"><span>メモ</span><textarea data-t="info" data-f="note" rows="3" ${ro}>${esc(i.note || '')}</textarea></label></div></div>
+    <div class="uic"><h4>② 保護者・連絡先</h4><div class="uig">${INFO_F.map(([f, l]) => kin(f, l, i[f])).join('')}</div></div>
+    <div class="uic"><h4>③ Googleフォト・メモ</h4><div class="uig">${kin('album_url', '共有アルバムのリンク（https://…）', i.album_url, 'type="url"')}<label class="wide"><span>メモ</span><textarea data-t="info" data-f="note" rows="3" ${ro}>${esc(i.note || '')}</textarea></label></div></div>
     ${leaveBox}
     </div>${mg ? `<button onclick="uiSave()">保存</button> <span id="ui_msg"></span>` : ''}${mg && nm ? `<p style="margin-top:28px"><button onclick="uiDelete()" style="color:#c00;border-color:#c00">この児童を削除</button></p>` : ''}`;
 };
@@ -937,6 +981,27 @@ async function uiSaveAssess() {
     UI.sel = name; await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
   } catch (e) { m.textContent = e.message; }
 }
+async function uiSaveJk() {   // 「受給者証」タブの保存：受給者証（leo_children）と相談支援（leo_child_info の2列だけ）。送迎・連絡先・メモは触らない
+  const w = $('uiw'), m = $('ui_msg'), name = uiCanon(w.dataset.name);
+  const get = t => { const o = {}; w.querySelectorAll(`[data-t="${t}"][data-f]`).forEach(x => o[x.dataset.f] = x.type === 'checkbox' ? x.checked : x.value.trim()); return o; };
+  const kid = get('kid'), info = get('info');
+  const hasKid = Object.values(kid).some(v => v && v !== '放デイ' && v !== '4600');
+  if (hasKid) {
+    if (!/^\d{10}$/.test(kid.jukyusha_no) || !/^\d{6}$/.test(kid.city_no)) { m.textContent = '受給者証番号は10桁・市町村番号は6桁の数字で入れてください（受給者証を入れない場合は受給者証の欄を空のままに）。'; return; }
+    kid.name = name; kid.cap_monthly = +kid.cap_monthly; kid.contract_days = kid.contract_days ? +kid.contract_days : null; kid.contract_start = kid.contract_start || null; kid.contract_end = kid.contract_end || null;
+    kid.first_date = kid.first_date || null; kid.kinyu_no = kid.kinyu_no ? +kid.kinyu_no : null; kid.gensan = kid.gensan ? [kid.gensan] : []; kid.guardian_kana = kid.guardian_kana || null; kid.kana = kid.kana || null;
+  }
+  const hasInfo = 'soudan_office' in info || 'soudan_person' in info;
+  if (hasInfo) { info.name = name; Object.keys(info).forEach(f => { if (info[f] === '') info[f] = null; }); }
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  const up = (t, k, r) => sb(`${t}?on_conflict=${k}`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([r]) });
+  try {
+    if (hasKid) await up('leo_children', 'name', kid);
+    if (hasInfo) await up('leo_child_info', 'name', info);
+    await uiDropSpaceAliases(w, name);
+    UI.sel = name; await renderLeoView('userinfo'); $('ui_msg').textContent = '保存しました。';
+  } catch (e) { m.textContent = e.message; }
+}
 async function uiSave() {
   const w = $('uiw'), m = $('ui_msg'), name = uiCanon(UI.adding ? $('ui_newname').value : w.dataset.name);
   if (!name) { m.textContent = '児童名を入れてください。'; return; }
@@ -952,7 +1017,7 @@ async function uiSave() {
   if (info.album_url && !/^https:\/\//.test(info.album_url)) { m.textContent = 'アルバムのリンクは https:// で始まるものを入れてください。'; return; }
   const hasKid = Object.values(kid).some(v => v && v !== '放デイ' && v !== '4600');
   if (hasKid) {
-    if (!/^\d{10}$/.test(kid.jukyusha_no) || !/^\d{6}$/.test(kid.city_no)) { m.textContent = '受給者証番号は10桁・市町村番号は6桁の数字で入れてください（受給者証を入れない場合は①を空のままに）。'; return; }
+    if (!/^\d{10}$/.test(kid.jukyusha_no) || !/^\d{6}$/.test(kid.city_no)) { m.textContent = '受給者証番号は10桁・市町村番号は6桁の数字で入れてください（受給者証を入れない場合は受給者証の欄を空のままに）。'; return; }
     kid.name = name; kid.cap_monthly = +kid.cap_monthly; kid.contract_days = kid.contract_days ? +kid.contract_days : null; kid.contract_start = kid.contract_start || null; kid.contract_end = kid.contract_end || null;
     kid.first_date = kid.first_date || null; kid.kinyu_no = kid.kinyu_no ? +kid.kinyu_no : null; kid.gensan = kid.gensan ? [kid.gensan] : []; kid.guardian_kana = kid.guardian_kana || null; kid.kana = kid.kana || null;
   }
