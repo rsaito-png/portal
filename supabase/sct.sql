@@ -257,7 +257,7 @@ begin
   end if;
   if not public.sct_is_admin() then
     new.user_id := case when tg_op = 'INSERT' then auth.uid() else old.user_id end;
-    new.email := lower(coalesce(auth.jwt() ->> 'email', ''));
+    new.email := lower(coalesce(nullif(auth.jwt() ->> 'email', ''), nullif(trim(new.email), ''), case when tg_op = 'UPDATE' then old.email end, ''));
     new.identity_checked_at := case when tg_op = 'UPDATE' then old.identity_checked_at else null end;
     new.identity_checked_by := case when tg_op = 'UPDATE' then old.identity_checked_by else null end;
     if tg_op = 'UPDATE' and old.identity_status = 'verified' and new.identity_proof_path is not distinct from old.identity_proof_path then

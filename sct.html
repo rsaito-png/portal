@@ -18,12 +18,18 @@ table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #eee;pad
 </style></head><body>
 <header><span>実施者養成研修</span><span><a href="index.html">職員ポータル</a> <button id="out" hidden onclick="logout()">ログアウト</button></span></header>
 <main>
-<div id="login" class="card"><p>受講者の入口です。歯科医師・看護師・精神保健福祉士・公認心理師の方が、日時の決まった研修を申し込みます。</p>
+<div id="start" class="card"><p>歯科医師・看護師・精神保健福祉士・公認心理師の方が、日時の決まった研修を申し込むページです。ログインやアカウント作成は不要です。</p>
+<button onclick="startGuest()">申し込みを始める</button>
+<p class="note">申し込みの内容は、このブラウザに保存されます。予約後も同じ端末・ブラウザでこのページを開いてください。</p>
+<p class="note"><a href="#" onclick="showBox('login');return false">メールアドレスで登録済みの方はこちら</a></p>
+<p id="gmsg" class="ng"></p></div>
+<div id="login" class="card" hidden><p>登録済みの方のログインです。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
 <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
 <button onclick="login()">ログイン</button>
 <button class="g" onclick="showBox('signup')">アカウントを作る</button>
 <button class="g" onclick="showBox('forgot')">パスワードを忘れた方</button>
+<button class="g" onclick="showBox('start')">もどる</button>
 <p id="msg" class="ng"></p></div>
 <div id="signup" class="card" hidden><p>メールアドレスとパスワード（8文字以上）でアカウントを作ります。</p>
 <input id="sem" type="email" placeholder="メールアドレス" autocomplete="username">
@@ -50,7 +56,7 @@ const C = window.PORTAL_CONFIG, $ = id => document.getElementById(id);
 const DEMO = new URLSearchParams(location.search).get('demo') === '1';
 const esc = Sct.esc;
 let TAB = 'profile', ME = null, D = null;
-function showBox(name) { ['login', 'signup', 'forgot', 'setpw'].forEach(id => $(id).hidden = id !== name); }
+function showBox(name) { ['start', 'login', 'signup', 'forgot', 'setpw'].forEach(id => $(id).hidden = id !== name); }
 function sess() {
   const s = JSON.parse(localStorage.getItem('sess') || 'null');
   if (!s) return null;
@@ -66,6 +72,21 @@ async function login() {
   const j = await r.json();
   if (!r.ok) { $('msg').textContent = 'ログインできませんでした。'; return; }
   saveSess(j); bootApp();
+}
+async function startGuest() {
+  $('gmsg').textContent = '';
+  const r = await fetch(C.supabaseUrl + '/auth/v1/signup', { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { sct_guest: true } }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) { $('gmsg').textContent = '申し込みを始められませんでした。時間をおいてもう一度お試しください。'; return; }
+  j.user = j.user || {}; j.user.email = j.user.email || '';
+  saveSess(j); bootApp();
+}
+async function refreshSess() {
+  const s = sess();
+  if (!s || !s.refresh) return false;
+  const r = await fetch(C.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh }) });
+  if (!r.ok) return false;
+  const j = await r.json(); j.user = j.user || {}; j.user.email = j.user.email || s.email || ''; saveSess(j); return true;
 }
 async function signup() {
   const email = $('sem').value.trim(), password = $('spw').value;
@@ -155,7 +176,8 @@ function viewProfile() {
   const pay = payRow();
   const opts = Sct.LICENSES.map(l => `<option ${p.license_type === l ? 'selected' : ''}>${l}</option>`).join('');
   const ex = [['none', '免除なし（3科目 12,800円）'], ['subject1', '科目1を免除（衛生管理者・10,800円）'], ['all', '全免除（労働衛生コンサルタント・受講不要）']];
-  return `<div class="card"><h2>プロフィール</h2><p class="note">${esc(ME.email)} ${DEMO ? '（見本）' : ''}</p>
+  return `<div class="card"><h2>プロフィール</h2>${ME.email ? `<p class="note">${esc(ME.email)} ${DEMO ? '（見本）' : ''}</p>` : ''}
+    ${ME.email ? '' : `<label>メールアドレス（ご連絡用）<input id="contact_email" type="email" value="${esc(p.email || '')}"></label>`}
     <label>氏名<input id="full_name" value="${esc(p.full_name || '')}"></label>
     <label>ふりがな<input id="kana" value="${esc(p.kana || '')}"></label>
     <label>資格種別<select id="license"><option value="">選んでください</option>${opts}</select></label>
@@ -175,6 +197,7 @@ function viewProfile() {
 async function saveProfile() {
   const exemption = (document.querySelector('input[name=ex]:checked') || {}).value || 'none';
   const row = { full_name: $('full_name').value.trim(), kana: $('kana').value.trim() || null, license_type: $('license').value || null, license_no: $('license_no').value.trim() || null, exemption };
+  if ($('contact_email')) { row.email = $('contact_email').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) { $('pstat').textContent = 'ご連絡用のメールアドレスを入れてください。'; return; } }
   if (!row.full_name || !row.license_type) { $('pstat').textContent = '氏名と資格種別は必須です。'; return; }
   try {
     if (DEMO) { D.profile = { ...(D.profile || {}), ...row, user_id: ME.id, exemption_status: exemption === 'none' ? 'none' : 'pending' }; if ($('exfile').files[0]) D.profile.exemption_proof_path = 'demo'; if ($('idfile').files[0]) { D.profile.identity_proof_path = 'demo'; D.profile.identity_status = 'pending'; } draw(); return; }
@@ -282,10 +305,11 @@ async function downloadCert() {
   } catch (e) { alert(e.message); }
 }
 async function bootApp() {
-  $('login').hidden = true; $('signup').hidden = true; $('forgot').hidden = true; $('app').hidden = false; $('out').hidden = false;
+  $('start').hidden = true; $('login').hidden = true; $('signup').hidden = true; $('forgot').hidden = true; $('app').hidden = false; $('out').hidden = false;
   try { await load(); draw(); } catch (e) { $('view').innerHTML = `<p class="ng">${esc(e.message)}</p><p class="note">supabase/sct.sql を適用したあとに、もう一度開いてください。</p>`; }
 }
 if (AUTH_HASH.get('access_token') && ['recovery', 'invite', 'signup'].includes(AUTH_HASH.get('type'))) showBox('setpw');
 else if (DEMO) bootApp();
-else if (sess() && sess().exp > Date.now() && sess().uid) bootApp();
+else if (sess() && sess().exp > Date.now() + 60000 && sess().uid) bootApp();
+else if (sess() && sess().refresh) refreshSess().then(ok => { if (ok && sess().uid) bootApp(); });
 </script></body></html>
