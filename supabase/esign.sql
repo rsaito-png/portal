@@ -64,8 +64,14 @@ create table if not exists public.doc_signatures (
   typed_name text not null,
   text_sha256 text not null,
   template_version int,
-  signed_at timestamptz not null default now()
+  signed_at timestamptz not null default now(),
+  signature_png text                     -- 手書き署名のPNG（data URL）。記名だけの古い行は null
 );
+-- 既に表がある環境へ足すだけ。古い署名行は画像なしのまま残す
+alter table public.doc_signatures add column if not exists signature_png text;
+alter table public.doc_signatures drop constraint if exists doc_signatures_signature_png_chk;
+alter table public.doc_signatures add constraint doc_signatures_signature_png_chk
+  check (signature_png is null or (signature_png like 'data:image/png;base64,%' and char_length(signature_png) <= 300000));
 -- ⑥ 経過の記録
 create table if not exists public.doc_events (
   id bigint generated always as identity primary key,
@@ -130,18 +136,20 @@ begin
     'https://rsaito-png.github.io/portal/#sign', coalesce(off, 'レオ'));
 end $$;
 
--- 署名（本人）: 登録氏名と一致するか確認し、DB側でSHA-256を計算して記録
-create or replace function public.doc_sign(p_doc bigint, p_typed_name text) returns void language plpgsql security definer set search_path = public as $$
+-- 署名（本人）: ログイン済みなので氏名は登録の full_name を記録する。手書きPNGは必須。SHA-256はDB側で計算
+drop function if exists public.doc_sign(bigint, text);
+create function public.doc_sign(p_doc bigint, p_signature text) returns void language plpgsql security definer set search_path = public as $$
 declare d staff_docs; t doc_templates; nm text; off text;
 begin
   select * into d from staff_docs where id = p_doc and user_id = auth.uid() and status = 'issued' and method = 'electronic';
   if not found then raise exception '署名できる書類がありません'; end if;
+  if p_signature is null or p_signature not like 'data:image/png;base64,%' or char_length(p_signature) > 300000 then
+    raise exception '署名を書いてください'; end if;
   select full_name, office into nm, off from staff_profiles where user_id = auth.uid();
-  if regexp_replace(coalesce(p_typed_name,''), '[\s　]', '', 'g') <> regexp_replace(coalesce(nm,''), '[\s　]', '', 'g') or coalesce(nm,'') = ''
-    then raise exception '入力した氏名が登録されている氏名と一致しません'; end if;
+  if coalesce(nm,'') = '' then raise exception '登録されている氏名がありません。事務に連絡してください'; end if;
   select * into t from doc_templates where id = d.template_id;
-  insert into doc_signatures(doc_id, user_id, typed_name, text_sha256, template_version)
-    values (p_doc, auth.uid(), p_typed_name, encode(sha256(convert_to(d.rendered_text, 'UTF8')), 'hex'), t.version);
+  insert into doc_signatures(doc_id, user_id, typed_name, text_sha256, template_version, signature_png)
+    values (p_doc, auth.uid(), nm, encode(sha256(convert_to(d.rendered_text, 'UTF8')), 'hex'), t.version, p_signature);
   update staff_docs set status = 'superseded' where id = d.prev_doc_id and status in ('signed','paper');
   update staff_docs set status = 'signed' where id = p_doc;
   insert into doc_events(doc_id, actor, event) values (p_doc, auth.uid(), 'signed');
