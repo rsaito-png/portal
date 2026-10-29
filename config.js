@@ -147,5 +147,5 @@ window.PORTAL_CONFIG = {
   },
   // 出退勤打刻（#dakoku）。秘密鍵は置かない。gasUrl は GAS ウェブアプリの /exec。
   // token はスクリプトプロパティ DAKOKU_TOKEN と同じ文字列。ページに出るので秘密ではない。空なら打刻ボタンの先には繋がらない。
-  dakoku: { gasUrl: '', token: '' },
+  dakoku: { gasUrl: 'https://script.google.com/macros/s/AKfycbwOFXipVY98Q9x7123hjlFhAOV2wLQ209ursj6q8iX_hb61f4qHL6Idszn2ABEz8y6U/exec', token: '3517d63074ab498269ad81494ad8ea2e' },
 };
