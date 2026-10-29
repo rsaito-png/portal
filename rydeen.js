@@ -8,7 +8,7 @@ const RW = {};            // 利用者画面の各ページ
 const RY_ADMIN_NAV = [['home', 'ホーム'], ['journal', '業務日誌'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者'], ['contracts', '契約・重説'], ['plans', '個別支援計画'],
   ['staff', '勤務実績表'], ['tasks', '作業タスク'], ['manuals', 'マニュアル'], ['reports', '日報'], ['notes', 'メモ・ファイル']];
 const RY_WORKER_NAV = [['home', '今日の作業'], ['manuals', 'マニュアル'], ['report', '日報を書く']];
-const RY_FILES = { journal: 'rydeen-journal.js', records: 'rydeen-journal.js', contracts: 'rydeen-docs.js', plans: 'rydeen-docs.js', staff: 'rydeen-staff.js', billing: 'rydeen-bill.js' };
+const RY_FILES = { journal: 'rydeen-journal.js', records: 'rydeen-journal.js', contracts: 'rydeen-docs.js', plans: 'rydeen-docs.js', staff: 'rydeen-staff.js?v=20261029dakoku', billing: 'rydeen-bill.js' };
 
 // ---------- 共通の小物 ----------
 const ryEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -137,6 +137,7 @@ RV.home = async () => {
   const [w, r, k, j, u] = await Promise.all([rCount('bp_profiles', 'role=eq.worker'), rCount('bp_daily_reports', 'report_date=eq.' + t), rCount('bp_tasks', 'task_date=eq.' + t), rCount('bp_journal', `journal_date=eq.${t}&status=neq.`), rCount('bp_service_records', 'signed_at=is.null')]);
   const card = (n, l, h) => `<a class="tile" href="#rydeen/${h}"><span class="big">${n}</span>${l}</a>`;
   ryAdminFrame('home', `<h4>きょうの状況（${t}）</h4><div class="grid">${card(w, '利用者数', 'users')}${card(j, '本日の日誌 入力済み', 'journal')}${card(u, '署名待ちの実績記録票', 'records')}${card(r, '本日の日報', 'reports')}${card(k, '本日のタスク', 'tasks')}</div>
+    <p class="note"><a href="#dakoku">出退勤打刻</a>（スマホ。事業所の近くだけ。勤務実績表とは別）</p>
     ${[['毎日やること', '職員が入力するのは、ここだけです', ['journal', 'reports', 'tasks']], ['月末にやること', '日誌から自動で転記・集計されます。確認して請求します', ['records', 'billing', 'staff']], ['利用者まわり', '', ['users', 'contracts', 'plans']], ['資料', '', ['manuals', 'notes']]].map(([t, n, ks]) => `<h4>${t}</h4>${n ? `<p class="note">${n}</p>` : ''}<div class="grid">${ks.map(k2 => `<a class="tile" href="#rydeen/${k2}">${(RY_ADMIN_NAV.find(x => x[0] === k2) || [0, k2])[1]}</a>`).join('')}</div>`).join('')}`);
 };
 

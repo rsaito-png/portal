@@ -13,6 +13,15 @@
 3. Supabase の Authentication > Users > Add user で職員を登録（Auto Confirm にチェック）
 4. GitHub Pages を有効化
 
+## 出退勤打刻（`#dakoku`）
+スマホで出勤・退勤を残す画面です。入口は RYDEEN のタイル「出退勤打刻」（勤務実績表の隣）と、勤務実績表の先頭のリンクです。
+
+- 画面は `dakoku.js`、範囲と本人の判定は `dakoku-lib.js`。`node tools/dakoku_check.js` で確認できます。見本は `?demo=1#dakoku`（シートには書きません）。
+- 記録先はスプレッドシート「出退勤記録（レオ・金斗雲・RYDEEN）」（`1KEyzLGVwIWR2ziWNyghhGzSf6B2ZfHE-UIj8U0szxzs`）。タブは 設定 / 職員 / 打刻ログ / 管理者修正。
+- ページに秘密鍵は置きません。`dakoku-gas/Code.gs` を Apps Script のウェブアプリにし、URL を `config.js` の `dakoku.gasUrl` に入れます。手順は `dakoku-gas/README.md`。
+- `dakoku.token` とスクリプトプロパティ `DAKOKU_TOKEN` は同じ文字列です。ページに出るので秘密ではありません。本人は、ログイン中のメールと職員シートの「ログイン用メール」で揃えます。メールが空のあいだは、その事業所の名前を選んで打刻します。
+- 設定の「有効」が FALSE の事業所（レオ・金斗雲）は出しません。位置はブラウザの現在地と、設定の緯度・経度・打刻許可半径(m) を比べ、範囲の外は記録しません。修正画面はまだありません。
+
 ## 注意
 - 公開キーはブラウザに出してよい種類。秘密キー（service_role / secret）は絶対に書かない
 - 個人データは国内リージョンのみに保存
