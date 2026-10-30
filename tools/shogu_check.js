@@ -244,7 +244,14 @@ function utf16hex(text) {
   ok(html.includes('shogu.js') && html.includes("id === 'shogu'"), 'portal route');
   const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
   ok(cfg.includes('#shogu'), 'soumu tile');
+  const hr = cfg.slice(cfg.indexOf("name: '人事労務'"), cfg.indexOf("name: '補助金・助成金'"));
+  ok(hr.includes('#shogu') && hr.includes('処遇改善加算（試作）'), 'prototype tile stays in hr');
+  ok(hr.includes('国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作'), 'prototype tile note');
+  ok(hr.indexOf('#sign') < hr.indexOf('#shogu') && hr.indexOf('#sct') < hr.indexOf('#shogu'), 'prototype tile is last in hr');
+  ok(html.includes('処遇改善加算（試作）') && html.includes('国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作'), 'manager path uses the same label');
   const ui = fs.readFileSync(path.join(root, 'shogu.js'), 'utf8');
+  ok(ui.includes('処遇改善加算（試作）') && ui.includes('設定（試作）'), 'screen title marks prototype');
+  ok(ui.includes('国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作'), 'screen one-liner');
   ok(ui.includes('この案で確定'), 'confirm is the main button');
   ok(ui.includes('フリーウェイ用CSVを出す'), 'one csv button');
   ok(ui.includes('調整する'), 'manual edits stay folded');
