@@ -1,7 +1,7 @@
 // 日中一時支援（星心会レスパイトスタジオ）。#nicchu/log 一覧・その日の記録。
 // 署名はポータルでは受けない（印刷して市役所へ出す）。金斗雲の訪問記録（kin_visit）とは別。
 const NC = { month: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7), shown: [], dayId: null, mem: null, flash: '', busy: false };
-const NC_PLACE = '星心会レスパイトスタジオ（四日市市あさけが丘2-1-12）';
+const NC_PLACE = '星心会レスパイトスタジオ';
 const NC_HELPERS = ['山川美恵子', '大坪シズカ', '齊藤連'];
 
 /* nc-pure */
@@ -174,7 +174,7 @@ function ncEnsureStyle() {
 .nc-row{display:flex;justify-content:space-between;gap:8px;align-items:center}
 .nc-row label{display:flex;align-items:center;gap:6px;margin:0;width:auto}
 .nc-card textarea,.nc-card select{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #bbb;border-radius:8px}
-.nc-pt{display:block;color:#777;font-size:12px;font-weight:normal}
+.nc-pt{display:block;color:#777;font-size:12px;font-weight:normal}.nc-lead{color:#444;font-size:17px;line-height:1.5;margin:8px 0 12px}
 .nc-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 button.nc-chip,button.nc-mini{width:auto;display:inline-block;margin:4px 4px 4px 0;padding:8px 12px;background:#fff;color:#222;border:1px solid #bbb;border-radius:999px}
 button.nc-chip.on{background:var(--main);color:#fff;border-color:var(--main)}
@@ -402,7 +402,7 @@ async function ncPaintList() {
   NC.flash = '';
   document.getElementById('view').innerHTML = `<button class="back" type="button" onclick="location.hash='nicchu'">← 日中一時支援へ</button>
     <h3 style="color:#1f7a6b">日中一時支援</h3>
-    <p class="nc-pt">${esc(NC_PLACE)}　ふだん 7:00–13:00。どの曜日でも記録できます。金斗雲の訪問記録とは別です。署名は受け取らず、印刷して市役所へ出します。</p>
+    <p class="nc-lead">${esc(NC_PLACE)}　ふだん 7:00–13:00。どの曜日でも記録できます。金斗雲の訪問記録とは別です。署名は受け取らず、印刷して市役所へ出します。</p>
     <p><a class="back" href="gl:g23" style="display:inline-block;text-decoration:none">📅 土日スケジュール</a></p>
     ${ncDemoNote()}${flash}
     <div class="nc-card"><label>月<input type="month" id="nc_month" value="${esc(NC.month)}" onchange="NC.month=this.value||NC.month;renderNicchu()"></label>
@@ -430,7 +430,7 @@ async function ncPaintEdit(date) {
   const w = ncWeekday(date);
   document.getElementById('view').innerHTML = `<button class="back" type="button" onclick="location.hash='nicchu/log'">← 一覧へ</button>
     <h3 style="color:#1f7a6b">${esc(ncFmtDay(date))}の支援記録</h3>
-    <p class="nc-pt">${esc(NC_PLACE)}${w === '日' ? '' : '　日曜以外でも保存できます。'}　印刷して市役所へ出します。</p>${ncDemoNote()}
+    <p class="nc-lead">${esc(NC_PLACE)}${w === '日' ? '' : '　日曜以外でも保存できます。'}　印刷して市役所へ出します。</p>${ncDemoNote()}
     ${shown.length ? `<div class="nc-card">
       <label>記入者 ${ncPt('Funcionário')}<select id="nc_staff"><option value="">選んでください</option>${staffNames.map(n => `<option value="${esc(n)}" ${n === picked ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
       <div>天気 ${ncPt('Tempo')}${ncChips('weather', NC_WEATHER, day && day.weather || '')}</div>
