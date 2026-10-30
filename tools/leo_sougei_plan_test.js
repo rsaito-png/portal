@@ -181,7 +181,7 @@ const planFn = between(leo, 'function leoKidPlanHtml', 'function leoSougeiMineHt
 assert.ok(!planFn.includes('source_url') && !planFn.includes('target="_blank"') && !planFn.includes('PDF未登録'));
 assert.ok(planFn.includes('本計画PDFはまだ登録されていません'));
 assert.ok(leo.includes('元の計画書を開く'));
-assert.ok(index.includes('leo.js?v=20261030plantext'));
+assert.ok(index.includes('leo.js?v=20261030assess'));
 const leoMergeNikki = grab('leoMergeNikki');
 const portalPick = [{ day, kind: '迎え', kids: ['児童A'], staff: '職員X', start_time: '14:50', place: '見本公園', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z', kid_times: { '児童A': '14:50' }, kid_places: { '児童A': '見本公園' } }];
 const picked = leoMergeNikki(nikki, portalPick);
