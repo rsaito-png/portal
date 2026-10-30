@@ -76,7 +76,7 @@ async function renderShogu(parts) {
   const back = settings
     ? `<div class="sg-top"><button class="back" type="button" onclick="location.hash='shogu'">← 月の作業へ</button></div>`
     : `<div class="sg-top"><button class="back" type="button" onclick="location.hash='soumu'">← 総務へ</button><button class="back" type="button" onclick="location.hash='shogu/set'">設定</button></div>`;
-  const denied = back + '<h3>処遇改善加算</h3>';
+  const denied = back + '<h3>処遇改善加算（試作）</h3>';
   const access = await shoguAccess();
   if (access === 'denied') { $('view').innerHTML = `<div class="sg">${denied}<p>事務と管理者だけが見られます。</p></div>`; return; }
   if (access === 'missing') { $('view').innerHTML = `<div class="sg">${denied}<p>データベースにまだ表がありません。Supabase の SQL Editor で supabase/shogu.sql を実行してください。</p></div>`; return; }
@@ -88,8 +88,9 @@ async function renderShogu(parts) {
   const msg = `<p id="sg_msg" class="sg-msg">${SHOGU.msg ? Shogu.esc(SHOGU.msg) : ''}</p>`;
   SHOGU.msg = '';
   const body = settings ? shoguSettingsView() : shoguFlowView();
+  const proto = '<p class="note">国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作</p>';
   const lead = settings ? '' : '<p class="note">金額は自動で出します。提出・送金・フリーウェイへの送信はしません。</p>';
-  $('view').innerHTML = `<div class="sg">${back}<h3>${settings ? '設定' : '処遇改善加算'}</h3>${lead}${msg}${body}</div>`;
+  $('view').innerHTML = `<div class="sg">${back}<h3>${settings ? '設定（試作）' : '処遇改善加算（試作）'}</h3>${proto}${lead}${msg}${body}</div>`;
 }
 
 function shoguWorking(plan) {

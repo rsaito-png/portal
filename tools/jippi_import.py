@@ -4,6 +4,7 @@
 - Google側は読むだけ（CSVは box 上に置く。リポジトリには入れない＝個人名を含むため）
 - 一覧：児童ごとに お昼代・おやつ代 の列を合計（「300円」→300）。保護者名・支払いリンクは実費精算タブにあれば取り込む
 - 再取り込みしても 送信済み・メモ・手で貼ったリンクは消さない（金額と保護者名だけ更新、リンクは空でないときだけ上書き）
+- 支払いリンクの作成はポータルの実費画面（jippi-checkout）。pay_link_amount はここでは更新しない。金額が変わっていれば、画面の「リンクを作成／更新」が作り直す
 service_role キー: /home/box/tools/supabase/service_role_key（表示しない）"""
 import csv, json, re, sys, urllib.request
 ym = sys.argv[1]; assert re.fullmatch(r'\d{4}-\d{2}', ym)

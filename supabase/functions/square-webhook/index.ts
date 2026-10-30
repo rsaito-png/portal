@@ -4,6 +4,7 @@
 // SQUARE_ENVIRONMENT は sandbox / production。ヘッダ square-environment と違う通知は入金にしない。
 // verify_jwt は false（supabase/config.toml）。入金の正はここ。成功ページでは確定しない。
 // 同じ Square アカウントの他の支払い（レオの実費など）は注文IDも payment_note も一致しないので無視する。
+// 実費（jippi-checkout）の payment_note は「leo-jippi YYYY-MM」。UUID ではないので sct_payments には紐づかない。
 import { env, json, safeEqual, serviceInsert, serviceSelect, serviceUpdate } from "../_shared/http.ts";
 import { squareDecision, squareSignature } from "../_shared/square.ts";
 
