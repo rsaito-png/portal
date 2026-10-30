@@ -292,13 +292,11 @@ function leoFindChildPlan(plans, name) {
   const hits = list.filter(x => sameChildName(x.name, name));
   return hits.length === 1 ? hits[0] : null;
 }
+// 今日の利用児童の「本計画」は本文の展開だけ。Googleドキュメント等はここから開かない。
 function leoKidPlanHtml(name, plan) {
   const label = `📋 本計画${plan && (plan.term || plan.period) ? `（${esc(plan.term || '')}　${esc(plan.period || '')}）` : ''}`;
-  if (plan && plan.source_url) {
-    return `<p style="margin-top:6px"><a href="${esc(plan.source_url)}" target="_blank" rel="noopener" style="font-weight:bold;color:#36c">${label}PDFを開く</a></p>`;
-  }
-  if (plan && plan.body) {
-    return `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">${label}を読む（PDF未登録）</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(plan.body)}</div></details>`;
+  if (plan && String(plan.body || '').trim()) {
+    return `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">${label}を読む</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(plan.body)}</div></details>`;
   }
   return `<p style="margin-top:6px"><small>本計画PDFはまだ登録されていません</small></p>`;
 }

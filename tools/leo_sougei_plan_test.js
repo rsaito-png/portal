@@ -75,16 +75,32 @@ assert.strictEqual(leoKidTile([], events, day), '予定 2人');
 assert.strictEqual(leoKidTile([], events, next), '予定 1人');
 assert.strictEqual(leoKidTile([], [], day), '0人');
 
-const planHtml = leoKidPlanHtml('児童 A', { term: '2期', period: '2026年5月〜2026年10月', body: '【利用者名】児童A\n【長期目標】\n見本の目標です。' });
-assert.ok(planHtml.includes('個別支援計画（2期　2026年5月〜2026年10月）を読む'));
+const planHtml = leoKidPlanHtml('児童 A', { term: '2期', period: '2026年5月〜2026年10月', body: '【利用者名】児童A\n【長期目標】\n見本の目標です。', source_url: 'https://docs.google.com/document/d/with-body' });
+assert.ok(planHtml.includes('本計画（2期　2026年5月〜2026年10月）を読む'));
 assert.ok(planHtml.startsWith('<details'));
 assert.ok(planHtml.includes('見本の目標です。'));
 assert.ok(!planHtml.includes('【利用者名】'));
+assert.ok(!planHtml.includes('PDF未登録'));
+assert.ok(!planHtml.includes('PDFを開く'));
+assert.ok(!planHtml.includes('docs.google.com'));
+assert.ok(!planHtml.includes('target="_blank"'));
 assert.ok(!planHtml.includes('個別支援計画を開く'));
-const planBtn = leoKidPlanHtml('児童 B', null);
-assert.ok(planBtn.includes("PLAN_OPEN='児童B'"));
-assert.ok(planBtn.includes("location.hash='leo/plan'"));
-assert.ok(planBtn.includes('📋 個別支援計画を開く'));
+const bodyOnly = leoKidPlanHtml('児童 A', { body: '本文だけです。' });
+assert.ok(bodyOnly.includes('📋 本計画を読む'));
+assert.ok(bodyOnly.startsWith('<details'));
+assert.ok(bodyOnly.includes('本文だけです。'));
+const planBtn = leoKidPlanHtml('児童 B', { source_url: 'https://docs.google.com/document/d/link-only' });
+assert.ok(planBtn.includes('本計画PDFはまだ登録されていません'));
+assert.ok(!planBtn.includes('docs.google.com'));
+assert.ok(!planBtn.includes('target="_blank"'));
+assert.ok(!planBtn.includes("PLAN_OPEN="));
+assert.ok(!planBtn.includes('<details'));
+const emptyPlan = leoKidPlanHtml('児童 C', null);
+assert.strictEqual(emptyPlan, planBtn);
+assert.ok(emptyPlan.includes('本計画PDFはまだ登録されていません'));
+const blankPlan = leoKidPlanHtml('児童 D', { body: ' \n\t', source_url: 'https://example.com/plan.pdf' });
+assert.ok(blankPlan.includes('本計画PDFはまだ登録されていません'));
+assert.ok(!blankPlan.includes('example.com'));
 assert.strictEqual(leoKidWarnHtml([]), '');
 assert.strictEqual(leoKidWarnHtml(null), '');
 const warnHtml = leoKidWarnHtml(['送迎の配慮：<見本>', 'メモ：半分']);
@@ -161,6 +177,11 @@ assert.ok(!yotei.includes('if (DEMO) return old.call(this)'));
 assert.ok(yotei.includes('leoSougeiMineHtml'));
 assert.ok(yotei.includes('same(e.staff, me)'));
 assert.ok(leo.includes('120000') && leo.includes('visibilitychange') && leo.includes('SG_EDIT'));
+const planFn = between(leo, 'function leoKidPlanHtml', 'function leoSougeiMineHtml');
+assert.ok(!planFn.includes('source_url') && !planFn.includes('target="_blank"') && !planFn.includes('PDF未登録'));
+assert.ok(planFn.includes('本計画PDFはまだ登録されていません'));
+assert.ok(leo.includes('元の計画書を開く'));
+assert.ok(index.includes('leo.js?v=20261030plantext'));
 const leoMergeNikki = grab('leoMergeNikki');
 const portalPick = [{ day, kind: '迎え', kids: ['児童A'], staff: '職員X', start_time: '14:50', place: '見本公園', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z', kid_times: { '児童A': '14:50' }, kid_places: { '児童A': '見本公園' } }];
 const picked = leoMergeNikki(nikki, portalPick);
@@ -213,8 +234,8 @@ vm.runInContext(`
   if (mine.includes('児童B')) throw new Error('sougei leaked another driver');
   const kids = await LEO_VIEWS.kids();
   if (!kids.includes('予定表から表示（日誌取り込み前）') || !kids.includes('児童A')) throw new Error('kids fallback');
-  if (!kids.includes('個別支援計画を開く') || !kids.includes("PLAN_OPEN='児童A'")) throw new Error('kids fallback plan button');
-  if (kids.includes('を読む')) throw new Error('no plan row should stay a button');
+  if (!kids.includes('本計画PDFはまだ登録されていません')) throw new Error('kids fallback plan missing');
+  if (kids.includes('を読む') || kids.includes('PDFを開く') || kids.includes('target="_blank"') || kids.includes("PLAN_OPEN=")) throw new Error('no plan row should stay a message');
   sb = async (path) => {
     const p = String(path);
     if (p.startsWith('staff_profiles')) return [{ nikki_name: '連先生' }];
@@ -223,7 +244,10 @@ vm.runInContext(`
       { day: t, kind: '利用', child: '児童A', start_time: '14:45', end_time: '17:00' },
       { day: t, kind: '利用', child: '児童 B', start_time: '15:00', end_time: '17:30' },
     ];
-    if (p.includes('leo_child_plan')) return [{ name: '児童 A', term: '2期', period: '2026年5月〜2026年10月', body: '【利用者名】児童A\\n【長期目標】\\n見本の目標です。' }];
+    if (p.includes('leo_child_plan')) return [
+      { name: '児童 A', term: '2期', period: '2026年5月〜2026年10月', body: '【利用者名】児童A\\n【長期目標】\\n見本の目標です。', source_url: 'https://docs.google.com/document/d/with-body' },
+      { name: '児童 B', source_url: 'https://docs.google.com/document/d/link-only' },
+    ];
     if (p.startsWith('leo_child_care')) return [{ child: '児童A', note: '（見本）助手席の後ろ' }];
     if (p.includes('select=name,note')) return [{ name: '児童 B', note: '（見本）おやつは半分' }];
     return [];
@@ -232,11 +256,11 @@ vm.runInContext(`
   if (!rich.includes('予定表から表示（日誌取り込み前）')) throw new Error('rich fallback note');
   const cards = rich.split('class="card"').slice(1);
   if (cards.length !== 2) throw new Error('two fallback cards');
-  if (!cards[0].includes('児童A') || !cards[0].includes('個別支援計画（2期　2026年5月〜2026年10月）を読む') || !cards[0].includes('見本の目標です。')) throw new Error('fallback plan details');
-  if (cards[0].includes('【利用者名】') || cards[0].includes('メモ：')) throw new Error('fallback plan card mixed');
+  if (!cards[0].includes('児童A') || !cards[0].includes('本計画（2期　2026年5月〜2026年10月）を読む') || !cards[0].includes('見本の目標です。')) throw new Error('fallback plan details');
+  if (cards[0].includes('【利用者名】') || cards[0].includes('メモ：') || cards[0].includes('PDF未登録') || cards[0].includes('docs.google.com') || cards[0].includes('target="_blank"')) throw new Error('fallback plan card mixed');
   if (!cards[0].includes('送迎の配慮：（見本）助手席の後ろ')) throw new Error('fallback care');
-  if (!cards[1].includes("PLAN_OPEN='児童B'") || !cards[1].includes('メモ：（見本）おやつは半分')) throw new Error('fallback button and memo');
-  if (cards[1].includes('送迎の配慮') || cards[1].includes('を読む')) throw new Error('fallback button card mixed');
+  if (!cards[1].includes('本計画PDFはまだ登録されていません') || !cards[1].includes('メモ：（見本）おやつは半分')) throw new Error('fallback missing plan and memo');
+  if (cards[1].includes('送迎の配慮') || cards[1].includes('を読む') || cards[1].includes('docs.google.com') || cards[1].includes('target="_blank"')) throw new Error('fallback button card mixed');
   sb = async (path) => {
     const p = String(path);
     if (p.startsWith('staff_profiles')) return [{ nikki_name: '連先生' }];
@@ -254,14 +278,15 @@ vm.runInContext(`
   sb = async (path) => {
     const p = String(path);
     if (p.includes('leo_nikki')) return [{ day: t, kind: '利用', child: '児童B', service: '放デイ', pick_driver: '連先生', pick_car: '2号車', drop_driver: '友香先生', drop_car: '2号車', pick_time: '14:40', drop_time: '17:20', pick_place: '見本小学校', drop_place: '自宅', start_time: '15:00', end_time: '17:30' }];
-    if (p.includes('leo_child_plan')) return [{ name: '児童B', term: '1期', period: '見本期間', body: '【長期目標】\\n日誌側の本文' }];
+    if (p.includes('leo_child_plan')) return [{ name: '児童B', term: '1期', period: '見本期間', body: '【長期目標】\\n日誌側の本文', source_url: 'https://docs.google.com/document/d/nikki' }];
     if (p.startsWith('leo_child_care')) return [{ child: '児童B', note: '（見本）チャイルドシート' }];
     if (p.includes('select=name,note')) return [{ name: '児童B', note: '（見本）メモです' }];
     return [];
   };
   const loggedKids = await LEO_VIEWS.kids();
   if (loggedKids.includes('予定表から表示')) throw new Error('nikki kids stays off the schedule');
-  if (!loggedKids.includes('個別支援計画（1期　見本期間）を読む') || !loggedKids.includes('日誌側の本文')) throw new Error('nikki plan helper');
+  if (!loggedKids.includes('本計画（1期　見本期間）を読む') || !loggedKids.includes('日誌側の本文')) throw new Error('nikki plan helper');
+  if (loggedKids.includes('docs.google.com') || loggedKids.includes('PDFを開く') || loggedKids.includes('PDF未登録')) throw new Error('nikki plan must expand text');
   if (!loggedKids.includes('送迎の配慮：（見本）チャイルドシート') || !loggedKids.includes('メモ：（見本）メモです')) throw new Error('nikki warn helper');
   sb = async (path) => {
     const p = String(path);
