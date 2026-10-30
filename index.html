@@ -128,7 +128,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261030lineproto"></script>
+<script src="config.js?v=20261030fixmerge"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -161,7 +161,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo_jippi.js?v=20261030jippi"></script>
 <script src="leo_jogan.js?v=20261030jogan"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
-<script src="uketsuke.js?v=20261030home1"></script>
+<script src="uketsuke.js?v=20261030fixreq"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261030dakoku"></script>
 <script src="chamu.js?v=20261030chamu"></script>
@@ -240,13 +240,16 @@ function leoHomeBody(o) {
   const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}`;
   const duty = dutyName === '児発管の仕事' ? (dutyInner ? `<div class="grid">${dutyInner}</div>` : '') : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`;
   // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。LINEの下書き（#leo/linedraft）は直リンクのみ。
+  // 不具合・修正の依頼は毎日やる・現場・事務・計画には重ねない。who の下、管理系ルーティンの前に単独で出す。
+  const fix = vis.filter(t => t[1] === '不具合・修正の依頼').map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('');
+  const fixRow = fix ? `<div class="grid">${fix}</div>` : '';
   return `<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#dakoku', '⏰', '出退勤打刻', '', '')}
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}</div>
     ${duty}
-    ${who}${rt}`;
+    ${who}${fixRow}${rt}`;
 }
 async function leoHomeStatus() {
   try { if (DEMO || typeof sb !== 'function') return;

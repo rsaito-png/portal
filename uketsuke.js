@@ -2,7 +2,7 @@
 // 見られる範囲は DB 側（RLS）で決まる：職員＝自分の事業所だけ／事務＝全部。状態の変更だけできる
 // 画面の「分からないことを送る」も、ここのフォームと同じ uketsuke_submit に送る（別の行き先は作らない）
 const UK_STATUS = ['未対応', '対応中', '完了'];
-const UK_CATS = ['その他', '日誌', '送迎', '請求', '計画', '記録'];
+const UK_CATS = ['その他', '不具合・修正', '日誌', '送迎', '請求', '計画', '記録'];
 const UK_DEMO = [
   { id: 3, created_at: new Date().toISOString(), sender_name: '職員X', office: 'レオ', category: '送迎', body: '（見本）明日の児童Aのお迎えを15:00に変更お願いします', status: '未対応' },
   { id: 2, created_at: new Date().toISOString(), sender_name: '職員Y', office: 'レオ', category: '日誌', body: '（見本）昨日の日誌、児童Bの終了時刻が違っています', status: '対応中' },
@@ -18,7 +18,7 @@ async function renderUketsuke() {
     const groups = {}; rows.forEach(r => (groups[r.office || '事業所未設定'] = groups[r.office || '事業所未設定'] || []).push(r));
     const tabs = ['未完了', 'すべて'].map(f => `<button class="${f === UK_FILTER ? 'on' : ''}" onclick="UK_FILTER='${f}';renderUketsuke()">${f}</button>`).join('');
     $('view').innerHTML = back + `<h3>受付</h3>${typeof DEMO !== 'undefined' && DEMO ? '<p class="note">見本データです（架空）</p>' : ''}
-      <p class="note">ポータルから送られた依頼・報告です。${ROLE === '事務' ? '事務なので全事業所を表示しています。' : '自分の事業所の分だけ表示しています。'}対応したら状態を変えてください。どの画面からでも、右下の「分からないことを送る」で、いまのページのまま同じ受付に送れます。</p>
+      <p class="note">ポータルから送られた依頼・報告です。不具合や画面の修正依頼もここから。${ROLE === '事務' ? '事務なので全事業所を表示しています。' : '自分の事業所の分だけ表示しています。'}対応したら状態を変えてください。どの画面からでも、右下の「分からないことを送る」で、いまのページのまま同じ受付に送れます。</p>
       <div class="card"><h4>✏️ ここから送る</h4>
       <select id="uk_c">${UK_CATS.map(c => `<option>${c}</option>`).join('')}</select>
       <textarea id="uk_b" rows="3" maxlength="4000" style="width:100%;font-size:16px" placeholder="依頼・報告を書いてください"></textarea>
