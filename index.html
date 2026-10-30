@@ -67,10 +67,10 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
 <script src="nicchu.js?v=20261026sched"></script>
-<script src="sui_render.js?v=202610170620"></script>
-<script src="sui.js?v=202610301330"></script>
+<script src="sui_render.js?v=202610301600"></script>
+<script src="sui.js?v=202610301600"></script>
 <script src="sui_contract.js?v=202610301300"></script>
-<script src="sui_basic.js?v=202610301330"></script>
+<script src="sui_basic.js?v=202610301600"></script>
 <script src="kin_contract.js?v=202610221354"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
@@ -218,7 +218,7 @@ async function render() {
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'suishodama' && sub === 'ledger') { SUI.edit = null; return renderSuiLedger(); }
   if (id === 'suishodama' && sub === 'contract') { SC.link = null; return renderSuiContract(); }
-  if (id === 'suishodama' && sub === 'basic') { SBX.id = null; return renderSuiBasic(); }
+  if (id === 'suishodama' && sub === 'basic') return renderSuiBasic();
   if (id === 'suishodama' && sub === 'plan') { SUI.planId = null; return renderSuiPlan(); }
   if (id === 'kintoun' && sub === 'ledger') return renderKinLedger();
   if (id === 'kintoun' && sub === 'contract') return renderKinContract();
