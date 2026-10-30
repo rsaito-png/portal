@@ -14,12 +14,16 @@ plan1: {intent(生活に対する意向), policy(総合的な援助の方針), l
   goals: 最大4行の配列。各 {priority(優先順位 "1"〜), issue(解決すべき課題), goal(支援目標), target(達成時期), service(サービスの種類・内容・量), provider(提供事業者名・担当者・電話), role(本人の役割), eval(評価時期), note(留意事項)}}
 plan2: {cells: 12行×8列の二次元配列（行は 6:00,8:00,10:00,12:00,14:00,16:00,18:00,20:00,22:00,0:00,2:00,4:00 の順。列は 月,火,水,木,金,土,日,祝 の順。各セルは週単位のサービス名や活動、なければ空文字）,
   activities: 12個の文字列（各行の「主な日常生活上の活動」）, other(週単位以外のサービス), overview(生活の全体像)}
-monitoring（kind=継続のときのみ出力）: {interview_date, place, interviewer, period, client_intent, family_intent, long_status, short_status, service_eval, overall, new_needs, change_needed("要"か"不要"), change_reason, coordination, next_monitoring}
+monitoring（kind=継続のときのみ出力）: {interview_date(モニタリング実施日), policy(総合的な援助の方針。前回計画から引き継ぐ), overall(全体の状況),
+  rows: 前回計画の個別目標ごと（最大4行）の配列。各 {goal(支援目標), target(達成時期), provision(サービス提供状況・事業者からの聞き取り), feeling(本人の感想・満足度), achievement(支援目標の達成度・ニーズの充足度), next(今後の課題・解決方法), chg_type(サービス種類の変更 "有"/"無"/""), chg_amount(サービス量の変更 同), chg_week(週間計画の変更 同), note(その他留意事項。次回モニタリング時期など)}}
+basic（基本情報シート＝別紙1・別紙2。常に出力）: {overview(１．概要：支援経過・現状と課題等), age, sex, housing_type(持家/借家/グループ・ケアホーム/入所施設/医療機関/その他), disease(障害または疾患名・手帳), family(家族構成：年齢・職業・主たる介護者等), social_map(社会関係図：関わる機関・人物と役割), life_history(生活歴：受診歴等含む), medical(医療の状況：受診科目・頻度・主治医・疾患名・服薬), client_wish(本人の主訴), family_wish(家族の主訴),
+  support_public: 公的支援（障害福祉サービス・介護保険・行政等）の配列 各 {name(名称), provider(提供機関・提供者), content(支援内容), freq(頻度), note(備考)}, support_other: その他の支援（医療・インフォーマル等）の同形式の配列,
+  cells: 現在の生活の12行×7列（行は plan2 と同じ時刻、列は 月〜日）, activities: 12個（主な日常生活上の活動）, other(週単位以外のサービス)}
 規則:
 - 文字起こしに根拠のない事項（事業者名・電話・時期・サービス量・日付など）は作り込まず空文字にする。推測で補わない。
 - 「えー」「あのー」などのフィラーは除き、「本人」「母」「父」等を用いた書き言葉の福祉計画の文体（である調・体言止め可）にする。
 - 継続の場合は、前回の確定済み計画の目標とサービスを引き継ぎ、今回の文字起こしの内容で達成状況や変更を反映する。
-- 新規は plan1 と plan2 のみ、継続は plan1・plan2・monitoring の3つ全て。header は出力しない。`;
+- 新規は basic・plan1・plan2、継続は basic・plan1・plan2・monitoring の全て。header は出力しない。`;
 
 // ---- 仮名化：xAIへ送る前に個人を特定できる値を置き換え、返ってきた文章で元に戻す ----
 type Pair = [string, string]; // [本物, 仮の値]
@@ -93,7 +97,19 @@ Deno.serve(async (req) => {
     if (!draft.plan1 || !draft.plan2) return fail(id, "draftにplan1/plan2がありません");
     if (r.kind !== "継続") delete draft.monitoring;
     else if (!draft.monitoring) return fail(id, "継続なのにmonitoringがありません");
-    const { error } = await db.from("sui_request").update({ draft: { plan1: draft.plan1, plan2: draft.plan2, ...(draft.monitoring ? { monitoring: draft.monitoring } : {}) }, status: "作成済み", error: null, updated_at: new Date().toISOString() }).eq("id", id).eq("status", "待ち");
+    const out = { plan1: draft.plan1, plan2: draft.plan2, basic: draft.basic ?? {}, ...(draft.monitoring ? { monitoring: draft.monitoring } : {}) };
+    // 録音後の自動作成：基本情報シート・計画案（計画1/計画2）・モニタリングを「下書き」で作る
+    const made: Record<string, number> = {};
+    const hdr = { office_name: "水晶玉", created_on: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), user_name: uu.name, guardian_name: uu.guardian_name, guardian_relation: uu.guardian_relation, shien_kubun: uu.shien_kubun, jukyusha_fukushi: uu.jukyusha_fukushi, jukyusha_chiiki: uu.jukyusha_chiiki, jukyusha_jido: uu.jukyusha_jido, cap_amount: uu.cap_amount, monitoring_period: uu.monitoring_period };
+    if (out.monitoring) { const p1 = (prev as any[]).find((x) => x.plan_type === "計画1"); out.monitoring.plan_created_on = p1?.body?.header?.created_on ?? ""; if (!out.monitoring.policy) out.monitoring.policy = p1?.body?.policy ?? ""; }
+    if (out.basic) { out.basic.address = uu.address ?? ""; out.basic.phone = uu.phone ?? ""; if (uu.birth) out.basic.birth = String(uu.birth); }
+    for (const [t, k] of [["基本情報", "basic"], ["計画1", "plan1"], ["計画2", "plan2"], ["モニタリング", "monitoring"]] as const) {
+      const body = (out as Record<string, any>)[k]; if (!body) continue;
+      const { data: lv } = await db.from("sui_plan").select("version").eq("user_id", r.user_id).eq("plan_type", t).order("version", { ascending: false }).limit(1);
+      const { data: p, error: pe } = await db.from("sui_plan").insert({ user_id: r.user_id, plan_type: t, version: (lv?.[0]?.version ?? 0) + 1, kind: r.kind, doc_class: t === "モニタリング" || t === "基本情報" ? null : "計画案", status: "下書き", body: { ...body, header: hdr } }).select("id").single();
+      if (pe) return fail(id, `${t}作成失敗: ` + pe.message); made[k] = p.id;
+    }
+    const { error } = await db.from("sui_request").update({ draft: out, made, status: "作成済み", error: null, updated_at: new Date().toISOString() }).eq("id", id).eq("status", "待ち");
     if (error) return fail(id, "書き戻し失敗: " + error.message);
     return Response.json({ ok: true, id });
   } catch (e) { return fail(id, String((e as Error).message ?? e)); }

@@ -40,7 +40,7 @@ async function siSaveUser(id) {
 async function siDelUser(id) { if (!confirm('この利用者と、計画・依頼をすべて削除します。よろしいですか？')) return; try { await sb(`sui_user?id=eq.${id}`, { method: 'DELETE' }); SUI.edit = null; renderSuiLedger(); } catch (e) { alert(e.message); } }
 
 // ===== 計画 =====
-const siTypeLabel = t => t === '計画1' ? 'サービス等利用計画' : t === '計画2' ? '週間計画表' : 'モニタリング報告書';
+const siTypeLabel = t => t === '計画1' ? 'サービス等利用計画' : t === '計画2' ? '週間計画表' : t === '基本情報' ? '基本情報シート（別紙1・2）' : 'モニタリング報告書';
 function siStat(ps, t, c) { // 計画案/計画ごとの 作成・署名・送付 の状況（その様式の最新版）
   const p = ps.filter(x => x.plan_type === t && x.doc_class === c).sort((x, y) => y.version - x.version)[0];
   if (!p) return '<span style="color:#999">未作成</span>';
@@ -63,14 +63,14 @@ async function renderSuiPlan() {
     <div class="card"><h4>③ 書類（${esc(u.name)}さん）</h4><table class="tbl"><tr><th>書類</th><th>計画案</th><th>計画</th></tr>${types.map(t => `<tr><td>${siTypeLabel(t)}</td><td>${siStat(ps, t, '計画案')}</td><td>${siStat(ps, t, '計画')}</td></tr>`).join('')}</table>
     <p class="note">計画案と計画は別の書類です（内容は同じでよい）。それぞれ署名をもらい、市役所へ紙で送ります。</p>
     ${ps.length ? `<table class="tbl"><tr><th>書類</th><th>区分</th><th>版</th><th>状態</th><th></th></tr>${ps.map(p => `<tr><td>${siTypeLabel(p.plan_type)}</td><td>${esc(p.doc_class || '')}</td><td>v${p.version}（${esc(p.kind)}）</td><td>${p.status === '確定' ? '🔒確定' : '下書き'}</td><td><button onclick="SUI.planId=${p.id};renderSuiPlan()">開く</button> <button class="back" onclick="siCont(${p.id})">次の版を作る</button></td></tr>`).join('')}</table>` : '<p>まだ書類がありません。②で下書きを取り込むか、下のボタンで白紙から作ります。</p>'}
-    <details><summary>白紙から作る</summary><p>${types.map(t => `<button class="back" onclick="siNewPlan('${t}','新規')">＋${siTypeLabel(t)}</button>`).join(' ')} <button class="back" onclick="siNewPlan('モニタリング','新規')">＋モニタリング報告書</button></p></details></div></div>`;
+    <details><summary>白紙から作る</summary><p>${types.map(t => `<button class="back" onclick="siNewPlan('${t}','新規')">＋${siTypeLabel(t)}</button>`).join(' ')} <button class="back" onclick="siNewPlan('モニタリング','新規')">＋モニタリング報告書</button> <button class="back" onclick="siNewPlan('基本情報','新規')">＋基本情報シート</button></p></details></div></div>`;
     siRestoreTx(u.id); siStartPoll(u.id, rq);
   } catch (e) { $('view').innerHTML = siBack + `<p>${esc(e.message)}</p>`; }
 }
 const siHdr = u => ({ user_name: u.name, guardian_name: u.guardian_name, guardian_relation: u.guardian_relation, shien_kubun: u.shien_kubun, jukyusha_fukushi: u.jukyusha_fukushi, jukyusha_chiiki: u.jukyusha_chiiki, jukyusha_jido: u.jukyusha_jido, cap_amount: u.cap_amount, monitoring_period: u.monitoring_period });
 async function siNewPlan(t, kind, from, cls) {
   try { const u = (await sb(`sui_user?id=eq.${SUI.uid}&select=*`))[0], last = (await sb(`sui_plan?user_id=eq.${u.id}&plan_type=eq.${encodeURIComponent(t)}&select=version&order=version.desc&limit=1`))[0];
-    const body = from ? from.body : { header: siHdr(u) }, doc_class = t === 'モニタリング' ? null : (cls || (from && from.doc_class) || '計画案');
+    const body = from ? from.body : { header: siHdr(u) }, doc_class = t === 'モニタリング' || t === '基本情報' ? null : (cls || (from && from.doc_class) || '計画案');
     const r = await sb('sui_plan', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: u.id, plan_type: t, version: last ? last.version + 1 : 1, kind, doc_class, prev_plan_id: from && !from.dup ? from.id : null, source_id: from && from.dup ? from.id : null, status: from && from.status || '下書き', body }) });
     SUI.planId = r[0].id; await renderSuiPlan(); return r[0]; } catch (e) { alert(e.message); }
 }
@@ -89,26 +89,35 @@ async function siEditor(u, id) {
   if (p.plan_type === '計画1') {
     const g = b.goals || [], tx = (k, l, r) => `<label>${l}<br><textarea id="sb_${k}" rows="${r}" ${dis}>${esc(b[k] ?? '')}</textarea></label>`;
     body = `${tx('intent', '1 生活に対する意向', 3)}${tx('policy', '2 総合的な援助の方針', 3)}${tx('long_goal', '3 長期目標', 2)}${tx('short_goal', '4 短期目標', 2)}<h4>5 個別目標</h4>` + [0, 1, 2, 3].map(i => `<div class="card"><b>${i + 1}行目</b><div class="g">${SUI_GOAL.map(([k, l]) => `<label>${l}<br><textarea id="sg_${i}_${k}" rows="2" ${dis}>${esc((g[i] || {})[k] ?? '')}</textarea></label>`).join('')}</div></div>`).join('');
+  } else if (p.plan_type === '基本情報') {
+    const ta = (k, l, r = 4) => `<label style="grid-column:1/-1">${l}<br><textarea id="sb_${k}" rows="${r}" ${dis}>${esc(b[k] ?? '')}</textarea></label>`, c = b.cells || [], a = b.activities || [];
+    const sr = (key, n) => { const v = b[key] || []; return `<table class="grid8"><tr>${SUI_BS.map(([, l]) => `<th>${l}</th>`).join('')}</tr>${Array.from({ length: Math.max(n, v.length) }, (_, i) => `<tr>${SUI_BS.map(([k]) => `<td><textarea id="ss_${key}_${i}_${k}" rows="1" ${dis}>${esc((v[i] || {})[k] ?? '')}</textarea></td>`).join('')}</tr>`).join('')}</table>`; };
+    body = `<h4>別紙１</h4>${ta('overview', SUI_BT[0][1], 6)}<h4>２．利用者の状況</h4><div class="g">${SUI_BX.map(([k, l]) => `<label>${l}<br><input id="sb_${k}" value="${esc(b[k] ?? '')}" ${dis}></label>`).join('')}</div><div class="g">${SUI_BT.slice(1).map(([k, l]) => ta(k, l)).join('')}</div>
+    <h4>３．支援の状況</h4><b>公的支援（障害福祉サービス、介護保険等）</b>${sr('support_public', 4)}<b>その他の支援</b>${sr('support_other', 2)}
+    <h4>別紙２【現在の生活】</h4><div style="overflow-x:auto"><table class="grid8" style="min-width:860px"><tr><th style="width:56px"></th>${SUI_WD.slice(0, 7).map(w => `<th>${w}</th>`).join('')}<th>主な日常生活上の活動</th></tr>${SUI_ROWS.map((r, i) => `<tr><th>${r}</th>${SUI_WD.slice(0, 7).map((w, j) => `<td><textarea id="sc_${i}_${j}" rows="2" ${dis}>${esc((c[i] || [])[j] ?? '')}</textarea></td>`).join('')}<td><textarea id="sa_${i}" rows="2" ${dis}>${esc(a[i] ?? '')}</textarea></td></tr>`).join('')}</table></div><label>週単位以外のサービス<br><textarea id="sb_other" rows="3" ${dis}>${esc(b.other ?? '')}</textarea></label>`;
   } else if (p.plan_type === '計画2') {
     const c = b.cells || [], a = b.activities || [];
     body = `<div style="overflow-x:auto"><table class="grid8" style="min-width:900px"><tr><th style="width:56px"></th>${SUI_WD.map(w => `<th>${w}</th>`).join('')}<th>主な日常生活上の活動</th></tr>${SUI_ROWS.map((r, i) => `<tr><th>${r}</th>${SUI_WD.map((w, j) => `<td><textarea id="sc_${i}_${j}" rows="2" ${dis}>${esc((c[i] || [])[j] ?? '')}</textarea></td>`).join('')}<td><textarea id="sa_${i}" rows="2" ${dis}>${esc(a[i] ?? '')}</textarea></td></tr>`).join('')}</table></div>
     <label>週単位以外のサービス<br><textarea id="sb_other" rows="3" ${dis}>${esc(b.other ?? '')}</textarea></label><label>生活の全体像<br><textarea id="sb_overview" rows="4" ${dis}>${esc(b.overview ?? '')}</textarea></label>`;
   } else {
-    body = SUI_MON.map(([t, fs]) => `<h4>${t}</h4><div class="g">${fs.map(([k, l, ty]) => ty === 'ta' ? `<label style="grid-column:1/-1">${l}<br><textarea id="sm_${k}" rows="3" ${dis}>${esc(b[k] ?? '')}</textarea></label>` : ty === 'sel' ? `<label>${l}<br><select id="sm_${k}" ${dis}><option value=""></option><option ${b[k] === '要' ? 'selected' : ''}>要</option><option ${b[k] === '不要' ? 'selected' : ''}>不要</option></select></label>` : `<label>${l}<br><input id="sm_${k}" type="${ty || 'text'}" value="${esc(b[k] ?? '')}" ${dis}></label>`).join('')}</div>`).join('');
+    const rs = b.rows || [];
+    body = `<div class="g">${SUI_MON.map(([k, l, ty]) => ty === 'ta' ? `<label style="grid-column:1/-1">${l}<br><textarea id="sm_${k}" rows="4" ${dis}>${esc(b[k] ?? '')}</textarea></label>` : `<label>${l}<br><input id="sm_${k}" value="${esc(b[k] ?? '')}" ${dis}></label>`).join('')}</div>` + [0, 1, 2, 3].map(i => `<div class="card"><b>優先順位 ${i + 1}</b><div class="g">${SUI_MROW.map(([k, l, ty]) => ty === 'yn' ? `<label>${l}<br><select id="smr_${i}_${k}" ${dis}><option value=""></option><option ${(rs[i] || {})[k] === '有' ? 'selected' : ''}>有</option><option ${(rs[i] || {})[k] === '無' ? 'selected' : ''}>無</option></select></label>` : `<label>${l}<br><textarea id="smr_${i}_${k}" rows="2" ${dis}>${esc((rs[i] || {})[k] ?? '')}</textarea></label>`).join('')}</div></div>`).join('');
   }
   return `<div class="sui-big"><h3>${esc(p.doc_class ? p.doc_class + '：' : '')}${siTypeLabel(p.plan_type)}　${esc(u.name)}　v${p.version}（${esc(p.kind)}）${lock ? '🔒確定' : '下書き'}</h3><div class="card sui-form"><h4>ヘッダー</h4>${hdr}${body}
   <p>${lock ? '<span class="note">確定した版は変更できません。続ける場合は「継続」で新しい版を作ります。</span>' : `<button onclick="siSavePlan(${p.id},false)">下書き保存</button> <button onclick="siSavePlan(${p.id},'ver')">新しい版として保存</button> <button onclick="siSavePlan(${p.id},true)">確定する</button>`}
   <button class="back" onclick="siPrint(${p.id})">🖨️ 印刷 / PDF</button> <button class="back" onclick="SUI.planId=null;renderSuiPlan()">一覧へ</button> <span id="sp_m"></span></p></div>
-  ${p.doc_class && lock ? `<div class="card"><h4>${esc(p.doc_class)}の署名・送付 <button class="back" style="font-size:.8em" onclick="siSignHelp(event)">？署名の手順</button></h4>
+  ${lock ? `<div class="card"><h4>${esc(p.doc_class || siTypeLabel(p.plan_type))}の署名・送付 <button class="back" style="font-size:.8em" onclick="siSignHelp(event)">？署名の手順</button></h4>
    <p>署名：${p.signed_on ? `<b style="color:#2e6b4f">✅ ${esc(p.signed_on)}　${esc(p.signer_kind || '')}</b>` : '未'}　<button onclick="siOnsite(${p.id})">✍️ その場で署名（タブレットを利用者に渡す）</button> <button class="back" onclick="siLink(${p.id})">署名リンクを発行</button> <button class="back" onclick="siPaper(${p.id})">紙で署名済みを記録</button></p>
    ${p.doc_class === '計画案' ? `<p><button onclick="siDup(${p.id})">この計画案から「計画」を作る（同じ内容を複製）</button></p>` : ''}
-   <p>市役所へ紙で送付した日 <input type="date" id="sp_sent" value="${esc(p.sent_on || '')}" style="width:auto"> <button onclick="siSent(${p.id})">保存</button> <span id="sp_sm"></span></p><div id="sp_link"></div></div>` : p.doc_class ? '<p class="note">確定すると、署名・送付の欄が出ます。</p>' : ''}</div>`;
+   <p>市役所へ紙で送付した日 <input type="date" id="sp_sent" value="${esc(p.sent_on || '')}" style="width:auto"> <button onclick="siSent(${p.id})">保存</button> <span id="sp_sm"></span></p><div id="sp_link"></div></div>` : '<p class="note">確定すると、電子署名（その場／リンク）と送付の欄が出ます。</p>'}</div>`;
 }
 function siCollect(t) {
   const b = { header: {} }; SUI_HDR.forEach(([k]) => b.header[k] = siV('sh_' + k)); if (b.header.cap_amount != null) b.header.cap_amount = +b.header.cap_amount;
   if (t === '計画1') { ['intent', 'policy', 'long_goal', 'short_goal'].forEach(k => b[k] = siV('sb_' + k)); b.goals = [0, 1, 2, 3].map(i => Object.fromEntries(SUI_GOAL.map(([k]) => [k, siV(`sg_${i}_${k}`)]))); }
+  else if (t === '基本情報') { SUI_BX.concat(SUI_BT).forEach(([k]) => b[k] = siV('sb_' + k)); b.other = siV('sb_other'); b.cells = SUI_ROWS.map((_, i) => SUI_WD.slice(0, 7).map((_, j) => siV(`sc_${i}_${j}`))); b.activities = SUI_ROWS.map((_, i) => siV('sa_' + i));
+    ['support_public', 'support_other'].forEach(key => { b[key] = []; for (let i = 0; $(`ss_${key}_${i}_name`); i++) b[key].push(Object.fromEntries(SUI_BS.map(([k]) => [k, siV(`ss_${key}_${i}_${k}`)]))); }); }
   else if (t === '計画2') { b.cells = SUI_ROWS.map((_, i) => SUI_WD.map((_, j) => siV(`sc_${i}_${j}`))); b.activities = SUI_ROWS.map((_, i) => siV('sa_' + i)); b.other = siV('sb_other'); b.overview = siV('sb_overview'); }
-  else SUI_MON.forEach(([, fs]) => fs.forEach(([k]) => b[k] = siV('sm_' + k)));
+  else { SUI_MON.forEach(([k]) => b[k] = siV('sm_' + k)); b.rows = [0, 1, 2, 3].map(i => Object.fromEntries(SUI_MROW.map(([k]) => [k, siV(`smr_${i}_${k}`)]))); }
   return b;
 }
 async function siSavePlan(id, mode) {
@@ -139,7 +148,7 @@ async function siOnsite(id) {
 async function siOnStep() {
   const O = SUI.on, p = O.q[O.i]; if (!p) { SUI.planId = null; return renderSuiPlan(); }
   const d = suiDocHtml(p); siPage(d.land);
-  $('view').innerHTML = `<div class="sui-big sui-on"><div class="noprint" style="background:#eef;padding:8px;border-radius:8px"><b style="font-size:1.2em">${esc(p.doc_class)}の確認と署名（${O.i + 1}／${O.q.length}）</b>　<button class="back" onclick="SUI.on=null;renderSuiPlan()">やめる</button></div>
+  $('view').innerHTML = `<div class="sui-big sui-on"><div class="noprint" style="background:#eef;padding:8px;border-radius:8px"><b style="font-size:1.2em">${esc(p.doc_class || siTypeLabel(p.plan_type))}の確認と署名（${O.i + 1}／${O.q.length}）</b>　<button class="back" onclick="SUI.on=null;renderSuiPlan()">やめる</button></div>
   <div class="sui-doc" style="max-height:48vh;overflow:auto;border:1px solid #ccc;margin:8px 0;padding:6px"><h2>${d.title}　v${p.version}</h2>${d.html}</div>
   <div class="card"><b>署名の方法</b>　<label><input type="radio" name="om" value="本人" checked onchange="siOm()"> 本人</label>　<label><input type="radio" name="om" value="ご家族" onchange="siOm()"> 代理の方（ご家族など）</label>　<label><input type="radio" name="om" value="署名困難" onchange="siOm()"> 署名が難しい</label>
    <div id="om_rel" hidden>氏名 <input id="om_nm" style="width:30%"> 続柄 <input id="om_rl" style="width:20%"></div><div id="om_rs" hidden>理由 <input id="om_rv" style="width:70%"></div>
@@ -174,10 +183,10 @@ function siRecPanel(u, rq, pend) {
   <label>文字起こし（自動で入ります。直してもかまいません）${sr ? '' : '<b>　このブラウザは音声認識に対応していないので、手で入力してください。</b>'}<br><textarea id="sr_tx" rows="6" style="width:100%" oninput="localStorage.setItem('sui_tx_${u.id}',this.value)"></textarea></label>
   <p><button style="font-size:1.1em;padding:10px 20px" onclick="siReq()">この内容で下書きを作ってもらう</button> <span id="sr_m"></span></p>
   ${pend && pend.length ? `<p style="color:#c60">📴 送信待ち ${pend.length}件（通信が戻ると自動で送ります） <button class="back" onclick="siFlush().then(n=>{$('sr_m').textContent=n+'件送りました';renderSuiPlan()})">いま送る</button></p>` : ''}</div>
-  <div class="card"><h4>② できた下書き</h4><p class="note">下書きは1分ほどでできます。「作成中」のあいだは、このまま待つと自動で出ます。</p><div id="sr_list">${siReqTable(rq)}</div><div id="sr_dr"></div></div>`;
+  <div class="card"><h4>② できた下書き</h4><p class="note">録音して依頼すると、約1分で基本情報シート・計画案（サービス等利用計画・週間計画表）・継続ならモニタリングが自動でできます。「作成中」のあいだは、このまま待つと自動で出ます。</p><div id="sr_list">${siReqTable(rq)}</div><div id="sr_dr"></div></div>`;
 }
 const siReqTable = rq => rq.length ? `<table class="tbl"><tr><th>録音した日時</th><th>種別</th><th>状態</th><th></th></tr>${rq.map(r => `<tr><td>${esc(siFmtDt(r.created_at))}</td><td>${esc(r.kind)}</td><td>${r.status === '待ち' ? '作成中 ⏳' : esc(r.status)}</td><td>${r.draft ? `<button onclick="siDraft(${r.id})">中身を見る</button>` : ''}</td></tr>`).join('')}</table>` : '<p>まだありません。①で録音すると、ここに出ます。</p>';
-const SI_DLBL = { plan1: 'サービス等利用計画', plan2: '週間計画表', monitoring: 'モニタリング報告書', intent: '生活に対する意向', policy: '総合的な援助の方針', long_goal: '長期目標', short_goal: '短期目標', goals: '個別目標', activities: '主な日常生活上の活動', other: '週単位以外のサービス', overview: '生活の全体像', cells: '週間の予定' };
+const SI_DLBL = { basic: '基本情報（別紙1・2）', rows: '各目標の状況', plan1: 'サービス等利用計画', plan2: '週間計画表', monitoring: 'モニタリング報告書', intent: '生活に対する意向', policy: '総合的な援助の方針', long_goal: '長期目標', short_goal: '短期目標', goals: '個別目標', activities: '主な日常生活上の活動', other: '週単位以外のサービス', overview: '生活の全体像', cells: '週間の予定' };
 const siDView = (v, k) => { if (v == null || v === '' || (Array.isArray(v) && !v.flat(9).some(Boolean))) return ''; const l = SI_DLBL[k] || k;
   if (typeof v !== 'object') return `<p><b>${esc(l)}</b><br>${esc(String(v)).replace(/\n/g, '<br>')}</p>`;
   const inner = Array.isArray(v) ? v.map((x, i) => siDView(x, (i + 1) + '')).join('') : Object.entries(v).filter(([kk]) => kk !== 'header').map(([kk, x]) => siDView(x, kk)).join('');
@@ -206,14 +215,14 @@ async function siReq() {
 function siStartPoll(uid, rq) {
   clearInterval(SUI.poll); if (!rq.some(r => r.status === '待ち')) return;
   SUI.poll = setInterval(async () => { try { if (!$('sr_list') || SUI.planId || SUI.on || SUI.uid !== uid) return clearInterval(SUI.poll);
-    const now = await sb(`sui_request?user_id=eq.${uid}&select=id,kind,status,created_at,draft&order=id.desc`); $('sr_list').innerHTML = siReqTable(now);
-    const done = now.find(r => r.status === '作成済み' && r.draft && !SUI.seen[r.id]); if (done) { SUI.seen[done.id] = 1; siDraft(done.id, true); }
+    const now = await sb(`sui_request?user_id=eq.${uid}&select=id,kind,status,created_at,draft,made&order=id.desc`); $('sr_list').innerHTML = siReqTable(now);
+    const done = now.find(r => r.status === '作成済み' && r.draft && !SUI.seen[r.id]); if (done) { SUI.seen[done.id] = 1; clearInterval(SUI.poll); if (done.made) await renderSuiPlan(); siDraft(done.id, true); return; }
     if (!now.some(r => r.status === '待ち')) clearInterval(SUI.poll); } catch (_) {} }, 5000);
 }
 async function siDraft(id, auto) {
-  const r = (await sb(`sui_request?id=eq.${id}&select=draft,kind`))[0], d = r.draft || {};
-  $('sr_dr').innerHTML = `<div class="card" style="border:2px solid #2e6b4f"><b>${auto ? '✅ 下書きができました（依頼#' + id + '）' : '下書き（依頼#' + id + '）'}</b><div style="background:#f6f6f6;padding:8px;max-height:360px;overflow:auto">${Object.entries(d).map(([k, x]) => siDView(x, k)).join('') || '（中身が空です）'}</div><p class="note">取り込むと、その書類の「計画案（下書き）」ができます。③で開いて直せます。</p>
-  <p>${d.plan1 ? `<button onclick="siImport(${id},'計画1')">サービス等利用計画の計画案として取り込む</button> ` : ''}${d.plan2 ? `<button onclick="siImport(${id},'計画2')">週間計画表の計画案として取り込む</button> ` : ''}${d.monitoring ? `<button onclick="siImport(${id},'モニタリング')">モニタリングとして取り込む</button>` : ''}</p></div>`;
+  const r = (await sb(`sui_request?id=eq.${id}&select=draft,kind,made`))[0], d = r.draft || {};
+  $('sr_dr').innerHTML = `<div class="card" style="border:2px solid #2e6b4f"><b>${auto ? '✅ 下書きができました（依頼#' + id + '）' : '下書き（依頼#' + id + '）'}</b><div style="background:#f6f6f6;padding:8px;max-height:360px;overflow:auto">${Object.entries(d).map(([k, x]) => siDView(x, k)).join('') || '（中身が空です）'}</div>${r.made ? `<p>📄 自動でできた書類：${r.made.basic ? '基本情報シート・' : ''}${r.made.plan1 ? 'サービス等利用計画（計画案）・' : ''}${r.made.plan2 ? '週間計画表（計画案）・' : ''}${r.made.monitoring ? 'モニタリング報告書' : ''}（いずれも下書き）。③の一覧から開いて直し、確定して署名へ。<br><a href="#suishodama/basic">📋 基本情報シートを開く</a>　<a href="#suishodama/contract">📄 利用契約書・重要事項説明書の署名へ</a></p>` : `<p class="note">取り込むと、その書類の「計画案（下書き）」ができます。③で開いて直せます。</p>`}
+  <p>${r.made ? '' : (d.plan1 ? `<button onclick="siImport(${id},'計画1')">サービス等利用計画の計画案として取り込む</button> ` : '') + (d.plan2 ? `<button onclick="siImport(${id},'計画2')">週間計画表の計画案として取り込む</button> ` : '') + (d.monitoring ? `<button onclick="siImport(${id},'モニタリング')">モニタリングとして取り込む</button>` : '')}</p></div>`;
 }
 async function siImport(id, t) { try { const r = (await sb(`sui_request?id=eq.${id}&select=draft,kind`))[0], u = (await sb(`sui_user?id=eq.${SUI.uid}&select=*`))[0], k = { '計画1': 'plan1', '計画2': 'plan2', 'モニタリング': 'monitoring' }[t], d = r.draft[k] || {}; d.header = Object.assign(siHdr(u), d.header || {}); await siNewPlan(t, r.kind, { body: d }); } catch (e) { alert(e.message); } }
 
@@ -243,12 +252,12 @@ async function siMonthly() {
   const el = $('sui_month'); if (!el) return; if (DEMO) { el.innerHTML = ''; return; }
   el.innerHTML = '<p>月間利用実績を読み込み中…</p>';
   try {
-    const ym = SUI.ym, [us, ps, ks] = await Promise.all([sb('sui_user?select=id,name&order=name'), sb('sui_plan?select=id,user_id,plan_type,kind,doc_class,status,body,created_at,signed_on,sent_on&order=version.desc'), sb(`sui_kasan?ym=eq.${ym}&select=*`)]);
+    const ym = SUI.ym, [us, ps, ks] = await Promise.all([sb('sui_user?select=id,name&order=name'), sb('sui_plan?select=id,user_id,plan_type,kind,doc_class,status,body,created_at,signed_on,sent_on&plan_type=neq.%E5%9F%BA%E6%9C%AC%E6%83%85%E5%A0%B1&order=version.desc'), sb(`sui_kasan?ym=eq.${ym}&select=*`)]);
     const day = p => (p.body && p.body.header && p.body.header.created_on) || (p.created_at || '').slice(0, 10);
     const km = Object.fromEntries(ks.map(k => [k.user_id, k.items || []])), cnt = { 新規: 0, 継続: 0 }, kc = {};
     const rows = us.map(u => {
       const mine = ps.filter(p => p.user_id === u.id && day(p).slice(0, 7) === ym);
-      const plan = mine.filter(p => p.plan_type !== 'モニタリング'), mon = mine.filter(p => p.plan_type === 'モニタリング');
+      const plan = mine.filter(p => p.plan_type !== 'モニタリング' && p.plan_type !== '基本情報'), mon = mine.filter(p => p.plan_type === 'モニタリング');
       const it = km[u.id] || []; if (!mine.length && !it.length) return null;
       let typ = '—', cls = '';
       if (plan.length) { const nw = plan.some(p => p.kind === '新規'); typ = nw ? '新規（計画作成）' : '新規扱い（計画変更）'; cnt.新規++; cls = '#e8f3ec'; }
