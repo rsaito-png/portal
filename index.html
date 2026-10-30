@@ -92,7 +92,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261030home1"></script>
+<script src="config.js?v=20261030shogu"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -134,6 +134,8 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leaderboard.js?v=20261026hold"></script>
 <script src="jukyusha_lib.js?v=202610281700"></script>
 <script src="leo_jukyusha.js?v=20261029jcheck2"></script>
+<script src="shogu_logic.js?v=20261030shogu"></script>
+<script src="shogu.js?v=20261030shogu"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -276,6 +278,7 @@ async function render() {
   if (id === 'banto' && typeof renderBanto === 'function') return renderBanto();
   if (id === 'sns' && typeof renderSns === 'function') return renderSns();
   if (id === 'soumu') return renderSoumu();
+  if (id === 'shogu' && typeof renderShogu === 'function') return renderShogu(route.slice(1));
   if (id === 'soudan' && typeof renderSoudan === 'function') return renderSoudan();
   if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
   if (id === 'mgr') return renderMgr();
@@ -357,6 +360,12 @@ async function renderSoumu() {
     const kh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '経理'), kg = kh && kh.nextElementSibling;
     if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + t + '</div>');
   } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
+  if (!clerk && !sec.querySelector('a[href="#shogu"]') && (DUTY === '管理者' || (typeof shoguUiCan === 'function' && await shoguUiCan()))) {
+    const t = tileHtml(['💴', '処遇改善加算', '#shogu', '国保連PDFの投入と賃金改善の監査（管理者）'], '#555');
+    const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
+    if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', t);
+    else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + t + '</div>');
+  }
   if (typeof esignBadge === 'function') esignBadge();
 }
 window.addEventListener('hashchange', render);
