@@ -770,16 +770,8 @@ LEO_VIEWS.seikyu = async function () {
 };
 // ===== 利用者情報（児童ごとにワンストップ）：受給者証(leo_children)・送迎の配慮(leo_child_care)・連絡先/送迎/アルバム(leo_child_info) =====
 const UI = { sel: null, adding: false, tab: 'basic', roster: 'active' };
-// アセスメント項目（キー＝leo_child_assess.data のキー。ポータル内オリジナルのアセスメント入力でも同じ構造を使う）
-const ASSESS_SECTIONS = [
-  ['基本・診断', [['birth','生年月日'],['school','学校・園の名前と学年'],['diagnosis','診断名・障がい名など',1],['techo','手帳（種別・判定）'],['agencies','これまでに関わった機関・病院名',1],['visit_status','通院の状況',1],['meds_status','服薬の状況',1],['meds_regular','常用している薬',1],['other_service','他に通っている事業所']]],
-  ['家族・関係', [['family','家族構成（職業・学年）',1],['rel','親子関係・兄弟関係の特徴',1]]],
-  ['かかりつけ', [['hp_pediatric','小児科（病院・医師）'],['hp_ortho','整形外科'],['hp_ent','耳鼻咽喉科'],['hp_derm','皮膚科'],['hp_other','その他の科']]],
-  ['食事・排泄・身辺自立', [['allergy','アレルギーの有無'],['allergy_detail','アレルギーの内容',1],['utensil','食具'],['likes','好きな食べ物'],['dislikes','嫌いな食べ物'],['amount','食べる量'],['urine','小便（回数/日）'],['wipe','自分で拭けるか'],['stool','大便（回数/日）'],['handwash','手洗い'],['gargle','うがい'],['dress','着衣'],['undress','脱衣'],['button','ボタンの付け外し']]],
-  ['遊び・性格', [['play_home','遊び（自宅）',1],['play_out','遊び（自宅以外）',1],['interest','興味関心',1],['personality','性格',1],['panic','パニックの時の様子・切り替え方',1],['other_msg','その他伝えたいこと',1]]],
-  ['健康状態', [['temp','平熱'],['convulsion','ひきつけ・痙攣の経験'],['convulsion_detail','（詳細）'],['h_bleed','出血が止まりにくい'],['h_fall','転びやすい'],['h_skin','皮膚が弱い'],['h_earnose','耳・鼻の病気'],['h_hernia','脱腸'],['h_joint','関節がはずれやすい'],['h_cold','風邪をひきやすい'],['h_tonsil','扁桃腺で熱が出やすい'],['h_asthma','喘息が出やすい'],['h_allergic','アレルギー体質'],['h_vaccine','予防接種で高熱'],['h_rash','湿疹が出やすい'],['h_drugrash','薬で湿疹'],['h_vomit','吐きやすい'],['h_diarrhea','下痢をしやすい'],['h_constipation','便秘をしやすい'],['under_doctor','現在医者にかかっているか'],['health_other','その他、身体の心配',1]]],
-  ['保護者の願い', [['wish_life','生活',1],['wish_habit','基本的生活習慣',1],['wish_motor','運動や感覚',1],['wish_cog','認知や行動',1],['wish_lang','言語とコミュニケーション',1],['wish_human','人間関係',1]]],
-  ['同意・書類', [['photo_consent','写真・動画の掲載（ホームページ・Instagram等）'],['photo_detail','同意する場合の範囲',1],['doc_insurance','保険証の写真（リンク）'],['doc_jukyusha','受給者証の写真（リンク）']]]];
+// アセスメント項目は assess_lib.js（Google フォームと同じ見出し。キーは leo_child_assess.data）。ここには置かない。
+const DEMO_ASSESS = [{ name: '児童A', source: '見本', updated_at: '2026-10-01T00:00:00Z', data: { name_kana: '児童A（じどうえー）', school: '見本小学校 1年', allergy: '有り', allergy_detail: '卵（見本）', convulsion: 'いいえ', temp: '36.5' } }];
 
 const WD = ['月', '火', '水', '木', '金', '土', '日'], TMODE = ['送迎あり', '迎えのみ', '送りのみ', '保護者送迎', 'なし'];
 const INFO_F = [['guardian_name', '保護者氏名'], ['guardian_phone', '保護者 電話'], ['guardian_phone2', '予備の電話'], ['emergency_contact', '緊急連絡先（続柄・電話）'], ['home_address', '自宅住所']];
@@ -889,7 +881,7 @@ window.jcAdd = async () => {
 LEO_VIEWS.userinfo = async function () {
   const mg = canManage();
   const safeSheet = async kind => { try { return await sheetRows(kind); } catch (e) { return []; } };
-  const [kids, infos, cares, nk, asses, plans, kataRows, keiRows] = DEMO ? [DEMO_BILL.kids, DEMO_LEFT_INFOS, [], DEMO_BILL.nikki, [], [], DEMO_DATA.kata, DEMO_DATA.keikaku] : await Promise.all([mg ? sb('leo_children?order=name') : [], sb('leo_child_info?order=name').catch(() => []), sb('leo_child_care').catch(() => []), billData().then(d => d.nikki).catch(() => []), sb('leo_child_assess?order=name').catch(() => []), sb('leo_child_plan').catch(() => []), safeSheet('kata'), safeSheet('keikaku')]);
+  const [kids, infos, cares, nk, asses, plans, kataRows, keiRows] = DEMO ? [DEMO_BILL.kids, DEMO_LEFT_INFOS, [], DEMO_BILL.nikki, DEMO_ASSESS, [], DEMO_DATA.kata, DEMO_DATA.keikaku] : await Promise.all([mg ? sb('leo_children?order=name') : [], sb('leo_child_info?order=name').catch(() => []), sb('leo_child_care').catch(() => []), billData().then(d => d.nikki).catch(() => []), sb('leo_child_assess?order=name').catch(() => []), sb('leo_child_plan').catch(() => []), safeSheet('kata'), safeSheet('keikaku')]);
   const LEFT = leftIndex(infos), tday = today();
   const rawNames = [...new Set([...kids.map(x => x.name), ...infos.map(x => x.name), ...cares.map(x => x.child), ...asses.map(x => x.name), ...plans.map(x => x.name), ...nk.map(n => n.child), ...kataRows.map(r => r['児童名']), ...keiRows.map(r => r['児童名'])])].filter(n => n && !String(n).startsWith('※'));
   const clusters = uiClustersOf(rawNames);
@@ -936,9 +928,16 @@ LEO_VIEWS.userinfo = async function () {
   if (UI.tab === 'assess' && nm) {
     const a = A[nm] || {}, d = a.data || {};
     const tabs = tabBar('assess');
+    if (typeof AssessForm === 'undefined') return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}</h3>${tabs}<p class="note">アセスメントの項目を読み込めませんでした。</p>`;
+    const known = new Set(AssessForm.KEYS), extra = {};
+    Object.entries(d).forEach(([k, v]) => { if (!known.has(k) && v != null && String(v) !== '') extra[k] = v; });
+    const fields = AssessForm.SPEC.map(([title, rows]) => `<div class="uic"><h4>${esc(title)}</h4>${title === AssessForm.PHOTO_SEC ? `<p class="note" style="padding:0 10px">${esc(AssessForm.PHOTO_NOTE)}</p>` : ''}<div class="uig">${rows.map(([k, short, label, type]) => {
+      const f = { k, short, label, type }, alert = (type === 'ari' && d[k] === '有り') || (type === 'yn' && d[k] === 'はい');
+      return `<label class="${type === 'area' || type === 'url' ? 'wide' : ''}"${alert ? ' style="background:#fce4d6;border-radius:6px"' : ''}><span>${AssessForm.labelHtml(f)}</span>${AssessForm.control(f, d[k] || '', !mg)}</label>`;
+    }).join('')}</div></div>`).join('');
     return `<button class="back" onclick="uiOpen(null)">← 児童の一覧へ</button>${css}<h3>${esc(nm)}${mark}${demoNote()}</h3>${tabs}
-      <p class="note">${a.source ? '取り込み元：' + esc(a.source) + '。' : 'まだ入力がありません。'}診断名・服薬などの機微情報を含みます。レオ職員だけが見られます。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'}</p>
-      <div id="uiw" data-name="${esc(nm)}"${aliasAttr}>${ASSESS_SECTIONS.map(([t, fs]) => `<div class="uic"><h4>${t}</h4><div class="uig">${fs.map(([f, l, w]) => `<label${w ? ' class="wide"' : ''}><span>${l}</span>${w ? `<textarea data-t="as" data-f="${f}" rows="2" ${ro}>${esc(d[f] || '')}</textarea>` : `<input data-t="as" data-f="${f}" value="${esc(d[f] || '')}" ${ro}>`}</label>`).join('')}</div></div>`).join('')}</div>
+      <p class="note">${a.source ? '取り込み元：' + esc(a.source) + '。' : 'まだ入力がありません。'}診断名・服薬などの機微情報を含みます。レオ職員だけが見られます。${mg ? '' : '（見るだけです。直すのは児発管・事務・管理者）'} 保護者に入力してもらうときは <a href="#leo/assess">アセスメント</a> からリンクを作れます（新規の児童も、先に登録しなくて大丈夫です）。</p>
+      <div id="uiw" data-name="${esc(nm)}" data-as-extra="${esc(JSON.stringify(extra))}"${aliasAttr}>${fields}</div>
       ${mg ? `<button onclick="uiSaveAssess()">保存</button> <span id="ui_msg"></span>` : ''}`;
   }
   const kin = (f, l, v, extra = '') => `<label><span>${l}</span><input data-t="info" data-f="${f}" value="${esc(v ?? '')}" ${extra} ${ro}></label>`;
@@ -1030,6 +1029,11 @@ async function uiSavePlan() {
 async function uiSaveAssess() {
   const w = $('uiw'), m = $('ui_msg'), name = uiCanon(w.dataset.name), data = {};
   w.querySelectorAll('[data-t="as"]').forEach(x => { if (x.value.trim()) data[x.dataset.f] = x.value.trim(); });
+  let extra = {};
+  try { extra = JSON.parse(w.dataset.asExtra || '{}'); } catch (e) { extra = {}; }
+  Object.entries(extra).forEach(([k, v]) => { if (data[k] == null && v != null && String(v).trim() !== '') data[k] = v; });
+  const bad = typeof AssessForm !== 'undefined' ? AssessForm.staffCheck(data) : '';
+  if (bad) { m.textContent = bad; return; }
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try {
     await sb('leo_child_assess?on_conflict=name', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ name, data, source: 'ポータル入力', updated_at: new Date().toISOString() }]) });
