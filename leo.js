@@ -270,6 +270,19 @@ function leoKidTile(nikkiRows, events, day) {
 function leoKidWarnHtml(lines) {
   return lines && lines.length ? `<div style="background:#fff6e5;border-left:4px solid #e8833a;padding:6px 8px;margin:6px 0">${lines.map(x => '⚠ ' + esc(x)).join('<br>')}</div>` : '';
 }
+function leoFullChildName(name, roster) {
+  const raw = String(name || '').trim();
+  if (!raw) return '';
+  const toks = typeof childTokens === 'function' ? childTokens(raw) : raw.split(/\s+/).filter(Boolean);
+  if (toks.length >= 2) return typeof canonChildName === 'function' ? canonChildName(raw) : raw;
+  if (typeof sameChildName !== 'function') return raw;
+  const canon = n => typeof canonChildName === 'function' ? canonChildName(n) : String(n || '').trim();
+  const hits = [...new Set((roster || []).filter(n => n && sameChildName(n, raw)).map(canon).filter(Boolean))];
+  const longs = hits.filter(n => (typeof childTokens === 'function' ? childTokens(n) : String(n).split(/\s+/).filter(Boolean)).length >= 2);
+  if (longs.length === 1) return longs[0];
+  if (hits.length === 1) return hits[0];
+  return typeof canonChildName === 'function' ? canonChildName(raw) : raw;
+}
 function leoFindChildPlan(plans, name) {
   const list = plans || [];
   const nn = s => String(s || '').replace(/\s/g, '');
@@ -374,6 +387,8 @@ const LEO_VIEWS = {
     const N = s => String(s || '').replace(/\s/g, '');
     const days = byDay(rows);
     const planOf = c => leoFindChildPlan(cp, c);
+    const roster = [...ci.map(x => x.name), ...cp.map(x => x.name), ...cc.map(x => x.child)].filter(Boolean);
+    const disp = c => leoFullChildName(c, roster);
     const msg = c => [...cc.filter(x => (typeof sameChildName === 'function' ? sameChildName(x.child, c) : N(x.child) === N(c)) && x.note).map(x => '送迎の配慮：' + x.note), ...ci.filter(x => (typeof sameChildName === 'function' ? sameChildName(x.name, c) : N(x.name) === N(c)) && x.note).map(x => 'メモ：' + x.note)];
     const head = `<h3>${PLABEL[PERIOD]}の利用児童</h3>${periodTabs('kids')}${demoNote()}<p><small>伝達事項は <a href="#leo/userinfo">利用者情報</a>（メモ・送迎の配慮）に書いたものです。</small></p>`;
     const ride = (label, flag, time, place, driver) => flag === 'del' ? `${label}：カレンダーで変更` : `${label}：${esc(time)} ${esc(place || '自宅')}（${esc(driver) || '未定'}）`;
@@ -387,12 +402,12 @@ const LEO_VIEWS = {
       const absEvents = (evs || []).filter(e => e.kind === '休み' && e.child && leoAbsLabel(e));
       const absBy = {};
       absEvents.forEach(e => { (absBy[e.day] = absBy[e.day] || []).push(e); });
-      const absBlock = Object.keys(absBy).sort().map(d => `<h4>${fmtDay(d)}</h4><p>欠席：${absBy[d].map(e => `${esc(e.child)}（${esc(leoAbsLabel(e))}${leoAbsContact(e) ? '・連絡 ' + esc(leoAbsContact(e)) : ''}）`).join('、')}</p>`).join('');
+      const absBlock = Object.keys(absBy).sort().map(d => `<h4>${fmtDay(d)}</h4><p>欠席：${absBy[d].map(e => `${esc(disp(e.child))}（${esc(leoAbsLabel(e))}${leoAbsContact(e) ? '・連絡 ' + esc(leoAbsContact(e)) : ''}）`).join('、')}</p>`).join('');
       if (ev.length) {
         const by = {};
         ev.forEach(e => { (by[e.day] = by[e.day] || []).push(e); });
         return head + `<p class="note">予定表から表示（日誌取り込み前）</p>` + Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}（${by[d].length}人）</h4>${by[d].map(e =>
-          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}${leoKidWarnHtml(msg(e.child))}${leoKidPlanHtml(e.child, planOf(e.child))}</div>`).join('')}`).join('') + absBlock;
+          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(disp(e.child))}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}${leoKidWarnHtml(msg(e.child))}${leoKidPlanHtml(e.child, planOf(e.child))}</div>`).join('')}`).join('') + absBlock;
       }
       if (absBlock) return head + absBlock;
     }
@@ -404,12 +419,12 @@ const LEO_VIEWS = {
       const absNames = new Set(calAbs.map(r => N(r.child)));
       const abs = merged.filter(r => r.kind === '欠席' && !absNames.has(N(r.child)));
       const gone = merged.filter(r => r.kind === '利用' && r._hide && !r._abs);
-      const absHtml = calAbs.map(r => `${esc(r.child)}（${esc(r._abs)}${r._absContact ? '・連絡 ' + esc(r._absContact) : ''}）`).concat(abs.map(r => esc(r.child)));
+      const absHtml = calAbs.map(r => `${esc(disp(r.child))}（${esc(r._abs)}${r._absContact ? '・連絡 ' + esc(r._absContact) : ''}）`).concat(abs.map(r => esc(disp(r.child))));
       return `<h4>${fmtDay(d)}（${use.length}人）</h4>${use.map(r => { const m = msg(r.child);
         const note = (r._calUse === true || r._calPick === true || r._calDrop === true) ? '<br><small>カレンダーで変更</small>' : '';
-        return `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(r.child)}</b>　${esc(r.service)}　${esc(r.start_time)}〜${esc(r.end_time)}<br><small>${ride('迎え', r._calPick, r.pick_time, r.pick_place, r.pick_driver)}／${ride('送り', r._calDrop, r.drop_time, r.drop_place, r.drop_driver)}</small>${note}
+        return `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(disp(r.child))}</b>　${esc(r.service)}　${esc(r.start_time)}〜${esc(r.end_time)}<br><small>${ride('迎え', r._calPick, r.pick_time, r.pick_place, r.pick_driver)}／${ride('送り', r._calDrop, r.drop_time, r.drop_place, r.drop_driver)}</small>${note}
         ${leoKidWarnHtml(m)}${leoKidPlanHtml(r.child, planOf(r.child))}</div>`; }).join('')}
-        ${gone.length ? `<p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(r.child)).join('、')}</small></p>` : ''}
+        ${gone.length ? `<p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(disp(r.child))).join('、')}</small></p>` : ''}
         ${absHtml.length ? `<p>欠席：${absHtml.join('、')}</p>` : ''}`;
     }).join('');
   },
