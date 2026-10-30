@@ -92,12 +92,12 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261030shogu"></script>
+<script src="config.js?v=20261030shoguchamu"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261026b"></script>
-<script src="leo.js?v=20261030fullname"></script>
+<script src="leo.js?v=20261030plantext"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=20261030gas"></script>
@@ -126,6 +126,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="uketsuke.js?v=20261030home1"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261030dakoku"></script>
+<script src="chamu.js?v=20261030chamu"></script>
 <script src="dakoku-lib.js?v=20261030dakoku"></script>
 <script src="dakoku.js?v=20261030dakoku"></script>
 <script src="soudan.js?v=202610211550"></script>
@@ -272,6 +273,7 @@ async function render() {
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'dakoku' && typeof renderDakoku === 'function') return renderDakoku();
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
+  if (id === 'chamu' && sub && typeof renderChamu === 'function') return renderChamu(sub);
   if (id === 'ht') return renderHt();
   if (id === 'sct' && typeof renderSct === 'function') return renderSct();
   if (id === 'chair') return renderChair();
