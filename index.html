@@ -227,7 +227,7 @@ function officeBody(o) {
   if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(t, o.color)).join('')}</div>`;
   const vis = visTiles(o);
   const nx = ((o.next || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
-  const next = `<h3 class="nx">次にやること</h3><div class="nxl">${nx.map(t => `<a class="nxc" href="${t[2]}" style="border-left:8px solid ${o.color}"><span>${t[0]}</span><b>${shortName(o, t[1])}</b><small>${t[3]}</small></a>`).join('')}</div>`;
+  const next = nx.length ? `<h3 class="nx">次にやること</h3><div class="nxl">${nx.map(t => `<a class="nxc" href="${t[2]}" style="border-left:8px solid ${o.color}"><span>${t[0]}</span><b>${shortName(o, t[1])}</b><small>${t[3]}</small></a>`).join('')}</div>` : '';
   const gs = groupList(o);
   const btns = gs.map(g => g.tiles.length === 1 && g.tiles[0][2] ? `<a class="tile big" href="${g.tiles[0][2]}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`
     : `<a class="tile big" href="#${o.id}/g${g.k}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`).join('');
