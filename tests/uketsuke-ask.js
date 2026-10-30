@@ -88,6 +88,8 @@ assert.strictEqual(ukSubjectOf('#kintoun/ledger', { KL: { id: null } }, root({ a
 
 const opt = { selectedIndex: 0, options: [{ textContent: '利用者B' }] };
 assert.deepStrictEqual(ukSubjectOf('#kintoun/visit', { KV: { id: 9 } }, root({ ids: { kv_user_id: opt } })), { kind: '利用者', name: '利用者B' });
+assert.deepStrictEqual(ukSubjectOf('#kintoun/write', {}, root({ ids: { userName: { value: '3', selectedIndex: 0, options: [{ textContent: '利用者B' }] } } })), { kind: '利用者', name: '利用者B' });
+assert.strictEqual(ukSubjectOf('#kintoun/write', {}, root({ ids: { userName: { value: '', selectedIndex: 0, options: [{ textContent: '選択してください' }] } } })), null);
 assert.deepStrictEqual(
   ukSubjectOf('#kintoun/print', { KPR: { uid: 2 } }, root({ all: { '#view select': [opt] } })),
   { kind: '利用者', name: '利用者B' });

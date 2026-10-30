@@ -15,7 +15,9 @@ async function renderKinPrint() {
     const sig = {}; if (ids.length) (await sb(`kin_sign_log?id=in.(${ids.join(',')})&select=id,signature`)).forEach(r => sig[r.id] = r.signature);
     const u = us.find(x => x.id === KPR.uid) || {}, cell = v => {
       if (v.sign_status !== '署名済み') return '未署名';
-      const id = (/^kin_sign_log:(\d+)$/.exec(v.signature_url || '') || [])[1], img = id && sig[id] ? `<img src="${sig[id]}" alt="署名">` : (v.signature_url ? '署名済（画像は保管先に有）' : '');
+      const id = (/^kin_sign_log:(\d+)$/.exec(v.signature_url || '') || [])[1];
+      const inline = v.signature_png && String(v.signature_png).indexOf('data:image/') === 0 ? `<img src="${v.signature_png}" alt="署名">` : '';
+      const img = id && sig[id] ? `<img src="${sig[id]}" alt="署名">` : (inline || (v.signature_url ? '署名済（画像は保管先に有）' : ''));
       return `${img}<div>${esc(v.signer_kind || '')}${v.signed_at ? ' ' + esc(new Date(v.signed_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })) : ''}</div>${v.sign_reason ? `<div>理由：${esc(v.sign_reason)}</div>` : ''}${v.late_signed ? `<div>後日署名・${esc(v.late_signed.replace(/^はい[（(]?/, '').replace(/[）)]$/, '') || '後日署名')}</div>` : ''}`; };
     const rep = v => [1, 2, 3, 4, 5].map(i => v['report' + i]).filter(Boolean).join(' / ');
     $('view').innerHTML = back + `<div class="noprint"><h3>訪問記録の印刷</h3><p>利用者 <select onchange="KPR.uid=+this.value;renderKinPrint()">${us.map(x => `<option value="${x.id}" ${x.id === KPR.uid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select> 月 <input type="month" value="${esc(m)}" onchange="KPR.month=this.value||KPR.month;renderKinPrint()"> <button onclick="window.print()">🖨️ 印刷 / PDF保存</button></p><p class="note">印刷ダイアログで用紙A4・縦を選び、「PDFに保存」でPDF化できます。</p></div>
