@@ -60,7 +60,7 @@ async function kvForm(id) {
   <p class="kv-sub">Registro de prestação de serviço${id === 'new' ? '（新規）' : ''}</p>
 
   <div class="kv-field">${kvLab('サービス提供日', 'Data do serviço', true)}${kvIn('kv_visit_date', v.visit_date || today, 'date')}</div>
-  <div class="kv-field">${kvLab('担当ヘルパー名', 'Nome do cuidador')}${kvIn('kv_staff_name', v.staff_name)}${`<p class="kv-hint">空欄のまま保存できます（後日入力可）</p>`}</div>
+  <div class="kv-field">${kvLab('担当ヘルパー名', 'Nome do cuidador')}${kvIn('kv_staff_name', v.staff_name)}<p class="kv-hint">空欄のまま保存できます</p></div>
   <div class="kv-field">${kvLab('利用者氏名', 'Nome do usuário', true)}<select id="kv_user_id">${us.map(u => `<option value="${u.id}" ${u.id === v.user_id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>
   <div class="kv-field">${kvLab('サービス区分', 'Tipo de serviço', true)}<select id="kv_service">${KL_SVC.map(s => `<option ${s === (v.service || '身体介護') ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
 
