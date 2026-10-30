@@ -268,18 +268,51 @@ assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者�
 assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
-const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, ['出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く']));
+const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, ['出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く', '不具合・修正の依頼']));
 const uncovered = leo.tiles.map(t => t[1]).filter(n => !groupNames.has(n) && !onHome.has(n)).sort();
-assert.strictEqual(uncovered.join('|'), ['受付', '公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '受給者証の入力（保護者から）', '職員配置表', '書類', '送迎 型表', '配置表・型表・管理表・送迎の配慮の入力', '日誌の元シート', '実績記録（見るだけ）'].sort().join('|'));
-['出退勤打刻', 'ヒヤリハット', '今日の利用児童', 'LINE報告を書く', '日誌（児童ごと）', '上限額管理', '今日やること（児発管）'].forEach(n => assert.ok(!groupNames.has(n), '毎日やると重ねない: ' + n));
+assert.strictEqual(uncovered.join('|'), ['公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '受給者証の入力（保護者から）', '職員配置表', '書類', '送迎 型表', '配置表・型表・管理表・送迎の配慮の入力', '日誌の元シート', '実績記録（見るだけ）'].sort().join('|'));
+['出退勤打刻', 'ヒヤリハット', '今日の利用児童', 'LINE報告を書く', '不具合・修正の依頼', '日誌（児童ごと）', '上限額管理', '今日やること（児発管）'].forEach(n => assert.ok(!groupNames.has(n), '毎日やると重ねない: ' + n));
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 assert.ok(!leo.groups[0][2].includes('LINE報告を書く'), 'LINE報告は現場に重ねない');
 assert.strictEqual(leo.tiles.find(t => t[1] === 'LINE報告を書く')[2], '#leo/line');
 assert.ok(!leo.groups.some(g => g[2].includes('LINEの下書き')), 'LINEの下書きはグループに置かない');
 assert.ok(html.includes("big('#leo/line', '💬', 'LINE報告を書く'"), '毎日やるはLINE報告を書く');
+assert.ok(!html.includes("big('#uketsuke'"), '毎日やるには不具合の依頼を置かない');
+assert.ok(html.includes("t[1] === '不具合・修正の依頼'"), 'who の下に単独で出す');
 assert.ok(!html.includes("big('#leo/linedraft'"), '毎日やるから下書きを外す');
+const fixTile = leo.tiles.find(t => t[2] === '#uketsuke');
+assert.strictEqual(fixTile[1], '不具合・修正の依頼');
+assert.strictEqual(fixTile[0], '🐛');
+assert.ok(!fixTile[6], '役割制限なし');
+assert.strictEqual(leo.tiles.filter(t => t[2] === '#uketsuke').length, 1, '受付の別名タイルは足さない');
+assert.ok(!leo.groups.some(g => g[2].includes('受付') || g[2].includes('不具合・修正の依頼')));
 assert.ok(!html.includes('全ての画面') && !html.includes('すべての画面'), '画面側の文言も消す');
 assert.ok(!cfg.includes('全ての画面') && !cfg.includes('すべての画面'), '設定の文言も消す');
 assert.ok(!html.includes('!anyCatch'), '未分類を最後のグループへ足さない');
+
+const homeSrc = html.slice(html.indexOf('const visTiles'), html.indexOf('async function leoHomeStatus'));
+function renderLeoHome(role, duty) {
+  const sbx = { DUTY: duty, ROLE: role, canManage: () => duty === '管理者' || duty === '児発管', leo };
+  vm.runInNewContext(homeSrc + '\nthis.out = leoHomeBody(leo);', sbx);
+  return sbx.out;
+}
+[['職員', '現場支援員'], ['職員', '児発管'], ['職員', '管理者'], ['事務', '現場支援員']].forEach(([role, duty]) => {
+  const body = renderLeoHome(role, duty);
+  const dailyEnd = body.indexOf('</div>', body.indexOf('毎日やる'));
+  const daily = body.slice(body.indexOf('毎日やる'), dailyEnd);
+  assert.ok(!daily.includes('不具合・修正の依頼') && !daily.includes('#uketsuke'), role + '/' + duty + ' の毎日やるには置かない');
+  assert.ok(body.indexOf('href="#uketsuke"') > dailyEnd, role + '/' + duty + ' は毎日やるの外');
+  assert.strictEqual(body.split('不具合・修正の依頼').length - 1, 1, 'ホームに一度だけ: ' + role + '/' + duty);
+  assert.strictEqual(body.split('href="#uketsuke"').length - 1, 1);
+  ['出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く'].forEach(label => {
+    assert.ok(daily.includes(label), label);
+  });
+});
+const kanri = renderLeoHome('職員', '児発管');
+assert.ok(kanri.indexOf('宮本がする') < kanri.indexOf('不具合・修正の依頼'), 'who の下');
+assert.ok(kanri.indexOf('不具合・修正の依頼') < kanri.indexOf('管理系ルーティン'), '管理系ルーティンの前');
+const field = renderLeoHome('職員', '現場支援員');
+assert.ok(field.includes('事務・計画') && field.indexOf('事務・計画') < field.indexOf('不具合・修正の依頼'));
+assert.strictEqual(field.split('不具合・修正の依頼').length - 1, 1);
 
 console.log('leo_home_cal_test ok');

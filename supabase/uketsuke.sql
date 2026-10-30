@@ -8,7 +8,7 @@ create table if not exists public.uketsuke (
   sender_name text, sender_email text, chat_user text,
   space text, thread text, message_name text unique,
   office text,                 -- staff_profiles.chat_email で引いた事業所（未登録なら null）
-  category text not null,      -- 日誌/送迎/請求/計画/記録/その他
+  category text not null,      -- 日誌/送迎/請求/計画/記録/その他/不具合・修正
   body text not null,
   status text not null default '未対応' check (status in ('未対応','対応中','完了'))
 );

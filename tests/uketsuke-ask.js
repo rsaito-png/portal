@@ -54,7 +54,9 @@ const long = ukComposeBody('あ'.repeat(4000), { label: 'トップ', route: 'ind
 assert.strictEqual(long.tooLong, true);
 assert.ok(long.body.length > 4000);
 
-assert.deepStrictEqual(UK_CATS, ['その他', '日誌', '送迎', '請求', '計画', '記録']);
+assert.deepStrictEqual(UK_CATS, ['その他', '不具合・修正', '日誌', '送迎', '請求', '計画', '記録']);
+assert.ok(fs.readFileSync(require('path').join(__dirname, '../uketsuke.js'), 'utf8').includes('不具合や画面の修正依頼もここから'));
+assert.ok(fs.readFileSync(require('path').join(__dirname, '../supabase/uketsuke_submit.sql'), 'utf8').includes("'不具合・修正'"));
 
 assert.deepStrictEqual(ukSubjectOf('#leo/userinfo', { UI: { sel: '児童A' } }, root({})), { kind: '児童', name: '児童A' });
 assert.strictEqual(ukSubjectOf('#leo/userinfo', { UI: { sel: null } }, root({})), null);
