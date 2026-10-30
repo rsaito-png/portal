@@ -92,7 +92,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261030nonext"></script>
+<script src="config.js?v=20261030dakoku1"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -201,6 +201,7 @@ function leoHomeBody(o) {
   const duty = dutyName === '児発管の仕事' ? (dutyInner ? `<div class="grid">${dutyInner}</div>` : '') : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`;
   const pages = pageG.length ? `<h3 class="nx">レオのページ</h3><div class="grid">${pageG.map(gbtn).join('')}</div>` : '';
   return `<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
+    ${big('#dakoku', '⏰', '出退勤打刻', '', '')}
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/linedraft', '✉️', 'LINEの下書き', '', '')}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}</div>
