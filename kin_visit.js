@@ -35,21 +35,21 @@ async function kvForm(id) {
   const reports = KV_REPORT.map(r => `<div class="kv-field">${kvLab(r.ja, r.pt)}<textarea id="kv_${r.k}" class="kv-ta" rows="3">${esc(v[r.k] ?? '')}</textarea></div>`).join('');
   return `<style>
 .kv-wrap{max-width:720px;margin:0 auto}
-.kv-card{background:#fff;border-radius:16px;padding:28px 24px;box-shadow:0 4px 16px #0001}
+.kv-card{background:#fff4dc;color:#1c140c;border:4px solid #1a120c;border-radius:0;padding:28px 24px;box-shadow:6px 6px 0 #07060a}
 .kv-title{text-align:center;color:#0d6efd;font-size:1.6em;font-weight:700;margin:0 0 4px}
 .kv-sub{text-align:center;color:#6c757d;font-size:.85em;margin:0 0 24px}
 .kv-field{margin:0 0 22px}
 .kv-lab{font-weight:700;font-size:1.15em;margin:0 0 8px;line-height:1.4}
 .kv-pt{display:block;font-weight:400;color:#6c757d;font-size:.78em;margin-top:2px}
-.kv-req{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:6px;background:#ffe8e8;color:#c62828;font-size:.7em;font-weight:700;vertical-align:middle}
+.kv-req{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:0;border:2px solid #1a120c;background:#ffe8e8;color:#c62828;font-size:.7em;font-weight:700;vertical-align:middle}
 .kv-card input[type=text],.kv-card input[type=date],.kv-card input[type=time],.kv-card input[type=month],.kv-card select,.kv-ta{
-  width:100%;box-sizing:border-box;font-size:1.25em;padding:16px 14px;border:1px solid #ced4da;border-radius:10px;line-height:1.4;min-height:3.2em}
+  width:100%;box-sizing:border-box;font-size:1.25em;padding:16px 14px;border:3px solid #1a120c;border-radius:0;line-height:1.4;min-height:3.2em;background:#fffef8}
 .kv-ta{min-height:6em;resize:vertical;font-family:inherit}
 .kv-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:640px){.kv-row{grid-template-columns:1fr}}
 .kv-hint{color:#6c757d;font-size:.9em;margin:6px 0 0}
 .kv-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:8px}
-.kv-actions button{font-size:1.2em;padding:16px 28px;border-radius:10px}
+.kv-actions button{font-size:1.2em;padding:16px 28px;border-radius:0}
 .kv-save{background:#0d6efd;color:#fff;border:none;font-weight:700;width:100%}
 .kv-check{display:flex;flex-wrap:wrap;gap:20px;font-size:1.15em;margin:12px 0}
 .kv-check label{display:flex;align-items:center;gap:8px;font-weight:600}

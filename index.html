@@ -1,4 +1,5 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#121a2f">
 <title>星心会 職員ポータル</title>
 <style>
 :root{--main:#2e6b4f}
@@ -109,24 +110,29 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
   .sg-amount b{font-size:64px}
   .sg-h{font-size:40px}
 }
-</style></head><body>
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<link rel="stylesheet" href="theme-retro.css?v=20261030px">
+</head><body class="portal">
 <header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
 <div id="login" class="card"><p>メールアドレスとパスワードでログインしてください。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
 <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
 <button onclick="login()">ログイン</button>
-<button onclick="$('login').hidden=true;$('forgot').hidden=false" style="background:#fff;color:var(--main);border:1px solid var(--main)">はじめての方／パスワードを忘れた方</button>
-<button onclick="location.search='?demo=1'" style="background:#fff;color:var(--main);border:1px solid var(--main)">見本を見る</button><div id="msg"></div></div>
+<button class="btn-ghost" onclick="$('login').hidden=true;$('forgot').hidden=false">はじめての方／パスワードを忘れた方</button>
+<button class="btn-ghost" onclick="location.search='?demo=1'">見本を見る</button><div id="msg"></div></div>
 <div id="forgot" class="card" hidden><p>登録されているメールアドレスを入れてください。パスワードを決めるためのメールが届きます。</p>
 <input id="fem" type="email" placeholder="メールアドレス" autocomplete="username">
 <button onclick="sendReset()">メールを送る</button>
-<button onclick="$('forgot').hidden=true;$('login').hidden=false" style="background:#fff;color:#333;border:1px solid #bbb">もどる</button><div id="fmsg"></div></div>
+<button class="btn-ghost" onclick="$('forgot').hidden=true;$('login').hidden=false">もどる</button><div id="fmsg"></div></div>
 <div id="setpw" class="card" hidden><p>新しいパスワードを決めてください（8文字以上）。</p>
 <input id="npw" type="password" placeholder="新しいパスワード" autocomplete="new-password">
 <button onclick="setPassword()">パスワードを決める</button><div id="pmsg"></div></div>
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
-<p id="help" style="color:#888;font-size:13px"></p></div>
+<p id="help"></p></div>
 </main>
 <script src="config.js?v=20261030fixmerge"></script>
 <script src="gl.js?v=202610201000"></script>
@@ -137,10 +143,10 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo.js?v=20261030assess"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
-<script src="kin_visit.js?v=20261030gas"></script>
+<script src="kin_visit.js?v=20261030px"></script>
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
-<script src="nicchu.js?v=20261030lead"></script>
+<script src="nicchu.js?v=20261030px"></script>
 <script src="sui_render.js?v=202610301600"></script>
 <script src="sui.js?v=202610301600"></script>
 <script src="sui_contract.js?v=202610301300"></script>
@@ -149,24 +155,24 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
 <script src="report.js?v=202610200935"></script>
-<script src="ht.js?v=202610161540"></script>
+<script src="ht.js?v=20261030px"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
-<script src="sct.js?v=20261026ops"></script>
+<script src="sct.js?v=20261030px"></script>
 <script src="chair.js?v=20261026top"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=20261026calov"></script>
 <script src="leo_cal.js?v=20261026calov"></script>
-<script src="leo_home_cal.js?v=20261026calov"></script>
+<script src="leo_home_cal.js?v=20261030px"></script>
 <script src="leo_jippi.js?v=20261030jippi"></script>
 <script src="leo_jogan.js?v=20261030jogan"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
-<script src="uketsuke.js?v=20261030fixreq"></script>
+<script src="uketsuke.js?v=20261030px"></script>
 <script src="esign.js?v=20261030home1"></script>
-<script src="rydeen.js?v=20261030dakoku"></script>
-<script src="chamu.js?v=20261030chamu"></script>
+<script src="rydeen.js?v=20261030px"></script>
+<script src="chamu.js?v=20261030px"></script>
 <script src="dakoku-lib.js?v=20261030dakoku"></script>
-<script src="dakoku.js?v=20261030dakoku"></script>
+<script src="dakoku.js?v=20261030px"></script>
 <script src="soudan.js?v=202610211550"></script>
 <script src="banto.js?v=202610211550"></script>
 <script src="sns.js?v=202610271650"></script>

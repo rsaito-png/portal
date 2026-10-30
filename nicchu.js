@@ -169,15 +169,15 @@ function ncEnsureStyle() {
   if (document.getElementById('nc_style')) return;
   const st = document.createElement('style');
   st.id = 'nc_style';
-  st.textContent = `.nc-card{background:#fff;border-radius:12px;padding:14px;margin:10px 0;box-shadow:0 1px 3px #0002}
+  st.textContent = `.nc-card{background:#fff4dc;border:4px solid #1a120c;border-radius:0;padding:14px;margin:10px 0;box-shadow:4px 4px 0 #1a120c;color:#1c140c}
 .nc-card label{display:block;margin-top:8px}
 .nc-row{display:flex;justify-content:space-between;gap:8px;align-items:center}
 .nc-row label{display:flex;align-items:center;gap:6px;margin:0;width:auto}
-.nc-card textarea,.nc-card select{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #bbb;border-radius:8px}
-.nc-pt{display:block;color:#777;font-size:12px;font-weight:normal}.nc-lead{color:#444;font-size:17px;line-height:1.5;margin:8px 0 12px}
+.nc-card textarea,.nc-card select{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:3px solid #1a120c;border-radius:0;background:#fffef8}
+.nc-pt{display:block;color:#5c4e3e;font-size:14px;font-weight:normal}.nc-lead{color:#1c140c;font-size:17px;line-height:1.6;margin:8px 0 12px}
 .nc-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
-button.nc-chip,button.nc-mini{width:auto;display:inline-block;margin:4px 4px 4px 0;padding:8px 12px;background:#fff;color:#222;border:1px solid #bbb;border-radius:999px}
-button.nc-chip.on{background:var(--main);color:#fff;border-color:var(--main)}
+button.nc-chip,button.nc-mini{width:auto;display:inline-block;margin:4px 4px 4px 0;padding:10px 14px;background:#fff4dc;color:#1c140c;border:3px solid #1a120c;border-radius:0;box-shadow:3px 3px 0 #1a120c;font-size:16px}
+button.nc-chip.on{background:var(--main);color:#fff8e8;border-color:#1a120c}
 .nc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .nc-msg{white-space:pre-wrap;color:#c00}
 .nc-ok{color:#2e6b4f}
