@@ -116,7 +116,7 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=20261030chamu'));
+assert.ok(html.includes('chamu.js?v=20261030px'));
 assert.ok(html.includes("id === 'chamu' && sub && typeof renderChamu"));
 assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
 assert.ok(!cfg.includes('1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g'));

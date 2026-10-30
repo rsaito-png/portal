@@ -10,11 +10,11 @@ const sctEsc = s => (window.Sct ? Sct.esc(s) : String(s ?? ''));
 function sctCss() {
   if (document.getElementById('sctcss')) return;
   const s = document.createElement('style'); s.id = 'sctcss';
-  s.textContent = `.sctw{overflow-x:auto} .sctt{width:100%;font-size:15px;background:#fff} .sctt th{background:#eef2f0} .sctt td,.sctt th{padding:6px 4px;vertical-align:top}
-  .sctb{width:auto;display:inline-block;margin:2px 4px 2px 0;padding:6px 10px;font-size:15px} .sctb.g{background:#fff;color:var(--main);border:1px solid var(--main)}
-  .sctf label{display:block;font-size:14px;color:#555;margin-top:6px} .sctf input,.sctf select,.sctf textarea{width:100%;box-sizing:border-box;font-size:16px}
-  .scttabs button{width:auto;margin:0 6px 8px 0} .sctnote{color:#555;font-size:14px}
-  a.sctman{color:var(--main);font-weight:700;font-size:16px}`;
+  s.textContent = `.sctw{overflow-x:auto} .sctt{width:100%;font-size:16px;background:#fff4dc;color:#1c140c} .sctt th{background:#1a2744;color:#fff6e4} .sctt td,.sctt th{padding:6px 4px;vertical-align:top}
+  .sctb{width:auto;display:inline-block;margin:2px 4px 2px 0;padding:8px 12px;font-size:16px} .sctb.g{background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c}
+  .sctf label{display:block;font-size:16px;color:#4e4336;margin-top:6px} .sctf input,.sctf select,.sctf textarea{width:100%;box-sizing:border-box;font-size:17px}
+  .scttabs button{width:auto;margin:0 6px 8px 0} .sctnote{color:#ead9b4;font-size:16px}
+  a.sctman{color:var(--px-gold,#f2c14e);font-weight:700;font-size:17px}`;
   document.head.appendChild(s);
 }
 function sctJstInput(iso) {
