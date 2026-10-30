@@ -73,6 +73,42 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
   .ptabs button{font-size:24px;padding:12px 20px}
   #help{font-size:22px!important}
 }
+.sg{max-width:760px}
+.sg-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+.sg button.back{width:auto}
+.sg-step{font-weight:700;color:#2e6b4f;margin:22px 0 8px}
+.sg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sg-row label{display:flex;flex-direction:column;gap:4px;color:#444;min-width:0}
+.sg select{width:100%;box-sizing:border-box}
+.sg-drop{display:block;position:relative;border:2px dashed #2e6b4f;border-radius:14px;padding:22px 16px;background:#fff;text-align:center;cursor:pointer}
+.sg-drop span{font-weight:700}
+.sg-drop input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+@media (max-width:700px){.sg-row{grid-template-columns:1fr}}
+.sg-amount{background:#fff;border-radius:16px;text-align:center;padding:16px 12px;margin-top:12px;box-shadow:0 1px 3px #0002}
+.sg-amount span{display:block;color:#555}
+.sg-amount b{display:block;font-size:48px;line-height:1.15;color:#1d3d2e}
+.sg-quiet{color:#666;margin:6px 0}
+.sg-list{list-style:none;margin:0;padding:4px 16px;background:#fff;border-radius:12px}
+.sg-list li{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #eee}
+.sg-list li.sum{font-weight:800;border-bottom:0}
+.sg-card{border-radius:16px;padding:20px 22px;margin:12px 0}
+.sg-card.green{background:#e7f6ec;border:3px solid #2e6b4f}
+.sg-card.red{background:#fdecea;border:3px solid #c0392b}
+.sg-card.yellow{background:#fff6d6;border:3px solid #d4a017}
+.sg-card.wait{background:#fff;border:3px solid #d0d5dd}
+.sg-h{font-size:1.45em;font-weight:800;margin:0 0 8px;line-height:1.35}
+.sg-card.green .sg-h{color:#145c32}
+.sg-card.red .sg-h{color:#8e1b1b}
+.sg-card.yellow .sg-h{color:#5c3b00}
+.sg-pool{margin:12px 0 0;font-weight:700}
+.sg-msg{color:#a30;min-height:0}
+.sg-person{background:#fff;border-radius:12px;padding:12px 14px;margin:10px 0}
+.sg details{margin:14px 0}
+.sg summary{cursor:pointer;color:#555}
+@media (min-width: 900px){
+  .sg-amount b{font-size:64px}
+  .sg-h{font-size:40px}
+}
 </style></head><body>
 <header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
@@ -92,7 +128,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261030assess"></script>
+<script src="config.js?v=20261030assessflow"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -137,8 +173,8 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="jukyusha_lib.js?v=202610281700"></script>
 <script src="leo_jukyusha.js?v=20261029jcheck2"></script>
 <script src="leo_assess.js?v=20261030assess"></script>
-<script src="shogu_logic.js?v=20261030shogu"></script>
-<script src="shogu.js?v=20261030shogu"></script>
+<script src="shogu_logic.js?v=20261030flow"></script>
+<script src="shogu.js?v=20261030flow"></script>
 <script>
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
@@ -365,7 +401,7 @@ async function renderSoumu() {
     if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + t + '</div>');
   } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
   if (!clerk && !sec.querySelector('a[href="#shogu"]') && (DUTY === '管理者' || (typeof shoguUiCan === 'function' && await shoguUiCan()))) {
-    const t = tileHtml(['💴', '処遇改善加算', '#shogu', '国保連PDFの投入と賃金改善の監査（管理者）'], '#555');
+    const t = tileHtml(['💴', '処遇改善加算', '#shogu', '国保連のPDFから、給与に載せる案を出す'], '#555');
     const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
     if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', t);
     else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + t + '</div>');

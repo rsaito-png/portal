@@ -51,6 +51,10 @@ eq(S.floorStatus(180001, 180000).code, 'over', 'above is fine');
 eq(S.floorStatus(179999, 180000).code, 'under', 'one yen under warns');
 eq(S.floorStatus(null, 180000).code, 'blank', 'blank gross is not a breach');
 
+eq(S.splitYenFloor(100, [1, 1, 1]), { shares: [33, 33, 33], leftover: 1 }, 'floor split leaves the yen');
+eq(S.allocateByBaseline(100, [1, 1, 1]).shares, [34, 33, 33], 'minimum is restored onto wages');
+eq(S.allocateByBaseline(100, [1, 1, 1]).topped, 1, 'one yen was restored');
+eq(S.allocateByBaseline(59500, [250000, 180000]).shares, [34593, 24907], 'leo baselines keep the half');
 eq(S.splitYen(100, [1, 1, 1]).shares, [34, 33, 33], '100 splits without losing a yen');
 eq(S.splitYen(100, [1, 1, 1]).shares.reduce((a, b) => a + b, 0), 100, 'split sum');
 eq(S.splitYen(100, [1, 2]).shares, [33, 67], 'weighted split');
@@ -59,6 +63,51 @@ eq(S.simulatePool(100, 3), { per: 33, remainder: 1, short: false, count: 3 }, 'p
 eq(S.simulatePool(-50, 4).short, true, 'shortfall is not divided');
 eq(S.simulatePool(98000, 1).per, 98000, 'one regular employee');
 eq(S.simulatePool(98000, 4).per, 24500, 'four regular employees');
+eq(S.regularCount('2026-09', { fy_year: 2026, regular_this: 1, regular_next: 4 }), 1, 'this fiscal year uses this year headcount');
+eq(S.regularCount('2027-04', { fy_year: 2026, regular_this: 1, regular_next: 4 }), 4, 'next fiscal year uses next headcount');
+
+const proposal = S.monthlyProposal({
+  month: '2026-09', officeId: 'leo',
+  receipts: [{ office_id: 'leo', service_type: '放課後等デイサービス', target_month: '2026-09-01', amount_yen: 158000, category: 'Ⅱロ', rate_got_ppm: 158000, rate_iv_ppm: 119000, iv_manual: false }],
+  staff: [
+    { id: 1, staff_code: '001', name: '見本 正子', office_id: 'leo', active: true, baseline_yen: 250000, contract_yen: 1, employment: '正社員' },
+    { id: 2, staff_code: '002', name: '見本 花', office_id: 'leo', active: true, baseline_yen: 180000, contract_yen: 999999, employment: '非正規' },
+    { id: 3, staff_code: '101', name: '見本 茶', office_id: 'chamu', active: true, baseline_yen: 200000, contract_yen: 200000, employment: '非正規' },
+  ],
+});
+eq(proposal.ivYen, 119000, 'proposal iv');
+eq(proposal.minimum, 59500, 'half of iv is the monthly target');
+eq(proposal.shares, [34593, 24907], 'split by usual pay, not contract pay');
+eq(proposal.monthly, 59500, 'monthly meets the half');
+eq(proposal.pool, 98500, 'receipt minus monthly is the pool');
+eq(proposal.people.map(p => p.name), ['見本 正子', '見本 花'], 'other offices stay out');
+const green = S.judgeMonth({
+  month: '2026-09', received: proposal.received, ivYen: proposal.ivYen, monthly: proposal.monthly, lump: 0,
+  people: proposal.people.map(p => ({ name: p.name, gross: p.baseline_yen, baseline: p.baseline_yen })),
+});
+eq(green.tone, 'green', 'auto plan is green');
+eq(green.pool, 98500, 'green pool');
+const red = S.judgeMonth({ month: '2026-09', received: 158000, ivYen: 119000, monthly: 50000, lump: 0, people: [] });
+eq(red.tone, 'red', 'under the half is red');
+eq(red.short, 9500, 'shortfall is the half gap, not the whole receipt');
+const yellow = S.judgeMonth({
+  month: '2026-09', received: 158000, ivYen: 119000, monthly: 59500, lump: 0,
+  people: [{ name: '見本 花', gross: 170000, baseline: 180000 }],
+});
+eq(yellow.tone, 'yellow', 'pay under the usual amount is yellow');
+eq(yellow.breaches[0].name, '見本 花', 'yellow names the person');
+const weighted = S.monthlyProposal({
+  month: '2026-09', officeId: 'leo',
+  receipts: [{ office_id: 'leo', service_type: '生活介護', target_month: '2026-09-01', amount_yen: 1000, category: 'Ⅱ', iv_manual: true, iv_yen: 200 }],
+  staff: [
+    { id: 1, staff_code: '1', name: 'A', office_id: 'leo', active: true, baseline_yen: 100, contract_yen: 999 },
+    { id: 2, staff_code: '2', name: 'B', office_id: 'leo', active: true, baseline_yen: 300, contract_yen: 1 },
+  ],
+});
+eq(weighted.shares, [25, 75], 'baseline ratio, contract ignored');
+eq(weighted.pool, 900, 'pool keeps the rest');
+eq(S.monthlyProposal({ month: '2026-09', officeId: 'leo', receipts: [], staff: [{ id: 1, office_id: 'leo', active: true, baseline_yen: 1, staff_code: '1', name: 'a' }] }).noReceipt, true, 'no receipt');
+eq(S.monthlyProposal({ month: '2026-09', officeId: 'leo', receipts: proposal.received ? [{ office_id: 'leo', service_type: '放課後等デイサービス', target_month: '2026-09-01', amount_yen: 1, category: '', iv_manual: false }] : [], staff: [] }).noStaff, true, 'no staff');
 
 const staff = [
   { id: 1, office_id: 'leo', name: '見本 正', staff_code: '001', active: true, baseline_yen: 250000, contract_yen: 250000, employment: '正社員' },
@@ -195,5 +244,16 @@ function utf16hex(text) {
   ok(html.includes('shogu.js') && html.includes("id === 'shogu'"), 'portal route');
   const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
   ok(cfg.includes('#shogu'), 'soumu tile');
+  const ui = fs.readFileSync(path.join(root, 'shogu.js'), 'utf8');
+  ok(ui.includes('この案で確定'), 'confirm is the main button');
+  ok(ui.includes('フリーウェイ用CSVを出す'), 'one csv button');
+  ok(ui.includes('調整する'), 'manual edits stay folded');
+  ok(ui.includes('もらった加算'), 'received amount is labeled');
+  ok(ui.includes('先に設定で職員を入れて'), 'empty staff points at settings');
+  ok(ui.includes('OK（賃金改善が加算以上／1/2達成）'), 'green card wording');
+  ok(ui.includes('円足りない'), 'red card wording');
+  ok(ui.includes('さんの支払総額が普段の給与を下回っている'), 'yellow card wording');
+  ok(ui.includes('賞与に回せる残り'), 'pool line');
+  ok(!ui.includes('PDF投入') && !ui.includes('全員明細') && !ui.includes('ボーナスプール') && !ui.includes('新加算'), 'six-tab jargon is off the screen');
   console.log('ok', n);
 })().catch(e => { console.error(e); process.exit(1); });
