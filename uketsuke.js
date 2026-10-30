@@ -135,6 +135,13 @@ function ukSubjectOf(hash, state, root) {
     const name = ukOptText(byId('kv_user_id'));
     if (name) return { kind: '利用者', name };
   }
+  if (id === 'kintoun' && sub === 'write') {
+    const sel = byId('userName');
+    if (sel && sel.value) {
+      const name = ukOptText(sel);
+      if (name) return { kind: '利用者', name };
+    }
+  }
   if (id === 'kintoun' && sub === 'print' && S.KPR && S.KPR.uid) {
     const name = ukOptText(q('#view select')[0]);
     if (name) return { kind: '利用者', name };
