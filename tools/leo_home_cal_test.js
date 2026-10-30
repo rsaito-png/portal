@@ -265,7 +265,7 @@ assert.strictEqual(leo.mine['現場支援員'].join('|'), '日誌（児童ごと
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
 assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|今日やること（児発管）');
-assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表');
+assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|上限額管理');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
 const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, ['出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く']));
