@@ -270,10 +270,24 @@ function leoKidTile(nikkiRows, events, day) {
 function leoKidWarnHtml(lines) {
   return lines && lines.length ? `<div style="background:#fff6e5;border-left:4px solid #e8833a;padding:6px 8px;margin:6px 0">${lines.map(x => '⚠ ' + esc(x)).join('<br>')}</div>` : '';
 }
+function leoFindChildPlan(plans, name) {
+  const list = plans || [];
+  const nn = s => String(s || '').replace(/\s/g, '');
+  const hit = list.find(x => nn(x.name) === nn(name));
+  if (hit) return hit;
+  if (typeof sameChildName !== 'function') return null;
+  const hits = list.filter(x => sameChildName(x.name, name));
+  return hits.length === 1 ? hits[0] : null;
+}
 function leoKidPlanHtml(name, plan) {
-  const key = String(name || '').replace(/\s/g, '');
-  if (plan) return `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">📋 個別支援計画（${esc(plan.term || '')}　${esc(plan.period || '')}）を読む</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(plan.body)}</div></details>`;
-  return `<button onclick="PLAN_OPEN='${key}';location.hash='leo/plan'">📋 個別支援計画を開く</button>`;
+  const label = `📋 本計画${plan && (plan.term || plan.period) ? `（${esc(plan.term || '')}　${esc(plan.period || '')}）` : ''}`;
+  if (plan && plan.source_url) {
+    return `<p style="margin-top:6px"><a href="${esc(plan.source_url)}" target="_blank" rel="noopener" style="font-weight:bold;color:#36c">${label}PDFを開く</a></p>`;
+  }
+  if (plan && plan.body) {
+    return `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">${label}を読む（PDF未登録）</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(plan.body)}</div></details>`;
+  }
+  return `<p style="margin-top:6px"><small>本計画PDFはまだ登録されていません</small></p>`;
 }
 function leoSougeiMineHtml(me, rows, events, care) {
   const CARE = care || {};
@@ -358,9 +372,9 @@ const LEO_VIEWS = {
     const rows = filterByLeftDay(rows0, LEFT);
     const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev0 || [], LEFT) : (ev0 || []);
     const N = s => String(s || '').replace(/\s/g, '');
-    const PL = Object.fromEntries(cp.map(x => [N(x.name), x]));
     const days = byDay(rows);
-    const msg = c => [...cc.filter(x => N(x.child) === N(c) && x.note).map(x => '送迎の配慮：' + x.note), ...ci.filter(x => N(x.name) === N(c) && x.note).map(x => 'メモ：' + x.note)];
+    const planOf = c => leoFindChildPlan(cp, c);
+    const msg = c => [...cc.filter(x => (typeof sameChildName === 'function' ? sameChildName(x.child, c) : N(x.child) === N(c)) && x.note).map(x => '送迎の配慮：' + x.note), ...ci.filter(x => (typeof sameChildName === 'function' ? sameChildName(x.name, c) : N(x.name) === N(c)) && x.note).map(x => 'メモ：' + x.note)];
     const head = `<h3>${PLABEL[PERIOD]}の利用児童</h3>${periodTabs('kids')}${demoNote()}<p><small>伝達事項は <a href="#leo/userinfo">利用者情報</a>（メモ・送迎の配慮）に書いたものです。</small></p>`;
     const ride = (label, flag, time, place, driver) => flag === 'del' ? `${label}：カレンダーで変更` : `${label}：${esc(time)} ${esc(place || '自宅')}（${esc(driver) || '未定'}）`;
     if (!days.length && !DEMO) {
@@ -378,7 +392,7 @@ const LEO_VIEWS = {
         const by = {};
         ev.forEach(e => { (by[e.day] = by[e.day] || []).push(e); });
         return head + `<p class="note">予定表から表示（日誌取り込み前）</p>` + Object.keys(by).sort().map(d => `<h4>${fmtDay(d)}（${by[d].length}人）</h4>${by[d].map(e =>
-          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}${leoKidWarnHtml(msg(e.child))}${leoKidPlanHtml(e.child, PL[N(e.child)])}</div>`).join('')}`).join('') + absBlock;
+          `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(e.child)}</b>　${esc(e.start_time || '')}〜${esc(e.end_time || '')}${leoKidWarnHtml(msg(e.child))}${leoKidPlanHtml(e.child, planOf(e.child))}</div>`).join('')}`).join('') + absBlock;
       }
       if (absBlock) return head + absBlock;
     }
@@ -394,7 +408,7 @@ const LEO_VIEWS = {
       return `<h4>${fmtDay(d)}（${use.length}人）</h4>${use.map(r => { const m = msg(r.child);
         const note = (r._calUse === true || r._calPick === true || r._calDrop === true) ? '<br><small>カレンダーで変更</small>' : '';
         return `<div class="card" style="margin:8px 0"><b style="font-size:18px">${esc(r.child)}</b>　${esc(r.service)}　${esc(r.start_time)}〜${esc(r.end_time)}<br><small>${ride('迎え', r._calPick, r.pick_time, r.pick_place, r.pick_driver)}／${ride('送り', r._calDrop, r.drop_time, r.drop_place, r.drop_driver)}</small>${note}
-        ${leoKidWarnHtml(m)}${leoKidPlanHtml(r.child, PL[N(r.child)])}</div>`; }).join('')}
+        ${leoKidWarnHtml(m)}${leoKidPlanHtml(r.child, planOf(r.child))}</div>`; }).join('')}
         ${gone.length ? `<p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(r.child)).join('、')}</small></p>` : ''}
         ${absHtml.length ? `<p>欠席：${absHtml.join('、')}</p>` : ''}`;
     }).join('');
