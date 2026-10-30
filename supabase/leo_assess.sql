@@ -1,5 +1,5 @@
--- レオ「アセスメント」：児童ごとに1行。項目は data(jsonb) のキーで持つ（キー一覧は leo.js の ASSESS_SECTIONS。
--- 今後のポータル内オリジナルのアセスメント入力（保護者向け公開ページ・職員入力）でも同じキーをそのまま使う）。
+-- レオ「アセスメント」：児童ごとに1行。項目は data(jsonb) のキーで持つ（キー一覧は assess_lib.js。
+-- 保護者向け公開ページ assess.html と、職員の利用者情報タブが同じキーを使う）。
 -- 閲覧：レオ職員・事務（機微情報を含むが職員全員に見せる方針）／編集：can_manage。新しい表のみ・既存データには触らない。
 create table if not exists public.leo_child_assess (
   name text primary key,                                   -- 日誌・leo_children と同じ表記
