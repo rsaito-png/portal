@@ -92,7 +92,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help" style="color:#888;font-size:13px"></p></div>
 </main>
-<script src="config.js?v=20261030chamu"></script>
+<script src="config.js?v=20261030chamuhome"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -123,8 +123,8 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo_home_cal.js?v=20261026calov"></script>
 <script src="leo_jippi.js?v=202610201000"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
-<script src="uketsuke.js?v=202610211600"></script>
-<script src="esign.js?v=20261028sign2"></script>
+<script src="uketsuke.js?v=20261030home1"></script>
+<script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261030dakoku"></script>
 <script src="chamu.js?v=20261030chamu"></script>
 <script src="dakoku-lib.js?v=20261030dakoku"></script>
@@ -305,7 +305,7 @@ async function render() {
     <div id="kankoyo_sec"><h3>官公需</h3><div id="sct_slot"></div></div>
     <h3>共通</h3>
     <div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
-    <div id="soumu_slot">${ROLE === C.clerk.role ? soumuTile() : ''}</div>
+    <div id="soumu_slot">${soumuTile()}</div>
     <h3 id="misc_h">未整理</h3>
     <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
   if (typeof esignBadge === 'function') esignBadge();
@@ -336,24 +336,30 @@ async function accAdmin() {
     const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/acc_is_admin', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' });
     return r.ok && (await r.json()) === true; } catch (e) { return false; }
 }
-// 総合トップの「総務」タイル。事務の方には常に、法人管理者には会計（簡易）があるので出す
-const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>人事労務・補助金・助成金・経理など（事務の方のみ）</small></a></div>`;
+// 総合トップの「総務」。全員が開ける（自分の書類の署名）。中の人事労務・補助金・経理は事務、会計（簡易）は法人管理者
+const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>書類の署名は全員。人事労務・補助金・経理は事務</small></a></div>`;
 async function accTile() {
   if (ROLE === C.clerk.role || document.getElementById('soumu_tile')) return;
   if (!(await accAdmin())) return;
   const sl = document.getElementById('soumu_slot'); if (sl && !document.getElementById('soumu_tile')) sl.innerHTML = soumuTile();
 }
-// #soumu：総務の見出しとタイル（事務の方は全部、法人管理者は会計（簡易）を経理の中に）
+// #soumu：総務。#sign は全職員、それ以外のタイルは事務。法人管理者は会計（簡易）を経理に足す
 async function renderSoumu() {
   const back = `<button class="back" onclick="location.hash=''">← トップへ</button>`;
   const clerk = ROLE === C.clerk.role;
-  $('view').innerHTML = back + `<h3>🗂️ 総務</h3><div id="sumu_sec">${clerk ? (C.clerk.groups || []).map(g => `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${g.tiles.map(t => tileHtml(t, '#555')).join('')}</div>`).join('') : ''}</div>`;
+  const groups = (C.clerk.groups || []).map(g => {
+    const tiles = (g.tiles || []).filter(t => clerk || t[2] === '#sign');
+    if (!tiles.length) return '';
+    return `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${tiles.map(t => tileHtml(t, '#555')).join('')}</div>`;
+  }).join('');
+  $('view').innerHTML = back + `<h3>🗂️ 総務</h3><div id="sumu_sec">${groups}</div>`;
   const sec = document.getElementById('sumu_sec');
   if (await accAdmin()) {
     const t = '<a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a>';
     const kh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '経理'), kg = kh && kh.nextElementSibling;
     if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + t + '</div>');
-  } else if (!clerk) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
+  } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
+  if (typeof esignBadge === 'function') esignBadge();
 }
 window.addEventListener('hashchange', render);
 let ROLE = C.defaultRole;
