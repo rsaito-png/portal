@@ -153,6 +153,7 @@ function sgUsePaint() {
 }
 function sgEventPaint(e, opt) {
   if (e && e.kind === '利用') return sgUsePaint();
+  if (e && e.kind === 'その他') return sgPaintFrom(SG_OTHER_HEX, false);   // その他（研修・見学など）は担当に関係なく常に赤 #d50000
   if (!e || !e.staff) return null;
   return sgStaffPaint(e.staff, opt);
 }
@@ -216,7 +217,7 @@ function sgSplit(evs) {
   const allDay = [], timed = [];
   for (const e of evs || []) {
     const s = sgMin(e.start_time);
-    if (e.kind === '休み' || e.kind === '休所' || e.kind === 'その他' || s == null) allDay.push(e);
+    if (e.kind === '休み' || e.kind === '休所' || s == null) allDay.push(e);   // その他も時刻があれば時間軸に出す
     else {
       let en = sgMin(e.end_time);
       if (en == null || en <= s) en = s + 50;
@@ -357,7 +358,7 @@ function sgDayHtml(day, evs, care, opt) {
   const staff = [];
   const seen = new Set();
   for (const e of es) {
-    if (!e.staff) continue;
+    if (!e.staff || e.kind === 'その他') continue;   // その他は常に赤なので、担当色の凡例には入れない
     const show = sgStaffShow(e.staff, { demo });
     if (!show || seen.has(sgNk(show))) continue;
     seen.add(sgNk(show));
@@ -366,7 +367,7 @@ function sgDayHtml(day, evs, care, opt) {
   const legend = staff.map(s => {
     const p = sgStaffPaint(s.raw, { demo });
     return `<span><i style="background:${p.hex}"></i>${sgEsc(s.show)}${p.mapped ? '' : ' <span class="other">その他</span>'}</span>`;
-  }).join('') + (mineOn ? '' : `<span><i style="background:${SG_USE_HEX}"></i>利用児童</span>`) + `<span>☆迎え　<u>★送り</u>（色は担当）</span>`;
+  }).join('') + (mineOn ? '' : `<span><i style="background:${SG_USE_HEX}"></i>利用児童</span>`) + (es.some(e => e.kind === 'その他') ? `<span><i style="background:${SG_OTHER_HEX}"></i>その他（研修・見学など）</span>` : '') + `<span>☆迎え　<u>★送り</u>（色は担当）</span>`;
   const canEdit = !!(opt && opt.canEdit);
   const openAttr = id => (canEdit && id != null && id !== '') ? ` onclick="event.stopPropagation();sgEvOpen(${typeof id === 'number' ? id : "'" + String(id).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"})"` : '';
   const chips = allDay.map(e => {
@@ -395,8 +396,9 @@ function sgDayHtml(day, evs, care, opt) {
     const t0 = sgMin(ev.start_time), t1 = sgMin(ev.end_time);
     const when = t0 == null ? sgHH(e.start) : (t1 != null && t1 > t0 ? `${sgHH(t0)}–${sgHH(t1)}` : sgHH(t0));
     const careLine = (ev.kind === '利用' || ev.kind === '休み') && care && care[sgNk(ev.child)] ? `⚠ ${care[sgNk(ev.child)]}` : '';
-    const body = sgLines(ev).concat(careLine ? [careLine] : []).map(sgEsc).join('\n');
-    const tip = `${sgKind(ev)} ${when} ${sgLines(ev).join(' / ')} ${shown}`.trim();
+    const lines = ev.kind === 'その他' ? [ev.title || ev.note || ev.place || ''].filter(Boolean) : sgLines(ev);   // その他は担当名を上の行に出すので本文では繰り返さない
+    const body = lines.concat(careLine ? [careLine] : []).map(sgEsc).join('\n');
+    const tip = `${sgKind(ev)} ${when} ${lines.join(' / ')} ${shown}`.trim();
     return `<div class="${cls}" style="${style}"${openAttr(ev.id)} title="${sgEsc(tip)}"><div class="k">${sgEsc(sgKind(ev))} ${when}${who ? '　' + who : ''}</div><div class="nm">${body}</div></div>`;
   }).join('');
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';

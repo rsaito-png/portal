@@ -318,4 +318,31 @@ const field = renderLeoHome('職員', '現場支援員');
 assert.ok(field.includes('事務・計画') && field.indexOf('事務・計画') < field.indexOf('不具合・修正の依頼'));
 assert.strictEqual(field.split('不具合・修正の依頼').length - 1, 1);
 
+// その他（研修・見学など）: 担当の有無に関係なく常に赤 #d50000。時刻があれば時間軸、無ければ終日の欄。担当名は出す
+{
+  const od = '2026-10-26';
+  const sonota = [
+    { id: 901, day: od, kind: 'その他', staff: '宮本 幸子', note: '研修', start_time: '10:00', end_time: '11:00' },
+    { id: 902, day: od, kind: 'その他', note: '見学者', start_time: '13:00', end_time: '14:00' },
+    { id: 903, day: od, kind: 'その他', note: '時刻なし', staff: '連先生' },
+    { id: 904, day: od, kind: 'その他', note: '外部', staff: '外部の人', start_time: '15:00' },
+  ];
+  const h = sgDayHtml(od, sonota, {}, { demo: false, today: '2026-10-27' });
+  assert.strictEqual((h.match(/<div class="sg-ev[^"]*" style="[^"]*" title="その他[^"]*"/g) || []).length, 3, '時刻のあるその他は時間軸のブロック');
+  assert.ok(/background:#d50000;color:#fff[^"]*" title="その他 10:00–11:00 研修 宮本 幸子"/.test(h), '担当が宮本でも赤');
+  assert.ok(/background:#d50000;color:#fff[^"]*" title="その他 13:00–14:00 見学者"/.test(h), '担当なしも赤');
+  assert.ok(/background:#d50000;color:#fff[^"]*" title="その他 15:00 外部 外部の人"/.test(h), '一覧外の担当も赤');
+  assert.ok(h.includes('<div class="k">その他 10:00–11:00　宮本 幸子</div><div class="nm">研修</div>'), '担当名は上の行、本文は内容');
+  assert.ok(!/background:#d81b60/.test(h), '宮本のピンクは使わない');
+  const chip = h.match(/<span class="sg-chip[^"]*"[^>]*>その他 連先生 時刻なし<\/span>/);
+  assert.ok(chip && chip[0].includes('background:#d50000') && !chip[0].includes('neutral') && !chip[0].includes('#1a237e'), '終日のチップも担当に関係なく赤（担当名は出す）');
+  const leg = h.slice(h.indexOf('class="sg-leg"'), h.indexOf('class="sg-cal"'));
+  assert.ok(leg.includes('その他（研修・見学など）') && leg.includes('background:#d50000'), '凡例に赤');
+  assert.ok(!leg.includes('宮本 幸子') && !leg.includes('連先生'), 'その他だけの担当は担当色の凡例に出さない');
+  const none = sgDayHtml(od, [{ day: od, kind: '利用', child: '児童A', start_time: '10:00', end_time: '11:00' }], {}, { demo: false, today: '2026-10-27' });
+  assert.ok(!none.includes('その他（研修・見学など）'), 'その他が無い日は凡例に出さない');
+  const mine = sgDayHtml(od, sonota, {}, { demo: false, mine: true, me: '宮本 幸子', today: '2026-10-27' });
+  assert.ok(mine.includes('研修') && !mine.includes('見学者') && mine.includes('その他（研修・見学など）'), '自分の担当では自分のその他だけ（赤）');
+}
+
 console.log('leo_home_cal_test ok');

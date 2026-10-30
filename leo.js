@@ -97,9 +97,19 @@ const leftMark = (idx, name, todayStr) => {
   return ` <span style="background:${bg};color:#fff;border-radius:4px;padding:0 5px;font-size:12px">${on ? '退所' : '退所予定'} ${esc(String(d).replace(/-/g, '/'))}</span>`;
 };
 const MASTER_DEMO = {};
+// ログイン中の職員の user_id（JWT の sub）。取れなければ ''。
+// 事務は RLS で全員の staff_profiles を読めるので、必ず自分の行に絞る（絞らないと先頭の他人の行を自分と取り違える）。
+function leoMyUid() {
+  try {
+    const t = JSON.parse(localStorage.getItem('sess') || '{}').token;
+    const sub = JSON.parse(atob(String(t).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub;
+    return /^[0-9a-f-]{36}$/i.test(sub || '') ? sub : '';
+  } catch (e) { return ''; }
+}
+const leoMyProfileQ = cols => { const u = leoMyUid(); return 'staff_profiles?select=' + cols + (u ? '&user_id=eq.' + u : ''); };
 async function myName() {
   if (DEMO) return DEMO_DATA.me;
-  const p = await sb('staff_profiles?select=nikki_name');
+  const p = await sb(leoMyProfileQ('nikki_name'));
   return p[0]?.nikki_name || '';
 }
 const same = (a, b) => a && b && a.replace(/\s/g, '') === b.replace(/\s/g, '');
@@ -592,7 +602,7 @@ async function loadDuty() {
     return;
   }
   try {
-    const p = await sb('staff_profiles?select=duty,office,nicchu,is_chair');
+    const p = await sb(leoMyProfileQ('duty,office,nicchu,is_chair'));
     DUTY = p[0]?.duty || '現場支援員';
     MY_OFFICE = p[0]?.office || '';
     NICCHU = !!p[0]?.nicchu;
