@@ -1,5 +1,6 @@
 # Edge Function の verify_jwt だけをここで指定する。
 # db や auth の設定は Supabase ダッシュボード側を正とする。このファイルは functions deploy が読む。
+# jippi-checkout と sct-checkout はログイン JWT を検証する（節を足さない＝verify_jwt は true のまま）。
 
 [functions.square-webhook]
 verify_jwt = false

@@ -86,7 +86,10 @@ supabase functions deploy sct-checkout --project-ref zvrardoyxocmqhvyddnf
 supabase functions deploy sct-certificate --project-ref zvrardoyxocmqhvyddnf
 supabase functions deploy square-webhook --project-ref zvrardoyxocmqhvyddnf
 supabase functions deploy meet-events --project-ref zvrardoyxocmqhvyddnf
+supabase functions deploy jippi-checkout --project-ref zvrardoyxocmqhvyddnf
 ```
+
+`jippi-checkout` はレオの実費画面が使う。JWT 検証はオンのまま（`--no-verify-jwt` は付けない）。シークレットは上の Square 3つを共有する。先に `supabase/leo_jippi.sql` を実行し、`pay_link_amount` 列を足す（再実行できる）。
 
 `config.toml` を読まないデプロイでは、次の2つに `--no-verify-jwt` を付けます。`sct-checkout` と `sct-certificate` には付けません。
 
@@ -110,7 +113,7 @@ supabase functions delete stripe-webhook --project-ref zvrardoyxocmqhvyddnf
 - 保存後、Endpoint Details の Signature key を `SQUARE_WEBHOOK_SIGNATURE_KEY` に、登録した URL を `SQUARE_WEBHOOK_NOTIFICATION_URL` に、それぞれそのまま置きます。
 - 入金の確定はこの関数だけが行います。`sct.html?paid=1` では確定しません。反映まで少し待つ案内だけです。
 - 金額は DB の `sct_price`（12,800 / 10,800 / 0）です。関数はリクエストの金額を使いません。Square の JPY は円単位なので、12,800 円は `12800` です。チップ・クーポン・ポイントは支払いリンク側でオフにします。
-- 同じアカウントの他の入金（レオの実費の支払いリンクなど）もこの URL に届きます。`sct_payments` の注文 ID か、支払いノートに入れた決済 ID と一致しない通知は記録するだけで入金にしません。
+- 同じアカウントの他の入金（レオの実費の支払いリンクなど）もこの URL に届きます。`sct_payments` の注文 ID か、支払いノートに入れた決済 ID と一致しない通知は記録するだけで入金にしません。実費の `payment_note` は `leo-jippi` と年月で、決済 ID ではありません。実費の入金確認は LINE のままです。
 - カード拒否（`FAILED`）では行を失敗にしません。同じ支払いリンクでやり直せるためです。取りやめるときは運営の「無効」です。
 - Sandbox の試験番号は `4111 1111 1111 1111`（有効期限は未来、セキュリティコードは任意）です。本番のカード番号は使いません。
 - 確認: Square ダッシュボードの Payments と Orders。支払う前の注文は `DRAFT`、支払い後は `OPEN` です。ポータルの状態が「入金済」になるのは webhook のあとです。
