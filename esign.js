@@ -43,8 +43,10 @@ async function esignBadge() {
   try {
     const docs = DEMO ? ES_DEMO.docs : await sb('staff_docs?select=id,status&status=eq.issued');
     const n = docs.filter(d => d.status === 'issued').length;
-    const a = document.querySelector('a[href="#sign"]');
-    if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">署名待ち ${n}</span>`);
+    if (!n) return;
+    // ホームの入口は総務タイル。総務を開いたあとは #sign 自身に出す
+    const a = document.querySelector('a[href="#sign"]') || document.getElementById('soumu_tile');
+    if (a && !a.querySelector('.badge')) a.insertAdjacentHTML('afterbegin', `<span class="badge">署名待ち ${n}</span>`);
   } catch (e) { }
 }
 

@@ -10,8 +10,10 @@ window.PORTAL_CONFIG = {
   roles: ['職員', '事務'],
   defaultRole: '職員',
   // 事務だけに見せる区画（画面で隠すだけ。データ側の保護は Supabase のRLSで別途行う）
+  // #sign（書類の確認と署名）だけは全職員が総務から開く。出し分けは index.html の renderSoumu
   clerk: { name: '総務', role: '事務', groups: [
     { name: '人事労務', tiles: [
+      ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
       ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'],
       ['🩺', '実施者養成研修（運営）', '#sct', '運用マニュアル'] ] },
     { name: '補助金・助成金', tiles: [
@@ -130,11 +132,7 @@ window.PORTAL_CONFIG = {
   // 法人共通（ホームの下に表示）
   shared: { name: '法人共通', tiles: [
     ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
-    ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
-    ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
-    ['📝', '法定研修 受講確認フォーム', 'gl:g14', '研修を受けたら職員が回答'],
-    ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
-    ['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤'] ] },
+    ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'] ] },
   // 電子サイン（労働契約書・誓約書）。他法人は employer と defaults を書き換える。文面（テンプレート）はDBに登録
   esign: {
     enabled: true,
