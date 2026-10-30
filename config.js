@@ -41,6 +41,7 @@ window.PORTAL_CONFIG = {
       tiles: [
       ['📋', '今日やること（児発管）', '#leo/home', '計画の期限・ヒヤリハット確認・実績確認', 'main', null, '児発管'],
       ['⚠️', 'ヒヤリハット', '#leo/hiyari', '全員で読む・報告はここから', 'main'],
+      ['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤。事業所の近くだけ', 'main'],
       ['💬', '公式LINE', 'https://chat.line.biz/U09e93081492c29e963d2bba78499043f', '報告はこちらから', 'main'],
       ['🛠️', '公式LINE（管理画面）', 'https://manager.line.biz/account/@468rfild', '管理者・児発管・事務のみ', 'main', null, '児発管'],
       ['📷', '写真（Googleフォト）', 'https://photos.google.com/', '撮った写真・保護者と共有'],
@@ -90,6 +91,7 @@ window.PORTAL_CONFIG = {
       // 土日スケジュールのURLは portal_links の g23（公開ページには置かない。金斗雲システムと同じ）
       ['📅', '土日スケジュール', 'gl:g23', '居宅介護・日中一時の土日。別タブで開く', 'main'],
       ['🏯', '金斗雲システム', 'gl:g10', '@psr-seishinkai.org のアカウントで開く'],
+      ['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤（位置情報不要）', 'main'],
       ['✅', '実績記録一覧', 'gl:g11', 'GAS Webアプリから入力'],
       ['⏰', '出退勤記録', 'gl:g12', 'GAS＋手動'],
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
@@ -130,7 +132,7 @@ window.PORTAL_CONFIG = {
     ['📅', 'カレンダー', 'https://calendar.google.com/', 'Googleカレンダー'],
     ['📝', '法定研修 受講確認フォーム', 'gl:g14', '研修を受けたら職員が回答'],
     ['❓', '職員向け 使い方', 'help.html', 'ログイン・レオの画面・日誌の直し方'],
-    ['⏰', '出退勤（新・テスト）', 'https://rsaito-png.github.io/kintai/', 'テスト版'] ] },
+    ['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤'] ] },
   // 電子サイン（労働契約書・誓約書）。他法人は employer と defaults を書き換える。文面（テンプレート）はDBに登録
   esign: {
     enabled: true,

@@ -66,16 +66,20 @@
     const chosen = pool.find(s => s.id === String(opt.chosenId || ''));
     return { staff: chosen || null, mode: hits.length > 1 ? 'ambiguous' : 'pick', list: pool };
   }
-  // 現在地が許可半径の中か。範囲外・座標なしは打刻不可。
+  // 緯度・経度・半径がそろっている事業所だけ位置情報を要する（金斗雲などは不要）。
+  function gpsRequired(office) {
+    const o = officeView(office);
+    return o.lat != null && o.lng != null && o.radius > 0;
+  }
+  // 現在地が許可半径の中か。GPS不要の事業所は位置なしで打刻可。
   function judge(pos, office) {
     const o = officeView(office);
-    if (!o.enabled) return { ok: false, distance: null, reason: 'この事業所は打刻を停止しています' };
-    if (o.lat == null || o.lng == null) return { ok: false, distance: null, reason: '緯度・経度が未設定です' };
-    if (!(o.radius > 0)) return { ok: false, distance: null, reason: '打刻許可半径が未設定です' };
-    if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) return { ok: false, distance: null, reason: '位置情報がありません' };
+    if (!o.enabled) return { ok: false, distance: null, reason: 'この事業所は打刻を停止しています', gps: false };
+    if (!gpsRequired(o)) return { ok: true, distance: null, reason: '', gps: false };
+    if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) return { ok: false, distance: null, reason: '位置情報がありません', gps: true };
     const distance = meters(pos.lat, pos.lng, o.lat, o.lng);
-    if (distance > o.radius) return { ok: false, distance: distance, reason: '範囲外です（' + Math.round(distance) + 'm / 許可' + Math.round(o.radius) + 'm）' };
-    return { ok: true, distance: distance, reason: '' };
+    if (distance > o.radius) return { ok: false, distance: distance, reason: '範囲外です（' + Math.round(distance) + 'm / 許可' + Math.round(o.radius) + 'm）', gps: true };
+    return { ok: true, distance: distance, reason: '', gps: true };
   }
   const kindOk = k => KINDS.indexOf(k) >= 0;
 
@@ -83,7 +87,7 @@
   const SAMPLE = {
     offices: [
       { name: 'レオ', code: 'LEO', radius: 200, lat: null, lng: null, enabled: false },
-      { name: '金斗雲', code: 'KINTOUN', radius: 200, lat: null, lng: null, enabled: false },
+      { name: '金斗雲', code: 'KINTOUN', radius: null, lat: null, lng: null, enabled: true },
       { name: 'RYDEEN', code: 'RYDEEN', radius: 200, lat: 35.034866, lng: 136.583191, enabled: true },
     ],
     staff: [
@@ -91,12 +95,13 @@
       { id: 'R002', name: '見本 職員', office: 'RYDEEN', email: 'demo-staff@example.com', role: '本人', enabled: true },
       { id: 'R009', name: '見本 無効', office: 'RYDEEN', email: '', role: '本人', enabled: false },
       { id: 'L001', name: '見本 レオ', office: 'レオ', email: 'leo@example.com', role: '本人', enabled: true },
+      { id: 'K001', name: '見本 ヘルパー', office: '金斗雲', email: '', role: '本人', enabled: true },
     ],
   };
   const sample = () => JSON.parse(JSON.stringify(SAMPLE));
 
   const api = {
-    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, resolveStaff, judge, kindOk, sample,
+    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, resolveStaff, gpsRequired, judge, kindOk, sample,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Dakoku = api;

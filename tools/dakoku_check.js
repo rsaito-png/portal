@@ -24,12 +24,13 @@ const far = { lat: 35.034866 + 0.003, lng: 136.583191 };
 const out = Dakoku.judge(far, base);
 ok(!out.ok && out.reason.indexOf('範囲外') === 0, 'outside ' + out.reason);
 ok(!Dakoku.judge({ lat: 1, lng: 1 }, { enabled: false, radius: 200, lat: 1, lng: 1 }).ok, 'disabled office');
-ok(!Dakoku.judge({ lat: 1, lng: 1 }, { enabled: true, radius: 200, lat: null, lng: null }).ok, 'no coords');
+ok(Dakoku.judge({ lat: 1, lng: 1 }, { enabled: true, radius: 200, lat: null, lng: null }).ok, 'no coords means GPS off');
+ok(Dakoku.gpsRequired({ enabled: true, radius: 200, lat: null, lng: null }) === false, 'gpsRequired empty');
 ok(!Dakoku.judge(null, base).ok, 'no fix');
 
 const sample = Dakoku.sample();
-eq(Dakoku.visibleOffices(sample.offices).map(o => o.name), ['RYDEEN'], 'only enabled');
-ok(Dakoku.visibleOffices([{ name: 'レオ', enabled: 'FALSE' }, { name: '金斗雲', enabled: false }]).length === 0, 'leo and kintoun hidden');
+eq(Dakoku.visibleOffices(sample.offices).map(o => o.name), ['金斗雲', 'RYDEEN'], 'enabled offices');
+ok(Dakoku.visibleOffices([{ name: 'レオ', enabled: 'FALSE' }, { name: '金斗雲', enabled: false }]).length === 0, 'disabled hidden');
 
 const staff = sample.staff;
 const emailHit = Dakoku.resolveStaff({ email: 'Demo-Staff@example.com', staff: staff, office: 'RYDEEN', chosenId: 'R001' });
@@ -50,14 +51,23 @@ eq(amb.staff.id, 'B', 'pick among dupes');
 
 ok(Dakoku.kindOk('出勤') && Dakoku.kindOk('退勤') && !Dakoku.kindOk('休憩') && !Dakoku.kindOk(''), 'kinds');
 
+const noGps = { name: '金斗雲', code: 'KINTOUN', radius: null, lat: null, lng: null, enabled: true };
+ok(Dakoku.gpsRequired(noGps) === false, 'gpsRequired false for empty coords');
+ok(Dakoku.judge(null, noGps).ok === true, 'judge ok without position when GPS off');
+ok(Dakoku.gpsRequired({ name: 'RYDEEN', lat: 35.034866, lng: 136.583191, radius: 200, enabled: true }) === true, 'gpsRequired true for RYDEEN');
+
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 ok(index.includes("id === 'dakoku'") && index.includes('dakoku-lib.js') && index.includes('dakoku.js'), 'index wired');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
 ok(cfg.includes("#dakoku") && cfg.includes('gasUrl') && cfg.includes('token:'), 'config tile and endpoint');
+ok(cfg.includes("位置情報不要"), 'kintoun tile notes no GPS');
 const staffJs = fs.readFileSync(path.join(root, 'rydeen-staff.js'), 'utf8');
 ok(staffJs.includes('href="#dakoku"'), 'link beside staff screen');
 const gas = fs.readFileSync(path.join(root, 'dakoku-gas/Code.gs'), 'utf8');
 ['function doGet', 'function doPost', 'DAKOKU_TOKEN', '打刻ログ', '設定', '職員', '6371000', '1KEyzLGVwIWR2ziWNyghhGzSf6B2ZfHE-UIj8U0szxzs', 'text/plain', '管理者修正'].forEach(s => ok(gas.includes(s), 'gas ' + s));
 ok(gas.includes('種別は出勤か退勤') && gas.includes('ログイン中のメールと職員が一致しません'), 'gas checks');
+ok(gas.includes('needGps') || gas.includes('gps=off'), 'gas optional GPS');
+const ui = fs.readFileSync(path.join(root, 'dakoku.js'), 'utf8');
+ok(ui.includes('gpsRequired') && ui.includes('位置情報不要') && ui.includes('ポータルへ'), 'ui no-GPS path');
 
 console.log('ok', n);
