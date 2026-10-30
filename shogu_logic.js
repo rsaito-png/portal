@@ -203,6 +203,113 @@
     if (n === 0) return splitYen(total, []);
     return splitYen(total, Array(n).fill(1));
   }
+  // 比率で按分し、1円未満は切り捨てる。余りは誰にも寄せない。
+  function splitYenFloor(total, weights) {
+    const parsed = parseYenInput(total);
+    if (!parsed.ok || parsed.yen == null) throw new Error('配分する額が整数ではありません');
+    const t = BigInt(parsed.yen);
+    const w = weights.map(x => {
+      const p = parseYenInput(x);
+      if (!p.ok || p.yen == null || p.yen < 0) throw new Error('重みが整数ではありません');
+      return BigInt(p.yen);
+    });
+    const sum = w.reduce((a, b) => a + b, 0n);
+    if (t < 0n) throw new Error('負の額は配分できません');
+    if (sum <= 0n) return { shares: w.map(() => 0), leftover: biNum(t) };
+    const shares = w.map(x => (t * x) / sum);
+    const used = shares.reduce((a, b) => a + b, 0n);
+    return { shares: shares.map(biNum), leftover: biNum(t - used) };
+  }
+  // 毎月の最低額（新加算Ⅳ相当の半分、端数は切り上げ）を普段の給与の比で分ける。
+  // 切り捨ての余りは、最低額を割らないときだけプールへ出せる。割るときはその円だけ給与に残す。
+  // 残さないと自動案が1円不足で毎月の判定を落とす。
+  function allocateByBaseline(total, baselines) {
+    const parsed = parseYenInput(total);
+    if (!parsed.ok || parsed.yen == null) throw new Error('配分する額が整数ではありません');
+    const n = baselines.length;
+    if (!n) return { shares: [], topped: 0 };
+    const weights = baselines.map(b => {
+      const p = parseYenInput(b);
+      if (!p.ok || p.yen == null || p.yen < 0) throw new Error('普段の給与が整数ではありません');
+      return p.yen;
+    });
+    if (!weights.some(w => w > 0)) {
+      const even = splitEven(parsed.yen, n);
+      return { shares: even.shares, topped: 0 };
+    }
+    const floored = splitYenFloor(parsed.yen, weights);
+    if (floored.leftover <= 0) return { shares: floored.shares, topped: 0 };
+    const t = BigInt(parsed.yen);
+    const w = weights.map(x => BigInt(x));
+    const sum = w.reduce((a, b) => a + b, 0n);
+    const shares = floored.shares.map(x => BigInt(x));
+    let left = BigInt(floored.leftover);
+    const order = w.map((x, i) => ({ i, r: (t * x) % sum })).sort((a, b) => (a.r === b.r ? a.i - b.i : (a.r > b.r ? -1 : 1)));
+    let topped = 0;
+    for (const o of order) {
+      if (left <= 0n) break;
+      shares[o.i] += 1n;
+      left -= 1n;
+      topped += 1;
+    }
+    return { shares: shares.map(biNum), topped };
+  }
+  function regularCount(month, settings) {
+    const fy = fiscalYearOf(month);
+    const y = +((settings && settings.fy_year) || 0);
+    const cur = +((settings && settings.regular_this) || 0);
+    const next = +((settings && settings.regular_next) || 0);
+    if (fy != null && fy === y + 1) return Number.isInteger(next) && next >= 0 ? next : 0;
+    return Number.isInteger(cur) && cur >= 0 ? cur : 0;
+  }
+  // 月額はⅣ相当の1/2（最低限）。余り（受領額 − 月額）が賞与プール。重みは普段の給与。
+  function monthlyProposal({ month, officeId, receipts, staff }) {
+    const m = ym(month);
+    const recs = (receipts || []).filter(r => r.office_id === officeId && ym(r.target_month) === m);
+    const people = (staff || []).filter(s => s.office_id === officeId && s.active !== false)
+      .slice().sort((a, b) => String(a.staff_code || '').localeCompare(String(b.staff_code || ''), 'ja') || String(a.id).localeCompare(String(b.id)));
+    const received = recs.length ? sumYen(recs.map(r => r.amount_yen || 0)) : null;
+    const ivs = recs.map(ivEquivalent);
+    const ivYen = recs.length && ivs.every(x => x.yen != null) ? sumYen(ivs.map(x => x.yen)) : null;
+    const minimum = ivYen == null ? null : biNum((BigInt(ivYen) + 1n) / 2n);
+    let target = minimum;
+    if (target != null && received != null && target > received) target = received;
+    let shares = people.map(() => 0);
+    let topped = 0;
+    if (people.length && target != null) {
+      const alloc = allocateByBaseline(target, people.map(s => (s.baseline_yen == null || s.baseline_yen === '' ? 0 : s.baseline_yen)));
+      shares = alloc.shares;
+      topped = alloc.topped;
+    }
+    const monthly = shares.reduce((a, b) => a + b, 0);
+    const pool = received == null ? null : received - monthly;
+    return {
+      month: m, officeId, people, shares, received, ivYen, minimum, monthly, pool, topped,
+      noStaff: people.length === 0,
+      noReceipt: recs.length === 0,
+      ivUnknown: recs.length > 0 && ivYen == null,
+      services: recs.map(r => ({ service: r.service_type, yen: r.amount_yen == null ? null : +r.amount_yen })),
+    };
+  }
+  // 緑は、月額が最低限以上で、残りを賞与に回せば受領額に届くとき。赤は最低限までの不足。黄は普段の給与割れ。
+  function judgeMonth({ month, received, ivYen, monthly, lump, people }) {
+    const breaches = [];
+    for (const p of people || []) {
+      const st = floorStatus(p.gross, p.baseline);
+      if (st.code === 'under') breaches.push({ name: p.name || '', short: st.short });
+    }
+    const paid = sumYen([monthly || 0, lump || 0]);
+    const half = halfStatus(month, ivYen, monthly || 0);
+    const pool = received == null ? null : received - paid;
+    let tone = 'wait';
+    let short = 0;
+    if (received != null && ivYen != null && half.code !== 'unknown') {
+      if (half.code === 'fail') { tone = 'red'; short = half.need - (monthly || 0); }
+      else if (breaches.length) tone = 'yellow';
+      else tone = 'green';
+    }
+    return { tone, short, breaches, pool, half, paid };
+  }
   function simulatePool(balance, count) {
     if (typeof balance === 'number' && Number.isSafeInteger(balance) && balance < 0) {
       const n = +count;
@@ -625,7 +732,7 @@
     PPM, RATES, SERVICES, HALF_FROM, esc, ym, monthDate, fiscalYearOf, monthsOfFy, sumYen,
     parseYenInput, parsePercent, formatPercent, canonicalService, servicesFor, ratePeriod, rateTable,
     categoriesFor, lookupRates, normCategory, ivEquivalent, halfStatus, floorStatus,
-    splitYen, splitEven, simulatePool, poolSummary, auditRow, buildAudit,
+    splitYen, splitEven, splitYenFloor, allocateByBaseline, regularCount, monthlyProposal, judgeMonth, simulatePool, poolSummary, auditRow, buildAudit,
     csvCell, toCsv, freewayRows, detailCsv, auditCsv, parseCsv, parseStaffSheet, parseNotice, extractPdfText, pdfStreams, SAMPLE_NOTICE,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
