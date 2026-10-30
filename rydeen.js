@@ -8,7 +8,7 @@ const RW = {};            // 利用者画面の各ページ
 const RY_ADMIN_NAV = [['home', 'ホーム'], ['journal', '業務日誌'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者'], ['contracts', '契約・重説'], ['plans', '個別支援計画'],
   ['staff', '勤務実績表'], ['tasks', '作業タスク'], ['manuals', 'マニュアル'], ['reports', '日報'], ['notes', 'メモ・ファイル']];
 const RY_WORKER_NAV = [['home', '今日の作業'], ['manuals', 'マニュアル'], ['report', '日報を書く']];
-const RY_FILES = { journal: 'rydeen-journal.js', records: 'rydeen-journal.js', contracts: 'rydeen-docs.js', plans: 'rydeen-docs.js', staff: 'rydeen-staff.js?v=20261029dakoku', billing: 'rydeen-bill.js' };
+const RY_FILES = { journal: 'rydeen-journal.js', records: 'rydeen-journal.js', contracts: 'rydeen-docs.js', plans: 'rydeen-docs.js', staff: 'rydeen-staff.js?v=20261030dakoku', billing: 'rydeen-bill.js' };
 
 // ---------- 共通の小物 ----------
 const ryEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

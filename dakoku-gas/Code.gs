@@ -148,8 +148,7 @@ function dkPunch_(b) {
   var office = null;
   dkOffices_().forEach(function (o) { if (o.name === String(b.office || '').trim()) office = o; });
   if (!office || !office.enabled) return { ok: false, error: 'この事業所は打刻できません' };
-  if (office.lat == null || office.lng == null) return { ok: false, error: '緯度・経度が未設定です' };
-  if (!(office.radius > 0)) return { ok: false, error: '打刻許可半径が未設定です' };
+  var needGps = office.lat != null && office.lng != null && office.radius > 0;
   var staff = null;
   dkStaff_().forEach(function (s) {
     if (s.id === String(b.staffId || '').trim() && s.office === office.name && s.enabled) staff = s;
@@ -158,13 +157,16 @@ function dkPunch_(b) {
   var email = String(b.email || '').trim().toLowerCase();
   if (staff.email && email !== staff.email.toLowerCase()) return { ok: false, error: 'ログイン中のメールと職員が一致しません' };
   var lat = dkNum_(b.lat), lng = dkNum_(b.lng);
-  if (lat == null || lng == null) return { ok: false, error: '位置情報がありません' };
-  var distance = dkMeters_(lat, lng, office.lat, office.lng);
-  if (distance > office.radius) return { ok: false, error: '範囲外です（' + Math.round(distance) + 'm / 許可' + Math.round(office.radius) + 'm）' };
+  var distance = null;
+  if (needGps) {
+    if (lat == null || lng == null) return { ok: false, error: '位置情報がありません' };
+    distance = dkMeters_(lat, lng, office.lat, office.lng);
+    if (distance > office.radius) return { ok: false, error: '範囲外です（' + Math.round(distance) + 'm / 許可' + Math.round(office.radius) + 'm）' };
+  }
   var at = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
   var acc = dkNum_(b.accuracy);
   var memo = 'acc=' + (acc == null ? '' : String(Math.round(acc))) + '; ' + String(b.memo || '').slice(0, 160);
-  var note = 'dist=' + distance.toFixed(1) + '; email=' + String(b.email || '').slice(0, 120);
+  var note = (needGps ? ('dist=' + distance.toFixed(1) + '; ') : 'gps=off; ') + 'email=' + String(b.email || '').slice(0, 120);
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {

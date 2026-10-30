@@ -112,7 +112,7 @@ function dkPaint() {
   const who = DK.sess.demo ? '見本モードです。シートには書きません。' : (DK.sess.email ? 'ログイン中: ' + DK.sess.email : 'ログイン中のメールがありません。');
   let officeHtml = '';
   if (!v.offices.length) officeHtml = '<div class="wn">打刻できる事業所がありません。設定シートの「有効」が TRUE の事業所だけ出ます（いま有効なのは RYDEEN の想定です）。</div>';
-  else if (v.offices.length === 1) officeHtml = `<p><b>${dkEsc(v.office.name)}</b> <span class="meta">許可半径 ${Math.round(v.office.radius || 0)}m</span></p>`;
+  else if (v.offices.length === 1) officeHtml = `<p><b>${dkEsc(v.office.name)}</b>` + (Dakoku.gpsRequired(v.office) ? ` <span class="meta">許可半径 ${Math.round(v.office.radius || 0)}m</span>` : ` <span class="meta">位置情報不要</span>`) + `</p>`;
   else officeHtml = `<label class="meta">事業所</label><select id="dk_office">${v.offices.map(o => `<option value="${dkEsc(o.name)}"${o.name === DK.office ? ' selected' : ''}>${dkEsc(o.name)}</option>`).join('')}</select>`;
   let staffHtml = '';
   if (v.office && v.mode === 'email' && v.staff) staffHtml = `<p>職員: <b>${dkEsc(v.staff.name)}</b> <span class="meta">（ログインのメールで本人を特定）</span></p>`;
@@ -120,22 +120,25 @@ function dkPaint() {
     const note = v.mode === 'ambiguous' ? '同じメールの職員が複数います。本人を選んでください。' : 'ログイン用メールが空（または一致しない）ため、名前を選んでいます。職員シートにメールを入れると自動で本人になります。';
     staffHtml = `<div class="wn">${dkEsc(note)}</div><label class="meta">職員</label><select id="dk_staff"><option value="">選んでください</option>${v.list.map(s => `<option value="${dkEsc(s.id)}"${s.id === (v.staff && v.staff.id) ? ' selected' : ''}>${dkEsc(s.name)}</option>`).join('')}</select>`;
   } else if (v.office) staffHtml = '<div class="ng">この事業所の有効な職員がいません。</div>';
+  const needGps = !!(v.office && Dakoku.gpsRequired(v.office));
   let geo = '';
   if (v.office) {
-    if (DK.locating) geo = '<div class="wn">位置を確認しています…</div>';
+    if (!needGps) geo = `<div class="okb">この事業所は位置情報不要です。${v.staff ? '打刻できます。' : '職員を選ぶとボタンが押せます。'}</div>`;
+    else if (DK.locating) geo = '<div class="wn">位置を確認しています…</div>';
     else if (DK.posError) geo = `<div class="ng">${dkEsc(DK.posError)}</div>`;
     else if (v.judge.ok) geo = `<div class="okb">事業所まで ${Math.round(v.judge.distance)}m（許可 ${Math.round(v.office.radius)}m）。${v.staff ? '打刻できます。' : '職員を選ぶとボタンが押せます。'}${DK.pos && DK.pos.demo ? ' 見本の位置（事業所の中心）です。' : ''}${DK.pos && DK.pos.accuracy != null ? ' <span class="meta">精度 ±' + Math.round(DK.pos.accuracy) + 'm</span>' : ''}</div>`;
     else geo = `<div class="ng">${dkEsc(v.judge.reason || '打刻できません')}</div>`;
   }
-  const can = !!(v.judge.ok && v.staff && !DK.busy && !DK.locating);
+  const can = !!(v.judge.ok && v.staff && !DK.busy && !(needGps && DK.locating));
   const dis = can ? '' : ' disabled';
   const msg = DK.msg ? `<div class="${DK.bad ? 'ng' : 'okb'}">${dkEsc(DK.msg)}</div>` : '';
   const recent = DK.recent.length ? `<ul>${DK.recent.map(r => `<li>${dkEsc(r.at)} ${dkEsc(r.kind)}</li>`).join('')}</ul>` : '<p class="meta">まだありません。</p>';
-  const demoBtn = DK.sess.demo && v.office ? '<button type="button" class="loc" data-dk="demo">見本の位置で試す（記録しない）</button>' : '';
+  const demoBtn = DK.sess.demo && v.office && needGps ? '<button type="button" class="loc" data-dk="demo">見本の位置で試す（記録しない）</button>' : '';
+  const locBtn = needGps ? '<button type="button" class="loc" data-dk="loc">位置を取り直す</button>' : '';
   root.innerHTML = `<h3>出退勤打刻</h3><p class="meta">${dkEsc(who)}</p>${msg}${officeHtml}${staffHtml}${geo}
     ${v.office ? `<button type="button" class="go" data-dk="in"${dis}>出勤</button>
     <button type="button" class="go out" data-dk="out"${dis}>退勤</button>
-    <button type="button" class="loc" data-dk="loc">位置を取り直す</button>${demoBtn}
+    ${locBtn}${demoBtn}
     <p class="meta">押し忘れを直す画面は、まだありません。責任者に伝えてください。</p>
     <div class="card"><h4>最近の打刻</h4>${recent}</div>` : ''}`;
   dkBind();
@@ -169,7 +172,17 @@ function dkPickOffice(name) {
   DK.office = name;
   DK.staffId = dkRecall(name, DK.sess.email);
   DK.recent = []; DK.msg = '';
-  dkPaint();
+  DK.posError = '';
+  const office = (DK.data && Dakoku.visibleOffices(DK.data.offices).find(o => o.name === name)) || null;
+  if (office && Dakoku.gpsRequired(office)) {
+    DK.pos = null;
+    dkLocate();
+  } else {
+    DK_LOC_SEQ++;
+    DK.pos = null;
+    DK.locating = false;
+    dkPaint();
+  }
   dkRecent();
 }
 function dkPickStaff(id) {
@@ -203,11 +216,17 @@ async function dkPunch(kind) {
   }
   DK.busy = true; DK.msg = ''; dkPaint();
   try {
-    const j = await dkRpc({
+    const needGps = Dakoku.gpsRequired(v.office);
+    const payload = {
       action: 'punch', office: v.office.name, staffId: v.staff.id, kind: kind,
-      lat: DK.pos.lat, lng: DK.pos.lng, accuracy: DK.pos.accuracy == null ? '' : DK.pos.accuracy,
       email: DK.sess.email, memo: (navigator.userAgent || '').slice(0, 160),
-    });
+    };
+    if (needGps && DK.pos) {
+      payload.lat = DK.pos.lat;
+      payload.lng = DK.pos.lng;
+      payload.accuracy = DK.pos.accuracy == null ? '' : DK.pos.accuracy;
+    }
+    const j = await dkRpc(payload);
     DK.msg = kind + 'を記録しました（' + (j.at || '') + '）';
     DK.bad = false;
     DK.busy = false;
@@ -219,7 +238,7 @@ async function dkPunch(kind) {
   }
 }
 async function renderDakoku() {
-  const back = '<button class="back" type="button" onclick="location.hash=\'rydeen\'">← RYDEENへ</button>';
+  const back = '<button class="back" type="button" onclick="location.hash=\'\'">← ポータルへ</button>';
   $('view').innerHTML = back + '<div class="dk" id="dk_root"><h3>出退勤打刻</h3><p>読み込み中…</p></div>';
   DK.sess = dkSession();
   DK.msg = ''; DK.bad = false; DK.busy = false; DK.recent = [];
@@ -233,7 +252,10 @@ async function renderDakoku() {
   const offices = Dakoku.visibleOffices(DK.data.offices);
   if (!DK.office || !offices.some(o => o.name === DK.office)) DK.office = offices.length ? offices[0].name : '';
   if (!DK.staffId) DK.staffId = dkRecall(DK.office, DK.sess.email);
-  if (offices.length) DK.locating = true;
+  const cur = offices.find(o => o.name === DK.office);
+  const needGps = !!(cur && Dakoku.gpsRequired(cur));
+  if (needGps) DK.locating = true;
   dkPaint();
-  if (offices.length) { dkLocate(); dkRecent(); }
+  if (needGps) dkLocate();
+  if (offices.length) dkRecent();
 }
