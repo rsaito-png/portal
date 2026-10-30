@@ -29,6 +29,7 @@ const cases = [
   ['userinfo', ukRouteFrom('/index.html', '#leo/userinfo', C), 'レオ / 利用者情報（児童ごと）', 'index.html#leo/userinfo'],
   ['group', ukRouteFrom('/index.html', '#leo/g0', C), 'レオ / 全ての画面', 'index.html#leo/g0'],
   ['sign', ukRouteFrom('/index.html', '#sign', C), '書類の確認と署名', 'index.html#sign'],
+  ['dakoku', ukRouteFrom('/index.html', '#dakoku', C), '出退勤打刻', 'index.html#dakoku'],
   ['esign help', ukRouteFrom('/esign-help.html', '', C), '電子サインの使い方', 'esign-help.html'],
   ['acc tax', ukRouteFrom('/acc.html', '#tax', C), '会計（簡易） / 申告', 'acc.html#tax'],
 ];
