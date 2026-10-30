@@ -536,12 +536,41 @@ function kkCopy(t, b) {
   navigator.clipboard.writeText(u).then(() => { b.textContent = 'コピーしました'; }, () => prompt('このリンクをコピーしてください', u));
 }
 
-// ===== 職責（管理者／児発管／現場支援員／事務） =====
+// ===== 職責（管理者／児発管／現場支援員／事務）・所属事業所 =====
 let DUTY = '現場支援員';
+let MY_OFFICE = '';
+let NICCHU = false;
+let IS_CHAIR = false;
 const canManage = () => ROLE === '事務' || ['管理者', '児発管'].includes(DUTY);
+// トップの事業所タイル：事務・管理者・会長は全部、それ以外は所属＋（nicchuなら日中一時）
+function visibleOffices() {
+  if (typeof DEMO !== 'undefined' && DEMO) return C.offices;
+  if (ROLE === '事務' || DUTY === '管理者' || IS_CHAIR) return C.offices;
+  const names = new Set();
+  if (MY_OFFICE) names.add(MY_OFFICE);
+  if (NICCHU) names.add('日中一時支援');
+  const list = C.offices.filter(o => names.has(o.name));
+  return list.length ? list : C.offices.filter(o => o.name === MY_OFFICE);
+}
+function canOpenOffice(o) {
+  if (!o) return false;
+  if (typeof DEMO !== 'undefined' && DEMO) return true;
+  if (ROLE === '事務' || DUTY === '管理者' || IS_CHAIR) return true;
+  return visibleOffices().some(x => x.id === o.id);
+}
 async function loadDuty() {
-  if (DEMO) { DUTY = new URLSearchParams(location.search).get('duty') || (ROLE === '事務' ? '管理者' : '現場支援員'); return; }
-  try { const p = await sb('staff_profiles?select=duty'); DUTY = p[0]?.duty || '現場支援員'; } catch (e) { }
+  if (DEMO) {
+    DUTY = new URLSearchParams(location.search).get('duty') || (ROLE === '事務' ? '管理者' : '現場支援員');
+    MY_OFFICE = ''; NICCHU = false; IS_CHAIR = false;
+    return;
+  }
+  try {
+    const p = await sb('staff_profiles?select=duty,office,nicchu,is_chair');
+    DUTY = p[0]?.duty || '現場支援員';
+    MY_OFFICE = p[0]?.office || '';
+    NICCHU = !!p[0]?.nicchu;
+    IS_CHAIR = !!p[0]?.is_chair;
+  } catch (e) { }
 }
 
 // ===== ヒヤリハット（その事業所の全職員が見る・新着は未読表示） =====
