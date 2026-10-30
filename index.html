@@ -97,7 +97,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261026b"></script>
-<script src="leo.js?v=20261029jcheck2"></script>
+<script src="leo.js?v=20261030office"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=20261030gas"></script>
@@ -283,6 +283,7 @@ async function render() {
   if (id === 'clerk' && sub === 'docs' && (sub2 === 'new' || sub2 === 'paper') && typeof renderDocsForm === 'function') return renderDocsForm(sub2);
   if (id === 'clerk' && sub === 'docs' && typeof renderDocsAdmin === 'function') return renderDocsAdmin();
   const o = C.offices.find(x => x.id === id);
+  if (o && typeof canOpenOffice === 'function' && !canOpenOffice(o)) { location.hash = ''; return; }
   if (o) {
     $('view').innerHTML = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>
       <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
@@ -295,8 +296,9 @@ async function render() {
   // 評定所タイルは HYOJOSHO_HOLD（leaderboard.js）が true のあいだ出さない。戻すときはそのフラグを false に。
   const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
+  const officesHome = (typeof visibleOffices === 'function' ? visibleOffices() : C.offices);
   $('view').innerHTML = `<h3>障害福祉事業</h3>
-    <div class="grid">${C.offices.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
+    <div class="grid">${officesHome.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
     <div id="kankoyo_sec"><h3>官公需</h3><div id="sct_slot"></div></div>
     <h3>共通</h3>
     <div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
