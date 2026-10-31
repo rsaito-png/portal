@@ -1,27 +1,36 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>実施者養成研修</title>
 <style>
-:root{--main:#2e6b4f}
-body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222}
-header{background:var(--main);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}
-header a,header button{color:#fff;background:none;border:1px solid #fff;border-radius:8px;padding:6px 10px}
-main{max-width:720px;margin:auto;padding:16px}
-.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin-bottom:12px}
-input,select,button,textarea{font-size:16px;box-sizing:border-box;padding:10px;margin:4px 0;border-radius:8px;border:1px solid #bbb;width:100%}
-button{background:var(--main);color:#fff;border:0;cursor:pointer;width:auto}
-button.g{background:#fff;color:var(--main);border:1px solid var(--main)}
-nav button{margin-right:6px}
-label{display:block;font-size:14px;color:#555;margin-top:8px}
-.note{color:#666;font-size:14px}.ng{color:#a00}.ok{background:#dff3e4;padding:8px;border-radius:8px}
-table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #eee;padding:6px 4px;text-align:left}
-.sct-cert{background:#fff;border:1px solid #ddd;padding:16px;margin-top:12px}
+:root{--main:#1f5f9e;--main-d:#174a7c;--line:#dde3ea;--bg:#f5f8fb;--text:#1f2a37;--sub:#5b6b7b}
+*{box-sizing:border-box}
+body{font-family:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;margin:0;background:var(--bg);color:var(--text);line-height:1.75;letter-spacing:.02em;-webkit-font-smoothing:antialiased}
+header{background:#fff;color:var(--text);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);border-top:3px solid var(--main);font-weight:600}
+header button{color:var(--main);background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 14px;font-size:14px;margin:0}
+header button:hover{border-color:var(--main)}
+main{max-width:760px;margin:auto;padding:24px 16px 48px}
+h2{font-size:20px;font-weight:600;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+h3{font-size:17px;font-weight:600;margin:0 0 8px}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,42,67,.04)}
+input,select,button,textarea{font-family:inherit;font-size:16px;padding:10px 12px;margin:4px 0;border-radius:6px;border:1px solid #c9d2dc;width:100%;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--main);box-shadow:0 0 0 3px rgba(31,95,158,.12)}
+button{background:var(--main);color:#fff;border:1px solid var(--main);cursor:pointer;width:auto;font-weight:500;transition:background .15s}
+button:hover{background:var(--main-d)}
+button.g{background:#fff;color:var(--main);border:1px solid var(--line)}
+button.g:hover{border-color:var(--main);background:#f3f7fb}
+nav{display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:16px}
+nav button,nav button.g{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;color:var(--sub);padding:10px 14px;margin:0 0 -1px}
+nav button:not(.g){color:var(--main);border-bottom-color:var(--main);font-weight:600;background:none}
+nav button:hover{background:none;color:var(--main)}
+label{display:block;font-size:14px;color:var(--sub);margin-top:10px}
+a{color:var(--main)}
+.note{color:var(--sub);font-size:14px}.ng{color:#b42318}.ok{background:#ecf6f0;color:#1d6b45;border:1px solid #cfe8da;padding:10px 12px;border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0}
+th{background:#f3f6f9;color:var(--sub);font-weight:600;font-size:13px}
+td,th{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;vertical-align:top}
+.sct-cert{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px;margin-top:12px}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
-<link rel="stylesheet" href="theme-retro.css?v=20261030px">
 </head><body>
-<header><span>実施者養成研修</span><span><a href="index.html">職員ポータル</a> <button id="out" hidden onclick="logout()">ログアウト</button></span></header>
+<header><span>実施者養成研修</span><span><button id="out" hidden onclick="logout()">ログアウト</button></span></header>
 <main>
 <div id="start" class="card"><p>歯科医師・看護師・精神保健福祉士・公認心理師の方が、日時の決まった研修を申し込むページです。ログインやアカウント作成は不要です。</p>
 <button onclick="startGuest()">申し込みを始める</button>
