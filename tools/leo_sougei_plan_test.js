@@ -126,7 +126,7 @@ assert.ok(emptyHtml.includes('友香先生'));
 assert.ok(emptyHtml.includes('見本小学校'));
 assert.ok(emptyHtml.includes('1号車'));
 assert.ok(emptyHtml.includes('未定'));
-assert.ok(emptyHtml.includes('自宅'));
+assert.ok(!emptyHtml.includes('自宅'), '場所が空欄のときは自宅と補わない');
 assert.ok(emptyHtml.includes('自分の担当だけ見る'));
 assert.ok(emptyHtml.includes('（見本）助手席の後ろ'));
 assert.ok(!emptyHtml.includes('この期間の日誌タブがまだありません'));

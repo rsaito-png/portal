@@ -151,7 +151,7 @@ begin
   if not found then return null; end if;
   select coalesce(jsonb_agg(jsonb_build_object('dow', k->>'曜日', 'start', k->>'利用開始', 'end', k->>'利用終了',
       'weekly', coalesce(k->>'利用週', '毎週') <> '不定期', 'parent', coalesce(k->>'保護者送迎', ''),
-      'school_time', coalesce(nullif(k->>'学校お迎え時刻（基準）※空欄なら迎え開始', ''), nullif(k->>'迎え開始', '')), 'pick_place', nullif(k->>'迎え場所', ''), 'drop_place', coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'))
+      'school_time', coalesce(nullif(k->>'学校お迎え時刻（基準）※空欄なら迎え開始', ''), nullif(k->>'迎え開始', '')), 'pick_place', nullif(btrim(k->>'迎え場所', E' \t　'), ''), 'drop_place', nullif(btrim(k->>'送り場所（空欄なら自宅）', E' \t　'), ''))
       order by position(k->>'曜日' in '月火水木金土')), '[]') into reg from leo_sched_kata(r.child) k;
   select coalesce(to_jsonb(leo_sched_closed(r.month)), '[]') into closed;
   select jsonb_build_object('month', a.month, 'answered_at', a.answered_at, 'same_month', a.month = r.month, 'answer', a.answer) into prev
@@ -225,7 +225,7 @@ begin
   insert into _lsv
   select d.day, public.leo_name_canon(kata.k->>'児童名'), d.dow, kata.k->>'利用開始', kata.k->>'利用終了', nullif(kata.k->>'迎え開始', ''), nullif(kata.k->>'送り終了', ''),
     leo_sched_staff(kata.k->>'迎え担当'), leo_sched_staff(kata.k->>'送り担当'), nullif(kata.k->>'迎え順', '')::int, nullif(kata.k->>'送り順', '')::int, coalesce(kata.k->>'保護者送迎', ''),
-    coalesce(nullif(kata.k->>'迎え場所', ''), case when nullif(kata.k->>'迎え開始', '') is null then '自宅' else '（未登録）' end), coalesce(nullif(kata.k->>'送り場所（空欄なら自宅）', ''), '自宅'), false, false
+    coalesce(btrim(kata.k->>'迎え場所', E' \t　'), ''), coalesce(btrim(kata.k->>'送り場所（空欄なら自宅）', E' \t　'), ''), false, false
   from (select d::date as day, (array['日','月','火','水','木','金','土'])[extract(dow from d)::int + 1] as dow from generate_series(p_month, last_day, interval '1 day') d) d
   join (
     select distinct on (public.leo_name_canon(k->>'児童名'), k->>'曜日') k
@@ -279,7 +279,9 @@ begin
     order by r.kata, w.dow, w.answered_at desc nulls last, w.child
   ) w
   where w.kata = s.child and w.dow = s.dow and s.ps is not null and w.school_time <> s.ps;
-  update _lsv s set pplace = coalesce(w.pick_place, s.pplace), dplace = coalesce(w.drop_place, s.dplace)
+  -- 迎え場所・送り場所：保護者の回答に場所が入っていれば（空白だけは空欄扱い）それを使い、空欄なら型表の値を使う。
+  -- どちらも空欄なら空欄のまま（自宅や（未登録）は入れない）。日ごとの連絡の「送り場所変更」は、下の例外処理でその日だけ上書きする。
+  update _lsv s set pplace = coalesce(nullif(btrim(w.pick_place, E' \t　'), ''), s.pplace), dplace = coalesce(nullif(btrim(w.drop_place, E' \t　'), ''), s.dplace)
   from (
     select distinct on (r.kata, w.dow) r.kata, w.dow, w.pick_place, w.drop_place
     from _nres r join leo_schedule_weekday w on w.child = r.answer and w.month = p_month
@@ -303,7 +305,7 @@ begin
       if not exists (select 1 from _lsv where child = v.child and day = v.day) and v.day <> all(closed) then
         insert into _lsv select v.day, v.child, d.dow, k->>'利用開始', k->>'利用終了', nullif(k->>'迎え開始', ''), nullif(k->>'送り終了', ''),
             leo_sched_staff(k->>'迎え担当'), leo_sched_staff(k->>'送り担当'), nullif(k->>'迎え順', '')::int, nullif(k->>'送り順', '')::int, coalesce(k->>'保護者送迎', ''),
-            coalesce(nullif(k->>'迎え場所', ''), case when nullif(k->>'迎え開始', '') is null then '自宅' else '（未登録）' end), coalesce(nullif(k->>'送り場所（空欄なら自宅）', ''), '自宅'), false, false
+            coalesce(btrim(k->>'迎え場所', E' \t　'), ''), coalesce(btrim(k->>'送り場所（空欄なら自宅）', E' \t　'), ''), false, false
           from (select (array['日','月','火','水','木','金','土'])[extract(dow from v.day)::int + 1] dow) d,
             lateral (select k from leo_sched_kata_all() k where public.leo_name_canon(k->>'児童名') = v.child order by (k->>'曜日' = d.dow) desc, (k->>'児童名' = v.child) desc, k->>'曜日' limit 1) kk(k);
         if not found then warn := warn || jsonb_build_array(jsonb_build_object('child', v.child, 'msg', to_char(v.day, 'MM/DD') || ' 追加利用：型表に行がないため作れません')); end if;
@@ -344,7 +346,7 @@ begin
             from (select *, max(ks) over (partition by day, pst order by ps, pord rows between unbounded preceding and 1 preceding) pm from _lsv where ps is not null and not parent_drop) a) b
       group by day, pst, grp loop
     ev := ev || jsonb_build_array(jsonb_build_object('day', g.day, 'kind', '迎え', 'kids', g.kids, 'staff', g.staff, 'start_time', g.st, 'end_time', g.en, 'kid_places', g.kp, 'kid_times', g.kt,
-      'place', (select string_agg(distinct x, '、') from jsonb_each_text(g.kp) e(k, x) where x <> '自宅'), 'title', '☆' || array_to_string(g.kids, '→')));
+      'place', (select string_agg(distinct x, '、') from jsonb_each_text(g.kp) e(k, x) where coalesce(x, '') <> '' and x <> '自宅'), 'title', '☆' || array_to_string(g.kids, '→')));
     if g.staff is null then warn := warn || jsonb_build_array(jsonb_build_object('child', array_to_string(g.kids, '・'), 'msg', to_char(g.day, 'MM/DD') || ' 迎えの担当が決まっていません')); end if;
   end loop;
   for g in select day, dst staff, array_agg(child order by dord nulls last, ke) kids, min(ke) st, max(pe) en,
@@ -353,7 +355,7 @@ begin
             from (select *, max(coalesce(pe, ke)) over (partition by day, dst order by ke, dord rows between unbounded preceding and 1 preceding) pm from _lsv where not parent_pick and (pe is not null or dst is not null)) a) b
       group by day, dst, grp loop
     ev := ev || jsonb_build_array(jsonb_build_object('day', g.day, 'kind', '送り', 'kids', g.kids, 'staff', g.staff, 'start_time', g.st, 'end_time', g.en, 'kid_places', g.kp, 'kid_times', g.kt,
-      'place', (select string_agg(distinct x, '、') from jsonb_each_text(g.kp) e(k, x) where x <> '自宅'), 'title', '★' || array_to_string(g.kids, '→')));
+      'place', (select string_agg(distinct x, '、') from jsonb_each_text(g.kp) e(k, x) where coalesce(x, '') <> '' and x <> '自宅'), 'title', '★' || array_to_string(g.kids, '→')));
     if g.staff is null then warn := warn || jsonb_build_array(jsonb_build_object('child', array_to_string(g.kids, '・'), 'msg', to_char(g.day, 'MM/DD') || ' 送りの担当が決まっていません')); end if;
   end loop;
   for g in select e.day, e.staff, e.title from leo_events e where e.kind = '不在' and e.day >= p_month and e.day <= last_day loop

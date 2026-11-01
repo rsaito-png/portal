@@ -248,7 +248,7 @@ function leoPlanTableHtml(events, care) {
   jobs.forEach(j => { if (!map[j.day]) { map[j.day] = []; days.push(j.day); } map[j.day].push(j); });
   const cell = (v, ng) => v ? esc(v) : `<b style="color:#c00">${ng}</b>`;
   return days.map(d => `<h4>${fmtDay(d)}　予定表</h4><div class="sheet-scroll"><table class="sougei-view"><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>担当</th><th>車</th></tr>${map[d].map(j =>
-    `<tr><td>${esc(j.t)}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}</td><td>${esc(j.p) || '自宅'}</td><td>${cell(j.dr, '未定')}</td><td>${cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`).join('');
+    `<tr><td>${esc(j.t)}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}</td><td>${esc(j.p)}</td><td>${cell(j.dr, '未定')}</td><td>${cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`).join('');
 }
 function leoTileStatus(nikkiRows, events, day) {
   const all = (nikkiRows || []).filter(r => r.day === day);
@@ -348,7 +348,7 @@ function leoSougeiAllHtml(rows, events, care) {
     const bad = jobs.filter(j => j.cal !== 'del' && (!j.dr || !j.car)).length;
     const goneHtml = gone.length ? `<p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(r.child)).join('、')}</small></p>` : '';
     return `<h4>${fmtDay(d)}　${bad ? `<span style="color:#c00">未確定 ${bad}件</span>` : '全て確定'}</h4>${goneHtml}<div class="sheet-scroll"><table class="sougei-view"><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>担当</th><th>車</th></tr>${jobs.map(j =>
-      `<tr><td>${j.cal === 'del' ? '' : esc(j.t || '')}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}${leoCalMark(!!j.cal)}</td><td>${j.cal === 'del' ? '' : (esc(j.p) || '自宅')}</td><td>${j.cal === 'del' ? '' : cell(j.dr, '未定')}</td><td>${j.cal === 'del' ? '' : cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`;
+      `<tr><td>${j.cal === 'del' ? '' : esc(j.t || '')}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}${leoCalMark(!!j.cal)}</td><td>${j.cal === 'del' ? '' : esc(j.p)}</td><td>${j.cal === 'del' ? '' : cell(j.dr, '未定')}</td><td>${j.cal === 'del' ? '' : cell(j.car, '未定')}</td></tr>`).join('')}</table></div>`;
   }).join('');
   const planHtml = plan.length ? `<p class="note">${LEO_PLAN_NOTE}</p>${leoPlanTableHtml(plan, CARE)}` : '';
   const body = (nikkiHtml || planHtml) ? `${nikkiHtml}${planHtml}` : noTab();
@@ -399,7 +399,7 @@ const LEO_VIEWS = {
     const disp = c => leoFullChildName(c, roster);
     const msg = c => [...cc.filter(x => (typeof sameChildName === 'function' ? sameChildName(x.child, c) : N(x.child) === N(c)) && x.note).map(x => '送迎の配慮：' + x.note), ...ci.filter(x => (typeof sameChildName === 'function' ? sameChildName(x.name, c) : N(x.name) === N(c)) && x.note).map(x => 'メモ：' + x.note)];
     const head = `<h3>${PLABEL[PERIOD]}の利用児童</h3>${periodTabs('kids')}${demoNote()}<p><small>伝達事項は <a href="#leo/userinfo">利用者情報</a>（メモ・送迎の配慮）に書いたものです。</small></p>`;
-    const ride = (label, flag, time, place, driver) => flag === 'del' ? `${label}：カレンダーで変更` : `${label}：${esc(time)} ${esc(place || '自宅')}（${esc(driver) || '未定'}）`;
+    const ride = (label, flag, time, place, driver) => flag === 'del' ? `${label}：カレンダーで変更` : `${label}：${esc(time)} ${esc(place || '')}（${esc(driver) || '未定'}）`;
     if (!days.length && !DEMO) {
       let ev = evs.filter(e => e.kind === '利用' && e.child && !leoCalHidden(e));
       if (!ev.length) {
@@ -445,7 +445,7 @@ const LEO_VIEWS = {
     return `<h3>送迎 型表（曜日ごと・見るだけ）</h3>${demoNote()}<p class="note">いつもの予定です。その日の変更は日誌・カレンダーが正です。退所した児童は下に分けて表示しています（型表の行は残したまま、保存はしていません）。</p>` + dows.map(w =>
       `<h4>${w}曜日</h4><div class="sheet-scroll"><table class="kata-view"><tr><th>児童</th><th>迎え</th><th>送り</th></tr>${active.filter(r => r['曜日'] === w).map(r => r['保護者送迎']
         ? `<tr><td>${cell(r)}</td><td colspan="2">保護者送迎（${esc(r['利用開始'])}〜${esc(r['利用終了'])}）</td></tr>`
-        : `<tr><td>${cell(r)}</td><td>${esc(r['迎え開始'])} ${esc(r['迎え担当'])}<br><small>${esc(r['迎え場所'])}</small></td><td>${esc(r['送り終了'])} ${esc(r['送り担当'])}<br><small>${esc(r['送り場所（空欄なら自宅）']) || '自宅'}</small></td></tr>`).join('')}</table></div>`).join('')
+        : `<tr><td>${cell(r)}</td><td>${esc(r['迎え開始'])} ${esc(r['迎え担当'])}<br><small>${esc(r['迎え場所'])}</small></td><td>${esc(r['送り終了'])} ${esc(r['送り担当'])}<br><small>${esc(r['送り場所（空欄なら自宅）'])}</small></td></tr>`).join('')}</table></div>`).join('')
       + (leftNames.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:bold">退所した児童（${leftNames.length}人）</summary><p class="note">型表には残しています。退所日の翌日以降の利用予定・カレンダー・送迎には出しません。</p><ul>${leftNames.map(n => `<li>${esc(n)}${leftMark(LEFT, n, tday)}</li>`).join('')}</ul></details>` : '');
   },
   async keikaku() {
