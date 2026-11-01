@@ -38,12 +38,12 @@ async function load() {
     regular: [{ dow: '月', weekly: true, parent: '', school_time: null, pick_place: '〇〇小学校', drop_place: '自宅' }, { dow: '水', weekly: true, parent: '母の送り', school_time: null }, { dow: '金', weekly: true, parent: '', school_time: null, pick_place: '〇〇小学校', drop_place: '自宅' }, { dow: '木', weekly: false, parent: '', school_time: null }],
     prev: { month: '2026-11', same_month: false, answer: { weekdays: { 月: { use: true, school_time: '15:00' }, 金: { use: true, school_time: '14:30' } } } } };
   else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); const r = await rpc('leo_sched_get', { p_token: T }); D = r.ok ? await r.json() : null; if (!D) return bad(); }
-  // 初期値＝前回（または今回すでに送った）回答 → 型表 の順
+  // 初期値＝前回（または今回すでに送った）回答。ただし場所（お迎え・送り）だけは型表の値から始める（型表が空欄なら空欄）
   const pa = (D.prev && D.prev.answer) || {}, pw = pa.weekdays || {};
   const dows = [...new Set([...(D.regular || []).map(r => r.dow), ...Object.keys(pw)])];
   const list = (dows.length ? dows : ['月', '火', '水', '木', '金']).sort((a, b) => '月火水木金土'.indexOf(a) - '月火水木金土'.indexOf(b));
   for (const w of list) { const r = (D.regular || []).find(x => x.dow === w) || {}, p = pw[w] || {};
-    S.wd[w] = { use: p.use !== undefined ? !!p.use : (r.weekly !== false && !!r.dow), school_time: hm(p.school_time || r.school_time), pick_place: p.pick_place || r.pick_place || '', drop_place: p.drop_place || r.drop_place || '自宅', parent: r.parent || '', irregular: r.weekly === false }; }
+    S.wd[w] = { use: p.use !== undefined ? !!p.use : (r.weekly !== false && !!r.dow), school_time: hm(p.school_time || r.school_time), pick_place: r.pick_place || '', drop_place: r.drop_place || '', parent: r.parent || '', irregular: r.weekly === false }; }
   if (D.prev && D.prev.same_month) { S.note = pa.note || ''; for (const x of pa.days || []) { const e = S.days[x.day] = S.days[x.day] || {}; e[x.kind] = { time: hm(x.time), place: x.place || '' }; } }
   render();
 }
