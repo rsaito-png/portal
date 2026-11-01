@@ -264,7 +264,7 @@ assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '個別支
 assert.strictEqual(leo.mine['現場支援員'].join('|'), '日誌（児童ごと）');
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
-assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|今日やること（児発管）');
+assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|今日やること（児発管）|日誌（見る・直す）');
 assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|上限額管理');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
@@ -309,6 +309,25 @@ function renderLeoHome(role, duty) {
   });
 });
 const kanri = renderLeoHome('職員', '児発管');
+// 中村 友香がする の欄に 今日の日誌（#leo/nikki）。他の欄・毎日やるには増やさない
+{
+  const nikkiHref = leo.tiles.find(t => t[1] === '日誌（見る・直す）')[2];
+  assert.strictEqual(nikkiHref, '#leo/nikki');
+  assert.ok(!leo.who[1][1].includes('日誌（見る・直す）'), '宮本の欄には置かない');
+  [['職員', '現場支援員'], ['職員', '児発管'], ['職員', '管理者'], ['事務', '現場支援員']].forEach(([role, duty]) => {
+    const b = renderLeoHome(role, duty);
+    const nk = b.indexOf('中村 友香がする'), mi = b.indexOf('宮本がする');
+    const sec = b.slice(nk, mi >= 0 ? mi : undefined);
+    assert.ok(sec.includes('href="#leo/nikki"') && sec.includes('今日の日誌'), role + '/' + duty + ' 中村の欄に今日の日誌');
+    assert.strictEqual(sec.split('href="#leo/nikki"').length - 1, 1);
+    const daily = b.slice(b.indexOf('毎日やる'), b.indexOf('</div>', b.indexOf('毎日やる')));
+    assert.ok(!daily.includes('#leo/nikki'), '毎日やるには置かない');
+    if (mi >= 0) assert.ok(!b.slice(mi).includes('href="#leo/nikki"'), '宮本の欄以降に重ねない');
+  });
+  const nakamura = renderLeoHome('職員', '児発管');
+  const sec = nakamura.slice(nakamura.indexOf('中村 友香がする'), nakamura.indexOf('宮本がする'));
+  assert.ok(sec.indexOf('今日やること') < sec.indexOf('今日の日誌'), '中村の欄の最後');
+}
 assert.ok(kanri.indexOf('宮本がする') < kanri.indexOf('不具合・修正の依頼'), 'who の下');
 assert.ok(kanri.indexOf('上限額管理') < kanri.indexOf('不具合・修正の依頼'), '宮本の欄の下');
 const routineAt = kanri.indexOf('管理系ルーティン');
