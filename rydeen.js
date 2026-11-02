@@ -1,14 +1,14 @@
 // RYDEEN（就労継続支援B型）。b-portal(Next.js) を、法人ポータルと同じ素のHTML/JSで作り直したもの。
 // ログインは法人ポータルのセッション(localStorage 'sess')をそのまま使う。権限は bp_profiles(admin/worker, office=RYDEEN)。
-// 画面側でも遮断するが、本体は Supabase の RLS（supabase/schema は b-portal の schema.sql ＋ supabase/rydeen_journal.sql）。
+// 画面側でも遮断するが、本体は Supabase の RLS（supabase/schema は b-portal の schema.sql ＋ supabase/rydeen_journal.sql ＋ supabase/rydeen_wage.sql）。
 // 個人データはこのファイルに書かない（リポジトリは公開）。
 const RYD = { me: null, st: {}, loaded: {} };
 const RV = {};            // 管理画面の各ページ: RV[名前] = async () => html を描画
 const RW = {};            // 利用者画面の各ページ
-const RY_ADMIN_NAV = [['home', 'ホーム'], ['journal', '業務日誌'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者'], ['contracts', '契約・重説'], ['plans', '個別支援計画'],
+const RY_ADMIN_NAV = [['home', 'ホーム'], ['journal', '業務日誌'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['wage', '工賃'], ['users', '利用者'], ['contracts', '契約・重説'], ['plans', '個別支援計画'],
   ['staff', '勤務実績表'], ['tasks', '作業タスク'], ['manuals', 'マニュアル'], ['reports', '日報'], ['notes', 'メモ・ファイル']];
-const RY_WORKER_NAV = [['home', '今日の作業'], ['manuals', 'マニュアル'], ['report', '日報を書く']];
-const RY_FILES = { journal: 'rydeen-journal.js', records: 'rydeen-journal.js', contracts: 'rydeen-docs.js', plans: 'rydeen-docs.js', staff: 'rydeen-staff.js?v=20261030dakoku', billing: 'rydeen-bill.js' };
+const RY_WORKER_NAV = [['home', '今日の作業'], ['wage', '工賃'], ['manuals', 'マニュアル'], ['report', '日報を書く']];
+const RY_FILES = { journal: 'rydeen-journal.js', records: 'rydeen-journal.js', contracts: 'rydeen-docs.js', plans: 'rydeen-docs.js', staff: 'rydeen-staff.js?v=20261030dakoku', billing: 'rydeen-bill.js', wage: 'rydeen-wage.js?v=20261102wage' };
 
 // ---------- 共通の小物 ----------
 const ryEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -119,6 +119,7 @@ async function renderRydeen(sub) {
     const me = await ryMe();
     if (!me) return ryShow(ryBack + '<div class="card ry"><p class="big">B型の利用権限がありません。</p><p>管理者に、B型への登録を依頼してください。</p></div>');
     if (me.role === 'worker') {
+      if (sub === 'wage' && !RW.wage) await ryScript(RY_FILES.wage);
       if (!RW[sub]) sub = 'home';
       return await RW[sub](sub);
     }
@@ -138,7 +139,7 @@ RV.home = async () => {
   const card = (n, l, h) => `<a class="tile" href="#rydeen/${h}"><span class="big">${n}</span>${l}</a>`;
   ryAdminFrame('home', `<h4>きょうの状況（${t}）</h4><div class="grid">${card(w, '利用者数', 'users')}${card(j, '本日の日誌 入力済み', 'journal')}${card(u, '署名待ちの実績記録票', 'records')}${card(r, '本日の日報', 'reports')}${card(k, '本日のタスク', 'tasks')}</div>
     <p class="note"><a href="#dakoku">出退勤打刻</a>（スマホ。事業所の近くだけ。勤務実績表とは別）</p>
-    ${[['毎日やること', '職員が入力するのは、ここだけです', ['journal', 'reports', 'tasks']], ['月末にやること', '日誌から自動で転記・集計されます。確認して請求します', ['records', 'billing', 'staff']], ['利用者まわり', '', ['users', 'contracts', 'plans']], ['資料', '', ['manuals', 'notes']]].map(([t, n, ks]) => `<h4>${t}</h4>${n ? `<p class="note">${n}</p>` : ''}<div class="grid">${ks.map(k2 => `<a class="tile" href="#rydeen/${k2}">${(RY_ADMIN_NAV.find(x => x[0] === k2) || [0, k2])[1]}</a>`).join('')}</div>`).join('')}`);
+    ${[['毎日やること', '職員が入力するのは、ここだけです', ['journal', 'reports', 'tasks']], ['月末にやること', '日誌から自動で転記・集計されます。確認して請求します', ['records', 'billing', 'wage', 'staff']], ['利用者まわり', '', ['users', 'contracts', 'plans']], ['資料', '', ['manuals', 'notes']]].map(([t, n, ks]) => `<h4>${t}</h4>${n ? `<p class="note">${n}</p>` : ''}<div class="grid">${ks.map(k2 => `<a class="tile" href="#rydeen/${k2}">${(RY_ADMIN_NAV.find(x => x[0] === k2) || [0, k2])[1]}</a>`).join('')}</div>`).join('')}`);
 };
 
 // ---------- 職員: 利用者 ----------
