@@ -264,13 +264,13 @@ assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '個別支
 assert.strictEqual(leo.mine['現場支援員'].join('|'), '日誌（児童ごと）');
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
-assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|今日やること（児発管）|日誌（見る・直す）');
+assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|今日やること（児発管）|日誌（見る・直す）|配置表・型表・管理表・送迎の配慮の入力');
 assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|上限額管理');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
 const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, ['出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く', '不具合・修正の依頼']));
 const uncovered = leo.tiles.map(t => t[1]).filter(n => !groupNames.has(n) && !onHome.has(n)).sort();
-assert.strictEqual(uncovered.join('|'), ['公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '受給者証の入力（保護者から）', '職員配置表', '書類', '配置表・型表・管理表・送迎の配慮の入力', '日誌の元シート（参考・旧）', '実績記録（児童ごと）'].sort().join('|'));
+assert.strictEqual(uncovered.join('|'), ['公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '受給者証の入力（保護者から）', '職員配置表', '書類', '日誌の元シート（参考・旧）', '実績記録（児童ごと）'].sort().join('|'));
 ['出退勤打刻', 'ヒヤリハット', '今日の利用児童', 'LINE報告を書く', '不具合・修正の依頼', '日誌（児童ごと）', '上限額管理', '今日やること（児発管）'].forEach(n => assert.ok(!groupNames.has(n), '毎日やると重ねない: ' + n));
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 assert.ok(!leo.groups[0][2].includes('LINE報告を書く'), 'LINE報告は現場に重ねない');
@@ -326,7 +326,11 @@ const kanri = renderLeoHome('職員', '児発管');
   });
   const nakamura = renderLeoHome('職員', '児発管');
   const sec = nakamura.slice(nakamura.indexOf('中村 友香がする'), nakamura.indexOf('宮本がする'));
-  assert.ok(sec.indexOf('今日やること') < sec.indexOf('今日の日誌'), '中村の欄の最後');
+  assert.ok(sec.indexOf('今日やること') < sec.indexOf('今日の日誌'), '日誌は今日やることのあと');
+  assert.ok(sec.indexOf('今日の日誌') < sec.indexOf('配置表・型表・管理表'), '入力画面は日誌のあと');
+  assert.ok(sec.includes('href="#leo/master"'), '中村の欄に入力画面');
+  assert.ok(!leo.who[1][1].includes('配置表・型表・管理表・送迎の配慮の入力'), '宮本の欄には置かない');
+  assert.ok(leo.groups[0][2].includes('送迎 型表'), '現場の型表はそのまま');
 }
 assert.ok(kanri.indexOf('宮本がする') < kanri.indexOf('不具合・修正の依頼'), 'who の下');
 assert.ok(kanri.indexOf('上限額管理') < kanri.indexOf('不具合・修正の依頼'), '宮本の欄の下');
