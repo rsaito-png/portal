@@ -66,6 +66,10 @@ assert.ok(between(leo, 'async nikki()', 'async jisseki()').includes('leoRecordDa
 assert.ok(between(leo, 'async jisseki()', '// 保護者の実績確認').includes('rpc/leo_record_span'));
 assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoView').includes('rpc/leo_nikki_apply'));
 assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoView').includes('nikkiEditValue'));
+assert.ok(sql.includes('kata_drop'), '空の送り時刻は型表で埋める');
+assert.ok(sql.includes("k->>'送り終了'"), '型表の送り終了を読む');
+assert.ok(sql.includes("d_src is distinct from 'kata'"), 'カレンダーで直した時刻を型表で上書きしない');
+assert.ok(/drop_time = coalesce\(nullif\(btrim\(n\.drop_time\), ''\), d_time\)/.test(sql), '入っている送り時刻は残す');
 assert.ok(between(leo, 'async function saveDiary', 'let LD_DAY').includes('rpc/leo_activity_from_drafts'));
 
 console.log('leo_record_flow_test: ok');

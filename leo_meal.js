@@ -41,8 +41,12 @@
     const snack = snackRaw ? leoMealFlag(snackRaw) : '';
     if (mealRaw && !meal) err.push('食事提供は「あり」か「なし」にしてください');
     if (snackRaw && !snack) err.push('おやつ提供は「あり」か「なし」にしてください');
-    if (String(f.meal_note || '').trim().length > 500) err.push('食事の内容は500文字以内にしてください');
-    const body = { meal: meal || null, snack: snack || null, meal_note: leoClip(f.meal_note, 500) || null };
+    const body = { meal: meal || null, snack: snack || null };
+    // 内容欄が画面に無いときはキーを付けない。保存が空文字で入っている内容を消さない。
+    if (Object.prototype.hasOwnProperty.call(f, 'meal_note')) {
+      if (String(f.meal_note || '').trim().length > 500) err.push('食事の内容は500文字以内にしてください');
+      body.meal_note = leoClip(f.meal_note, 500) || null;
+    }
     if (Object.prototype.hasOwnProperty.call(f, 'day_note')) {
       if (String(f.day_note || '').trim().length > 2000) err.push('この日の記録は2000文字以内にしてください');
       body.day_note = leoClip(f.day_note, 2000) || null;
