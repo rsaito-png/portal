@@ -217,7 +217,7 @@ function kmHtml() {
   return '<div id="km-root"><h3>' + kmEsc(K.reiwa(KM.ym)) + '</h3>'
     + '<p class="note">' + kmEsc(svc.office) + '　' + kmEsc(svc.label) + '。職員の配置はこの月の共通の記録です（レオと茶夢で同じ）。利用者数はサービスごとです。' + (KM.entry === 'chamu' ? ' 曜日ごとの一覧は <a href="#chamu/haichi">職員配置表</a>。' : '')
     + ' <a href="#dakoku">出退勤打刻</a>は実態で、この表は監査用の配置です。</p>'
-    + '<p class="note">常勤 10:00–18:00（月〜金、齊藤・友香。水も両方）。非常勤は月火木 安藤11:00–14:00、金 安藤11:00–14:30、水 加藤11:00–14:00、文は月〜金14:00–17:00。金曜は安藤が14:30まで、文は14:00からで30分重なります。上段が開始、中段が終了、下段が勤務時間（休憩を含んでよい）。非常勤の職種略称の初期値は「指導」です。</p>'
+    + '<p class="note">常勤 10:00–18:00（月〜金、齊藤・友香。水も両方）。非常勤は月火木金 安藤11:00–14:00、水 加藤11:00–14:00、文は月〜金14:00–17:00。安藤と文は14:00で引き継ぎ、重なりません。上段が開始、中段が終了、下段が勤務時間（休憩を含んでよい）。非常勤の職種略称の初期値は「指導」です。</p>'
     + tabs
     + '<div class="km-bar noprint"><button type="button" class="km-b" onclick="kmShiftMonth(-1)">← 前の月</button>'
     + '<input class="mo" id="km-ym" type="month" value="' + kmEsc(KM.ym) + '" onchange="kmSetMonth(this.value)">'

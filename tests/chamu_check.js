@@ -121,7 +121,7 @@ const run = (users, records, settings) => {
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
 assert.ok(html.includes('chamu.js?v=202611021700'));
-assert.ok(html.includes('leo_kinmu.js?v=20261102kinmu'));
+assert.ok(html.includes('leo_kinmu.js?v=20261102f1400'));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
 assert.strictEqual(L.journalSavedNotice(['  ', '利用者A: 時刻空欄→11:00-15:00補完']).body, '記録票に転記しました。\n利用者A: 時刻空欄→11:00-15:00補完');
@@ -195,7 +195,7 @@ assert.deepStrictEqual(L.shiftIssues(seed), []);
   assert.deepStrictEqual(seed.filter(r => r.dow === dow && r.employment === '常勤').map(r => r.staff_name), ['齊藤', '中村友香'], dow);
 });
 assert.deepStrictEqual(seed.filter(r => r.staff_name === '安藤尚子').map(r => [r.dow, r.start_time, r.end_time]), [
-  ['月', '11:00', '14:00'], ['火', '11:00', '14:00'], ['木', '11:00', '14:00'], ['金', '11:00', '14:30'],
+  ['月', '11:00', '14:00'], ['火', '11:00', '14:00'], ['木', '11:00', '14:00'], ['金', '11:00', '14:00'],
 ]);
 assert.deepStrictEqual(seed.filter(r => r.staff_name === '加藤幸弘').map(r => [r.dow, r.start_time, r.end_time]), [['水', '11:00', '14:00']]);
 assert.strictEqual(seed.filter(r => r.staff_name === '中村文').length, 5);
@@ -216,7 +216,7 @@ Object.entries(weekDates).forEach(([dow, ymd]) => {
 assert.strictEqual(fumiMin, 900);
 assert.deepStrictEqual(L.dayShift('2026-11-02', seed).notes, []);
 assert.deepStrictEqual(L.dayShift('2026-11-05', seed).notes, []);
-assert.deepStrictEqual(L.dayShift('2026-11-06', seed).notes, ['安藤尚子と中村文が 14:00〜14:30 重なっています']);
+assert.deepStrictEqual(L.dayShift('2026-11-06', seed).notes, []);
 assert.ok(L.dayShift('2026-11-04', seed).people.some(p => p.name === '齊藤'));
 assert.ok(!L.dayShift('2026-11-04', seed).people.some(p => p.name === '安藤尚子'));
 assert.ok(L.dayShift('2026-11-05', seed).people.some(p => p.name === '安藤尚子' && p.start === '11:00' && p.end === '14:00'));
@@ -228,8 +228,8 @@ assert.strictEqual(sun.open, false);
 assert.strictEqual(sat.people.length, 0);
 assert.ok(L.dayShiftHtml('2026-11-07', seed).includes('土日は配置がありません'));
 const weekHtml = L.weekShiftHtml(seed);
-assert.ok(weekHtml.includes('10:00〜18:00') && weekHtml.includes('14:30') && weekHtml.includes('配置はありません'));
-assert.ok(weekHtml.includes('安藤尚子と中村文が 14:00〜14:30 重なっています'));
+assert.ok(weekHtml.includes('10:00〜18:00') && weekHtml.includes('11:00〜14:00') && weekHtml.includes('配置はありません'));
+assert.ok(!weekHtml.includes('14:30') && !weekHtml.includes('重なっています'));
 ['齊藤', '中村友香', '安藤尚子', '中村文', '加藤幸弘'].forEach(n => assert.ok(weekHtml.includes(n), n));
 assert.ok(!weekHtml.includes('時給') && !weekHtml.includes('1150') && !weekHtml.includes('80000') && !weekHtml.includes('11.5') && !weekHtml.includes('円'));
 const dirty = L.dayShiftHtml('2026-11-02', [{ dow: '月', staff_name: '齊藤', employment: '常勤', start_time: '10:00', end_time: '18:00', hourly_wage: 'secret-pay' }]);
