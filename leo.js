@@ -35,7 +35,7 @@ const DEMO_DATA = {
   ],
 };
 // 日誌で「直せる」項目。直すと1分ほどで Google の日誌に反映（box の apply_edits.py）
-// activity＝日誌Q列（活動記録・LINEからスパークが書く児童の様子）。食事・おやつ・加算は料金に関わるので直さない（日誌で直接）
+// activity＝日誌の活動記録（LINEから入る児童の様子）。食事提供と総合日誌はポータルの別表（leo_meal_record / leo_day_log）。シートの食事・おやつ列と国保連には写さない
 const NIKKI_FIELDS = [['activity','活動記録（児童の様子）'],['pick_place','迎え場所'],['pick_time','迎え時刻'],['pick_driver','迎え運転手'],['start_time','開始'],['end_time','終了'],
   ['drop_time','送り時刻'],['drop_driver','送り運転手'],['drop_place','送り場所']];
 
@@ -73,7 +73,14 @@ function range() {
 const PLABEL = { today: '今日', tomorrow: '明日', week: '今週' };
 const periodTabs = view => '<p class="ptabs">' + Object.entries(PLABEL).map(([k, l]) =>
   `<button class="${k === PERIOD ? 'on' : ''}" onclick="PERIOD='${k}';renderLeoView('${view}')">${l}</button>`).join('') + '</p>';
-const fmtDay = d => { const x = new Date(d + 'T00:00:00+09:00'); return isNaN(x) ? d : `${x.getMonth() + 1}/${x.getDate()}（${'日月火水木金土'[x.getDay()]}）`; };
+const fmtDay = d => {
+  const x = new Date(String(d) + 'T00:00:00+09:00');
+  if (isNaN(x)) return String(d ?? '');
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }).formatToParts(x);
+  const get = t => (p.find(v => v.type === t) || {}).value || '';
+  const wk = { Sun: '日', Mon: '月', Tue: '火', Wed: '水', Thu: '木', Fri: '金', Sat: '土' };
+  return `${get('month')}/${get('day')}（${wk[get('weekday')] || ''}）`;
+};
 async function loadNikki() {
   if (DEMO) return DEMO_DATA.nikki.map(r => ({ ...r, day: today() }));
   const [a, b] = range();
@@ -548,9 +555,12 @@ const LEO_VIEWS = {
     const [rowsAll, kinds] = await Promise.all([loadNikki(), leoChildKinds()]);
     const rows = rowsAll.filter(r => r.kind === '利用');
     let act = [];
+    const bundle = await leoLoadDayBundle(today());
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${today()}`); } catch (e) { }
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事・おやつはここでは直しません。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+    const meals = leoMealByChild(bundle.meals);
+    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+      leoDayLogHtml(today(), bundle.log, 'nk', bundle.missing) +
       rows.map(r => { const a = A[String(r.child || '').replace(/\s/g, '')], actVal = (a && a.text) || r.activity || '';
         return `<div class="card rec"><b>${esc(r.child)}</b>（${esc(leoCardService(r.child, kinds, r.service))}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
         ${NIKKI_FIELDS.map(([f, l]) => {
@@ -559,34 +569,50 @@ const LEO_VIEWS = {
           return f === 'activity'
             ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}">${esc(shown)}</textarea></label>`
             : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}" value="${esc(shown)}"></label>`;
-        }).join('')}</div>`; }).join('') +
+        }).join('')}
+        ${leoMealBox(r.child, meals[leoMealNorm(r.child)], r, false)}</div>`; }).join('') +
       `<button onclick="saveNikki()">保存して実績へ載せる</button><div id="saved"></div>`;
   },
   async jisseki() {
-    if (!DEMO) {
-      const t = today();
-      try { await sb('rpc/leo_record_span', { method: 'POST', body: JSON.stringify({ p_from: t.slice(0, 8) + '01', p_to: t }) }); } catch (e) { }
+    const [y, m] = JIS_MONTH.split('-').map(Number), last = new Date(y, m, 0).getDate();
+    const a = JIS_MONTH + '-01', b = JIS_MONTH + '-' + String(last).padStart(2, '0');
+    const cap = today();
+    if (!DEMO && a <= cap) {
+      try { await sb('rpc/leo_record_span', { method: 'POST', body: JSON.stringify({ p_from: a, p_to: b < cap ? b : cap }) }); } catch (e) { }
     }
-    const rows = DEMO ? DEMO_DATA.jisseki : await sb('leo_jisseki?order=day.desc,child&limit=200');
-    let nk = [];
-    if (DEMO) nk = DEMO_DATA.nikki;
-    else if (rows.length) {
-      const days = [...new Set(rows.map(r => r.day).filter(Boolean))];
-      if (days.length) nk = await sb(`leo_nikki?day=in.(${days.join(',')})&select=day,child,kind,pick_driver,drop_driver`);
+    let jis, nk, meals, missing = false;
+    if (DEMO) {
+      const demo = leoDemoJisseki(JIS_MONTH);
+      jis = demo.jis; nk = demo.nk;
+      meals = leoDemoExtras(today()).meals.filter(r => r.day >= a && r.day <= b);
+    } else {
+      const [jRows, nRows, mealPack] = await Promise.all([
+        sb(`leo_jisseki?day=gte.${a}&day=lte.${b}&order=day,child`),
+        sb(`leo_nikki?day=gte.${a}&day=lte.${b}&kind=in.(利用,欠席)&select=day,row_no,child,kind,service,start_time,end_time,pick_driver,drop_driver,meal,snack,activity&order=day,row_no`),
+        leoLoadMonthMeals(a, b)]);
+      jis = jRows || []; nk = nRows || []; meals = mealPack.rows; missing = mealPack.missing;
     }
-    const by = {};
-    nk.forEach(n => {
-      const k = DEMO ? n.child : (n.day + n.child);
-      const prev = by[k];
-      if (!prev || (n.kind === '利用' && prev.kind !== '利用')) by[k] = n;
-    });
-    const trip = r => filingTripDrivers(by[DEMO ? r.child : (r.day + r.child)]);
-    return `<h3>実績記録（見るだけ）</h3>${demoNote()}<p class="note">日誌の出席・欠席から自動で載ります（日付・児童・出席/欠席・開始終了）。国保連の請求は簡易入力に手で打ってください。利用料・加算はここには出しません。迎え・送りの担当は届け出上の名前です。</p>
-      <table><tr><th>日付</th><th>児童</th><th>状況</th><th>時間</th><th>迎え</th><th>送り</th></tr>${rows.map(r => {
-      const d = trip(r);
-      return `<tr><td>${esc(r.day)}</td><td>${esc(r.child)}</td><td>${esc(r.status)}</td><td>${esc(r.start_time)}〜${esc(r.end_time)}</td><td>${esc(d.pick)}</td><td>${esc(d.drop)}</td></tr>`;
-    }).join('')}</table>
-      <p class="note">直すのは日誌です。保存すると、この実績に入ります。</p>`;
+    const [yy, mm] = JIS_MONTH.split('-');
+    const head = `<h3>実績記録</h3>${demoNote()}
+      <p class="ptabs"><button onclick="jisShift(-1)">← 前の月</button> <b>${yy}年${+mm}月</b> <button onclick="jisShift(1)">次の月 →</button></p>
+      <p class="note">児童を選ぶと、その子の月と日が見えます。開始・終了を保存すると日誌から実績へ載ります。食事提供とこの日の記録はここに書きます。国保連の請求は簡易入力に手で打ってください。利用料・加算は出しません。</p>
+      ${missing ? '<p style="color:#c00">食事の保存場所がまだありません（supabase/leo_meal_log.sql を実行してください）。見ることはできます。</p>' : ''}`;
+    const names = leoJissekiChildren(JIS_MONTH, jis, nk);
+    JIS_NAMES = names;
+    if (!JIS_CHILD || !names.some(n => leoMealNorm(n) === leoMealNorm(JIS_CHILD))) {
+      JIS_CHILD = '';
+      return head + (names.length ? names.map((n, i) => {
+        const sum = leoChildMonth(n, JIS_MONTH, jis, nk, meals);
+        return `<button type="button" class="card" style="text-align:left;background:#fff;color:#222" onclick="jisPick(${i})"><b>${esc(n)}</b><br><small>出席 ${sum.use}日・欠席 ${sum.abs}日</small></button>`;
+      }).join('') : '<p>この月の利用はまだありません。</p>');
+    }
+    const sum = leoChildMonth(JIS_CHILD, JIS_MONTH, jis, nk, meals);
+    sum.days.forEach(d => { d.trip = filingTripDrivers(d); });
+    const day = sum.days.find(d => d.day === JIS_DAY);
+    return head + `<p><button type="button" class="back" onclick="jisBackKids()">← 児童の一覧</button></p>
+      <h4>${esc(JIS_CHILD)}</h4><p>出席 <b>${sum.use}</b>日・欠席 <b>${sum.abs}</b>日</p>` +
+      (sum.days.length ? sum.days.map(d => `<button type="button" class="ptabs" style="width:auto;margin:4px 6px 4px 0;padding:8px 12px;background:${d.day === JIS_DAY ? 'var(--main)' : '#fff'};color:${d.day === JIS_DAY ? '#fff' : '#222'}" onclick="jisOpen('${d.day}')">${esc(fmtDay(d.day))} ${esc(d.status || '')}</button>`).join('') : '<p>この月の記録はまだありません。</p>') +
+      (day ? leoJisDayHtml(day) : '<p class="note">日を選ぶと、その日の実績と食事提供を書けます。</p>');
   },
 };
 
@@ -754,24 +780,181 @@ async function leoRecordDay(day) {
   try { return await sb('rpc/leo_record_day', { method: 'POST', body: JSON.stringify({ p_day: day }) }); }
   catch (e) { return null; }
 }
+function leoDemoExtras(day) {
+  const t = today();
+  if (day !== t) return { log: null, meals: [] };
+  return {
+    log: { day: t, meal_menu: '（見本）白米、餃子、人参と玉葱のナムル、味噌汁', notes: '（見本）午後はホールで体を動かした。' },
+    meals: [{ day: t, child: '児童A', meal: 'あり', snack: 'あり', meal_note: '（見本）餃子の皮を6枚。白米は4分の3。', day_note: '' }],
+  };
+}
+function leoDemoJisseki(month) {
+  const t = today();
+  const days = [0, -1, -3].map(n => addDays(t, n)).filter(d => d.slice(0, 7) === month);
+  const jis = [], nk = [];
+  const push = (day, src, status) => {
+    jis.push({ day, child: src.child, status, start_time: status === '欠席' ? '' : (src.start_time || ''), end_time: status === '欠席' ? '' : (src.end_time || ''), source: 'ポータル' });
+    nk.push({ ...src, day, kind: status === '欠席' ? '欠席' : '利用' });
+  };
+  if (days[0]) { push(days[0], DEMO_DATA.nikki[0], '出席'); push(days[0], DEMO_DATA.nikki[1], '出席'); }
+  if (days[1]) {
+    push(days[1], { child: '児童A', row_no: 20, start_time: '', end_time: '', meal: '', snack: '', pick_driver: '', drop_driver: '' }, '欠席');
+    push(days[1], DEMO_DATA.nikki[2], '出席');
+  }
+  return { jis, nk };
+}
+async function leoLoadDayBundle(day) {
+  if (DEMO) return { ...leoDemoExtras(day), missing: false };
+  let log = [], meals = [], missing = false;
+  try { log = await sb(`leo_day_log?day=eq.${day}&select=day,meal_menu,notes`); }
+  catch (e) { missing = true; log = []; }
+  try { meals = await sb(`leo_meal_record?day=eq.${day}&select=day,child,meal,snack,meal_note,day_note`); }
+  catch (e) { missing = true; meals = []; }
+  return { log: (log && log[0]) || null, meals: meals || [], missing };
+}
+async function leoLoadMonthMeals(a, b) {
+  try {
+    const rows = await sb(`leo_meal_record?day=gte.${a}&day=lte.${b}&select=day,child,meal,snack,meal_note,day_note`);
+    return { rows: rows || [], missing: false };
+  } catch (e) { return { rows: [], missing: true }; }
+}
+function leoMealSelect(field, value) {
+  const v = leoMealFlag(value);
+  const opt = (val, label) => `<option value="${val}"${v === val ? ' selected' : ''}>${label}</option>`;
+  return `<select data-kind="meal" data-f="${field}" style="width:100%">${opt('', '未記入')}${opt('あり', 'あり')}${opt('なし', 'なし')}</select>`;
+}
+function leoMealBox(child, rec, sheet, withDay) {
+  const meal = leoMealPrefill(rec && rec.meal, sheet && sheet.meal);
+  const snack = leoMealPrefill(rec && rec.snack, sheet && sheet.snack);
+  const hint = [];
+  const sheetBit = (label, raw) => {
+    if (!raw) return;
+    hint.push(leoMealFlag(raw) ? `シートの${label}列: ${raw}` : `シートの${label}列: ${raw}（金額なので提供の有無には入れません）`);
+  };
+  sheetBit('食事', sheet && sheet.meal);
+  sheetBit('おやつ', sheet && sheet.snack);
+  return `<div data-meal-child="${esc(child)}">
+    <label>食事提供${leoMealSelect('meal', meal)}</label>
+    <label>内容（何をどのくらい）<textarea data-kind="meal" data-f="meal_note" rows="3">${esc((rec && rec.meal_note) || '')}</textarea></label>
+    <label>おやつ提供${leoMealSelect('snack', snack)}</label>
+    ${withDay ? `<label>この日の記録<textarea data-kind="meal" data-f="day_note" rows="3">${esc((rec && rec.day_note) || '')}</textarea></label>` : ''}
+    ${hint.length ? `<p class="note">${esc(hint.join(' ／ '))}</p>` : ''}
+  </div>`;
+}
+function leoDayLogHtml(day, log, prefix, missing) {
+  return `<div class="card rec" id="${prefix}_day"><b>総合日誌</b>　<small>${esc(fmtDay(day))}</small>
+    <p class="note">その日全体の記録です。食事メニューはここに書きます。児童ごとの食事提供は、下の各児童です。ポータルに保存します。Googleの表と国保連の請求には書きません。</p>
+    ${missing ? '<p style="color:#c00">保存場所がまだありません（supabase/leo_meal_log.sql を実行してください）。</p>' : ''}
+    <label>食事メニュー<textarea data-kind="day" id="${prefix}_menu" rows="3" maxlength="500">${esc((log && log.meal_menu) || '')}</textarea></label>
+    <label>連絡・報告・備考<textarea data-kind="day" id="${prefix}_notes" rows="4" maxlength="4000">${esc((log && log.notes) || '')}</textarea></label>
+    <button type="button" onclick="saveLeoDayLog('${day}','${prefix}')">総合日誌を保存</button><div id="${prefix}_daymsg"></div></div>`;
+}
+function leoReadMealBoxes(root) {
+  return [...root.querySelectorAll('[data-meal-child]')].map(box => {
+    const g = f => box.querySelector(`[data-f="${f}"]`);
+    const row = { child: box.dataset.mealChild, meal: g('meal') ? g('meal').value : '', snack: g('snack') ? g('snack').value : '', meal_note: g('meal_note') ? g('meal_note').value : '' };
+    if (g('day_note')) row.day_note = g('day_note').value;
+    return row;
+  });
+}
+async function leoUpsertMeals(day, forms) {
+  const packed = forms.map(f => ({ child: f.child, ...leoMealBody(f) }));
+  const err = packed.flatMap(p => p.err);
+  if (err.length) return err;
+  if (DEMO) return [];
+  const author = await myName(), now = new Date().toISOString();
+  await sb('leo_meal_record?on_conflict=day,child', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(packed.map(p => ({ day, child: p.child, ...p.body, author, updated_at: now }))) });
+  return [];
+}
+async function saveLeoDayLog(day, prefix) {
+  const m = document.getElementById(prefix + '_daymsg');
+  const v = leoDayLogBody({ meal_menu: document.getElementById(prefix + '_menu').value, notes: document.getElementById(prefix + '_notes').value });
+  if (v.err.length) { m.textContent = v.err[0]; return; }
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try {
+    const author = await myName();
+    await sb('leo_day_log?on_conflict=day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ day, ...v.body, author, updated_at: new Date().toISOString() }) });
+    m.textContent = '総合日誌を保存しました。';
+  } catch (e) { m.textContent = e.message; }
+}
+let JIS_MONTH = today().slice(0, 7);
+let JIS_CHILD = '';
+let JIS_DAY = '';
+let JIS_NAMES = [];
+let JIS_FLASH = '';
+function jisShift(delta) {
+  const [y, m] = JIS_MONTH.split('-').map(Number);
+  const n = new Date(y, m - 1 + delta, 1);
+  JIS_MONTH = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+  JIS_DAY = '';
+  renderLeoView('jisseki');
+}
+function jisPick(i) { JIS_CHILD = JIS_NAMES[i] || ''; JIS_DAY = ''; renderLeoView('jisseki'); }
+function jisOpen(day) { JIS_DAY = day; renderLeoView('jisseki'); }
+function jisBackKids() { JIS_CHILD = ''; JIS_DAY = ''; renderLeoView('jisseki'); }
+function leoJisDayHtml(row) {
+  const flash = JIS_FLASH; JIS_FLASH = '';
+  const trip = row.trip || filingTripDrivers(row);
+  const canTime = row.row_no != null && row.status !== '欠席' && row.kind !== '欠席';
+  const times = canTime
+    ? `<label>開始<input id="jis_start" data-old="${esc(row.start_time || '')}" value="${esc(row.start_time || '')}"></label><label>終了<input id="jis_end" data-old="${esc(row.end_time || '')}" value="${esc(row.end_time || '')}"></label>`
+    : `<p>開始 ${esc(row.start_time || '—')}　終了 ${esc(row.end_time || '—')}</p>${row.status === '欠席' ? '' : '<p class="note">この日の日誌の行が無いので、時間はここでは直せません。</p>'}`;
+  return `<div class="card rec" id="jis_day"><b>${esc(fmtDay(row.day))}</b> ${esc(row.status || '')} ${row.service ? esc(row.service) : ''}
+    <p class="note">迎え ${esc(trip.pick || '—')}　送り ${esc(trip.drop || '—')}</p>
+    ${times}
+    ${row.activity ? `<details><summary>活動記録</summary><p style="white-space:pre-wrap">${esc(row.activity)}</p></details>` : ''}
+    ${leoMealBox(JIS_CHILD, row, { meal: row.sheet_meal, snack: row.sheet_snack }, true)}
+    <input type="hidden" id="jis_row" value="${row.row_no != null ? esc(row.row_no) : ''}">
+    <button type="button" onclick="saveJisDay()">この日を保存</button><div id="jis_msg">${esc(flash)}</div>
+    <p class="note"><a href="#leo/diary" onclick="DIA_DAY='${row.day}'">この日の日誌</a>${row.day === today() ? ' ／ <a href="#leo/nikki">今日の日誌</a>' : ''}</p></div>`;
+}
+async function saveJisDay() {
+  const m = $('jis_msg'), box = document.getElementById('jis_day');
+  const form = leoReadMealBoxes(box)[0];
+  if (!form) { m.textContent = '記録が見つかりません。'; return; }
+  const v = leoMealBody(form);
+  if (v.err.length) { m.textContent = v.err[0]; return; }
+  const start = document.getElementById('jis_start'), end = document.getElementById('jis_end');
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try {
+    if (start && (start.value !== start.dataset.old || end.value !== end.dataset.old)) {
+      const rowNo = Number((document.getElementById('jis_row') || {}).value);
+      if (rowNo) await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: JIS_DAY, p_row: rowNo, p_fields: { start_time: start.value.trim(), end_time: end.value.trim() } }) });
+    }
+    const err = await leoUpsertMeals(JIS_DAY, [form]);
+    if (err.length) { m.textContent = err[0]; return; }
+    JIS_FLASH = '保存しました。';
+    renderLeoView('jisseki');
+  } catch (e) { m.textContent = e.message; }
+}
 async function saveNikki() {
   const by = {};
   let n = 0;
-  for (const i of document.querySelectorAll('.rec input, .rec textarea')) {
+  for (const i of document.querySelectorAll('#view .rec input, #view .rec textarea')) {
+    if (i.dataset.kind === 'meal' || i.dataset.kind === 'day') continue;
     const edit = nikkiEditValue(i.dataset.f, i.dataset.old, i.value);
     if (!edit) continue;
     (by[i.dataset.row] || (by[i.dataset.row] = {}))[i.dataset.f] = edit.new_value;
     i.dataset.old = edit.new_value;
     n += 1;
   }
+  const mealForms = leoReadMealBoxes(document.getElementById('view') || document);
+  const mealErr = mealForms.flatMap(f => leoMealBody(f).err);
   const rows = Object.entries(by);
-  if (!rows.length) { $('saved').textContent = '変更はありません。'; return; }
+  if (mealErr.length) { $('saved').textContent = mealErr[0]; return; }
+  if (!rows.length && !mealForms.length) { $('saved').textContent = '変更はありません。'; return; }
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${n}件の修正）。`; return; }
   try {
     for (const [row, fields] of rows) {
       await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: today(), p_row: Number(row), p_fields: fields }) });
     }
-    $('saved').textContent = `${rows.length}人分を日誌に保存し、実績へ転記しました。`;
+    if (mealForms.length) {
+      const err = await leoUpsertMeals(today(), mealForms);
+      if (err.length) { $('saved').textContent = err[0]; return; }
+    }
+    $('saved').textContent = rows.length ? `${rows.length}人分を日誌に保存し、実績へ転記しました。食事の記録も保存しました。` : '食事の記録を保存しました。';
   } catch (e) { $('saved').textContent = e.message; }
 }
 
@@ -1740,6 +1923,7 @@ let DIA_DAY = today();
 const DIA_DEMO = { rows: [{ child: '児童A', kind: '利用', start_time: '14:45', end_time: '17:00', pick_driver: '職員X', drop_driver: '職員Y', activity: '（見本）公園で鬼ごっこをした。' }], drafts: [{ child: '児童A', day: today(), body: '（見本）公園で鬼ごっこをしました。', author: '職員X' }] };
 LEO_VIEWS.diary = async function () {
   let rows, drafts, act = [];
+  const bundle = await leoLoadDayBundle(DIA_DAY);
   if (DEMO) ({ rows, drafts } = DIA_DEMO);
   else {
     await leoRecordDay(DIA_DAY);
@@ -1752,27 +1936,41 @@ LEO_VIEWS.diary = async function () {
   const noTable = drafts === null; drafts = drafts || [];
   const D = Object.fromEntries(drafts.map(x => [x.child, x]));
   const A = Object.fromEntries(act.map(x => [ldNN(x.child), x]));
-  const me = DEMO ? '職員X' : await myName();
+  const meals = leoMealByChild(bundle.meals);
   const idOf = k => 'dr_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
   return `<h3>日誌（児童ごと）</h3>${demoNote()}
     <p class="ptabs"><button onclick="DIA_DAY=addDays(DIA_DAY,-1);renderLeoView('diary')">← 前の日</button> <b>${fmtDay(DIA_DAY)}</b> <button onclick="DIA_DAY=addDays(DIA_DAY,1);renderLeoView('diary')">次の日 →</button></p>
     <p class="note">予定の利用児童を日誌に出します。LINE報告を保存すると、活動記録がここに入ります（である調のボット文があればそれを使い、無ければ補います）。下書きを保存しても活動記録に入ります。出席・欠席はサービス提供実績へ自動で載ります。国保連は簡易入力への手打ちです。迎え・送りの名前は届け出上の担当です。</p>
+    ${leoDayLogHtml(DIA_DAY, bundle.log, 'dr', bundle.missing)}
     ${noTable ? '<p style="color:#c00">下書きの保存場所がまだありません（管理者が準備中です）。</p>' : ''}
     ${rows.map(r => { const k = r.child, d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
-      return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
+      const mealRec = meals[leoMealNorm(k)];
+      return `<details class="card" open style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／食事 ${esc((mealRec && mealRec.meal) || '未記入')}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
         <div style="padding:0 14px 14px"><p class="note">迎え：${esc(filingDriverName(r.pick_driver) || '-')}　送り：${esc(filingDriverName(r.drop_driver) || '-')}</p>
         ${actText ? `<p style="white-space:pre-wrap"><b>日誌の活動記録${actSrc ? '（' + esc(actSrc) + '）' : ''}</b><br>${esc(actText)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
+        <div id="${id}_meal">${leoMealBox(k, meals[leoMealNorm(k)], r, false)}</div>
         <b>下書き（です・ます調）</b>${d ? `<small>　${esc(d.author || '')}</small>` : ''}
         <textarea id="${id}" rows="30" style="width:100%;font-size:16px;box-sizing:border-box" ${noTable ? 'disabled' : ''}>${esc(d ? d.body : '')}</textarea>
         <button ${noTable ? 'disabled' : ''} onclick="saveDiary('${esc(k)}','${id}')">保存</button><div id="${id}_m"></div></div></details>`; }).join('') || '<p>この日の日誌に利用の子がいません。</p>'}`;
 };
 async function saveDiary(child, id) {
-  const body = $(id).value.trim(), m = $(id + '_m'); if (!body) { m.textContent = '本文を書いてください。'; return; }
+  const body = $(id).value.trim(), m = $(id + '_m');
+  const box = document.getElementById(id + '_meal');
+  const mealForm = box ? leoReadMealBoxes(box)[0] : null;
+  const mealV = mealForm ? leoMealBody(mealForm) : { err: [], body: null };
+  if (mealV.err.length) { m.textContent = mealV.err[0]; return; }
+  if (!body && !mealForm) { m.textContent = '本文を書いてください。'; return; }
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try { const author = await myName();
-    await sb('leo_diary_draft?on_conflict=child,day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child, day: DIA_DAY, body, author, updated_at: new Date().toISOString() }) });
-    await sb('rpc/leo_activity_from_drafts', { method: 'POST', body: JSON.stringify({ p_day: DIA_DAY }) });
-    m.textContent = '保存し、日誌の活動記録へ転記しました。'; } catch (e) { m.textContent = e.message; }
+    if (body) {
+      await sb('leo_diary_draft?on_conflict=child,day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child, day: DIA_DAY, body, author, updated_at: new Date().toISOString() }) });
+      await sb('rpc/leo_activity_from_drafts', { method: 'POST', body: JSON.stringify({ p_day: DIA_DAY }) });
+    }
+    if (mealForm) {
+      const err = await leoUpsertMeals(DIA_DAY, [mealForm]);
+      if (err.length) { m.textContent = err[0]; return; }
+    }
+    m.textContent = body ? '保存し、日誌の活動記録へ転記しました。食事の記録も保存しました。' : '食事の記録を保存しました。'; } catch (e) { m.textContent = e.message; }
 }
 
 // ===== LINEの下書き（トップのタブ）：利用児童ごとに報告文を書く → leo_line_drafts ＋ 日誌の活動記録（leo_activity）へ自動転記 =====
