@@ -2,7 +2,7 @@
 -- 氏名・常勤/非常勤・開始・終了だけを置く。金額の列は置かない。
 -- 土日の行は置かない。再実行できる。chamu.sql のあと、Supabase SQL Editor でこのファイルを実行する。
 -- 2026-11-02 確定。常勤は月〜金とも齊藤・中村友香。非常勤の中村文は月〜金 14:00〜17:00 のまま。
--- 金曜は安藤尚子が 14:30 まで、中村文は 14:00 開始（30分重なる）。それ以外の日は 14:00 で引き継ぐ。
+-- 安藤尚子と中村文は 14:00 で引き継ぐ。時間は重ねない。
 
 create table if not exists public.chamu_shift (
   id uuid primary key default gen_random_uuid(),
@@ -42,7 +42,7 @@ insert into public.chamu_shift (dow, staff_name, employment, start_time, end_tim
   ('木', '中村文', '非常勤', '14:00', '17:00', 40),
   ('金', '齊藤', '常勤', '10:00', '18:00', 10),
   ('金', '中村友香', '常勤', '10:00', '18:00', 20),
-  ('金', '安藤尚子', '非常勤', '11:00', '14:30', 30),
+  ('金', '安藤尚子', '非常勤', '11:00', '14:00', 30),
   ('金', '中村文', '非常勤', '14:00', '17:00', 40)
 on conflict (dow, staff_name) do update set
   employment = excluded.employment,
