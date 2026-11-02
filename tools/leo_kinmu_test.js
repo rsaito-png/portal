@@ -100,7 +100,7 @@ const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
 const chamu = fs.readFileSync(path.join(__dirname, '..', 'chamu.js'), 'utf8');
 const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'kinmu.sql'), 'utf8');
-assert.ok(index.includes('leo_kinmu.js?v=20261102f1400'));
+assert.ok(index.includes('leo_kinmu.js?v=20261102read'));
 assert.ok(!JSON.stringify(roster).includes('14:30'), '金曜の安藤は14:00まで');
 assert.ok(index.includes("sub === 'kinmu'"));
 assert.ok(fs.readFileSync(path.join(__dirname, '..', 'leo.js'), 'utf8').includes("name === 'kinmu'"));

@@ -5,30 +5,57 @@
   if (document.getElementById('km-style')) return;
   var st = document.createElement('style');
   st.id = 'km-style';
-  st.textContent = ''
-    + '.km{font-size:14px}'
-    + '.km h3{font-size:22px;margin:8px 0}'
-    + '.km .note{font-size:14px;color:#444}'
-    + '.km .km-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}'
-    + '.km button.km-b{width:auto;font-size:16px;padding:8px 12px;margin:0}'
-    + '.km input.mo{width:auto;font-size:16px;padding:6px 8px;margin:0}'
-    + '.km .sheet-scroll{overflow:auto;max-width:100%;background:#fff;border:1px solid #ccc}'
-    + '.km table.grid{border-collapse:collapse;font-size:12px;width:max-content;background:#fff}'
-    + '.km table.grid th,.km table.grid td{border:1px solid #222;padding:1px 2px;text-align:center;vertical-align:middle;background:#fff}'
-    + '.km table.grid th{background:#e8efe9;font-weight:700}'
-    + '.km table.grid input,.km table.grid select{font-size:12px!important;padding:1px 2px!important;margin:0!important;width:4.4em;border-radius:3px;border:1px solid #bbb}'
-    + '.km table.grid select{width:9.2em}'
-    + '.km table.grid input.wide{width:8.5em;text-align:left}'
-    + '.km table.grid input.uc{width:2.8em}'
-    + '.km tr.r-end td{background:#f6f6f6}'
-    + '.km tr.r-hrs td{background:#e7f4ea}'
-    + '.km tr.users td{background:#fff6d6;font-weight:700}'
-    + '.km td.nm{text-align:left;font-weight:700;white-space:nowrap}'
-    + '.km .warn{color:#a30;font-weight:700}'
-    + '.km .ok{color:#164}'
-    + 'body.wide-sheet:has(#km-root) main{max-width:none}'
-    + '@media (min-width:900px){.km table.grid,.km table.grid th,.km table.grid td,.km table.grid input,.km table.grid select{font-size:12px!important;padding:1px 2px!important}}'
-    + '@media print{@page{size:A3 landscape;margin:8mm}header,.back,.noprint,#help,#out,#hi,.cm-nav{display:none!important}body{background:#fff}main{max-width:none!important;padding:0}.km table.grid input,.km table.grid select{border:0!important;background:transparent!important}}';
+  st.textContent = [
+    '.km{font-size:16px;color:#111}',
+    '.km h3{font-size:26px;margin:8px 0;color:#143528}',
+    '.km .note{font-size:15px!important;color:#222;line-height:1.45}',
+    '.km details summary{cursor:pointer;font-weight:800;color:#143528;margin:4px 0 8px}',
+    '.km .km-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}',
+    '.km button.km-b{width:auto;font-size:16px!important;padding:8px 12px!important;margin:0!important}',
+    '.km input.mo{width:auto;font-size:16px!important;padding:6px 8px!important;margin:0!important}',
+    '.km .sheet-scroll{overflow:auto;max-width:100%;max-height:72vh;-webkit-overflow-scrolling:touch;background:#fff;border:2px solid #111}',
+    '.km table.grid{display:table!important;border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;background:#fff;color:#111;box-shadow:none;border:0;font-size:16px}',
+    '.km table.grid tr{display:table-row}',
+    '.km table.grid th,.km table.grid td{display:table-cell;box-sizing:border-box;border:0;border-right:1px solid #222;border-bottom:1px solid #222;padding:6px 4px;text-align:center;vertical-align:middle;background:#fff;color:#111;white-space:nowrap}',
+    '.km table.grid thead th{position:sticky;top:0;z-index:2;height:44px;background:#143528;color:#fff;font-weight:800;font-size:16px;border-color:#0c241c}',
+    '.km table.grid thead tr:nth-child(2) th{top:44px;height:34px;font-size:15px}',
+    '.km table.grid th.nm,.km table.grid td.nm{position:sticky;left:0;z-index:3;min-width:9.4rem;width:9.4rem;max-width:9.4rem;text-align:left;background:#fff;box-shadow:4px 0 0 #143528;font-weight:800;white-space:normal;overflow:hidden}',
+    '.km table.grid thead th.nm,.km table.grid thead th.band{z-index:5;background:#143528;color:#fff;box-shadow:4px 0 0 #0c241c}',
+    '.km table.grid th.band,.km table.grid td.band{min-width:4.2rem;background:#fff;font-weight:800;font-size:15px;color:#143528}',
+    '.km table.grid input,.km table.grid select{font-size:17px!important;line-height:1.3;padding:8px 6px!important;margin:0!important;width:5.4rem;min-height:42px;box-sizing:border-box;border:1px solid #444!important;box-shadow:none!important;border-radius:4px!important;background:#fff!important;color:#111!important;text-align:center;font-weight:700}',
+    '.km table.grid select{width:7.4rem;text-align:left;padding-left:4px!important}',
+    '.km table.grid td.nm input.wide{display:block;width:100%!important;max-width:100%;text-align:left;font-weight:800}',
+    '.km table.grid input.uc{width:3.6rem}',
+    '.km table.grid button.km-b{font-size:14px!important;padding:6px 8px!important;min-height:0;margin-top:6px!important}',
+    '.km tr.r-end td{background:#eef3f0}',
+    '.km tr.r-hrs td{background:#d7f0e1}',
+    '.km tr.r-end td.band{background:#eef3f0}',
+    '.km tr.r-hrs td.band{background:#d7f0e1}',
+    '.km tr.r-hrs input{background:#f4fff8!important}',
+    '.km td.we{background:#f6f0e4}',
+    '.km tr.r-hrs td.we{background:#e7f3df}',
+    '.km thead th.we{background:#3e3424;color:#fff}',
+    '.km tr.users td{background:#fff3c4;font-weight:800}',
+    '.km tr.users td.nm,.km tr.users td.band{background:#fff3c4}',
+    '.km .warn{color:#8a1f00;font-weight:800}',
+    '.km .ok{color:#0d3b24;font-weight:700}',
+    'body.wide-sheet:has(#km-root) main{max-width:none}',
+    '@media (max-width:700px){',
+    '.km table.grid,.km table.grid th,.km table.grid td{font-size:15px}',
+    '.km table.grid input,.km table.grid select{font-size:16px!important;min-height:40px;padding:7px 4px!important}',
+    '.km .sheet-scroll{max-height:68vh}',
+    '}',
+    '@media print{',
+    '@page{size:A3 landscape;margin:8mm}',
+    'header,.back,.noprint,#help,#out,#hi,.cm-nav{display:none!important}',
+    'body{background:#fff;color:#000}',
+    'main{max-width:none!important;padding:0}',
+    '.km,.km .note,.km h3{color:#000!important}',
+    '.km .sheet-scroll{max-height:none;overflow:visible;border:0}',
+    '.km table.grid th,.km table.grid td{position:static!important;background:#fff!important;color:#000!important;border:1.5px solid #000!important;box-shadow:none!important;font-size:11pt!important}',
+    '.km table.grid input,.km table.grid select{font-size:12pt!important;color:#000!important;background:#fff!important;border:0!important;box-shadow:none!important;padding:1px 0!important;min-height:0;font-weight:700}',
+    '}'
+  ].join('');
   document.head.appendChild(st);
 })();
 
@@ -170,8 +197,9 @@ function kmHtml() {
     : '<p class="ptabs noprint">' + [['jido', '児童発達支援'], ['houday', '放課後等デイサービス']].map(function (x) {
       return '<button type="button" class="' + (x[0] === KM.service ? 'on' : '') + '" onclick="kmSetService(\'' + x[0] + '\')">' + x[1] + '</button>';
     }).join('') + '</p>';
-  var headDays = days.map(function (d) { return '<th>' + d.day + '</th>'; }).join('');
-  var headDow = days.map(function (d) { return '<th>' + d.dow + '</th>'; }).join('');
+  var we = function (d) { return d.wd === 0 || d.wd === 6 ? ' class="we"' : ''; };
+  var headDays = days.map(function (d) { return '<th' + we(d) + '>' + d.day + '</th>'; }).join('');
+  var headDow = days.map(function (d) { return '<th' + we(d) + '>' + d.dow + '</th>'; }).join('');
   var body = KM.lines.map(function (line, i) {
     var mins = K.lineMinutes(line);
     var warn = line.name === '中村文' && mins > K.FUMI_MONTH_MIN ? ' <span class="warn">枠超え</span>' : '';
@@ -182,25 +210,27 @@ function kmHtml() {
         return '<option value="' + kmEsc(v) + '"' + (v === cur ? ' selected' : '') + '>' + kmEsc(label) + '</option>';
       }).join('');
     };
+  var bands = { start: '開始', end: '終了', hours: '時間' };
     return ['start', 'end', 'hours'].map(function (f, idx) {
-      var cls = f === 'end' ? ' class="r-end"' : f === 'hours' ? ' class="r-hrs"' : '';
+      var cls = f === 'end' ? 'r-end' : f === 'hours' ? 'r-hrs' : 'r-start';
       var tds = days.map(function (d) {
         var c = (line.cells || {})[d.day] || {};
         var id = (f === 'start' ? 'km-s-' : f === 'end' ? 'km-e-' : 'km-h-') + i + '-' + d.day;
         var extra = f === 'hours' ? ' oninput="kmMark()"' : ' oninput="kmSyncHours(' + i + ',' + d.day + ')"';
-        return '<td><input id="' + id + '" value="' + kmEsc(c[f] || '') + '"' + dis + extra + '></td>';
+        return '<td' + we(d) + '><input id="' + id + '" value="' + kmEsc(c[f] || '') + '"' + dis + extra + '></td>';
       }).join('');
+      var band = '<td class="band">' + bands[f] + '</td>';
       if (idx === 0) {
-        return '<tr' + cls + '><td class="nm" rowspan="3">' + meta + '<input id="km-name-' + i + '" class="wide" value="' + kmEsc(line.name) + '"' + dis + ' oninput="kmMark()"></td>'
+        return '<tr class="' + cls + '"><td class="nm" rowspan="3">' + meta + '<input id="km-name-' + i + '" class="wide" value="' + kmEsc(line.name) + '"' + dis + ' oninput="kmMark()"></td>'
           + '<td rowspan="3"><select id="km-job-' + i + '"' + dis + ' onchange="kmMark()">' + opts(K.JOBS, line.job, false) + '</select></td>'
           + '<td rowspan="3"><select id="km-cls-' + i + '"' + dis + ' onchange="kmMark()">' + opts(K.CLASSES, line.cls, true) + '</select></td>'
           + '<td rowspan="3"><input id="km-qual-' + i + '" class="wide" value="' + kmEsc(line.qual || '') + '"' + dis + ' oninput="kmMark()"></td>'
-          + tds
+          + band + tds
           + '<td rowspan="3"><input id="km-note-' + i + '" class="wide" value="' + kmEsc(line.note || '') + '"' + dis + ' oninput="kmMark()">'
           + (KM.canWrite ? '<div><button type="button" class="km-b" onclick="kmRemove(' + i + ')">外す</button></div>' : '')
           + '</td></tr>';
       }
-      return '<tr' + cls + '>' + tds + '</tr>';
+      return '<tr class="' + cls + '">' + band + tds + '</tr>';
     }).join('');
   }).join('');
   var users = days.map(function (d) {
@@ -215,9 +245,8 @@ function kmHtml() {
   }).join(' ') + '</p>' : '';
   var state = KM.persisted ? '<span class="ok">この月は保存済みです。</span>' : '<span class="warn">この月はまだ保存されていません。週パターンを表示しています。</span>';
   return '<div id="km-root"><h3>' + kmEsc(K.reiwa(KM.ym)) + '</h3>'
-    + '<p class="note">' + kmEsc(svc.office) + '　' + kmEsc(svc.label) + '。職員の配置はこの月の共通の記録です（レオと茶夢で同じ）。利用者数はサービスごとです。' + (KM.entry === 'chamu' ? ' 曜日ごとの一覧は <a href="#chamu/haichi">職員配置表</a>。' : '')
-    + ' <a href="#dakoku">出退勤打刻</a>は実態で、この表は監査用の配置です。</p>'
-    + '<p class="note">常勤 10:00–18:00（月〜金、齊藤・友香。水も両方）。非常勤は月火木金 安藤11:00–14:00、水 加藤11:00–14:00、文は月〜金14:00–17:00。安藤と文は14:00で引き継ぎ、重なりません。上段が開始、中段が終了、下段が勤務時間（休憩を含んでよい）。非常勤の職種略称の初期値は「指導」です。</p>'
+    + '<p class="note">' + kmEsc(svc.office) + '　' + kmEsc(svc.label) + '。上段が開始、中段が終了、下段が時間。横に動かすと氏名は残ります。' + (KM.entry === 'chamu' ? ' <a href="#chamu/haichi">曜日の配置表</a>。' : '') + ' <a href="#dakoku">出退勤打刻</a>は別です。</p>'
+    + '<details class="noprint"><summary>配置の内容</summary><p class="note">職員の配置はこの月の共通の記録です（レオと茶夢で同じ）。利用者数はサービスごとです。常勤 10:00–18:00（月〜金、齊藤・友香。水も両方）。非常勤は月火木金 安藤11:00–14:00、水 加藤11:00–14:00、文は月〜金14:00–17:00。安藤と文は14:00で引き継ぎ、重なりません。非常勤の職種略称の初期値は「指導」です。勤務時間は休憩を含んでよい。</p></details>'
     + tabs
     + '<div class="km-bar noprint"><button type="button" class="km-b" onclick="kmShiftMonth(-1)">← 前の月</button>'
     + '<input class="mo" id="km-ym" type="month" value="' + kmEsc(KM.ym) + '" onchange="kmSetMonth(this.value)">'
@@ -230,9 +259,9 @@ function kmHtml() {
     + '<button type="button" class="km-b" onclick="kmReload()">読み直す</button></div>'
     + '<p class="noprint">' + state + (KM.msg ? ' ' + kmEsc(KM.msg) : '') + '</p>'
     + (fumi ? '<p class="note">' + fumi + '</p>' : '')
-    + '<div class="sheet-scroll"><table class="grid"><tr><th rowspan="2">氏名</th><th rowspan="2">職種</th><th rowspan="2">区分</th><th rowspan="2">資格</th>' + headDays + '<th rowspan="2">備考</th></tr><tr>' + headDow + '</tr>'
+    + '<div class="sheet-scroll"><table class="grid"><thead><tr><th class="nm" rowspan="2">氏名</th><th rowspan="2">職種</th><th rowspan="2">区分</th><th rowspan="2">資格</th><th class="band" rowspan="2">段</th>' + headDays + '<th rowspan="2">備考</th></tr><tr>' + headDow + '</tr></thead><tbody>'
     + body
-    + '<tr class="users"><td colspan="4">利用者数</td>' + users + '<td></td></tr></table></div>'
+    + '<tr class="users"><td class="nm">利用者数</td><td></td><td></td><td></td><td class="band">人数</td>' + users + '<td></td></tr></tbody></table></div>'
     + saved + '</div>';
 }
 async function kmBuild(entry) {
