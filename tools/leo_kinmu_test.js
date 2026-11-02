@@ -21,7 +21,7 @@ assert.ok(!JSON.stringify(roster).includes('11.5'), '11.5時間上限は使わ�
 assert.ok(!JSON.stringify(roster).includes('1600'), '1,600円換算は使わない');
 assert.deepStrictEqual(by('安藤尚子', '指導').week[4], ['11:00', '14:00'], '木曜の安藤');
 assert.strictEqual(by('安藤尚子', '指導').week[3], undefined, '水曜の安藤はなし');
-assert.deepStrictEqual(by('安藤尚子', '指導').week[5], ['11:00', '14:30']);
+assert.deepStrictEqual(by('安藤尚子', '指導').week[5], ['11:00', '14:00']);
 assert.deepStrictEqual(by('加藤幸弘', '指導').week[3], ['11:00', '14:00']);
 assert.strictEqual(Object.keys(by('加藤幸弘', '指導').week).join(','), '3');
 [1, 2, 3, 4, 5].forEach(wd => {
@@ -50,7 +50,7 @@ assert.deepStrictEqual(cell('安藤尚子', '指導', '水'), { start: '', end: 
 assert.deepStrictEqual(cell('齊藤連', '管理', '水'), { start: '10:00', end: '18:00', hours: '8:00' });
 assert.deepStrictEqual(cell('齊藤連', '児管', '水'), { start: '10:00', end: '18:00', hours: '8:00' });
 assert.deepStrictEqual(cell('中村友香', '保育', '水'), { start: '10:00', end: '18:00', hours: '8:00' });
-assert.deepStrictEqual(cell('安藤尚子', '指導', '金'), { start: '11:00', end: '14:30', hours: '3:30' });
+assert.deepStrictEqual(cell('安藤尚子', '指導', '金'), { start: '11:00', end: '14:00', hours: '3:00' });
 assert.deepStrictEqual(cell('中村文', '指導', '金'), { start: '14:00', end: '17:00', hours: '3:00' });
 assert.deepStrictEqual(cell('中村文', '指導', '土'), { start: '', end: '', hours: '' });
 assert.deepStrictEqual(cell('齊藤連', '管理', '日'), { start: '', end: '', hours: '' });
@@ -100,7 +100,8 @@ const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
 const chamu = fs.readFileSync(path.join(__dirname, '..', 'chamu.js'), 'utf8');
 const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'kinmu.sql'), 'utf8');
-assert.ok(index.includes('leo_kinmu.js?v=20261102kinmu'));
+assert.ok(index.includes('leo_kinmu.js?v=20261102f1400'));
+assert.ok(!JSON.stringify(roster).includes('14:30'), '金曜の安藤は14:00まで');
 assert.ok(index.includes("sub === 'kinmu'"));
 assert.ok(fs.readFileSync(path.join(__dirname, '..', 'leo.js'), 'utf8').includes("name === 'kinmu'"));
 assert.ok(cfg.includes("#leo/kinmu") && cfg.includes("#chamu/kinmu"));
