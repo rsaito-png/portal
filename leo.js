@@ -738,16 +738,10 @@ async function hyCheck(id) {
 // ===== 児発管ホーム：今日やること（一画面に、やることだけ） =====
 LEO_VIEWS.home = async function () {
   const todo = [];
-  // 1. 個別支援計画：期限切れ・30日以内（管理表）。退所日を過ぎた子、次の計画が退所日よりあとに始まる子は出さない
+  // 1. 個別支援計画：個別支援計画（管理）と同じ進み具合。退所済み、次の計画が退所日よりあと、本案まで終わった子、急ぎでない子は出さない
   try {
-    const [kk, LEFT] = await Promise.all([sheetRows('keikaku'), loadLeftIndex()]); const tday = today(), t = new Date(tday + 'T00:00:00+09:00');
-    kk.forEach(r => { const m = String(r['次期開始月'] || '').match(/(\d{4})年(\d{1,2})月/); if (!m || r['本案署名'] === '済') return;
-      if (leftDone(LEFT, r['児童名'], tday)) return;
-      const dueIso = `${m[1]}-${String(m[2]).padStart(2, '0')}-01`, ld = leftOnOf(LEFT, r['児童名']);
-      if (ld && dueIso > ld) return;
-      const due = new Date(+m[1], +m[2] - 1, 1), days = Math.round((due - t) / 864e5);
-      if (days <= 30 || r['フォーム送付目安日'] === '至急') todo.push([days < 0 || r['フォーム送付目安日'] === '至急' ? 0 : 1, '📝', `${esc(r['児童名'])}さんの計画の更新（${days < 0 ? '期限切れ' : 'あと' + days + '日'}）`, '#leo/keikaku',
-        ['計画書作成', '原案署名', '本案署名'].filter(k => r[k] !== '済').map(k => k.replace('原案署名', '原案の説明・同意').replace('本案署名', '本案の交付・同意')).join('・') + ' が残っています']); });
+    const [D0, LEFT] = await Promise.all([planData(), loadLeftIndex()]); const tday = today(), t = new Date(tday + 'T00:00:00+09:00');
+    planHomeTodos(D0, LEFT, tday, t).forEach(item => todo.push(item));
   } catch (e) { }
   // 2. ヒヤリハット：確認がまだのもの
   try { const h = (await hyRows()).filter(r => r.status === '未確認'); if (h.length) todo.push([0, '⚠️', `ヒヤリハットの確認 ${h.length}件`, '#leo/hiyari', '読んで、再発防止の工夫を書いて「確認した」を押す']); } catch (e) { }
@@ -1480,53 +1474,87 @@ async function planData() {
   const L = Object.fromEntries(links.map(l => [l.token, l]));
   return { rows, plans, links, sends, clinks, staff, mon: ans.map(a => ({ ...L[a.token], answers: a.answers, submitted_at: a.submitted_at })) };
 }
+// 個別支援計画（管理）の児童1人分。カードの赤い行（act）と、開始月・期間の急ぎ（flags）はここだけ。画面のボタンや文面は変えない。
+function planChildStatus(r, D0, LEFT, tday, t) {
+  const N = s => String(s || '').replace(/\s/g, '');
+  const name = r['児童名'], m = String(r['次期開始月'] || '').match(/(\d{4})年(\d{1,2})月/), d = m ? planDates(+m[1], +m[2]) : null;
+  const gone = leftDone(LEFT, name, tday), ldate = leftOnOf(LEFT, name);
+  const nextIso = d ? isoD(d.start) : '', leavingBeforeNext = !!(ldate && nextIso && nextIso > ldate);
+  // カードの期は「いま作っている次の期」＝現在の期+1。次期開始月が過ぎても、ここでは期を足さない。
+  const cur = parseInt(String(r['現在の期']).replace(/\D/g, '')) || 0, n = cur + 1, term = `第${n}期`;
+  const p = D0.plans.find(x => N(x.child) === N(name) && x.term_no === n), now = D0.plans.find(x => N(x.child) === N(name) && x.term_no === cur);
+  const mon = planExactTerm(D0.mon, name, term);
+  const sm = planExactTerm(D0.staff, name, term);
+  const ago = x => Math.floor((t - new Date(new Date(x).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) + 'T00:00:00+09:00')) / 864e5);
+  const wait = [];
+  const pend = (label, list, kind, doc) => { if (!list.length) return; const f = list[0], l = list[list.length - 1];
+    wait.push({ label, days: ago(f.sent_at), n: list.length, last: l.sent_at, via: l.via, arg: `'${kind}','${esc(name)}','${l.term || term}',${l.plan_id || 0},'${doc || ''}'` }); };
+  const S = (D0.sends || []).filter(x => N(x.child) === N(name));
+  if (!mon && !r['フォーム回答日']) pend('保護者アンケート', S.filter(x => x.kind === 'mon' && x.term === term), 'mon');
+  if (p && !p.genan_consent_at) pend('原案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '原案'), 'doui', '原案');
+  if (p && p.genan_consent_at && !p.honan_consent_at) pend('本案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '本案'), 'doui', '本案');
+  const done = [!!mon || !!r['フォーム回答日'], !!sm, !!(p && p.genan && p.honan && p.assessment && p.kaigi), !!(p && p.plan_made), !!(p && p.genan_consent_at), !!(p && p.genan_consent_at && d && t >= d.kaigi), !!(p && p.honan_consent_at)];
+  const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false);
+  const answered = !!(mon || r['フォーム回答日']);
+  const flags = planCardFlags({ st, start: d && d.start, periodTo: r._track && r._track.period_to, today: t, waiting: wait.length > 0, answered, active: !gone && !leavingBeforeNext });
+  const W = wait[0], ds = x => x ? md(x) : '';
+  let act = '';
+  if (gone) act = `退所（${(ldate || '').replace(/-/g, '/')}）。記録は残しています`;
+  else if (leavingBeforeNext && st < 7) act = `退所予定（${ldate.replace(/-/g, '/')}）。次の計画が始まる前に退所するため、急ぎの対象から外しています`;
+  else if (st >= 7) act = '✅ 本案の同意まで済み。いまやることはありません';
+  else if (st === 0) act = W ? `保護者アンケートの返事待ち（${W.days}日経過）` : '保護者アンケートのリンクを送る';
+  else if (st === 1) act = '職員モニタリングを作る';
+  else if (st === 2) act = p ? '計画書の4書類を確認する' : '計画書のひな形を作る';
+  else if (st === 3) act = '内容を確認して「計画書作成＝済」にする';
+  else if (st === 4) act = W ? `原案の同意の返事待ち（${W.days}日経過）` : '原案を保護者に送る';
+  else if (st === 5) act = `担当者会議を行う${d ? '（' + ds(d.kaigi) + '）' : ''}。終わったら本案を送る`;
+  else act = W ? `本案の同意の返事待ち（${W.days}日経過）` : '本案を保護者に送る';
+  return { name, m, d, gone, ldate, nextIso, leavingBeforeNext, cur, n, term, p, now, mon, sm, wait, done, st, answered, flags, W, act, key: N(name) };
+}
+// 今日やることの計画欄。管理画面の急ぎ（開始月・期間・45日以内・返事待ち・回答あり）だけ。完了・退所・退所前に次期が始まる子は出さない。
+function planUrgencyLabel(flags) {
+  if (flags.startPast) return '開始月を過ぎています';
+  if (flags.periodPast) return '今の計画期間を過ぎています';
+  return '';
+}
+function planHomeTodos(D0, LEFT, tday, t) {
+  const rows = (D0.rows || []).filter(r => r && r['児童名'] && !String(r['児童名']).startsWith('※'));
+  const out = [];
+  for (const r of rows) {
+    const s = planChildStatus(r, D0, LEFT, tday, t);
+    if (s.gone || s.leavingBeforeNext || s.st >= 7 || !s.flags.urgent) continue;
+    const late = planUrgencyLabel(s.flags);
+    out.push([s.flags.over ? 0 : 1, '📝', `${esc(s.name)}さん　${esc(s.act)}`, '#leo/plan', late || '個別支援計画（管理）']);
+  }
+  return out;
+}
 LEO_VIEWS.plan = async function () {
   const [D0, LEFT] = await Promise.all([planData(), loadLeftIndex()]), rows = D0.rows.filter(r => r['児童名'] && !String(r['児童名']).startsWith('※')), tday = today(), t = new Date(tday + 'T00:00:00+09:00'), mg = canManage();
-  const N = s => String(s || '').replace(/\s/g, '');
   const cards = rows.map(r => {
-    const name = r['児童名'], m = String(r['次期開始月'] || '').match(/(\d{4})年(\d{1,2})月/), d = m ? planDates(+m[1], +m[2]) : null;
-    const gone = leftDone(LEFT, name, tday), ldate = leftOnOf(LEFT, name);
-    const nextIso = d ? isoD(d.start) : '', leavingBeforeNext = !!(ldate && nextIso && nextIso > ldate);
-    // カードの期は「いま作っている次の期」＝現在の期+1。次期開始月が過ぎても、ここでは期を足さない。
-    const cur = parseInt(String(r['現在の期']).replace(/\D/g, '')) || 0, n = cur + 1, term = `第${n}期`;
-    const p = D0.plans.find(x => N(x.child) === N(name) && x.term_no === n), now = D0.plans.find(x => N(x.child) === N(name) && x.term_no === cur);
-    const mon = planExactTerm(D0.mon, name, term);
-    const sm = planExactTerm(D0.staff, name, term);
-    const ago = x => Math.floor((t - new Date(new Date(x).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) + 'T00:00:00+09:00')) / 864e5);
-    const wait = [];
-    const pend = (label, list, kind, doc) => { if (!list.length) return; const f = list[0], l = list[list.length - 1];
-      wait.push({ label, days: ago(f.sent_at), n: list.length, last: l.sent_at, via: l.via, arg: `'${kind}','${esc(name)}','${l.term || term}',${l.plan_id || 0},'${doc || ''}'` }); };
-    const S = (D0.sends || []).filter(x => N(x.child) === N(name));
-    if (!mon && !r['フォーム回答日']) pend('保護者アンケート', S.filter(x => x.kind === 'mon' && x.term === term), 'mon');
-    if (p && !p.genan_consent_at) pend('原案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '原案'), 'doui', '原案');
-    if (p && p.genan_consent_at && !p.honan_consent_at) pend('本案の同意', S.filter(x => x.kind === 'doui' && x.plan_id === p.id && x.doc === '本案'), 'doui', '本案');
+    const s = planChildStatus(r, D0, LEFT, tday, t);
+    const name = s.name, d = s.d, gone = s.gone, leavingBeforeNext = s.leavingBeforeNext;
+    const cur = s.cur, n = s.n, term = s.term, p = s.p, now = s.now, mon = s.mon, sm = s.sm, wait = s.wait, done = s.done, st = s.st, flags = s.flags, act = s.act;
     const waitHtml = () => wait.map(w => `<p style="background:${w.days >= 7 ? '#fde8e8' : '#fff8db'};padding:8px;border-radius:6px;margin:6px 0"><small>⏳ <b>${w.label}</b>：送って <b>${w.days}日</b>・返事なし（${w.n}回送付、最後 ${md(new Date(w.last))}・${esc(w.via)}）</small></p>`).join('');
-    const done = [!!mon || !!r['フォーム回答日'], !!sm, !!(p && p.genan && p.honan && p.assessment && p.kaigi), !!(p && p.plan_made), !!(p && p.genan_consent_at), !!(p && p.genan_consent_at && d && t >= d.kaigi), !!(p && p.honan_consent_at)];
-    const st = done.indexOf(false) < 0 ? 7 : done.indexOf(false);
-    const answered = !!(mon || r['フォーム回答日']);
-    const flags = planCardFlags({ st, start: d && d.start, periodTo: r._track && r._track.period_to, today: t, waiting: wait.length > 0, answered, active: !gone && !leavingBeforeNext });
-    const over = flags.over, soon = flags.soon;
-    const key = N(name), open = PLAN_OPEN === key || (DEMO && /open=1/.test(location.search) && name === '児童B');
+    const over = flags.over;
+    const key = s.key, open = PLAN_OPEN === key || (DEMO && /open=1/.test(location.search) && name === '児童B');
     const btn = (label, fn, dis) => `<button ${dis ? 'disabled' : ''} onclick="${fn}" style="display:block;width:100%;margin:6px 0;padding:12px;font-size:16px;border-radius:8px">${label}</button>`;
-    const W = wait[0], ds = x => x ? md(x) : '';
+    const W = wait[0];
     const rb = (l, f, dis) => mg ? btn(l, f, dis) : '';
-    let act = '', ab = '';
-    if (gone) act = `退所（${(ldate || '').replace(/-/g, '/')}）。記録は残しています`;
-    else if (leavingBeforeNext && st < 7) act = `退所予定（${ldate.replace(/-/g, '/')}）。次の計画が始まる前に退所するため、急ぎの対象から外しています`;
-    else if (st >= 7) act = '✅ 本案の同意まで済み。いまやることはありません';
-    else if (st === 0) { if (W) { act = `保護者アンケートの返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '保護者アンケートのリンクを送る'; ab = rb('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`); } }
-    else if (st === 1) { act = '職員モニタリングを作る'; ab = rb('活動記録から作る', `staffMon('${esc(name)}','${term}',${cur})`); }
-    else if (st === 2) { if (p) { act = '計画書の4書類を確認する'; ab = btn('書類を開いて直す', `planEdit(${p.id})`); } else { act = '計画書のひな形を作る'; ab = d ? rb('計画書を作る（ひな形）', `planNew('${esc(name)}',${n},${d.start.getFullYear()},${d.start.getMonth() + 1})`) : ''; } }
-    else if (st === 3) { act = '内容を確認して「計画書作成＝済」にする'; ab = rb('確認した（計画書作成＝済）', `planMade(${p.id})`, !(p.genan && p.honan)); }
-    else if (st === 4) { if (W) { act = `原案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '原案を保護者に送る'; ab = rb('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`); } }
-    else if (st === 5) { act = `担当者会議を行う${d ? '（' + ds(d.kaigi) + '）' : ''}。終わったら本案を送る`; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); }
-    else { if (W) { act = `本案の同意の返事待ち（${W.days}日経過）`; ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { act = '本案を保護者に送る'; ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); } }
+    let ab = '';
+    if (gone || (leavingBeforeNext && st < 7) || st >= 7) { /* ボタンは出さない。赤い行の文面は planChildStatus */ }
+    else if (st === 0) { if (W) { ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { ab = rb('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`); } }
+    else if (st === 1) { ab = rb('活動記録から作る', `staffMon('${esc(name)}','${term}',${cur})`); }
+    else if (st === 2) { if (p) { ab = btn('書類を開いて直す', `planEdit(${p.id})`); } else { ab = d ? rb('計画書を作る（ひな形）', `planNew('${esc(name)}',${n},${d.start.getFullYear()},${d.start.getMonth() + 1})`) : ''; } }
+    else if (st === 3) { ab = rb('確認した（計画書作成＝済）', `planMade(${p.id})`, !(p.genan && p.honan)); }
+    else if (st === 4) { if (W) { ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { ab = rb('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`); } }
+    else if (st === 5) { ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); }
+    else { if (W) { ab = rb('再送用にリンクをコピー', `planResend(${W.arg})`); } else { ab = rb('本案の同意リンクを作る', `planLink('doui','','',${p.id},'本案')`); } }
     const linkAct = /リンク|コピー/.test(ab) && !/^<button disabled/.test(ab);
     const how = linkAct ? `<div style="background:#f4f7ff;border-radius:6px;padding:8px;margin:6px 0;font-size:15px">1. 下の青いボタンを押してコピー → 2. 公式LINEで<b>${esc(name)}</b>さんの保護者のトークに貼って送る</div>` : '';
     const checks = PLAN_STEPS2.map((lb, i) => `<div style="color:${done[i] ? '#2a7a2a' : i === st ? '#c00' : '#999'}">${done[i] ? '✔' : i === st ? '▶' : '・'} ${lb}</div>`).join('');
     const urgent = flags.urgent;
     const lateBadge = flags.startPast ? '　<span class="badge">開始月を過ぎています</span>' : flags.periodPast ? '　<span class="badge">今の計画期間を過ぎています</span>' : '';
-    return { st, over, d, urgent, gone, key, wait: wait.map(w => ({ ...w, name, key: N(name) })), html: `<div class="card" style="border-left:6px solid ${gone ? '#888' : st >= 7 ? '#3a3' : over ? '#d33' : urgent ? '#e6b800' : '#ccc'};padding:14px">
+    return { st, over, d, urgent, gone, key, wait: wait.map(w => ({ ...w, name, key })), html: `<div class="card" style="border-left:6px solid ${gone ? '#888' : st >= 7 ? '#3a3' : over ? '#d33' : urgent ? '#e6b800' : '#ccc'};padding:14px">
       <div style="font-size:17px"><b>${esc(name)}</b>${leftMark(LEFT, name, tday)}　<small>${term}${d ? `（${d.start.getFullYear()}/${md(d.start)}〜）` : ''}</small>${lateBadge}</div>
       <div style="display:flex;gap:2px;margin:8px 0">${PLAN_STEPS2.map((_, i) => `<span style="flex:1;height:8px;border-radius:3px;background:${done[i] ? '#3a3' : i === st ? '#e6b800' : '#ddd'}"></span>`).join('')}</div>
       <div style="font-size:20px;font-weight:bold;margin:8px 0;color:${st >= 7 ? '#2a7a2a' : '#c00'}">${act}</div>
