@@ -84,8 +84,8 @@ function dkView() {
   const offices = Dakoku.visibleOffices(DK.data && DK.data.offices);
   const office = offices.find(o => o.name === DK.office) || null;
   const resolved = office ? Dakoku.resolveStaff({ email: DK.sess.email, staff: DK.data.staff, office: office.name, chosenId: DK.staffId }) : { staff: null, mode: 'pick', list: [] };
-  const judge = office ? Dakoku.judge(DK.locating ? null : DK.pos, office) : { ok: false, distance: null, reason: offices.length ? '事業所を選んでください' : '打刻できる事業所がありません' };
-  if (DK.locating && office) judge.reason = '位置を確認しています…';
+  const judge = office ? Dakoku.judge(DK.locating ? null : DK.pos, office) : { ok: false, distance: null, reason: offices.length ? '事業所を選んでください / Escolha o local' : '打刻できる事業所がありません / Nenhum local disponível para registro' };
+  if (DK.locating && office) judge.reason = '位置を確認しています… / Verificando localização…';
   return { offices, office, staff: resolved.staff, mode: resolved.mode, list: resolved.list, judge };
 }
 function dkBind() {
@@ -109,38 +109,38 @@ function dkPaint() {
   const root = document.getElementById('dk_root');
   if (!root || !DK.data) return;
   const v = dkView();
-  const who = DK.sess.demo ? '見本モードです。シートには書きません。' : (DK.sess.email ? 'ログイン中: ' + DK.sess.email : 'ログイン中のメールがありません。');
+  const who = DK.sess.demo ? '見本モードです。シートには書きません。 / Modo de demonstração: nada é gravado.' : (DK.sess.email ? 'ログイン中 / Conectado: ' + DK.sess.email : 'ログイン中のメールがありません。 / Sem e-mail de login.');
   let officeHtml = '';
   if (!v.offices.length) officeHtml = '<div class="wn">打刻できる事業所がありません。設定シートの「有効」が TRUE の事業所だけ出ます（いま有効なのは RYDEEN の想定です）。</div>';
-  else if (v.offices.length === 1) officeHtml = `<p><b>${dkEsc(v.office.name)}</b>` + (Dakoku.gpsRequired(v.office) ? ` <span class="meta">許可半径 ${Math.round(v.office.radius || 0)}m</span>` : ` <span class="meta">位置情報不要</span>`) + `</p>`;
-  else officeHtml = `<label class="meta">事業所</label><select id="dk_office">${v.offices.map(o => `<option value="${dkEsc(o.name)}"${o.name === DK.office ? ' selected' : ''}>${dkEsc(o.name)}</option>`).join('')}</select>`;
+  else if (v.offices.length === 1) officeHtml = `<p><b>${dkEsc(v.office.name)}</b>` + (Dakoku.gpsRequired(v.office) ? ` <span class="meta">許可半径 / Raio permitido ${Math.round(v.office.radius || 0)}m</span>` : ` <span class="meta">位置情報不要 / Sem localização</span>`) + `</p>`;
+  else officeHtml = `<label class="meta">事業所 / Local</label><select id="dk_office">${v.offices.map(o => `<option value="${dkEsc(o.name)}"${o.name === DK.office ? ' selected' : ''}>${dkEsc(o.name)}</option>`).join('')}</select>`;
   let staffHtml = '';
-  if (v.office && v.mode === 'email' && v.staff) staffHtml = `<p>職員: <b>${dkEsc(v.staff.name)}</b> <span class="meta">（ログインのメールで本人を特定）</span></p>`;
+  if (v.office && v.mode === 'email' && v.staff) staffHtml = `<p>職員 / Funcionário: <b>${dkEsc(v.staff.name)}</b> <span class="meta">（ログインのメールで本人を特定 / identificado pelo e-mail）</span></p>`;
   else if (v.office && v.list.length) {
-    const note = v.mode === 'ambiguous' ? '同じメールの職員が複数います。本人を選んでください。' : 'ログイン用メールが空（または一致しない）ため、名前を選んでいます。職員シートにメールを入れると自動で本人になります。';
-    staffHtml = `<div class="wn">${dkEsc(note)}</div><label class="meta">職員</label><select id="dk_staff"><option value="">選んでください</option>${v.list.map(s => `<option value="${dkEsc(s.id)}"${s.id === (v.staff && v.staff.id) ? ' selected' : ''}>${dkEsc(s.name)}</option>`).join('')}</select>`;
-  } else if (v.office) staffHtml = '<div class="ng">この事業所の有効な職員がいません。</div>';
+    const note = v.mode === 'ambiguous' ? '同じメールの職員が複数います。本人を選んでください。 / Há vários funcionários com o mesmo e-mail. Escolha seu nome.' : 'ログイン用メールが空（または一致しない）ため、名前を選んでいます。職員シートにメールを入れると自動で本人になります。 / Escolha seu nome na lista.';
+    staffHtml = `<div class="wn">${dkEsc(note)}</div><label class="meta">職員 / Funcionário</label><select id="dk_staff"><option value="">選んでください / Escolha</option>${v.list.map(s => `<option value="${dkEsc(s.id)}"${s.id === (v.staff && v.staff.id) ? ' selected' : ''}>${dkEsc(s.name)}</option>`).join('')}</select>`;
+  } else if (v.office) staffHtml = '<div class="ng">この事業所の有効な職員がいません。 / Não há funcionários ativos neste local.</div>';
   const needGps = !!(v.office && Dakoku.gpsRequired(v.office));
   let geo = '';
   if (v.office) {
-    if (!needGps) geo = `<div class="okb">この事業所は位置情報不要です。${v.staff ? '打刻できます。' : '職員を選ぶとボタンが押せます。'}</div>`;
-    else if (DK.locating) geo = '<div class="wn">位置を確認しています…</div>';
+    if (!needGps) geo = `<div class="okb">この事業所は位置情報不要です。 / Sem localização. ${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}</div>`;
+    else if (DK.locating) geo = '<div class="wn">位置を確認しています… / Verificando localização…</div>';
     else if (DK.posError) geo = `<div class="ng">${dkEsc(DK.posError)}</div>`;
-    else if (v.judge.ok) geo = `<div class="okb">事業所まで ${Math.round(v.judge.distance)}m（許可 ${Math.round(v.office.radius)}m）。${v.staff ? '打刻できます。' : '職員を選ぶとボタンが押せます。'}${DK.pos && DK.pos.demo ? ' 見本の位置（事業所の中心）です。' : ''}${DK.pos && DK.pos.accuracy != null ? ' <span class="meta">精度 ±' + Math.round(DK.pos.accuracy) + 'm</span>' : ''}</div>`;
-    else geo = `<div class="ng">${dkEsc(v.judge.reason || '打刻できません')}</div>`;
+    else if (v.judge.ok) geo = `<div class="okb">事業所まで / Distância ${Math.round(v.judge.distance)}m（許可 / permitido ${Math.round(v.office.radius)}m）。${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}${DK.pos && DK.pos.demo ? ' 見本の位置（事業所の中心）です。' : ''}${DK.pos && DK.pos.accuracy != null ? ' <span class="meta">精度 ±' + Math.round(DK.pos.accuracy) + 'm</span>' : ''}</div>`;
+    else geo = `<div class="ng">${dkEsc(v.judge.reason || '打刻できません / Não é possível registrar')}</div>`;
   }
   const can = !!(v.judge.ok && v.staff && !DK.busy && !(needGps && DK.locating));
   const dis = can ? '' : ' disabled';
   const msg = DK.msg ? `<div class="${DK.bad ? 'ng' : 'okb'}">${dkEsc(DK.msg)}</div>` : '';
-  const recent = DK.recent.length ? `<ul>${DK.recent.map(r => `<li>${dkEsc(r.at)} ${dkEsc(r.kind)}</li>`).join('')}</ul>` : '<p class="meta">まだありません。</p>';
-  const demoBtn = DK.sess.demo && v.office && needGps ? '<button type="button" class="loc" data-dk="demo">見本の位置で試す（記録しない）</button>' : '';
-  const locBtn = needGps ? '<button type="button" class="loc" data-dk="loc">位置を取り直す</button>' : '';
-  root.innerHTML = `<h3>出退勤打刻</h3><p class="meta">${dkEsc(who)}</p>${msg}${officeHtml}${staffHtml}${geo}
-    ${v.office ? `<button type="button" class="go" data-dk="in"${dis}>出勤</button>
-    <button type="button" class="go out" data-dk="out"${dis}>退勤</button>
+  const recent = DK.recent.length ? `<ul>${DK.recent.map(r => `<li>${dkEsc(r.at)} ${dkEsc(r.kind)}</li>`).join('')}</ul>` : '<p class="meta">まだありません。 / Nenhum registro ainda.</p>';
+  const demoBtn = DK.sess.demo && v.office && needGps ? '<button type="button" class="loc" data-dk="demo">見本の位置で試す（記録しない） / Testar com local de exemplo</button>' : '';
+  const locBtn = needGps ? '<button type="button" class="loc" data-dk="loc">位置を取り直す / Atualizar localização</button>' : '';
+  root.innerHTML = `<h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><p class="meta">${dkEsc(who)}</p>${msg}${officeHtml}${staffHtml}${geo}
+    ${v.office ? `<button type="button" class="go" data-dk="in"${dis}>出勤<br><small>Entrada</small></button>
+    <button type="button" class="go out" data-dk="out"${dis}>退勤<br><small>Saída</small></button>
     ${locBtn}${demoBtn}
-    <p class="meta">押し忘れを直す画面は、まだありません。責任者に伝えてください。</p>
-    <div class="card"><h4>最近の打刻</h4>${recent}</div>` : ''}`;
+    <p class="meta">押し忘れを直す画面は、まだありません。責任者に伝えてください。<br>Esqueceu de registrar? Avise o responsável.</p>
+    <div class="card"><h4>最近の打刻 / Registros recentes</h4>${recent}</div>` : ''}`;
   dkBind();
 }
 async function dkLocate() {
@@ -204,12 +204,12 @@ async function dkRecent() {
 async function dkPunch(kind) {
   if (DK.busy || !Dakoku.kindOk(kind)) return;
   const v = dkView();
-  if (!v.staff) { DK.msg = '職員を選んでください'; DK.bad = true; dkPaint(); return; }
-  if (!v.judge.ok) { DK.msg = v.judge.reason || '打刻できません'; DK.bad = true; dkPaint(); return; }
+  if (!v.staff) { DK.msg = '職員を選んでください / Escolha o funcionário'; DK.bad = true; dkPaint(); return; }
+  if (!v.judge.ok) { DK.msg = v.judge.reason || '打刻できません / Não é possível registrar'; DK.bad = true; dkPaint(); return; }
   if (DK.sess.demo) {
     const at = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }).replace('T', ' ');
     DK.recent.unshift({ at: at, kind: kind, office: v.office.name });
-    DK.msg = '見本モードです。' + kind + 'は記録していません。';
+    DK.msg = '見本モードです。' + kind + 'は記録していません。 / Modo de demonstração: ' + (kind === '出勤' ? 'entrada' : 'saída') + ' não gravada.';
     DK.bad = false;
     dkPaint();
     return;
@@ -227,26 +227,26 @@ async function dkPunch(kind) {
       payload.accuracy = DK.pos.accuracy == null ? '' : DK.pos.accuracy;
     }
     const j = await dkRpc(payload);
-    DK.msg = kind + 'を記録しました（' + (j.at || '') + '）';
+    DK.msg = kind + 'を記録しました（' + (j.at || '') + '） / ' + (kind === '出勤' ? 'Entrada' : 'Saída') + ' registrada';
     DK.bad = false;
     DK.busy = false;
     await dkRecent();
   } catch (e) {
-    DK.msg = e.message || '記録できませんでした';
+    DK.msg = e.message || '記録できませんでした / Não foi possível registrar';
     DK.bad = true; DK.busy = false;
     dkPaint();
   }
 }
 async function renderDakoku() {
-  const back = '<button class="back" type="button" onclick="location.hash=\'\'">← ポータルへ</button>';
-  $('view').innerHTML = back + '<div class="dk" id="dk_root"><h3>出退勤打刻</h3><p>読み込み中…</p></div>';
+  const back = '<button class="back" type="button" onclick="location.hash=\'\'">← ポータルへ / Voltar ao portal</button>';
+  $('view').innerHTML = back + '<div class="dk" id="dk_root"><h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><p>読み込み中… / Carregando…</p></div>';
   DK.sess = dkSession();
   DK.msg = ''; DK.bad = false; DK.busy = false; DK.recent = [];
   DK.pos = null; DK.posError = ''; DK.locating = false;
   try {
     DK.data = DK.sess.demo ? Dakoku.sample() : await dkRpc({ action: 'bootstrap' });
   } catch (e) {
-    $('view').innerHTML = back + `<div class="dk"><h3>出退勤打刻</h3><div class="ng">${dkEsc(e.message || e)}</div><p class="meta">手順は dakoku-gas/README.md です。</p></div>`;
+    $('view').innerHTML = back + `<div class="dk"><h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><div class="ng">${dkEsc(e.message || e)}</div><p class="meta">手順は dakoku-gas/README.md です。</p></div>`;
     return;
   }
   const offices = Dakoku.visibleOffices(DK.data.offices);
