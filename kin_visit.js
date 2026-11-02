@@ -680,7 +680,7 @@ function kvGasFields(id) {
     <div class="sv-h">前回の報告${kvGasPt('Último relatório')}</div>
     <div id="${id}-prev" class="gas-hint">—</div>
     <input type="checkbox" class="gas-check" id="${id}-ack" data-nodirty="1"><label class="ack" for="${id}-ack"><span class="off">☐</span><span class="on">☑</span> 指示と前回報告を確認しました${kvGasPt('Confirmei as instruções e o último relatório')}</label>
-    <p class="gas-hint">表示だけです。毎回書く必要はありません。</p>
+    <p class="gas-hint">表示だけです。毎回書く必要はありません。<br>Só para ler. Não precisa escrever toda vez.</p>
   </div>
   <div class="gas-field"><label class="gas-lab" for="${id}-serviceType">サービス区分${kvGasReq()}${kvGasPt('Tipo de serviço')}</label><select id="${id}-serviceType" class="gas-in">${svc}</select></div>
   <div class="gas-row gas-field"><div><label class="gas-lab" for="${id}-startTime">開始時間<span class="gas-req">必須</span>${kvGasPt('Horário de início')}</label><input type="time" id="${id}-startTime" class="gas-in"><button type="button" class="gas-now" data-now="${id}-startTime">今を開始に${kvGasPt('Agora (início)')}</button></div>
@@ -709,7 +709,7 @@ function kvGasShell() {
       <input type="radio" class="gas-check" name="mode" id="modeLater" value="later"><label class="gas-btn ok" for="modeLater">まとめて署名${kvGasPt('Assinar depois')}</label>
     </div>
     <div class="gas-field" id="dateBlock"><label class="gas-lab" for="date">サービス提供日${kvGasReq()}${kvGasPt('Data do serviço')}</label><input type="date" id="date" class="gas-in"><div id="dateWeekday" class="gas-hint"></div></div>
-    <div class="gas-field"><label class="gas-lab" for="helperName">担当ヘルパー名${kvGasPt('Nome do cuidador')}</label><input id="helperName" class="gas-in" autocomplete="name" placeholder="氏名"><p class="gas-hint">ログイン中の職員名を入れています。空欄のまま保存できます。</p></div>
+    <div class="gas-field"><label class="gas-lab" for="helperName">担当ヘルパー名${kvGasPt('Nome do cuidador')}</label><input id="helperName" class="gas-in" autocomplete="name" placeholder="氏名"><p class="gas-hint">ログイン中の職員名を入れています。空欄のまま保存できます。<br>Nome do funcionário logado. Pode salvar em branco.</p></div>
     <section id="normalSection">
       <div class="gas-field"><label class="gas-lab" for="userName">利用者氏名${kvGasReq()}${kvGasPt('Nome do usuário')}</label><select id="userName" class="gas-in"></select><div id="n-kana" class="gas-hint"></div></div>
       <div id="n-slotArea" hidden><div class="gas-lab">予定を選ぶ ${kvGasPt('Escolher horário')}</div><div id="n-chips"></div></div>
@@ -723,7 +723,7 @@ function kvGasShell() {
       <div class="gas-field"><div class="gas-lab">時間帯${kvGasPt('Período')}</div><div class="gas-group" id="bandGroup"></div><div id="t-bandInfo" class="gas-hint"></div></div>
       <div id="t-note" class="gas-note">タイムテーブルから入力しました。違うところだけ直してください / Preenchido pela escala. Corrija só o que for diferente.</div>
       <div id="t-empty" class="gas-note muted" hidden>この時間帯の予定はありません<br><span class="gas-pt">Sem agenda neste período</span></div>
-      <div id="t-none" class="gas-note warn" hidden>建物の入った支給がありません。台帳の「建物」に棟の名前を入れると、ここでまとめて記入できます。</div>
+      <div id="t-none" class="gas-note warn" hidden>建物の入った支給がありません。台帳の「建物」に棟の名前を入れると、ここでまとめて記入できます。<br><span class="gas-pt">Nenhum prédio cadastrado. Coloque o nome do prédio no cadastro para registrar juntos aqui.</span></div>
       <div id="t-cards"></div>
       <button type="button" id="trioSubmitBtn" class="gas-go"><span id="trioSubmitLabel">0人分をまとめて送信</span><br><span style="font-size:13px;font-weight:400">Enviar todos</span></button>
     </section>
@@ -735,7 +735,7 @@ function kvGasShell() {
       <div id="l-listHead"></div><div id="l-cards"></div>
       <button type="button" id="laterSubmitBtn" class="gas-go ok" hidden><span id="laterSubmitLabel">まとめて送信</span><br><span id="laterSubmitLabelPt" style="font-size:13px;font-weight:400">Enviar todas</span></button>
     </section>
-    <p style="margin-top:16px"><a class="gas-link" href="#kintoun/visit">今月の記録を見る</a></p>
+    <p style="margin-top:16px"><a class="gas-link" href="#kintoun/visit">今月の記録を見る / Ver registros do mês</a></p>
   </div></div>`;
 }
 function kvGasMode() { return $('modeLater').checked ? 'later' : $('modeTrio').checked ? 'trio' : 'normal'; }
@@ -830,7 +830,7 @@ function kvGasBuildCards() {
     card.id = 'card-' + id;
     card.hidden = true;
     card.dataset.inBand = '0';
-    card.innerHTML = `<div class="person-h"><div style="display:flex;justify-content:space-between;gap:8px"><div><span class="gas-badge" id="${id}-order">${i + 1}</span><b style="font-size:1.15rem">${esc(u.name)}</b> <span class="gas-hint">${u.name_kana ? '（' + esc(u.name_kana) + '）' : ''}</span><div class="gas-hint" id="${id}-slotLabel"></div></div><span class="gas-badge ok" id="${id}-sentBadge" hidden>送信済み</span><span class="gas-badge ng" id="${id}-failBadge" hidden>送信失敗</span></div><label class="skip-row" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:700"><input type="checkbox" id="${id}-skip" data-nodirty="1"><span>本日はなし${kvGasPt('Sem serviço hoje')}</span></label></div><div class="person-body" id="${id}-body"></div>`;
+    card.innerHTML = `<div class="person-h"><div style="display:flex;justify-content:space-between;gap:8px"><div><span class="gas-badge" id="${id}-order">${i + 1}</span><b style="font-size:1.15rem">${esc(u.name)}</b> <span class="gas-hint">${u.name_kana ? '（' + esc(u.name_kana) + '）' : ''}</span><div class="gas-hint" id="${id}-slotLabel"></div></div><span class="gas-badge ok" id="${id}-sentBadge" hidden>送信済み / Enviado</span><span class="gas-badge ng" id="${id}-failBadge" hidden>送信失敗 / Falhou</span></div><label class="skip-row" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:700"><input type="checkbox" id="${id}-skip" data-nodirty="1"><span>本日はなし${kvGasPt('Sem serviço hoje')}</span></label></div><div class="person-body" id="${id}-body"></div>`;
     box.appendChild(card);
     kvGasMount(id, $(id + '-body'));
   });
@@ -1127,7 +1127,7 @@ async function kvGasLoadPending() {
   } catch (e) { KW.pending = []; $('l-summary').textContent = e.message; return; }
   const s = kvPendingSummary(KW.pending, kvToday());
   const block = (ja, pt, range, users) => {
-    const chips = users.length ? users.map(u => `<button type="button" class="sum-chip" data-later-user="${esc(u.userName)}" data-later-week="${esc(u.weekStart)}">${esc(kvSurname(u.userName))} ${u.count}件</button>`).join('') : '<span class="gas-hint">なし</span>';
+    const chips = users.length ? users.map(u => `<button type="button" class="sum-chip" data-later-user="${esc(u.userName)}" data-later-week="${esc(u.weekStart)}">${esc(kvSurname(u.userName))} ${u.count}件</button>`).join('') : '<span class="gas-hint">なし / Nenhum</span>';
     return `<div style="margin-top:8px"><b>${ja}</b> <span class="gas-hint">${pt}${range ? ' ' + esc(range) : ''}</span><div>${chips}</div></div>`;
   };
   $('l-summary').innerHTML = block('今週', 'Esta semana', kvWeekRangeLabel(s.thisWeek.weekStart), s.thisWeek.users) + block('先週', 'Semana passada', kvWeekRangeLabel(s.lastWeek.weekStart), s.lastWeek.users) + (s.other.users.length ? block('ほかの週', 'Outras semanas', '', s.other.users) : '');
@@ -1143,7 +1143,7 @@ function kvGasRenderLater() {
   if (!sel || !sel.value) { $('l-listHead').innerHTML = '<div class="gas-note muted">利用者を選んでください<br><span class="gas-pt">Escolha o usuário</span></div>'; $('laterSubmitBtn').hidden = true; return; }
   const visits = kvPendingLater(KW.pending, name, KW.laterWeek);
   if (!visits.length) { $('l-listHead').innerHTML = '<div class="gas-note good">この週の署名待ちはありません<br><span class="gas-pt">Nada para assinar nesta semana</span></div>'; $('laterSubmitBtn').hidden = true; return; }
-  $('l-listHead').innerHTML = '<div class="visit-date">署名待ち ' + visits.length + '件</div><div class="gas-hint">内容を確認して、1件ずつ署名してください / Confira e assine cada visita.</div>';
+  $('l-listHead').innerHTML = '<div class="visit-date">署名待ち ' + visits.length + '件 / Aguardando assinatura</div><div class="gas-hint">内容を確認して、1件ずつ署名してください / Confira e assine cada visita.</div>';
   visits.forEach((v, i) => kvGasLaterCard(v, i));
   $('laterSubmitBtn').hidden = false;
   kvGasLaterLabel();
@@ -1154,7 +1154,7 @@ function kvGasLaterCard(v, i) {
   const card = document.createElement('div');
   card.className = 'person';
   card.id = 'card-' + id;
-  card.innerHTML = `<div class="person-h"><div class="visit-date">${esc(kvIsoShortLabel(v.visit_date))}</div><div class="visit-time">${esc(kvShortTime(v.start_time))}〜${esc(kvShortTime(v.end_time))}</div><div class="gas-hint">${esc(v.service || '')} ${esc(v.content || '')}</div><div class="gas-hint">ヘルパー / Cuidador: ${esc(v.staff_name || '')}</div><label class="skip-row" style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:700"><input type="checkbox" id="${id}-skip" data-nodirty="1"> 今は署名しない${kvGasPt('Não assinar agora')}</label><span class="gas-badge ok" id="${id}-sentBadge" hidden>送信済み</span><span class="gas-badge ng" id="${id}-failBadge" hidden>失敗</span></div><div class="person-body" id="${id}-body"></div>`;
+  card.innerHTML = `<div class="person-h"><div class="visit-date">${esc(kvIsoShortLabel(v.visit_date))}</div><div class="visit-time">${esc(kvShortTime(v.start_time))}〜${esc(kvShortTime(v.end_time))}</div><div class="gas-hint">${esc(v.service || '')} ${esc(v.content || '')}</div><div class="gas-hint">ヘルパー / Cuidador: ${esc(v.staff_name || '')}</div><label class="skip-row" style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:700"><input type="checkbox" id="${id}-skip" data-nodirty="1"> 今は署名しない${kvGasPt('Não assinar agora')}</label><span class="gas-badge ok" id="${id}-sentBadge" hidden>送信済み / Enviado</span><span class="gas-badge ng" id="${id}-failBadge" hidden>失敗 / Falhou</span></div><div class="person-body" id="${id}-body"></div>`;
   $('l-cards').appendChild(card);
   $(id + '-body').innerHTML = kvGasLaterSigner(id);
   KW.records[id] = { dirty: false, autofilled: false };
@@ -1170,7 +1170,7 @@ function kvGasLaterCard(v, i) {
 function kvGasLaterSigner(id) {
   const signer = (val, ja, pt, on) => `<input type="radio" class="gas-check" name="${id}-signerType" id="${id}-sg-${val}" value="${val}" ${on ? 'checked' : ''}><label class="gas-btn" for="${id}-sg-${val}">${ja}${kvGasPt(pt)}</label>`;
   return `<div class="signer"><div class="gas-lab">署名する人${kvGasPt('Quem assina')}</div>${signer('本人', '本人', 'Próprio usuário', true)}${signer('ご家族', 'ご家族', 'Familiar', false)}${signer('署名困難', '署名困難（確認は取れた）', 'Não consegue assinar (confirmado)', false)}</div>
-    <div class="gas-field" id="${id}-reasonWrap" hidden><label class="gas-lab">署名困難の理由${kvGasReq()}</label><textarea id="${id}-reason" class="gas-in" rows="2"></textarea></div>
+    <div class="gas-field" id="${id}-reasonWrap" hidden><label class="gas-lab">署名困難の理由${kvGasReq()}${kvGasPt('Motivo (não consegue assinar)')}</label><textarea id="${id}-reason" class="gas-in" rows="2"></textarea></div>
     <div class="gas-field" id="${id}-signWrap"><div class="gas-lab">確認署名${kvGasPt('Assinatura')}</div><div class="gas-canvas"><button type="button" class="gas-clear" data-clear="${id}">書き直す / Refazer</button><canvas id="${id}-canvas"></canvas></div></div>
     <div id="${id}-laterNote" hidden></div>`;
 }
