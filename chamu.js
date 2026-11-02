@@ -601,35 +601,35 @@ async function cmJournal() {
   CM.st.date = date;
   const card = u => {
     const l = by[u.id] || {}, chosen = l.user_id ? (l.present ? '出席' : '欠席') : '', k = u.id;
-    return `<div class="jr"><div class="row" style="align-items:end"><div style="flex:0 0 160px"><b>${cmEsc(u.name)}</b></div><div><label class="l">出欠</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
-      <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始', (l.start_time || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了', (l.end_time || '').slice(0, 5), 'time')}
-        <div><label class="l">送迎</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
-        <div><label class="l">食事</label>${cmSel('m_' + k, ChamuLib.MEAL, l.meal || 'あり')}</div>
-        <div id="eat_${k}" style="flex:1 1 100%;${(l.meal || 'あり') === 'あり' ? '' : 'display:none'}"><label class="l">摂食（任意）</label>${cmSel('i_' + k, ChamuLib.INTAKE, l.intake || '', '未記入')}
-          <p class="note">ざっくりで大丈夫です（100%・80%・50%・その他）。未記入でも保存できます。</p>
-          <div id="eatn_${k}" style="${l.intake === 'その他' ? '' : 'display:none'}">${cmInp('in_' + k, 'その他の目安（任意）', l.intake_note || '', 'text', 'maxlength="80" placeholder="例: 半分も残した"')}</div></div>
-        <div style="flex:1 1 100%">${cmNoteField('n_' + k, '支援内容・ご様子', l.support_note || '')}</div></div></div>`;
+    return `<div class="jr"><div class="row" style="align-items:end"><div style="flex:0 0 160px"><b>${cmEsc(u.name)}</b></div><div><label class="l">出欠 / Presença</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
+      <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始 / Início', (l.start_time || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了 / Fim', (l.end_time || '').slice(0, 5), 'time')}
+        <div><label class="l">送迎 / Transporte</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
+        <div><label class="l">食事 / Refeição</label>${cmSel('m_' + k, ChamuLib.MEAL, l.meal || 'あり')}</div>
+        <div id="eat_${k}" style="flex:1 1 100%;${(l.meal || 'あり') === 'あり' ? '' : 'display:none'}"><label class="l">摂食（任意） / Quanto comeu (opcional)</label>${cmSel('i_' + k, ChamuLib.INTAKE, l.intake || '', '未記入')}
+          <p class="note">ざっくりで大丈夫です（100%・80%・50%・その他）。未記入でも保存できます。<br>Pode ser aproximado. Pode salvar sem preencher.</p>
+          <div id="eatn_${k}" style="${l.intake === 'その他' ? '' : 'display:none'}">${cmInp('in_' + k, 'その他の目安（任意） / Outro (opcional)', l.intake_note || '', 'text', 'maxlength="80" placeholder="例: 半分も残した"')}</div></div>
+        <div style="flex:1 1 100%">${cmNoteField('n_' + k, '支援内容・ご様子 / Apoio e estado da pessoa', l.support_note || '')}</div></div></div>`;
   };
-  cmFrame('journal', `<h3>業務日誌　${cmEsc(date)}</h3><p class="note">職員が入力するのはここだけです。保存すると、出席した日は実績記録票に自動で転記されます。</p>
-    <p class="noprint"><button class="sec inl" onclick="CM.st.date='${cmShift(date, -1)}';renderChamu('journal')">＜ 前日</button>
-    <button class="sec inl" onclick="CM.st.date='${cmToday()}';renderChamu('journal')">今日</button>
-    <button class="sec inl" onclick="CM.st.date='${cmShift(date, 1)}';renderChamu('journal')">翌日 ＞</button>
+  cmFrame('journal', `<h3>業務日誌 / Diário de trabalho　${cmEsc(date)}</h3><p class="note">職員が入力するのはここだけです。保存すると、出席した日は実績記録票に自動で転記されます。<br>Os funcionários só preenchem aqui. Ao salvar, os dias de presença vão automaticamente para o registro de serviços.</p>
+    <p class="noprint"><button class="sec inl" onclick="CM.st.date='${cmShift(date, -1)}';renderChamu('journal')">＜ 前日 / Dia anterior</button>
+    <button class="sec inl" onclick="CM.st.date='${cmToday()}';renderChamu('journal')">今日 / Hoje</button>
+    <button class="sec inl" onclick="CM.st.date='${cmShift(date, 1)}';renderChamu('journal')">翌日 / Próximo dia ＞</button>
     <input type="date" id="j_date" value="${date}" style="width:auto" onchange="CM.st.date=this.value;renderChamu('journal')"></p>
-    ${shift.error ? '<div class="card"><h4>この日の配置</h4><p class="note">配置表を読めませんでした。supabase/chamu_shift.sql を適用してください。</p></div>' : ChamuLib.dayShiftHtml(date, shift.rows)}
-    <div class="card">${cmInp('j_staff', '記入者', (day && day.staff_name) || staff)}
-      <div><label class="l">天気</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>
-      <label class="l">献立</label><textarea id="j_menu" maxlength="500" placeholder="例: ごはん、味噌汁、豚肉の生姜焼き">${cmEsc((day && day.menu) || '')}</textarea>
-      <p class="note">栄養士への分量です。空欄でも保存できます。ごはんは炊いた後の量（半量も、その量で書いてください）。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけです。</p>
-      <div class="row">${cmInp('j_rice', 'ごはん（炊いた後）', (day && day.rice_portion) || '', 'text', 'maxlength="80" placeholder="例: 150g/人、半量は75g"')}
-        ${cmInp('j_egg', '卵（個数）', (day && day.egg_count) || '', 'text', 'maxlength="80" placeholder="例: 1個"')}
-        ${cmInp('j_tofu', '豆腐（1人分）', (day && day.tofu_g) || '', 'text', 'maxlength="80" placeholder="例: 150g"')}
-        ${cmInp('j_meat', '肉（1人分）', (day && day.meat_note) || '', 'text', 'maxlength="80" placeholder="例: 豚肉50g、ハム1枚、ソーセージ1本"')}
-        ${cmInp('j_fish', '魚（1人分）', (day && day.fish_g) || '', 'text', 'maxlength="80" placeholder="例: 80g"')}
-        ${cmInp('j_dairy', '牛乳・乳製品', (day && day.dairy_note) || '', 'text', 'maxlength="80" placeholder="例: 200g（なければ空欄）"')}</div>
-      ${cmNoteField('j_note', '全体申し送り', (day && day.note) || '')}</div>
-    <p class="noprint"><button class="sec inl" onclick="cmBulk()">予定どおり全員を一括入力</button></p>
+    ${shift.error ? '<div class="card"><h4>この日の配置 / Equipe do dia</h4><p class="note">配置表を読めませんでした。supabase/chamu_shift.sql を適用してください。</p></div>' : ChamuLib.dayShiftHtml(date, shift.rows)}
+    <div class="card">${cmInp('j_staff', '記入者 / Quem preencheu', (day && day.staff_name) || staff)}
+      <div><label class="l">天気 / Tempo</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>
+      <label class="l">献立 / Cardápio</label><textarea id="j_menu" maxlength="500" placeholder="例: ごはん、味噌汁、豚肉の生姜焼き">${cmEsc((day && day.menu) || '')}</textarea>
+      <p class="note">栄養士への分量です。空欄でも保存できます。ごはんは炊いた後の量（半量も、その量で書いてください）。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけです。<br>Quantidades para a nutricionista. Pode deixar em branco. Arroz: peso depois de cozido.</p>
+      <div class="row">${cmInp('j_rice', 'ごはん（炊いた後） / Arroz (cozido)', (day && day.rice_portion) || '', 'text', 'maxlength="80" placeholder="例: 150g/人、半量は75g"')}
+        ${cmInp('j_egg', '卵（個数） / Ovos (qtd.)', (day && day.egg_count) || '', 'text', 'maxlength="80" placeholder="例: 1個"')}
+        ${cmInp('j_tofu', '豆腐（1人分） / Tofu (por pessoa)', (day && day.tofu_g) || '', 'text', 'maxlength="80" placeholder="例: 150g"')}
+        ${cmInp('j_meat', '肉（1人分） / Carne (por pessoa)', (day && day.meat_note) || '', 'text', 'maxlength="80" placeholder="例: 豚肉50g、ハム1枚、ソーセージ1本"')}
+        ${cmInp('j_fish', '魚（1人分） / Peixe (por pessoa)', (day && day.fish_g) || '', 'text', 'maxlength="80" placeholder="例: 80g"')}
+        ${cmInp('j_dairy', '牛乳・乳製品 / Leite e laticínios', (day && day.dairy_note) || '', 'text', 'maxlength="80" placeholder="例: 200g（なければ空欄）"')}</div>
+      ${cmNoteField('j_note', '全体申し送り / Recado geral', (day && day.note) || '')}</div>
+    <p class="noprint"><button class="sec inl" onclick="cmBulk()">予定どおり全員を一括入力 / Preencher todos conforme o plano</button></p>
     ${users.map(card).join('') || '<div class="card">利用者がまだいません。<a href="#chamu/users">利用者</a>から登録してください。</div>'}
-    <button type="button" data-cm-save onclick="cmSaveJournal()">保存して記録票に転記</button>`);
+    <button type="button" data-cm-save onclick="cmSaveJournal()">保存して記録票に転記</button><p class="note">↑ Salvar e passar para o registro de serviços</p>`);
   users.forEach(u => {
     const p = document.getElementById('p_' + u.id), m = document.getElementById('m_' + u.id), i = document.getElementById('i_' + u.id);
     if (p) p.onchange = () => cmToggle(u.id);
@@ -651,7 +651,7 @@ async function cmHaichi() {
 }
 function cmNoteField(id, label, value) {
   const safe = String(id).replace(/[^A-Za-z0-9_-]/g, '');
-  return `<div class="cm-lab"><label class="l">${cmEsc(label)}</label><button type="button" class="sec inl noprint" id="tr_btn_${safe}" onclick="cmTranslate('${safe}')">日本語にする</button></div><textarea id="${safe}">${cmEsc(value || '')}</textarea><div id="tr_out_${safe}" class="cm-tr noprint"></div>`;
+  return `<div class="cm-lab"><label class="l">${cmEsc(label)}</label><button type="button" class="sec inl noprint" id="tr_btn_${safe}" onclick="cmTranslate('${safe}')" title="Traduzir para japonês">日本語にする</button><span class="note noprint"> ← Traduzir para japonês</span></div><textarea id="${safe}">${cmEsc(value || '')}</textarea><div id="tr_out_${safe}" class="cm-tr noprint"></div>`;
 }
 function cmMealToggle(id) {
   const eat = document.getElementById('eat_' + id), note = document.getElementById('eatn_' + id);
