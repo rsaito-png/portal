@@ -1,4 +1,4 @@
--- 迎え場所・送り場所：回答に場所があれば回答、空欄なら型表、どちらも空欄なら空欄、のテスト。本番の SQL Editor には貼らない（関数をテスト用の定義で置き換える）。
+-- 通常の曜日の場所・時刻は型表のみ。曜日回答の場所・時刻では上書きしない。例外（送り場所変更・時刻変更）だけその日を変える。本番の SQL Editor には貼らない（関数をテスト用の定義で置き換える）。
 -- 使い方: 空のデータベースで psql -v ON_ERROR_STOP=1 -f tools/leo_kata_place_test.sql
 \set ON_ERROR_STOP on
 
@@ -53,11 +53,11 @@ insert into public.leo_master (kind, data) values
   ('kata', '{"児童名":"児童D","曜日":"月","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","迎え開始":"14:30","迎え担当":"職員C","迎え順":"1","迎え場所":"","送り終了":"17:40","送り担当":"職員D","送り順":"1","送り場所（空欄なら自宅）":"　 "}'),
   ('kata', '{"児童名":"児童E","曜日":"火","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","保護者送迎":"","迎え場所":"","送り終了":"17:00","送り担当":"職員D","送り順":"2","送り場所（空欄なら自宅）":""}');
 
--- 保護者の回答。場所が入っていればそれが優先、空欄・空白だけなら型表。
---   一輝 月: 迎え=下野こども園（回答あり→回答が勝つ）、送り=空欄（→型表の空欄）
+-- 保護者の曜日回答。場所・時刻が入っていても予定には使わない（型表が勝つ）。
+--   一輝 月: 迎え=下野こども園（回答は無視 → 型表の下野小学校）、送り=空欄（型表も空欄）
 --   一輝 木: 迎え・送りとも NULL（→型表の下野小学校）
---   湊   月: 迎え=全角スペースと空白だけ（→型表の海蔵こども園）、送り=旧送り先（回答あり→回答が勝つ。型表の「自宅」より優先）
---   児童D/E: 回答の場所は空欄（型表も空欄 → 空欄のまま）
+--   湊   月: 迎え=空白だけ、送り=旧送り先（どちらも無視 → 型表の海蔵こども園／自宅）
+--   児童D/E: 回答の場所は空欄、学校お迎え時刻は 14:10（無視 → 型表の 14:30）。型表の場所も空欄 → 空欄のまま
 insert into public.leo_schedule_weekday (child, month, dow, use, school_time, pick_place, drop_place) values
   ('山根 一輝', '2026-11-01', '月', true, '14:30', '下野こども園', ''),
   ('山根 一輝', '2026-11-01', '木', true, '14:30', null, null),
@@ -67,8 +67,9 @@ insert into public.leo_schedule_weekday (child, month, dow, use, school_time, pi
 insert into public.leo_schedule_answer (child, month, answer) values
   ('山根 一輝', '2026-11-01', '{}'), ('市川　湊', '2026-11-01', '{}'), ('児童D', '2026-11-01', '{}'), ('児童E', '2026-11-01', '{}');
 -- 日ごとの連絡：11/09（月）の一輝の送り場所だけ変える
-insert into public.leo_schedule_exception (child, month, day, kind, place) values
-  ('山根 一輝', '2026-11-01', '2026-11-09', '送り場所変更', '祖父母宅');
+insert into public.leo_schedule_exception (child, month, day, kind, place, time) values
+  ('山根 一輝', '2026-11-01', '2026-11-09', '送り場所変更', '祖父母宅', null),
+  ('児童D', '2026-11-01', '2026-11-16', '時刻変更', null, '14:00');
 
 create function pg_temp.kp(p jsonb, p_day date, p_kind text, p_kid text) returns text language sql as $$
   select e->'kid_places'->>p_kid from jsonb_array_elements(p->'events') e
@@ -85,15 +86,17 @@ declare p jsonb; r text; n int;
 begin
   p := public.leo_sched_plan_core('2026-11-01');
 
-  -- 1) 回答に場所があればそれ、なければ型表
-  if pg_temp.kp(p, '2026-11-02', '迎え', '山根 一輝') is distinct from '下野こども園' then
-    raise exception 'FAIL 一輝 月 迎え: answer must win: %', pg_temp.kp(p, '2026-11-02', '迎え', '山根 一輝'); end if;
+  -- 1) 通常曜日の場所は型表のみ（曜日回答の場所は無視）
+  if pg_temp.kp(p, '2026-11-02', '迎え', '山根 一輝') is distinct from '下野小学校' then
+    raise exception 'FAIL 一輝 月 迎え: kata must win over answer: %', pg_temp.kp(p, '2026-11-02', '迎え', '山根 一輝'); end if;
   if pg_temp.kp(p, '2026-11-05', '迎え', '山根 一輝') is distinct from '下野小学校' then
-    raise exception 'FAIL 一輝 木 迎え: null answer must fall back to 型表: %', pg_temp.kp(p, '2026-11-05', '迎え', '山根 一輝'); end if;
+    raise exception 'FAIL 一輝 木 迎え: kata: %', pg_temp.kp(p, '2026-11-05', '迎え', '山根 一輝'); end if;
   if pg_temp.kp(p, '2026-11-02', '迎え', '市川 湊') is distinct from '海蔵こども園' then
-    raise exception 'FAIL 湊 迎え: whitespace-only answer must fall back to 型表: [%]', pg_temp.kp(p, '2026-11-02', '迎え', '市川 湊'); end if;
-  if pg_temp.kp(p, '2026-11-02', '送り', '市川 湊') is distinct from '旧送り先' then
-    raise exception 'FAIL 湊 送り: answer must win over 型表 自宅: %', pg_temp.kp(p, '2026-11-02', '送り', '市川 湊'); end if;
+    raise exception 'FAIL 湊 迎え: kata must win: [%]', pg_temp.kp(p, '2026-11-02', '迎え', '市川 湊'); end if;
+  if pg_temp.kp(p, '2026-11-02', '送り', '市川 湊') is distinct from '自宅' then
+    raise exception 'FAIL 湊 送り: weekday answer must not replace kata 自宅: %', pg_temp.kp(p, '2026-11-02', '送り', '市川 湊'); end if;
+  if p::text like '%下野こども園%' or p::text like '%旧送り先%' then
+    raise exception 'FAIL weekday answer place leaked into the plan'; end if;
 
   -- 2) どちらも空欄なら空欄のまま（自宅や（未登録）を入れない）
   if pg_temp.kp(p, '2026-11-02', '送り', '山根 一輝') is distinct from '' then
@@ -119,17 +122,19 @@ begin
   -- 4) place（まとめ表示）には空欄・自宅を入れない
   select e->>'place' into r from jsonb_array_elements(p->'events') e
     where e->>'kind' = '迎え' and (e->>'day')::date = '2026-11-02' and (e->'kids') ? '山根 一輝';
-  if r is distinct from '下野こども園、海蔵こども園' and r is distinct from '海蔵こども園、下野こども園' then
+  if r is distinct from '下野小学校、海蔵こども園' and r is distinct from '海蔵こども園、下野小学校' then
     raise exception 'FAIL 迎え place summary: [%]', r; end if;
   select e->>'place' into r from jsonb_array_elements(p->'events') e
     where e->>'kind' = '送り' and (e->>'day')::date = '2026-11-02' and (e->'kids') ? '児童D';
   if r is not null then raise exception 'FAIL blank-only 送り place must be null: [%]', r; end if;
 
-  -- 送り時刻は型表の送り終了。利用終了や、迎えの学校お迎え時刻では埋めない。
+  -- 送り時刻は型表の送り終了。利用終了や、曜日回答の学校お迎え時刻では埋めない。
   if pg_temp.kt(p, '2026-11-02', '送り', '児童D') is distinct from '17:40' then
     raise exception 'FAIL 児童D 送り時刻は型表の送り終了: %', pg_temp.kt(p, '2026-11-02', '送り', '児童D'); end if;
-  if pg_temp.kt(p, '2026-11-02', '迎え', '児童D') is distinct from '14:10' then
-    raise exception 'FAIL 児童D 迎えは回答の学校お迎え時刻: %', pg_temp.kt(p, '2026-11-02', '迎え', '児童D'); end if;
+  if pg_temp.kt(p, '2026-11-02', '迎え', '児童D') is distinct from '14:30' then
+    raise exception 'FAIL 児童D 迎えは型表の迎え開始（曜日回答の 14:10 ではない）: %', pg_temp.kt(p, '2026-11-02', '迎え', '児童D'); end if;
+  if pg_temp.kt(p, '2026-11-16', '迎え', '児童D') is distinct from '14:00' then
+    raise exception 'FAIL 児童D 11/16 時刻変更 exception: %', pg_temp.kt(p, '2026-11-16', '迎え', '児童D'); end if;
   if pg_temp.kt(p, '2026-11-02', '送り', '山根 一輝') is distinct from '17:00' then
     raise exception 'FAIL 一輝 送り時刻が学校お迎え時刻に置き換わっている: %', pg_temp.kt(p, '2026-11-02', '送り', '山根 一輝'); end if;
 end $$;
@@ -144,7 +149,7 @@ do $$
 declare r record;
 begin
   select * into r from public.leo_events where kind = '迎え' and day = '2026-11-02' and '山根 一輝' = any(kids) and source = 'kata';
-  if r.kid_places->>'山根 一輝' <> '下野こども園' or r.kid_places->>'市川 湊' <> '海蔵こども園' then
+  if r.kid_places->>'山根 一輝' <> '下野小学校' or r.kid_places->>'市川 湊' <> '海蔵こども園' then
     raise exception 'FAIL commit 迎え places %', r.kid_places; end if;
   if (select count(*) from public.leo_events where kind = '迎え' and day = '2026-11-02' and '山根 一輝' = any(kids)) <> 1 then
     raise exception 'FAIL old kata 迎え row was not replaced'; end if;

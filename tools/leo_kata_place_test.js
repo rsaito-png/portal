@@ -1,4 +1,4 @@
-// 迎え場所・送り場所（回答→型表→空欄）の SQL が、3つの SQL ファイルで同じ内容かを確かめる（DB は使わない）。
+// 通常の曜日の場所・時刻は型表のみ（曜日回答では上書きしない）。3つの SQL の plan_core が同じかを確かめる（DB は使わない）。
 // 使い方: node tools/leo_kata_place_test.js
 const fs = require('fs'), assert = require('assert');
 const block = f => { const s = fs.readFileSync(f, 'utf8'); const m = s.match(/-- BEGIN leo_sched_plan_core\n([\s\S]*?)-- END leo_sched_plan_core/); assert(m, f + ': plan_core block'); return m[1]; };
@@ -9,8 +9,10 @@ assert.strictEqual(b[0], b[2], 'leo_sched_name.sql plan_core differs from leo_sc
 for (const x of b) {
   assert(!/'（未登録）'/.test(x), '（未登録）が残っている');
   assert(!/else '自宅' end/.test(x) && !/, '自宅'\)/.test(x), '自宅の既定値が残っている');
-  assert(/coalesce\(nullif\(btrim\(w\.pick_place, E' \\t　'\), ''\), s\.pplace\)/.test(x), '回答の迎え場所（空白だけは空欄扱い）→型表の順になっていない');
-  assert(/coalesce\(nullif\(btrim\(w\.drop_place, E' \\t　'\), ''\), s\.dplace\)/.test(x), '回答の送り場所（空白だけは空欄扱い）→型表の順になっていない');
+  assert(/通常の曜日の場所・時刻は型表のみ。例外は exception だけ/.test(x), '通常曜日は型表のみ、というコメントがない');
+  assert(!/w\.school_time/.test(x), '曜日回答の school_time で場所・時刻を上書きしている');
+  assert(!/w\.pick_place/.test(x), '曜日回答の迎え場所で上書きしている');
+  assert(!/w\.drop_place/.test(x), '曜日回答の送り場所で上書きしている');
   assert(/where v\.kind|v\.kind = '送り場所変更'/.test(x) || /送り場所変更/.test(x), '送り場所変更の例外が消えている');
   assert(/set dplace = v\.place/.test(x), '送り場所変更の上書きが消えている');
   assert(/jsonb_object_agg\(child, nullif\(btrim\(pe\), ''\)\) kt/.test(x), '送りの児童ごとの時刻が送り終了になっていない');

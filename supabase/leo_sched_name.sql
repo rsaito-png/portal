@@ -211,7 +211,7 @@ revoke all on function public.leo_sched_get(text), public.leo_sched_submit(text,
 grant execute on function public.leo_sched_get(text), public.leo_sched_submit(text, jsonb) to anon, authenticated;
 
 -- BEGIN leo_sched_plan_core
--- 予定の中身。型表は読むだけ。回答が結び付いた子は回答を優先する。未回答の子は型表から予定を作らない。名前が複数の児童に当たる回答だけ、これまでどおり型表の「毎週」を使う。確認用の呼び出しは書き込まない。
+-- 予定の中身。型表は読むだけ。通常の曜日の場所・時刻は型表のみ。利用する曜日は回答を優先する。未回答の子は型表から予定を作らない。名前が複数の児童に当たる回答だけ、これまでどおり型表の「毎週」を使う。例外は exception だけ。確認用の呼び出しは書き込まない。
 create or replace function public.leo_sched_plan_core(p_month date) returns jsonb language plpgsql security definer set search_path = public as $$
 declare ev jsonb := '[]'; warn jsonb := '[]'; closed date[]; last_day date := (p_month + interval '1 month - 1 day')::date;
   v record; g record; hol text;
@@ -270,25 +270,8 @@ begin
   for v in select distinct public.leo_name_canon(answer) as answer from _nres where kind = 'orphan' and answer is not null loop
     warn := warn || jsonb_build_array(jsonb_build_object('child', v.answer, 'msg', '回答名「' || v.answer || '」に当たる型表の児童がいないため、この回答は予定に入っていません'));
   end loop;
-  update _lsv s set
-    ks = to_char((s.ks::time + (w.school_time::time - s.ps::time)), 'HH24:MI'), ps = w.school_time
-  from (
-    select distinct on (r.kata, w.dow) r.kata, w.dow, w.school_time
-    from _nres r join leo_schedule_weekday w on w.child = r.answer and w.month = p_month
-    where r.kind = 'link' and w.school_time is not null
-    order by r.kata, w.dow, w.answered_at desc nulls last, w.child
-  ) w
-  where w.kata = s.child and w.dow = s.dow and s.ps is not null and w.school_time <> s.ps;
-  -- 迎え場所・送り場所：保護者の回答に場所が入っていれば（空白だけは空欄扱い）それを使い、空欄なら型表の値を使う。
-  -- どちらも空欄なら空欄のまま（自宅や（未登録）は入れない）。日ごとの連絡の「送り場所変更」は、下の例外処理でその日だけ上書きする。
-  update _lsv s set pplace = coalesce(nullif(btrim(w.pick_place, E' \t　'), ''), s.pplace), dplace = coalesce(nullif(btrim(w.drop_place, E' \t　'), ''), s.dplace)
-  from (
-    select distinct on (r.kata, w.dow) r.kata, w.dow, w.pick_place, w.drop_place
-    from _nres r join leo_schedule_weekday w on w.child = r.answer and w.month = p_month
-    where r.kind = 'link'
-    order by r.kata, w.dow, w.answered_at desc nulls last, w.child
-  ) w
-  where w.kata = s.child and w.dow = s.dow;
+  -- 通常の曜日の場所・時刻は型表のみ。例外は exception だけ。
+  -- 曜日回答の school_time・迎え場所・送り場所では上書きしない。変わる場所・時刻は型表を直す。
   for v in
     select distinct on (r.kata, e.day, e.kind, e.time, e.place, e.memo)
       e.day, e.kind, e.time, e.place, e.memo, r.kata as child
@@ -350,7 +333,7 @@ begin
     if g.staff is null then warn := warn || jsonb_build_array(jsonb_build_object('child', array_to_string(g.kids, '・'), 'msg', to_char(g.day, 'MM/DD') || ' 迎えの担当が決まっていません')); end if;
   end loop;
   -- 送りの児童ごとの時刻は送り終了（画面の送り時間）。利用終了は乗り始める時刻なので、ここには入れない。
-  -- 保護者の学校お迎え時刻は迎え（ps）だけを置き換える。送り時刻の回答欄は無い。母の迎えは pe を空にして送りを作らない。
+  -- 通常の曜日の迎え時刻は型表のまま。母の迎えは pe を空にして送りを作らない。
   for g in select day, dst staff, array_agg(child order by dord nulls last, ke) kids, min(ke) st, max(pe) en,
         jsonb_object_agg(child, dplace) kp, jsonb_object_agg(child, nullif(btrim(pe), '')) kt
       from (select *, sum(case when pm is null or ke >= pm then 1 else 0 end) over (partition by day, dst order by ke, dord) grp
