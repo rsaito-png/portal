@@ -120,14 +120,15 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=202611021700'));
+assert.ok(html.includes('chamu.js?v=202611021830'));
 assert.ok(html.includes('leo_kinmu.js?v=20261102f1400'));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
 assert.strictEqual(L.journalSavedNotice(['  ', '利用者A: 時刻空欄→11:00-15:00補完']).body, '記録票に転記しました。\n利用者A: 時刻空欄→11:00-15:00補完');
 assert.ok(!/給与|受給者証/.test(L.journalSavedNotice(['利用者A: 署名を取り直してください。']).body));
 assert.ok(html.includes("id === 'chamu' && sub && typeof renderChamu"));
-assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/haichi") && cfg.includes("#chamu/kinmu") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
+assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/kondate") && cfg.includes("#chamu/haichi") && cfg.includes("#chamu/kinmu") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
+assert.ok(!cfg.includes('gl:g8'));
 assert.ok(!cfg.includes('1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g'));
 assert.ok(cfg.includes('#rydeen/journal') && cfg.includes('#rydeen/billing'));
 assert.ok(src.includes('職員が入力するのはここだけ'));
@@ -244,5 +245,100 @@ assert.ok(L.shiftIssues([{ dow: '土', staff_name: '齊藤', employment: '常勤
 assert.ok(src.includes('CM_SHIFT_Q') && src.includes('chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort'));
 assert.ok(src.includes('ChamuLib.dayShiftHtml(date, shift.rows)') && src.includes('haichi: cmHaichi'));
 assert.ok(src.includes('supabase/chamu_shift.sql') && !src.includes('leo_sheet') && !src.includes('時給') && !src.includes('1150') && !src.includes('80000'));
+
+assert.strictEqual(L.userSymbol(0), 'A');
+assert.strictEqual(L.userSymbol(1), 'B');
+assert.strictEqual(L.userSymbol(25), 'Z');
+assert.strictEqual(L.userSymbol(26), 'AA');
+const eaten = L.prepareLine(baseUser({ meal: 'あり', intake: '80%', intake_note: '残した' }), defaults);
+assert.strictEqual(eaten.intake, '80%');
+assert.strictEqual(eaten.intake_note, null);
+const other = L.prepareLine(baseUser({ intake: 'その他', intake_note: ' 半分残した ' }), defaults);
+assert.strictEqual(other.intake, 'その他');
+assert.strictEqual(other.intake_note, '半分残した');
+const cleared = L.prepareLine(baseUser({ meal: 'なし', intake: '80%', intake_note: 'x' }), defaults);
+assert.strictEqual(cleared.meal, 'なし');
+assert.strictEqual(cleared.intake, null);
+assert.strictEqual(cleared.intake_note, null);
+const away = L.prepareLine(baseUser({ present: false, intake: '100%' }), defaults);
+assert.strictEqual(away.meal, null);
+assert.strictEqual(away.intake, null);
+assert.deepStrictEqual(L.validateJournal(form([baseUser({ intake: '' })])), []);
+assert.deepStrictEqual(L.validateJournal(form([baseUser({ intake: '50%' })])), []);
+assert.deepStrictEqual(L.validateJournal(form([baseUser({ meal: 'なし', intake: '80%' })])), []);
+assert.ok(L.validateJournal(form([baseUser({ intake: '73%' })])).some(e => e.includes('摂食')));
+assert.ok(L.validateJournal({ ...form([baseUser()]), rice_portion: 'あ'.repeat(81) }).some(e => e.includes('ごはん')));
+assert.deepStrictEqual(L.prepareHead({ menu: ' カレー ', rice_portion: '', egg_count: '1個', tofu_g: '  ', meat_note: '', fish_g: '', dairy_note: '' }), {
+  menu: 'カレー', rice_portion: null, egg_count: '1個', tofu_g: null, meat_note: null, fish_g: null, dairy_note: null,
+});
+const mealPlan = L.syncPlan([baseUser({ meal: 'あり', intake: '80%' })], [], defaults);
+assert.strictEqual(mealPlan.upsert[0].meal, 'あり');
+assert.ok(!('intake' in mealPlan.upsert[0]) && !('intake_note' in mealPlan.upsert[0]));
+const signedMeal = { id: 'r1', user_id: 'u1', start_time: '10:00', end_time: '16:00', transport: '往復', meal: 'あり', support_note: '落ち着いて過ごした', signed_at: 't' };
+const intakeOnly = L.syncPlan([baseUser({ intake: '50%' })], [signedMeal], defaults);
+assert.strictEqual(intakeOnly.upsert.length, 0);
+assert.strictEqual(intakeOnly.del.length, 0);
+assert.ok(src.includes("const mealOn = u.meal_addon !== false && r.meal === 'あり'"));
+{
+  const input = L.buildBillingInput(2026, 10, { settings: defaults, users: [user({ meal_addon: false })], records: [rec({ meal: 'あり' })] });
+  assert.strictEqual(input.agg[0].食事回数, 0);
+  assert.strictEqual(input.agg[0]['食事_01'], '0');
+  assert.strictEqual(input.users[0].食事提供体制加算対象, '非対象');
+  const files = buildBillingFiles(2026, 10, { office: input.office, users: input.users, agg: input.agg }, new Date(2026, 10, 15));
+  assert.ok(!bytesLatin1(files.j111.bytes).includes('225070'));
+}
+
+const dietUsers = [
+  { id: 'u1', sort: 1, active: true, name: '秘密太郎', recipient_no: '0000000001' },
+  { id: 'u2', sort: 2, active: false, name: '非表示花子' },
+  { id: 'u3', sort: 3, active: true, name: 'もう一人' },
+];
+const dietDays = [{
+  journal_date: '2026-10-01', menu: 'カレー', rice_portion: '半量75g', egg_count: '1個', meat_note: '豚肉50g', fish_g: '',
+  lines: [
+    { user_id: 'u1', present: true, meal: 'あり', intake: '80%' },
+    { user_id: 'u3', present: true, meal: 'なし', intake: '100%', intake_note: '無視' },
+  ],
+}, {
+  journal_date: '2026-10-02', menu: '魚', fish_g: '80g',
+  lines: [
+    { user_id: 'u1', present: false, meal: null },
+    { user_id: 'u2', present: true, meal: 'あり', intake: 'その他', intake_note: '半分残した' },
+  ],
+}];
+const diet = L.menuReport('2026-10', dietDays, dietUsers);
+assert.deepStrictEqual(diet.columns.map(c => c.symbol), ['A', 'B', 'C']);
+assert.strictEqual(diet.rows[0].count, 1);
+assert.strictEqual(diet.rows[0].cells[0].meal, 'あり');
+assert.strictEqual(diet.rows[0].cells[0].intake, '80%');
+assert.strictEqual(diet.rows[0].cells[1].meal, '');
+assert.strictEqual(diet.rows[0].cells[2].meal, 'なし');
+assert.strictEqual(diet.rows[0].cells[2].intake, '');
+assert.ok(diet.rows[0].menu.includes('カレー／ごはん（炊いた後） 半量75g'));
+assert.ok(diet.rows[0].menu.includes('卵 1個') && diet.rows[0].menu.includes('肉 豚肉50g'));
+assert.ok(!diet.rows[0].menu.includes('豆腐') && !diet.rows[0].menu.includes('牛乳'));
+assert.strictEqual(diet.rows[1].cells[0].meal, '');
+assert.strictEqual(diet.rows[1].cells[1].intake, 'その他（半分残した）');
+assert.strictEqual(diet.total, 2);
+const mail = L.menuMail(diet);
+assert.strictEqual(mail.to, 'makinakahigashi@gmail.com');
+assert.strictEqual(mail.toName, '中東真紀');
+assert.ok(mail.subject.includes('茶夢　献立報告　令和8年10月'));
+assert.ok(mail.body.startsWith('中東真紀 様\n\nお世話になっております。生活介護事業所「茶夢」です。'));
+assert.ok(mail.body.includes('氏名は書いていません'));
+assert.ok(mail.body.includes('半量75g') && mail.body.includes('提供数'));
+assert.ok(mail.gmail.startsWith('https://mail.google.com/mail/?') && mail.gmail.includes('view=cm') && !mail.gmail.includes('/send'));
+assert.ok(mail.mailto.startsWith('mailto:makinakahigashi@gmail.com?subject='));
+assert.ok(mail.csv.charCodeAt(0) === 0xfeff);
+assert.ok(mail.csv.includes('日付,献立,A,A摂食,B,B摂食,C,C摂食,提供数'));
+assert.ok(mail.csv.includes('あり,80%'));
+const shown = mail.body + mail.csv + mail.gmail + mail.mailto + L.menuReportHtml(diet);
+['秘密太郎', '非表示花子', 'もう一人', '0000000001', '受給者証', '時給'].forEach(s => assert.ok(!shown.includes(s), s));
+assert.ok(src.includes('chamu_users?select=id,sort,active'));
+assert.ok(src.includes('makinakahigashi@gmail.com') && src.includes("view: 'cm'") && src.includes('https://mail.google.com/mail/?'));
+assert.ok(src.includes('ここから直接は送りません') && src.includes('Gmailで下書きを開く'));
+assert.ok(!src.includes('https://mail.google.com/mail/send'));
+assert.ok(sql.includes('chamu_line_intake') && sql.includes('rice_portion') && sql.includes("intake in ('100%', '80%', '50%')"));
+assert.ok(sql.includes('請求には使わない'));
 
 console.log('chamu_check ok');
