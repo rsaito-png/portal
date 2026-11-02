@@ -66,7 +66,7 @@ ok(sql.includes('p_require_name') && sql.includes('leo_af_clean(p_vals, true, tr
 const cfg = read('config.js'), idx = read('index.html'), html = read('assess.html');
 ok(cfg.includes("['🔍', 'アセスメント', '#leo/assess'"), 'タイルはポータルのアセスメント');
 ok(!cfg.includes('gl:g5') && !cfg.includes('アセスメント（フォーム）'), 'Google フォームのタイルはない');
-ok(idx.includes('assess_lib.js?v=20261030assess') && idx.includes('leo_assess.js?v=20261030assess') && idx.includes('leo.js?v=20261102home2'), 'キャッシュバスト');
+ok(idx.includes('assess_lib.js?v=20261030assess') && idx.includes('leo_assess.js?v=20261030assess') && idx.includes('leo.js?v=20261102kakunin'), 'キャッシュバスト');
 ok(!html.includes('type="file"') && html.includes('写真は、受け取りません'), '保護者ページに写真アップロードはない');
 ok(read('leo.js').includes('AssessForm.SPEC') && read('leo.js').includes('data-as-extra'), '利用者情報タブは同じ項目で、知らないキーは残す');
 
