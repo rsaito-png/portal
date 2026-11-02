@@ -134,14 +134,14 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261102who"></script>
+<script src="config.js?v=20261102todo2"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261026b"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261102kesseki2"></script>
+<script src="leo.js?v=20261102todo2"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=20261030kinwrite"></script>
@@ -220,7 +220,7 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 
 
 // 事業所画面の本体。o.groups があれば「次にやること＋大ボタン（最大6〜8）」、無ければ従来のタイル一覧
-const visTiles = o => o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()));
+const visTiles = o => o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()) || (t[1] === '今日やること（児発管）' && typeof canLeoHomeTodo === 'function' && canLeoHomeTodo()));
 const shortName = (o, n) => (o.short || {})[n] || n;
 // 茶夢・金斗雲はメニューに日本語＋ポルトガル語を併記（o.pt）
 const ptL = (o, n, label) => o && o.pt && o.pt[n] ? `${label === undefined ? n : label}<em class="pt" style="display:block;font-size:.72em;font-style:normal;opacity:.75">${o.pt[n]}</em>` : (label === undefined ? n : label);

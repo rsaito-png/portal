@@ -14,10 +14,18 @@ create or replace function public.leo_todo_assignee(p_kind text) returns uuid la
 $$;
 
 -- p_items: [{kind, key, title, link}]。同じ source_key の未完了があれば題名・リンクを直す、なければ新しく出す
+-- 担当者別の依頼を出せる人：can_manage に加え、レオの安藤尚子・加藤幸弘（名前で引く）
+create or replace function public.can_leo_home_todo() returns boolean language sql stable security definer set search_path = public as $$
+  select public.can_manage() or exists (select 1 from staff_profiles where user_id = auth.uid() and active and office = 'レオ'
+    and (replace(replace(coalesce(full_name,''),'　',''),' ','') in ('安藤尚子','加藤幸弘') or replace(replace(coalesce(nikki_name,''),'　',''),' ','') in ('安藤尚子','加藤幸弘')));
+$$;
+revoke all on function public.can_leo_home_todo() from public, anon;
+grant execute on function public.can_leo_home_todo() to authenticated;
+
 create or replace function public.leo_publish_home_todos(p_items jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
 declare it jsonb; who uuid; nm text; tid bigint; res jsonb := '[]'::jsonb; act text;
 begin
-  if not public.can_manage() then raise exception '管理者・児発管・事務だけが依頼を出せます'; end if;
+  if not public.can_leo_home_todo() then raise exception '管理者・児発管・事務・大老・監査奉行（安藤・加藤）だけが依頼を出せます'; end if;
   for it in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
     if coalesce(it->>'key','') !~ '^leo:' or coalesce(it->>'title','') = '' then continue; end if;
     who := public.leo_todo_assignee(it->>'kind');
@@ -40,7 +48,7 @@ revoke all on function public.leo_todo_assignee(text) from public, anon;
 -- 依頼済みの表示用（未完了の source_key と担当名）。can_manage だけ
 create or replace function public.leo_home_todo_status() returns table(source_key text, name text, status text) language sql stable security definer set search_path = public as $$
   select t.source_key, coalesce(nullif(p.full_name,''), p.nikki_name), t.status from staff_todo t left join staff_profiles p on p.user_id = t.assignee
-  where t.source_key like 'leo:%' and t.status <> 'done' and public.can_manage();
+  where t.source_key like 'leo:%' and t.status <> 'done' and public.can_leo_home_todo();
 $$;
 revoke all on function public.leo_home_todo_status() from public, anon;
 grant execute on function public.leo_home_todo_status() to authenticated;
