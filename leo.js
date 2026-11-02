@@ -1599,26 +1599,67 @@ async function billChecks(nikki, flags) {
 
 // ===== ① LINE報告の下書き（「活動記録 下書き（業務日誌用）」ドキュメントの置き換え） =====
 // 書く→「LINE用にコピー」→公式LINEの1対1トークに貼って送る（送るのは職員。ポータルからは送らない）→ 日誌の活動記録（である調）はボットが作る
+// 根因は Google日誌→leo_nikki の同期停止（box の leo_sync.py。2026-11 の FILES が無い）。同期の復旧はこの画面の範囲外。
+// 日誌の写しが空の日だけ、暫定で予定（leo_events の kind=利用）から児童を出す。nikki に利用児童が1人でもいれば従来どおり日誌を優先し、予定は足さない。
+const LEO_LINE_PLAN_NOTE = '日誌の写しがまだ無いので予定（型表）の児童です。';
+function leoLineKidKey(s) { return String(s || '').replace(/[\s\u3000]/g, ''); }
+function leoLineKids(nikkiRows, events) {
+  const seen = new Set();
+  const add = (name, into) => {
+    const raw = String(name || '').trim();
+    const key = leoLineKidKey(raw);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    into.push(raw);
+  };
+  const fromNikki = [];
+  (nikkiRows || []).forEach(r => {
+    if (!r || (r.kind && r.kind !== '利用')) return;
+    add(r.child, fromNikki);
+  });
+  if (fromNikki.length) return { kids: fromNikki, source: 'nikki' };
+  const fromPlan = [];
+  (events || []).forEach(e => {
+    if (!e || e.kind !== '利用' || !e.child || leoCalHidden(e)) return;
+    add(e.child, fromPlan);
+  });
+  return { kids: fromPlan, source: fromPlan.length ? 'plan' : 'none' };
+}
+function leoLineKidsNote(source) {
+  if (source === 'plan') return `<p class="note">${LEO_LINE_PLAN_NOTE}</p>`;
+  if (source === 'none') return '<p>この日の利用の子がいません。</p>';
+  return '';
+}
 let LINE_DAY = today();
 const LINE_DEMO = { kids: ['児童A', '児童B', '児童C'], drafts: [{ id: 1, day: today(), child: '児童A', body: '本日もありがとうございました。\n（見本）公園で鬼ごっこをして、たくさん走りました。おやつも完食です。\n職員X', author_name: '職員X', sent_line: true }],
   act: [{ day: today(), child: '児童A', text: '（見本）公園で鬼ごっこをし、たくさん走った。おやつは完食した。', source: 'ボット' }] };
 LEO_VIEWS.line = async function () {
-  let kids, drafts, act;
-  if (DEMO) ({ kids, drafts, act } = LINE_DEMO);
-  else { const [n, d, a] = await Promise.all([sb(`leo_nikki?day=eq.${LINE_DAY}&kind=eq.利用&select=child&order=row_no`), sb(`leo_line_drafts?day=eq.${LINE_DAY}&order=updated_at.desc`), sb(`leo_activity?day=eq.${LINE_DAY}`)]);
-    kids = [...new Set(n.map(x => x.child).filter(Boolean))]; drafts = d; act = a; }
+  let kids, drafts, act, kidSource = 'nikki';
+  if (DEMO) { ({ kids, drafts, act } = LINE_DEMO); kidSource = kids.length ? 'nikki' : 'none'; }
+  else {
+    const [n, d, a, ev0, LEFT] = await Promise.all([
+      sb(`leo_nikki?day=eq.${LINE_DAY}&kind=eq.利用&select=child&order=row_no`),
+      sb(`leo_line_drafts?day=eq.${LINE_DAY}&order=updated_at.desc`),
+      sb(`leo_activity?day=eq.${LINE_DAY}`),
+      sb(`leo_events?day=eq.${LINE_DAY}&kind=eq.利用&select=day,kind,child,source,title,note&order=start_time.nullsfirst,id`).catch(() => []),
+      loadLeftIndex()]);
+    const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev0 || [], LEFT) : (ev0 || []);
+    const picked = leoLineKids(n || [], evs);
+    kids = picked.kids; kidSource = picked.source; drafts = d; act = a;
+  }
   const A = Object.fromEntries(act.map(x => [x.child, x])), D = {}; drafts.forEach(x => (D[x.child] ||= x));
   const me = DEMO ? '職員X' : await myName();
   return `<h3>LINE報告を書く</h3><a href="https://chat.line.biz/U09e93081492c29e963d2bba78499043f" target="_blank" rel="noopener" style="display:block;background:#06c755;color:#fff;text-align:center;font-size:20px;font-weight:bold;padding:14px;border-radius:10px;text-decoration:none;margin:6px 0 12px">💬 公式LINEを開く（新しいタブ）</a>${demoNote()}
     <p class="ptabs"><button onclick="LINE_DAY=addDays(LINE_DAY,-1);renderLeoView('line')">← 前の日</button> <b>${fmtDay(LINE_DAY)}</b> <button onclick="LINE_DAY=addDays(LINE_DAY,1);renderLeoView('line')">次の日 →</button></p>
     <p class="note">保護者さんへの報告文を、子どもごとに書きます。書けたら「LINE用にコピー」→ 公式LINEの1対1トークに貼って送ってください。日誌の活動記録（である調）は自動で作ります。</p>
+    ${leoLineKidsNote(kidSource)}
     ${kids.map(k => { const d = D[k], a = A[k], id = 'ln_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
       return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${d ? (d.sent_line ? '✅ LINE送信済' : '✏️ 下書きあり') : '⬜ まだ'}${a ? '／日誌 ' + esc(a.source) : ''}</small></summary>
         <div style="padding:0 14px 14px"><textarea id="${id}" rows="30" style="width:100%;font-size:16px;box-sizing:border-box" placeholder="本日もありがとうございました。…">${esc(d ? d.body : '')}</textarea>
         <p class="note">最後の行に名前（${esc(me || '自分の名前')}）を入れてください。</p>
         <button onclick="saveLine('${esc(k)}','${id}',${d ? d.id : 'null'})">保存</button>
         <button onclick="copyLine('${id}','${esc(k)}',${d ? d.id : 'null'})">LINE用にコピー（送った印をつける）</button>
-        ${a ? `<details style="margin-top:8px"><summary>日誌の活動記録（${esc(a.source)}）</summary><p style="white-space:pre-wrap">${esc(a.text)}</p></details>` : ''}<div id="${id}_m"></div></div></details>`; }).join('') || '<p>この日の日誌に利用の子がいません。</p>'}`;
+        ${a ? `<details style="margin-top:8px"><summary>日誌の活動記録（${esc(a.source)}）</summary><p style="white-space:pre-wrap">${esc(a.text)}</p></details>` : ''}<div id="${id}_m"></div></div></details>`; }).join('')}`;
 };
 async function saveLine(child, id, did) {
   const body = $(id).value.trim(), m = $(id + '_m'); if (!body) { m.textContent = '本文を書いてください。'; return; }
@@ -1695,19 +1736,23 @@ function ldMergeDrafts(lineDrafts, diaryDrafts) {
   return D;
 }
 LEO_VIEWS.linedraft = async function () {
-  let kids, D = {}, act = [], noTable = false;
+  let kids, D = {}, act = [], noTable = false, kidSource = 'nikki';
   if (DEMO) {
     kids = ['児童A', '児童B', '児童C'];
     D = ldMergeDrafts([{ id: 1, child: '児童A', body: '（見本）本日もありがとうございました。公園で鬼ごっこをしました。\n職員X', author_name: '職員X', updated_at: '9' }], []);
     act = [{ child: '児童A', text: '（見本）公園で鬼ごっこをした。', source: '自動（簡易）' }];
   } else {
-    const [n, line, diary, a] = await Promise.all([
+    const [n, line, diary, a, ev0, LEFT] = await Promise.all([
       sb(`leo_nikki?day=eq.${LD_DAY}&kind=eq.利用&select=child,row_no&order=row_no`),
       sb(`leo_line_drafts?day=eq.${LD_DAY}&order=updated_at.desc`).catch(() => null),
       sb(`leo_diary_draft?day=eq.${LD_DAY}`).catch(() => []),
-      sb(`leo_activity?day=eq.${LD_DAY}`).catch(() => [])]);
+      sb(`leo_activity?day=eq.${LD_DAY}`).catch(() => []),
+      sb(`leo_events?day=eq.${LD_DAY}&kind=eq.利用&select=day,kind,child,source,title,note&order=start_time.nullsfirst,id`).catch(() => []),
+      loadLeftIndex()]);
     if (line === null) noTable = true;
-    kids = [...new Set(n.map(x => x.child).filter(Boolean))];
+    const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev0 || [], LEFT) : (ev0 || []);
+    const picked = leoLineKids(n || [], evs);
+    kids = picked.kids; kidSource = picked.source;
     D = ldMergeDrafts(line || [], diary || []);
     act = a || [];
   }
@@ -1718,12 +1763,13 @@ LEO_VIEWS.linedraft = async function () {
     <p style="font-size:18px"><b>${fmtDay(LD_DAY)}：${done} / ${kids.length}人 書けました</b>${kids.length - done ? `（まだ：${kids.filter(k => !D[ldNN(k)]).map(esc).join('、')}）` : kids.length ? ' ✅ 全員書けました' : ''}</p>
     <p class="note">です・ます調で書いて「保存」すると、日誌の活動記録にも自動で入ります。「コピー」して公式LINEの1対1トークに貼って送ってください。</p>
     ${noTable ? '<p style="color:#c00">保存場所の準備ができていません（管理者が leo_line_drafts / leo_activity_from_drafts を用意してください）。</p>' : ''}
+    ${leoLineKidsNote(kidSource)}
     ${kids.map(k => { const d = D[ldNN(k)], a = A[ldNN(k)], id = ldId(k), did = d && d.lineId != null ? d.lineId : 'null';
       return `<div class="card"><b style="font-size:17px">■${esc(k)}</b>　<span id="${id}_s">${d ? (d.sent_line ? '✅ LINE送信済' : '✅ 書いた') : '⬜ まだ'}</span>${d && d.author ? `<small>　${esc(d.author)}</small>` : ''}${a ? `　<small id="${id}_a">／日誌 ${esc(a.source)}</small>` : `<small id="${id}_a"></small>`}
         <textarea id="${id}" rows="30" style="width:100%;font-size:16px;box-sizing:border-box;margin-top:6px" ${noTable ? 'disabled' : ''} oninput="ldDirty('${id}')">${esc(d ? d.body : '')}</textarea>
         <button ${noTable ? 'disabled' : ''} onclick="ldSave('${esc(k)}','${id}',${did})">保存</button>
         <button id="${id}_c" onclick="ldCopy('${id}',${did})">コピー</button> <span id="${id}_cm" style="color:#080"></span> <span id="${id}_m"></span>
-        ${a ? `<details style="margin-top:8px"><summary>日誌の活動記録（${esc(a.source)}）</summary><p style="white-space:pre-wrap">${esc(a.text)}</p></details>` : ''}</div>`; }).join('') || '<p>この日の利用の子がいません。</p>'}`;
+        ${a ? `<details style="margin-top:8px"><summary>日誌の活動記録（${esc(a.source)}）</summary><p style="white-space:pre-wrap">${esc(a.text)}</p></details>` : ''}</div>`; }).join('')}`;
 };
 function ldDirty(id) { const m = $(id + '_m'); m.style.color = '#c60'; m.textContent = '● 未保存'; }
 async function ldSave(child, id, did) {
