@@ -134,7 +134,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261101nikkitile"></script>
+<script src="config.js?v=20261102kinmu"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -171,7 +171,9 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="uketsuke.js?v=20261030px"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261030px"></script>
-<script src="chamu.js?v=20261102tr"></script>
+<script src="chamu.js?v=202611021700"></script>
+<script src="leo_kinmu_lib.js?v=20261102f1400"></script>
+<script src="leo_kinmu.js?v=20261102f1400"></script>
 <script src="dakoku-lib.js?v=20261030dakoku"></script>
 <script src="dakoku.js?v=20261030px"></script>
 <script src="soudan.js?v=202610211550"></script>
@@ -300,7 +302,7 @@ async function render() {
   const route = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (!(route[0] === 'leo' && route[1] === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(route[2] || '')) && typeof sgClearEdit === 'function') sgClearEdit();
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
-  if (!(id === 'leo' && (sub === 'kata' || sub === 'master'))) document.body.classList.remove('wide-sheet');
+  if (!(id === 'leo' && (sub === 'kata' || sub === 'master' || sub === 'kinmu')) && !(id === 'chamu' && sub === 'kinmu')) document.body.classList.remove('wide-sheet');
   if (id === 'leo' && sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '') && typeof renderSgDay === 'function') return renderSgDay(sub2);
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }

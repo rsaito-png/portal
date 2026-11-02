@@ -1,8 +1,10 @@
 // 茶夢（生活介護）。職員が入れるのは業務日誌だけ。保存すると実績記録票へ自動転記し、署名済みだけ国保連CSVの対象。
 // 請求の計算は rydeen-billing-lib.js のサービス種類22（生活介護）。B型の bp_* は使わない。
 // 自由記述のポルトガル語は「日本語にする」で確認する。訳文は保存せず、原文のまま記録する。
+// 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表は使わない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
-const CM_NAV = [['journal', '業務日誌'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
+const CM_NAV = [['journal', '業務日誌'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
+const CM_SHIFT_Q = 'chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort&order=sort.asc,staff_name.asc';
 
 /* cm-pure */
 var ChamuLib = (() => {
@@ -12,8 +14,8 @@ var ChamuLib = (() => {
   const BANDS = ['3時間未満', '3時間以上4時間未満', '4時間以上5時間未満', '5時間以上6時間未満', '6時間以上7時間未満', '7時間以上8時間未満', '8時間以上9時間未満'];
   const DEFAULTS = {
     office_no: '2410202663', office_name: '茶夢', service_type: '22', region_code: '06', unit_price: '10.37',
-    shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '6時間以上7時間未満',
-    default_start: '10:00', default_end: '16:00', ishi_gen: true,
+    shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '4時間以上5時間未満',
+    default_start: '11:00', default_end: '15:00', ishi_gen: true,
   };
   const clip = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
   const time = v => {
@@ -124,6 +126,11 @@ var ChamuLib = (() => {
     if (status === 404) return { error: '翻訳の機能がまだ有効になっていません' };
     return { error: '翻訳できませんでした' };
   };
+  // 日誌保存のあと、画面中央に出す文言。補足（時刻の補完・署名の取り直し）があれば続ける。
+  const journalSavedNotice = notes => {
+    const extra = (notes || []).map(s => String(s == null ? '' : s).trim()).filter(Boolean);
+    return { title: '保存しました', body: extra.length ? '記録票に転記しました。\n' + extra.join('\n') : '記録票に転記しました。' };
+  };
   const tripsOf = t => t === '往復' ? { sog: '両', go: 1, back: 1 } : t === '片道' ? { sog: '往', go: 1, back: 0 } : { sog: 'なし', go: 0, back: 0 };
   const buildBillingInput = (year, month, src) => {
     const settings = settingsOf(src && src.settings);
@@ -185,7 +192,91 @@ var ChamuLib = (() => {
     });
     return { office, users, agg, settings, blocking, warnings, signedCount: signed.length, unsignedCount: inMonth.length - signed.length, preview };
   };
-  return { WEATHER, TRANSPORT, MEAL, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult };
+  const DOW_JA = ['日', '月', '火', '水', '木', '金', '土'];
+  const OPEN_DOW = ['月', '火', '水', '木', '金'];
+  const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const dowOf = ymd => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+    if (!m) return '';
+    const y = +m[1], mo = +m[2], d = +m[3];
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return '';
+    return DOW_JA[dt.getUTCDay()];
+  };
+  const shiftOf = row => {
+    const r = row || {};
+    return {
+      dow: String(r.dow || '').trim(),
+      name: String(r.staff_name || '').trim(),
+      employment: String(r.employment || '').trim(),
+      start: time(r.start_time),
+      end: time(r.end_time),
+      sort: Number.isFinite(+r.sort) ? +r.sort : 0,
+    };
+  };
+  const byShift = (a, b) => {
+    const rank = x => x.employment === '常勤' ? 0 : 1;
+    return rank(a) - rank(b) || String(a.start).localeCompare(String(b.start)) || (a.sort - b.sort) || String(a.name).localeCompare(String(b.name), 'ja');
+  };
+  const hhmm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  // 常勤と非常勤が同じ時間にいるのは通常。重ねないのは安藤尚子と中村文だけ（端の 14:00 は引き継ぎ）。
+  const overlapNotes = people => {
+    const notes = [];
+    const a = (people || []).filter(p => p.name === '安藤尚子');
+    const b = (people || []).filter(p => p.name === '中村文');
+    a.forEach(x => b.forEach(y => {
+      const as = minutes(x.start), ae = minutes(x.end), bs = minutes(y.start), be = minutes(y.end);
+      if (as == null || ae == null || bs == null || be == null) return;
+      if (as < be && bs < ae) notes.push('安藤尚子と中村文が ' + hhmm(Math.max(as, bs)) + '〜' + hhmm(Math.min(ae, be)) + ' 重なっています');
+    }));
+    return notes;
+  };
+  const peopleOn = (rows, dow) => (rows || []).map(shiftOf).filter(r => r.dow === dow && r.name).sort(byShift);
+  const dayShift = (ymd, rows) => {
+    const dow = dowOf(ymd);
+    const open = OPEN_DOW.indexOf(dow) >= 0;
+    const people = open ? peopleOn(rows, dow) : [];
+    return { dow, open, people, notes: overlapNotes(people) };
+  };
+  const weekShift = rows => OPEN_DOW.map(dow => {
+    const people = peopleOn(rows, dow);
+    return { dow, open: true, people, notes: overlapNotes(people) };
+  });
+  const peopleTable = people => `<table class="cm-shift"><tr><th>氏名</th><th>区分</th><th>時間</th></tr>${people.map(p =>
+    `<tr><td>${escHtml(p.name)}</td><td>${escHtml(p.employment)}</td><td>${escHtml(p.start)}〜${escHtml(p.end)}</td></tr>`).join('')}</table>`;
+  const notesHtml = notes => (notes || []).map(n => `<p class="wn">${escHtml(n)}</p>`).join('');
+  const dayShiftHtml = (ymd, rows) => {
+    const day = dayShift(ymd, rows);
+    if (!day.dow) return '';
+    const head = `<h4>この日の配置（${escHtml(day.dow)}）</h4>`;
+    if (!day.open) return `<div class="card cm-shift-day">${head}<p>土日は配置がありません。</p></div>`;
+    const body = day.people.length ? peopleTable(day.people) : '<p>この曜日の配置はまだ入っていません。</p>';
+    return `<div class="card cm-shift-day">${head}${body}${notesHtml(day.notes)}<p class="note"><a href="#chamu/haichi">曜日ごとの配置表</a></p></div>`;
+  };
+  const weekShiftHtml = rows => {
+    const body = weekShift(rows).map(day => `<h4>${escHtml(day.dow)}曜</h4>${day.people.length ? peopleTable(day.people) : '<p>この曜日の配置はまだ入っていません。</p>'}${notesHtml(day.notes)}`).join('');
+    return `<p class="note">毎週この形です。常勤は 10:00〜18:00（休憩1時間の想定）。非常勤は 11:00〜17:00 のあいだです。</p>${body}<h4>土曜・日曜</h4><p>配置はありません。</p>`;
+  };
+  const shiftIssues = rows => {
+    const list = (rows || []).map(shiftOf).filter(r => r.name);
+    const issues = [], seen = {};
+    list.forEach(r => {
+      const key = r.dow + '\0' + r.name;
+      if (seen[key]) issues.push(r.dow + ' ' + r.name + ' が重複しています');
+      seen[key] = true;
+      if (OPEN_DOW.indexOf(r.dow) < 0) issues.push(r.name + ' は土日に入れません');
+      const a = minutes(r.start), b = minutes(r.end);
+      if (a == null || b == null || b <= a) issues.push(r.dow + ' ' + r.name + ' の時間が正しくありません');
+      if (r.employment !== '常勤' && r.employment !== '非常勤') issues.push(r.name + ' の区分が正しくありません');
+      if (r.name === '加藤幸弘' && r.dow !== '水') issues.push('加藤幸弘は水曜だけです');
+      if (r.name === '安藤尚子' && r.dow === '水') issues.push('安藤尚子は水曜には入りません');
+      if (r.name === '中村文' && (r.start !== '14:00' || r.end !== '17:00')) issues.push('中村文は 14:00〜17:00 のままにします');
+      if (r.employment === '常勤' && (r.start !== '10:00' || r.end !== '18:00')) issues.push(r.dow + 'の常勤は 10:00〜18:00 です');
+      if (r.employment === '非常勤' && (r.start < '11:00' || r.end > '17:00')) issues.push(r.dow + ' ' + r.name + ' は 11:00〜17:00 のあいだです');
+    });
+    return issues;
+  };
+  return { WEATHER, TRANSPORT, MEAL, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues };
 })();
 /* /cm-pure */
 
@@ -199,7 +290,51 @@ const cmBack = () => '<button class="back noprint" onclick="location.hash=\'cham
 const cmNav = cur => `<div class="cm-nav noprint">${CM_NAV.filter(([k]) => k !== 'billing' || CM.bill).map(([k, l]) => `<a href="#chamu/${k}" class="${k === cur ? 'on' : ''}">${l}</a>`).join('')}</div>`;
 const cmFrame = (cur, html) => cmShow(`<div class="cm">${cmBack()}${cmNav(cur)}<div id="cm_m"></div>${html}</div>`);
 const cmMsg = (text, ok) => { const m = document.getElementById('cm_m'); if (m) m.innerHTML = `<div class="${ok ? 'okb' : 'ng'}">${cmEsc(text).replace(/\n/g, '<br>')}</div>`; };
-async function cmGo(fn) { try { await fn(); } catch (e) { cmMsg(e.message || e); } }
+// 保存ボタンは日誌の一番下。上の緑枠だけだと、スクロールしたまま気づかない。
+function cmNotice(title, body, ok) {
+  if (typeof document === 'undefined' || !document.body) return;
+  let el = document.getElementById('cm_dlg');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'cm_dlg';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'cm_dlg_t');
+    document.body.appendChild(el);
+    el.addEventListener('click', ev => { if (ev.target === el) cmNoticeClose(); });
+    document.addEventListener('keydown', ev => {
+      const d = document.getElementById('cm_dlg');
+      if (!d || d.hidden) return;
+      if (ev.key === 'Escape') cmNoticeClose();
+    });
+  }
+  el.className = 'cm-dlg ' + (ok ? 'ok' : 'bad');
+  el.hidden = false;
+  el.innerHTML = '<div class="box"><b class="t" id="cm_dlg_t"></b><p class="b" id="cm_dlg_b"></p><button type="button" id="cm_dlg_ok">閉じる</button></div>';
+  document.getElementById('cm_dlg_t').textContent = String(title || '');
+  document.getElementById('cm_dlg_b').textContent = String(body || '');
+  const btn = document.getElementById('cm_dlg_ok');
+  btn.onclick = cmNoticeClose;
+  btn.focus();
+}
+function cmNoticeClose() {
+  const el = document.getElementById('cm_dlg');
+  if (el) el.hidden = true;
+}
+function cmSaveBtn(busy) {
+  const btn = document.querySelector('[data-cm-save]');
+  if (!btn) return;
+  btn.disabled = !!busy;
+  btn.textContent = busy ? '保存しています…' : '保存して記録票に転記';
+}
+async function cmGo(fn, opt) {
+  try { await fn(); }
+  catch (e) {
+    const text = String((e && e.message) || e || '保存できませんでした');
+    cmMsg(text);
+    if (opt && opt.notice) cmNotice(opt.notice, text, false);
+  }
+}
 (function () {
   const st = document.createElement('style');
   st.textContent = `.cm-nav{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}.cm-nav a{background:#fff4dc;border:3px solid #1a120c;border-radius:0;padding:10px 14px;text-decoration:none;color:#1c140c;font-size:17px;box-shadow:3px 3px 0 #1a120c}
@@ -215,9 +350,18 @@ async function cmGo(fn) { try { await fn(); } catch (e) { cmMsg(e.message || e);
 .cm .cm-tr{margin:0 0 8px}.cm .cm-tr .cap{font-size:15px;color:#4e4336;margin:6px 0 4px}
 .cm .cm-tr .ja{background:#fffef8;border:3px solid #1a120c;padding:10px;white-space:pre-wrap;box-shadow:3px 3px 0 #1a120c;font-size:17px;color:#1c140c}
 .cm .ng{background:#fde8e8;border:3px solid #1a120c;border-radius:0;padding:8px 10px;margin:6px 0;white-space:pre-wrap}.cm .okb{background:#e6f4ea;border:3px solid #1a120c;border-radius:0;padding:8px 10px;margin:6px 0}.cm .wn{background:#fff6d6;border:3px solid #1a120c;border-radius:0;padding:8px 10px;margin:6px 0}
+.cm-dlg{position:fixed;inset:0;z-index:100;background:rgba(7,6,10,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.cm-dlg[hidden]{display:none!important}
+.cm-dlg .box{background:#fff4dc;color:#1c140c;border:4px solid #1a120c;box-shadow:6px 6px 0 #07060a;max-width:28em;width:100%;max-height:min(80vh,640px);overflow:auto;padding:22px 18px 16px;box-sizing:border-box}
+.cm-dlg.bad .box{background:#fde8e8}
+.cm-dlg .t{display:block;font-size:1.25em;line-height:1.4;margin:0 0 10px}
+.cm-dlg.ok .t{color:#145c32}
+.cm-dlg.bad .t{color:#8e1b1b}
+.cm-dlg .b{margin:0;white-space:pre-wrap;font-size:1em;line-height:1.55;color:#1c140c}
+.cm-dlg button{margin-top:16px}
 .cm .note{color:#4e4336}.cm img.cm-sg{width:260px;max-width:100%;border:3px solid #1a120c;background:#fff}
 .cm .pad{height:200px;touch-action:none}.cm .pad canvas{width:100%;height:100%;display:block;background:#fff;border:3px solid #1a120c;border-radius:0;touch-action:none}
-@media print{header,.back,.cm-nav,.noprint,#help,#out{display:none!important}body{background:#fff}main{max-width:none;padding:0}}`;
+@media print{header,.back,.cm-nav,.noprint,#help,#out,.cm-dlg{display:none!important}body{background:#fff}main{max-width:none;padding:0}}`;
   document.head.appendChild(st);
 })();
 
@@ -226,7 +370,10 @@ async function cmRest(path, opt, retried) {
   if (s.exp && s.exp < Date.now() + 30000 && !retried && typeof refreshSess === 'function') {
     if (await refreshSess()) { try { s = JSON.parse(localStorage.getItem('sess') || '{}'); } catch (e) { s = {}; } }
   }
-  const r = await fetch(C.supabaseUrl + '/rest/v1/' + path, { ...(opt || {}), headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + (s.token || ''), 'Content-Type': 'application/json', ...((opt && opt.headers) || {}) } });
+  let r;
+  try {
+    r = await fetch(C.supabaseUrl + '/rest/v1/' + path, { ...(opt || {}), headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + (s.token || ''), 'Content-Type': 'application/json', ...((opt && opt.headers) || {}) } });
+  } catch (e) { throw new Error('通信できませんでした。もう一度押してください。'); }
   if (r.status === 401 && !retried && typeof refreshSess === 'function' && await refreshSess()) return cmRest(path, opt, true);
   if (!r.ok) {
     let msg = '保存できませんでした（' + r.status + '）';
@@ -261,6 +408,10 @@ const cmInp = (id, label, val, type, extra) => `<div><label class="l">${label}</
 
 async function renderChamu(sub) {
   sub = sub || 'journal';
+  if (sub === 'kinmu' && typeof kmOpen === 'function') {
+    document.body.classList.add('wide-sheet');
+    return kmOpen('chamu');
+  }
   if (typeof DEMO !== 'undefined' && DEMO) return cmShow(cmBack() + '<div class="card"><p>見本モードでは、茶夢の日誌は使えません。ログインしてお使いください。</p></div>');
   cmShow(cmBack() + '<p>読み込み中…</p>');
   try {
@@ -269,16 +420,17 @@ async function renderChamu(sub) {
   } catch (e) { return cmShow(cmBack() + `<div class="card"><p>${cmEsc(e.message || e)}</p><p class="note">茶夢の表がまだないときは、supabase/chamu.sql を適用してください。</p></div>`); }
   if (CM.can !== true) return cmShow(cmBack() + '<div class="card"><p>茶夢の記録は、茶夢の職員と、事務・会長が使えます。</p><p class="note">茶夢の職員として使うには、管理者に所属（staff_profiles の office）を「茶夢」にしてもらってください。</p></div>');
   if (sub === 'billing' && CM.bill !== true) return cmFrame('billing', '<div class="card"><p>国保連CSVは、事務・茶夢の管理者・会長だけが作れます。</p></div>');
-  const page = { journal: cmJournal, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
+  const page = { journal: cmJournal, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
   try { await page(); } catch (e) { cmFrame(sub, `<div class="ng">${cmEsc(e.message || e)}</div>`); }
 }
 
 async function cmJournal() {
   const date = CM.st.date || cmToday();
-  const [users, day, settings, staff] = await Promise.all([
+  const [users, day, settings, staff, shift] = await Promise.all([
     cmUsers(false),
     cmRest(`chamu_journal?journal_date=eq.${date}&select=*,chamu_journal_line(*)`).then(a => (a && a[0]) || null),
     cmSettingsRow(), cmStaffName(),
+    cmRest(CM_SHIFT_Q).then(a => ({ rows: a || [] })).catch(() => ({ error: true })),
   ]);
   const lines = (day && day.chamu_journal_line) || [];
   const by = {}; lines.forEach(l => { by[l.user_id] = l; });
@@ -296,15 +448,26 @@ async function cmJournal() {
     <button class="sec inl" onclick="CM.st.date='${cmToday()}';renderChamu('journal')">今日</button>
     <button class="sec inl" onclick="CM.st.date='${cmShift(date, 1)}';renderChamu('journal')">翌日 ＞</button>
     <input type="date" id="j_date" value="${date}" style="width:auto" onchange="CM.st.date=this.value;renderChamu('journal')"></p>
+    ${shift.error ? '<div class="card"><h4>この日の配置</h4><p class="note">配置表を読めませんでした。supabase/chamu_shift.sql を適用してください。</p></div>' : ChamuLib.dayShiftHtml(date, shift.rows)}
     <div class="card">${cmInp('j_staff', '記入者', (day && day.staff_name) || staff)}
       <div class="row"><div><label class="l">天気</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>${cmInp('j_menu', '献立', (day && day.menu) || '')}</div>
       ${cmNoteField('j_note', '全体申し送り', (day && day.note) || '')}</div>
     <p class="noprint"><button class="sec inl" onclick="cmBulk()">予定どおり全員を一括入力</button></p>
     ${users.map(card).join('') || '<div class="card">利用者がまだいません。<a href="#chamu/users">利用者</a>から登録してください。</div>'}
-    <button onclick="cmSaveJournal()">保存して記録票に転記</button>`);
+    <button type="button" data-cm-save onclick="cmSaveJournal()">保存して記録票に転記</button>`);
   users.forEach(u => { const el = document.getElementById('p_' + u.id); if (el) el.onchange = () => cmToggle(u.id); });
   CM.st.users = users;
   CM.st.defaults = ChamuLib.settingsOf(settings);
+}
+async function cmHaichi() {
+  let body;
+  try {
+    const rows = await cmRest(CM_SHIFT_Q) || [];
+    body = ChamuLib.weekShiftHtml(rows);
+  } catch (e) {
+    body = '<div class="card"><p>配置表を読めませんでした。</p><p class="note">supabase/chamu_shift.sql を適用してください。</p></div>';
+  }
+  cmFrame('haichi', `<h3>職員配置表</h3><p class="note">曜日を見ると、その日に誰がいるかが分かります。日誌の日付にも、同じ曜日の配置を出します。月ごとの三重県様式は <a href="#chamu/kinmu">勤務実績及び利用者の実績表</a> です。</p>${body}`);
 }
 function cmNoteField(id, label, value) {
   const safe = String(id).replace(/[^A-Za-z0-9_-]/g, '');
@@ -362,27 +525,38 @@ function cmReadJournal(date) {
   };
 }
 async function cmSaveJournal() {
-  await cmGo(async () => {
-    const date = CM.st.date || cmToday(), defaults = CM.st.defaults || ChamuLib.DEFAULTS, form = cmReadJournal(date);
-    const errs = ChamuLib.validateJournal(form, defaults);
-    if (errs.length) throw new Error(errs.join('\n'));
-    const prepared = form.users.map(u => ({ user_id: u.user_id, name: u.name, ...ChamuLib.prepareLine(u, defaults) }));
-    const dayRows = await cmRest('chamu_journal?on_conflict=journal_date', {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify({ journal_date: date, staff_name: form.staff_name.trim(), weather: form.weather || null, menu: form.menu.trim() || null, note: form.note.trim() || null, updated_at: new Date().toISOString() }),
-    });
-    const day = dayRows[0];
-    if (prepared.length) await cmRest('chamu_journal_line?on_conflict=journal_id,user_id', {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(prepared.map(u => ({
-        journal_id: day.id, user_id: u.user_id, present: u.present, start_time: u.start_time, end_time: u.end_time,
-        transport: u.transport, meal: u.meal, support_note: u.present ? (u.support_note || '') : null,
-      }))),
-    });
-    const notes = prepared.filter(u => u.filled).map(u => `${u.name}: 時刻空欄→${u.start_time}-${u.end_time}補完`).concat(await cmApplySync(date, prepared, defaults));
-    await cmJournal();
-    cmMsg('保存しました。' + (notes.length ? '\n' + notes.join('\n') : '\n実績記録票に転記しました。'), true);
-  });
+  if (CM.saving) return;
+  CM.saving = true;
+  cmSaveBtn(true);
+  try {
+    await cmGo(async () => {
+      const date = CM.st.date || cmToday(), defaults = CM.st.defaults || ChamuLib.DEFAULTS, form = cmReadJournal(date);
+      const errs = ChamuLib.validateJournal(form, defaults);
+      if (errs.length) throw new Error(errs.join('\n'));
+      const prepared = form.users.map(u => ({ user_id: u.user_id, name: u.name, ...ChamuLib.prepareLine(u, defaults) }));
+      const dayRows = await cmRest('chamu_journal?on_conflict=journal_date', {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({ journal_date: date, staff_name: form.staff_name.trim(), weather: form.weather || null, menu: form.menu.trim() || null, note: form.note.trim() || null, updated_at: new Date().toISOString() }),
+      });
+      const day = dayRows && dayRows[0];
+      if (!day || !day.id) throw new Error('日誌を保存できませんでした。もう一度押してください。');
+      if (prepared.length) await cmRest('chamu_journal_line?on_conflict=journal_id,user_id', {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(prepared.map(u => ({
+          journal_id: day.id, user_id: u.user_id, present: u.present, start_time: u.start_time, end_time: u.end_time,
+          transport: u.transport, meal: u.meal, support_note: u.present ? (u.support_note || '') : null,
+        }))),
+      });
+      const notes = prepared.filter(u => u.filled).map(u => `${u.name}: 時刻空欄→${u.start_time}-${u.end_time}補完`).concat(await cmApplySync(date, prepared, defaults));
+      await cmJournal();
+      const saved = ChamuLib.journalSavedNotice(notes);
+      cmMsg('保存しました。' + (notes.length ? '\n' + notes.join('\n') : '\n実績記録票に転記しました。'), true);
+      cmNotice(saved.title, saved.body, true);
+    }, { notice: '保存できませんでした' });
+  } finally {
+    CM.saving = false;
+    cmSaveBtn(false);
+  }
 }
 async function cmApplySync(date, prepared, defaults) {
   const recs = await cmRest(`chamu_service_records?service_date=eq.${date}&select=*`) || [];
@@ -473,7 +647,7 @@ async function cmBilling() {
   }
   CM.files = files;
   const s = input.settings, blocked = input.blocking.length > 0 || !!err || !files || (files && files.issues.length > 0);
-  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、10:00–16:00、医師未配置減算あり）です。</p>
+  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、11:00–15:00、医師未配置減算あり）です。</p>
     <div class="row">${cmInp('bs_office_no', '事業所番号', s.office_no)}${cmInp('bs_office_name', '事業所名', s.office_name)}
       ${cmInp('bs_region_code', '地域区分コード', s.region_code)}${cmInp('bs_unit_price', '地域区分単価', s.unit_price)}
       ${cmInp('bs_shogu_rate', '処遇改善加算率', s.shogu_rate)}${cmInp('bs_shogu_item', '処遇改善のサービスコード項目', s.shogu_item)}
@@ -506,8 +680,8 @@ async function cmSaveSettings() {
     const row = {
       office_no: office, office_name: cmV('bs_office_name').trim() || '茶夢', service_type: '22', region_code: cmV('bs_region_code').trim() || '06',
       unit_price: cmV('bs_unit_price').trim() || '10.37', shogu_rate: cmV('bs_shogu_rate').trim() || '0.096', shogu_item: cmV('bs_shogu_item').trim() || '5175',
-      capacity_scale: '11-20', standard_band: cmV('bs_band') || ChamuLib.DEFAULTS.standard_band, default_start: ChamuLib.time(cmV('bs_start')) || '10:00',
-      default_end: ChamuLib.time(cmV('bs_end')) || '16:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
+      capacity_scale: '11-20', standard_band: cmV('bs_band') || ChamuLib.DEFAULTS.standard_band, default_start: ChamuLib.time(cmV('bs_start')) || '11:00',
+      default_end: ChamuLib.time(cmV('bs_end')) || '15:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
     };
     const saved = await cmRest('chamu_billing_settings?id=eq.1', { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
     if (!saved || !saved.length) throw new Error('請求設定がありません。supabase/chamu.sql を適用してください');
