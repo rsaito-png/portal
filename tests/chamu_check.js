@@ -121,7 +121,7 @@ const run = (users, records, settings) => {
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
 assert.ok(html.includes('chamu.js?v=202611021830'));
-assert.ok(html.includes('leo_kinmu.js?v=20261102f1400'));
+assert.ok(html.includes('leo_kinmu.js?v=20261102read'));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
 assert.strictEqual(L.journalSavedNotice(['  ', '利用者A: 時刻空欄→11:00-15:00補完']).body, '記録票に転記しました。\n利用者A: 時刻空欄→11:00-15:00補完');
