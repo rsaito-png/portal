@@ -260,7 +260,7 @@ vm.runInNewContext(cfg, { window: cfgWin });
 const leo = cfgWin.PORTAL_CONFIG.offices.find(o => o.id === 'leo');
 assert.strictEqual(leo.groups.map(g => g[1]).join('|'), '現場|事務・計画');
 assert.strictEqual(leo.groups[0][2].join('|'), ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表', '日誌（見る・直す）'].join('|'));
-assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '個別支援計画（管理）', '個別支援計画 管理表', '利用者情報（児童ごと）', '来月の利用予定（保護者に聞く）', '利用料実費請求', '国保連請求', '保護者の実績確認', 'サービス提供実績記録表', '直した所', '請求の印（欠席時対応・子育てサポート）', '実績記録（請求元）'].join('|'));
+assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '個別支援計画（管理）', '個別支援計画 管理表', '利用者情報（児童ごと）', '来月の利用予定（保護者に聞く）', '利用料実費請求', '国保連請求', '保護者の実績確認', 'サービス提供実績記録表', '勤務実績及び利用者の実績表', '直した所', '請求の印（欠席時対応・子育てサポート）', '実績記録（請求元）'].join('|'));
 assert.strictEqual(leo.mine['現場支援員'].join('|'), '日誌（児童ごと）');
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
