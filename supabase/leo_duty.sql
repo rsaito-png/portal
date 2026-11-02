@@ -11,10 +11,20 @@ as $$ select coalesce(public.my_role() = '事務' or public.my_duty() in ('管�
 -- ヒヤリハットの確認・保護者の実績確認は児発管もできる
 drop policy if exists hy_check on public.hiyari;
 create policy hy_check on public.hiyari for update to authenticated using (public.can_manage() and (office = public.my_office() or public.my_role() = '事務')) with check (public.can_manage());
+-- 実績確認の閲覧はレオだけ（leo_kakunin.sql と同じ）。全事業所の can_manage() には広げない。
+-- 本番には can_manage_for がある。無いデータベースでだけ、同じ条件の関数を足す（ある関数は置き換えない）
+do $$ begin
+  if to_regprocedure('public.can_manage_for(text)') is null then
+    execute $fn$
+      create function public.can_manage_for(p_office text) returns boolean language sql stable security definer set search_path = public as
+      $body$ select coalesce(public.my_role() = '事務' or (public.my_duty() in ('管理者','児発管') and public.my_office() = p_office), false) $body$
+    $fn$;
+  end if;
+end $$;
 drop policy if exists lcl_clerk on public.leo_confirm_links;
-create policy lcl_clerk on public.leo_confirm_links for select to authenticated using (public.can_manage());
+create policy lcl_clerk on public.leo_confirm_links for select to authenticated using (public.can_manage_for('レオ'));
 drop policy if exists lc_clerk on public.leo_confirmations;
-create policy lc_clerk on public.leo_confirmations for select to authenticated using (public.can_manage());
+create policy lc_clerk on public.leo_confirmations for select to authenticated using (public.can_manage_for('レオ'));
 create or replace function public.leo_confirm_make_links(p_month text)
 returns int language plpgsql security definer set search_path = public, extensions as $$
 declare n int;

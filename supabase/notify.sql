@@ -62,7 +62,7 @@ create or replace function public.trg_notify_kakunin() returns trigger language 
 declare c text; m text;
 begin
   select child, month::text into c, m from leo_confirm_links where token = new.token;
-  perform notify_enqueue('mgr', '実績確認', '🖊️ ' || coalesce(c, '') || 'さんの保護者から、実績の確認（' || coalesce(m, '') || '）の回答が届きました。',
+  perform notify_enqueue('mgr', '実績確認', '🖊️ ' || coalesce(c, '') || 'さんの保護者から、実績と実費の確認（' || coalesce(m, '') || '）の回答が届きました。',
     'https://rsaito-png.github.io/portal/#leo/kakunin');
   return new;
 end $$;

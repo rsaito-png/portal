@@ -22,6 +22,8 @@ alter table public.leo_jippi add column if not exists pay_link_amount int check 
 comment on column public.leo_jippi.pay_link_amount is '支払いリンクを作ったときの lunch+snack（円）。同じなら作り直さない。古い Square リンクは無効化しない。';
 alter table public.leo_jippi enable row level security;
 drop policy if exists jippi_all on public.leo_jippi;
-create policy jippi_all on public.leo_jippi for all to authenticated using (public.can_manage()) with check (public.can_manage());
+create policy jippi_all on public.leo_jippi for all to authenticated using (public.can_manage_for('レオ')) with check (public.can_manage_for('レオ'));
+-- 保護者はログインなしの確認リンク（leo_confirm_get）だけで自分の行を見る。表の直接読みは渡さない
+revoke all on table public.leo_jippi from anon;
 -- jippi-checkout が本人の JWT で can_manage() を呼ぶ
 grant execute on function public.can_manage() to authenticated;
