@@ -120,13 +120,13 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=202611021500'));
+assert.ok(html.includes('chamu.js?v=202611021600'));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
 assert.strictEqual(L.journalSavedNotice(['  ', '利用者A: 時刻空欄→11:00-15:00補完']).body, '記録票に転記しました。\n利用者A: 時刻空欄→11:00-15:00補完');
 assert.ok(!/給与|受給者証/.test(L.journalSavedNotice(['利用者A: 署名を取り直してください。']).body));
 assert.ok(html.includes("id === 'chamu' && sub && typeof renderChamu"));
-assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
+assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/haichi") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
 assert.ok(!cfg.includes('1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g'));
 assert.ok(cfg.includes('#rydeen/journal') && cfg.includes('#rydeen/billing'));
 assert.ok(src.includes('職員が入力するのはここだけ'));
@@ -139,7 +139,7 @@ assert.ok(sql.includes("default '11:00'") && sql.includes("default '15:00'") && 
 assert.ok(sql.includes("values (1, '4時間以上5時間未満', '11:00', '15:00')"));
 assert.ok(!sql.includes("default '10:00'") && !sql.includes("default '16:00'") && !sql.includes("default '6時間以上7時間未満'"));
 assert.ok(src.includes("default_start: '11:00'") && src.includes("default_end: '15:00'") && src.includes('11:00–15:00'));
-assert.ok(!src.includes("'10:00'") && !src.includes("'16:00'") && !src.includes('10:00–16:00'));
+assert.ok(!src.includes("default_start: '10:00'") && !src.includes("|| '10:00'") && !src.includes("'16:00'") && !src.includes('10:00–16:00'));
 assert.ok(sql.includes("office = '茶夢'") && sql.includes('enable row level security'));
 assert.ok(!sql.includes('日置') && !sql.includes('0000222844'));
 
@@ -172,5 +172,72 @@ assert.ok(!/xai-[A-Za-z0-9]{8,}/.test(fn));
 const toml = fs.readFileSync(path.join(root, 'supabase/config.toml'), 'utf8');
 assert.ok(toml.includes('chamu-translate'));
 assert.ok(!/\[functions\.chamu-translate\][^[]*verify_jwt\s*=\s*false/.test(toml));
+
+const shiftSql = fs.readFileSync(path.join(root, 'supabase/chamu_shift.sql'), 'utf8');
+assert.ok(shiftSql.includes('enable row level security'));
+assert.ok(shiftSql.includes('using (public.chamu_can())'));
+assert.ok(shiftSql.includes('grant select on public.chamu_shift to authenticated'));
+assert.ok(shiftSql.includes('revoke all on public.chamu_shift from anon, authenticated, public'));
+assert.ok(!/grant\s+(insert|update|delete|all)\b/i.test(shiftSql));
+assert.ok(!/for\s+(insert|update|delete|all)\b/i.test(shiftSql));
+assert.ok(!shiftSql.includes('leo_sheet') && !shiftSql.includes('時給') && !shiftSql.includes('1150') && !shiftSql.includes('80000') && !shiftSql.includes('11.5'));
+assert.ok(shiftSql.includes("staff_name <> '中村文' or (start_time = '14:00' and end_time = '17:00')"));
+assert.ok(shiftSql.includes("staff_name <> '加藤幸弘' or dow = '水'"));
+assert.ok(shiftSql.includes("staff_name <> '安藤尚子' or dow <> '水'"));
+const seed = [];
+const seedRe = /\('([月火水木金])', '([^']+)', '(常勤|非常勤)', '(\d{2}:\d{2})', '(\d{2}:\d{2})', (\d+)\)/g;
+let seedM;
+while ((seedM = seedRe.exec(shiftSql))) seed.push({ dow: seedM[1], staff_name: seedM[2], employment: seedM[3], start_time: seedM[4], end_time: seedM[5], sort: +seedM[6] });
+assert.strictEqual(seed.length, 20);
+assert.deepStrictEqual(L.shiftIssues(seed), []);
+['月', '火', '水', '木', '金'].forEach(dow => {
+  assert.deepStrictEqual(seed.filter(r => r.dow === dow && r.employment === '常勤').map(r => r.staff_name), ['齊藤', '中村友香'], dow);
+});
+assert.deepStrictEqual(seed.filter(r => r.staff_name === '安藤尚子').map(r => [r.dow, r.start_time, r.end_time]), [
+  ['月', '11:00', '14:00'], ['火', '11:00', '14:00'], ['木', '11:00', '14:00'], ['金', '11:00', '14:30'],
+]);
+assert.deepStrictEqual(seed.filter(r => r.staff_name === '加藤幸弘').map(r => [r.dow, r.start_time, r.end_time]), [['水', '11:00', '14:00']]);
+assert.strictEqual(seed.filter(r => r.staff_name === '中村文').length, 5);
+const weekDates = { 月: '2026-11-02', 火: '2026-11-03', 水: '2026-11-04', 木: '2026-11-05', 金: '2026-11-06' };
+let fumiMin = 0;
+Object.entries(weekDates).forEach(([dow, ymd]) => {
+  assert.strictEqual(L.dowOf(ymd), dow);
+  const day = L.dayShift(ymd, seed);
+  assert.strictEqual(day.open, true);
+  assert.deepStrictEqual(day.people.map(p => p.name), seed.filter(r => r.dow === dow).sort((a, b) => a.sort - b.sort).map(r => r.staff_name));
+  const fumi = day.people.find(p => p.name === '中村文');
+  assert.deepStrictEqual([fumi.start, fumi.end], ['14:00', '17:00']);
+  fumiMin += 180;
+  const htmlDay = L.dayShiftHtml(ymd, seed);
+  day.people.forEach(p => { assert.ok(htmlDay.includes(p.name) && htmlDay.includes(p.start + '〜' + p.end)); });
+  assert.ok(!htmlDay.includes('時給') && !htmlDay.includes('円'));
+});
+assert.strictEqual(fumiMin, 900);
+assert.deepStrictEqual(L.dayShift('2026-11-02', seed).notes, []);
+assert.deepStrictEqual(L.dayShift('2026-11-05', seed).notes, []);
+assert.deepStrictEqual(L.dayShift('2026-11-06', seed).notes, ['安藤尚子と中村文が 14:00〜14:30 重なっています']);
+assert.ok(L.dayShift('2026-11-04', seed).people.some(p => p.name === '齊藤'));
+assert.ok(!L.dayShift('2026-11-04', seed).people.some(p => p.name === '安藤尚子'));
+assert.ok(L.dayShift('2026-11-05', seed).people.some(p => p.name === '安藤尚子' && p.start === '11:00' && p.end === '14:00'));
+const sat = L.dayShift('2026-11-07', seed), sun = L.dayShift('2026-11-08', seed);
+assert.strictEqual(sat.dow, '土');
+assert.strictEqual(sun.dow, '日');
+assert.strictEqual(sat.open, false);
+assert.strictEqual(sun.open, false);
+assert.strictEqual(sat.people.length, 0);
+assert.ok(L.dayShiftHtml('2026-11-07', seed).includes('土日は配置がありません'));
+const weekHtml = L.weekShiftHtml(seed);
+assert.ok(weekHtml.includes('10:00〜18:00') && weekHtml.includes('14:30') && weekHtml.includes('配置はありません'));
+assert.ok(weekHtml.includes('安藤尚子と中村文が 14:00〜14:30 重なっています'));
+['齊藤', '中村友香', '安藤尚子', '中村文', '加藤幸弘'].forEach(n => assert.ok(weekHtml.includes(n), n));
+assert.ok(!weekHtml.includes('時給') && !weekHtml.includes('1150') && !weekHtml.includes('80000') && !weekHtml.includes('11.5') && !weekHtml.includes('円'));
+const dirty = L.dayShiftHtml('2026-11-02', [{ dow: '月', staff_name: '齊藤', employment: '常勤', start_time: '10:00', end_time: '18:00', hourly_wage: 'secret-pay' }]);
+assert.ok(dirty.includes('齊藤') && dirty.includes('10:00〜18:00') && !dirty.includes('secret-pay'));
+assert.ok(L.shiftIssues([{ dow: '火', staff_name: '加藤幸弘', employment: '非常勤', start_time: '11:00', end_time: '14:00' }]).some(s => s.includes('水曜')));
+assert.ok(L.shiftIssues([{ dow: '月', staff_name: '中村文', employment: '非常勤', start_time: '14:30', end_time: '17:00' }]).some(s => s.includes('14:00〜17:00')));
+assert.ok(L.shiftIssues([{ dow: '土', staff_name: '齊藤', employment: '常勤', start_time: '10:00', end_time: '18:00' }]).some(s => s.includes('土日')));
+assert.ok(src.includes('CM_SHIFT_Q') && src.includes('chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort'));
+assert.ok(src.includes('ChamuLib.dayShiftHtml(date, shift.rows)') && src.includes('haichi: cmHaichi'));
+assert.ok(src.includes('supabase/chamu_shift.sql') && !src.includes('leo_sheet') && !src.includes('時給') && !src.includes('1150') && !src.includes('80000'));
 
 console.log('chamu_check ok');

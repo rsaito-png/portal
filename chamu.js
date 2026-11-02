@@ -1,8 +1,10 @@
 // 茶夢（生活介護）。職員が入れるのは業務日誌だけ。保存すると実績記録票へ自動転記し、署名済みだけ国保連CSVの対象。
 // 請求の計算は rydeen-billing-lib.js のサービス種類22（生活介護）。B型の bp_* は使わない。
 // 自由記述のポルトガル語は「日本語にする」で確認する。訳文は保存せず、原文のまま記録する。
+// 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表は使わない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
-const CM_NAV = [['journal', '業務日誌'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
+const CM_NAV = [['journal', '業務日誌'], ['haichi', '職員配置'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
+const CM_SHIFT_Q = 'chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort&order=sort.asc,staff_name.asc';
 
 /* cm-pure */
 var ChamuLib = (() => {
@@ -190,7 +192,91 @@ var ChamuLib = (() => {
     });
     return { office, users, agg, settings, blocking, warnings, signedCount: signed.length, unsignedCount: inMonth.length - signed.length, preview };
   };
-  return { WEATHER, TRANSPORT, MEAL, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice };
+  const DOW_JA = ['日', '月', '火', '水', '木', '金', '土'];
+  const OPEN_DOW = ['月', '火', '水', '木', '金'];
+  const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const dowOf = ymd => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+    if (!m) return '';
+    const y = +m[1], mo = +m[2], d = +m[3];
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return '';
+    return DOW_JA[dt.getUTCDay()];
+  };
+  const shiftOf = row => {
+    const r = row || {};
+    return {
+      dow: String(r.dow || '').trim(),
+      name: String(r.staff_name || '').trim(),
+      employment: String(r.employment || '').trim(),
+      start: time(r.start_time),
+      end: time(r.end_time),
+      sort: Number.isFinite(+r.sort) ? +r.sort : 0,
+    };
+  };
+  const byShift = (a, b) => {
+    const rank = x => x.employment === '常勤' ? 0 : 1;
+    return rank(a) - rank(b) || String(a.start).localeCompare(String(b.start)) || (a.sort - b.sort) || String(a.name).localeCompare(String(b.name), 'ja');
+  };
+  const hhmm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  // 常勤と非常勤が同じ時間にいるのは通常。重ねないのは安藤尚子と中村文だけ（端の 14:00 は引き継ぎ）。
+  const overlapNotes = people => {
+    const notes = [];
+    const a = (people || []).filter(p => p.name === '安藤尚子');
+    const b = (people || []).filter(p => p.name === '中村文');
+    a.forEach(x => b.forEach(y => {
+      const as = minutes(x.start), ae = minutes(x.end), bs = minutes(y.start), be = minutes(y.end);
+      if (as == null || ae == null || bs == null || be == null) return;
+      if (as < be && bs < ae) notes.push('安藤尚子と中村文が ' + hhmm(Math.max(as, bs)) + '〜' + hhmm(Math.min(ae, be)) + ' 重なっています');
+    }));
+    return notes;
+  };
+  const peopleOn = (rows, dow) => (rows || []).map(shiftOf).filter(r => r.dow === dow && r.name).sort(byShift);
+  const dayShift = (ymd, rows) => {
+    const dow = dowOf(ymd);
+    const open = OPEN_DOW.indexOf(dow) >= 0;
+    const people = open ? peopleOn(rows, dow) : [];
+    return { dow, open, people, notes: overlapNotes(people) };
+  };
+  const weekShift = rows => OPEN_DOW.map(dow => {
+    const people = peopleOn(rows, dow);
+    return { dow, open: true, people, notes: overlapNotes(people) };
+  });
+  const peopleTable = people => `<table class="cm-shift"><tr><th>氏名</th><th>区分</th><th>時間</th></tr>${people.map(p =>
+    `<tr><td>${escHtml(p.name)}</td><td>${escHtml(p.employment)}</td><td>${escHtml(p.start)}〜${escHtml(p.end)}</td></tr>`).join('')}</table>`;
+  const notesHtml = notes => (notes || []).map(n => `<p class="wn">${escHtml(n)}</p>`).join('');
+  const dayShiftHtml = (ymd, rows) => {
+    const day = dayShift(ymd, rows);
+    if (!day.dow) return '';
+    const head = `<h4>この日の配置（${escHtml(day.dow)}）</h4>`;
+    if (!day.open) return `<div class="card cm-shift-day">${head}<p>土日は配置がありません。</p></div>`;
+    const body = day.people.length ? peopleTable(day.people) : '<p>この曜日の配置はまだ入っていません。</p>';
+    return `<div class="card cm-shift-day">${head}${body}${notesHtml(day.notes)}<p class="note"><a href="#chamu/haichi">曜日ごとの配置表</a></p></div>`;
+  };
+  const weekShiftHtml = rows => {
+    const body = weekShift(rows).map(day => `<h4>${escHtml(day.dow)}曜</h4>${day.people.length ? peopleTable(day.people) : '<p>この曜日の配置はまだ入っていません。</p>'}${notesHtml(day.notes)}`).join('');
+    return `<p class="note">毎週この形です。常勤は 10:00〜18:00（休憩1時間の想定）。非常勤は 11:00〜17:00 のあいだです。</p>${body}<h4>土曜・日曜</h4><p>配置はありません。</p>`;
+  };
+  const shiftIssues = rows => {
+    const list = (rows || []).map(shiftOf).filter(r => r.name);
+    const issues = [], seen = {};
+    list.forEach(r => {
+      const key = r.dow + '\0' + r.name;
+      if (seen[key]) issues.push(r.dow + ' ' + r.name + ' が重複しています');
+      seen[key] = true;
+      if (OPEN_DOW.indexOf(r.dow) < 0) issues.push(r.name + ' は土日に入れません');
+      const a = minutes(r.start), b = minutes(r.end);
+      if (a == null || b == null || b <= a) issues.push(r.dow + ' ' + r.name + ' の時間が正しくありません');
+      if (r.employment !== '常勤' && r.employment !== '非常勤') issues.push(r.name + ' の区分が正しくありません');
+      if (r.name === '加藤幸弘' && r.dow !== '水') issues.push('加藤幸弘は水曜だけです');
+      if (r.name === '安藤尚子' && r.dow === '水') issues.push('安藤尚子は水曜には入りません');
+      if (r.name === '中村文' && (r.start !== '14:00' || r.end !== '17:00')) issues.push('中村文は 14:00〜17:00 のままにします');
+      if (r.employment === '常勤' && (r.start !== '10:00' || r.end !== '18:00')) issues.push(r.dow + 'の常勤は 10:00〜18:00 です');
+      if (r.employment === '非常勤' && (r.start < '11:00' || r.end > '17:00')) issues.push(r.dow + ' ' + r.name + ' は 11:00〜17:00 のあいだです');
+    });
+    return issues;
+  };
+  return { WEATHER, TRANSPORT, MEAL, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues };
 })();
 /* /cm-pure */
 
@@ -330,16 +416,17 @@ async function renderChamu(sub) {
   } catch (e) { return cmShow(cmBack() + `<div class="card"><p>${cmEsc(e.message || e)}</p><p class="note">茶夢の表がまだないときは、supabase/chamu.sql を適用してください。</p></div>`); }
   if (CM.can !== true) return cmShow(cmBack() + '<div class="card"><p>茶夢の記録は、茶夢の職員と、事務・会長が使えます。</p><p class="note">茶夢の職員として使うには、管理者に所属（staff_profiles の office）を「茶夢」にしてもらってください。</p></div>');
   if (sub === 'billing' && CM.bill !== true) return cmFrame('billing', '<div class="card"><p>国保連CSVは、事務・茶夢の管理者・会長だけが作れます。</p></div>');
-  const page = { journal: cmJournal, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
+  const page = { journal: cmJournal, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
   try { await page(); } catch (e) { cmFrame(sub, `<div class="ng">${cmEsc(e.message || e)}</div>`); }
 }
 
 async function cmJournal() {
   const date = CM.st.date || cmToday();
-  const [users, day, settings, staff] = await Promise.all([
+  const [users, day, settings, staff, shift] = await Promise.all([
     cmUsers(false),
     cmRest(`chamu_journal?journal_date=eq.${date}&select=*,chamu_journal_line(*)`).then(a => (a && a[0]) || null),
     cmSettingsRow(), cmStaffName(),
+    cmRest(CM_SHIFT_Q).then(a => ({ rows: a || [] })).catch(() => ({ error: true })),
   ]);
   const lines = (day && day.chamu_journal_line) || [];
   const by = {}; lines.forEach(l => { by[l.user_id] = l; });
@@ -357,6 +444,7 @@ async function cmJournal() {
     <button class="sec inl" onclick="CM.st.date='${cmToday()}';renderChamu('journal')">今日</button>
     <button class="sec inl" onclick="CM.st.date='${cmShift(date, 1)}';renderChamu('journal')">翌日 ＞</button>
     <input type="date" id="j_date" value="${date}" style="width:auto" onchange="CM.st.date=this.value;renderChamu('journal')"></p>
+    ${shift.error ? '<div class="card"><h4>この日の配置</h4><p class="note">配置表を読めませんでした。supabase/chamu_shift.sql を適用してください。</p></div>' : ChamuLib.dayShiftHtml(date, shift.rows)}
     <div class="card">${cmInp('j_staff', '記入者', (day && day.staff_name) || staff)}
       <div class="row"><div><label class="l">天気</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>${cmInp('j_menu', '献立', (day && day.menu) || '')}</div>
       ${cmNoteField('j_note', '全体申し送り', (day && day.note) || '')}</div>
@@ -366,6 +454,16 @@ async function cmJournal() {
   users.forEach(u => { const el = document.getElementById('p_' + u.id); if (el) el.onchange = () => cmToggle(u.id); });
   CM.st.users = users;
   CM.st.defaults = ChamuLib.settingsOf(settings);
+}
+async function cmHaichi() {
+  let body;
+  try {
+    const rows = await cmRest(CM_SHIFT_Q) || [];
+    body = ChamuLib.weekShiftHtml(rows);
+  } catch (e) {
+    body = '<div class="card"><p>配置表を読めませんでした。</p><p class="note">supabase/chamu_shift.sql を適用してください。</p></div>';
+  }
+  cmFrame('haichi', `<h3>職員配置表</h3><p class="note">曜日を見ると、その日に誰がいるかが分かります。日誌の日付にも、同じ曜日の配置を出します。</p>${body}`);
 }
 function cmNoteField(id, label, value) {
   const safe = String(id).replace(/[^A-Za-z0-9_-]/g, '');
