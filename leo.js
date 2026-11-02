@@ -561,7 +561,7 @@ const LEO_VIEWS = {
             ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}">${esc(shown)}</textarea></label>`
             : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}" value="${esc(shown)}"></label>`;
         }).join('')}
-        ${leoMealBox(r.child, meals[leoMealNorm(r.child)], r, false)}</div>`; }).join('') +
+        ${leoMealBox(r.child, meals[leoMealNorm(r.child)], r, false, false)}</div>`; }).join('') +
       `<button onclick="saveNikki()">保存して実績へ載せる</button><div id="saved"></div>`;
   },
   async jisseki() {
@@ -808,7 +808,7 @@ function leoMealSelect(field, value) {
   const opt = (val, label) => `<option value="${val}"${v === val ? ' selected' : ''}>${label}</option>`;
   return `<select data-kind="meal" data-f="${field}" style="width:100%">${opt('', '未記入')}${opt('あり', 'あり')}${opt('なし', 'なし')}</select>`;
 }
-function leoMealBox(child, rec, sheet, withDay) {
+function leoMealBox(child, rec, sheet, withDay, withNote) {
   const meal = leoMealPrefill(rec && rec.meal, sheet && sheet.meal);
   const snack = leoMealPrefill(rec && rec.snack, sheet && sheet.snack);
   const hint = [];
@@ -818,9 +818,11 @@ function leoMealBox(child, rec, sheet, withDay) {
   };
   sheetBit('食事', sheet && sheet.meal);
   sheetBit('おやつ', sheet && sheet.snack);
+  // 今日の日誌だけ内容欄を出さない（withNote=false）。保存時は欄が無いので meal_note を送らず、入っている内容は残す。
+  const note = withNote === false ? '' : `<label>内容（何をどのくらい）<textarea data-kind="meal" data-f="meal_note" rows="3">${esc((rec && rec.meal_note) || '')}</textarea></label>`;
   return `<div data-meal-child="${esc(child)}">
     <label>食事提供${leoMealSelect('meal', meal)}</label>
-    <label>内容（何をどのくらい）<textarea data-kind="meal" data-f="meal_note" rows="3">${esc((rec && rec.meal_note) || '')}</textarea></label>
+    ${note}
     <label>おやつ提供${leoMealSelect('snack', snack)}</label>
     ${withDay ? `<label>この日の記録<textarea data-kind="meal" data-f="day_note" rows="3">${esc((rec && rec.day_note) || '')}</textarea></label>` : ''}
     ${hint.length ? `<p class="note">${esc(hint.join(' ／ '))}</p>` : ''}
@@ -837,7 +839,8 @@ function leoDayLogHtml(day, log, prefix, missing) {
 function leoReadMealBoxes(root) {
   return [...root.querySelectorAll('[data-meal-child]')].map(box => {
     const g = f => box.querySelector(`[data-f="${f}"]`);
-    const row = { child: box.dataset.mealChild, meal: g('meal') ? g('meal').value : '', snack: g('snack') ? g('snack').value : '', meal_note: g('meal_note') ? g('meal_note').value : '' };
+    const row = { child: box.dataset.mealChild, meal: g('meal') ? g('meal').value : '', snack: g('snack') ? g('snack').value : '' };
+    if (g('meal_note')) row.meal_note = g('meal_note').value;
     if (g('day_note')) row.day_note = g('day_note').value;
     return row;
   });
