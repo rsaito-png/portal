@@ -103,6 +103,33 @@ assert.ok(blankPlan.includes('本計画PDFはまだ登録されていません')
 assert.ok(!blankPlan.includes('example.com'));
 assert.strictEqual(leoKidWarnHtml([]), '');
 assert.strictEqual(leoKidWarnHtml(null), '');
+const leoKindOf = grab('leoKindOf');
+const leoServiceLabel = grab('leoServiceLabel');
+const leoCardService = grab('leoCardService');
+const leoChildWrite = grab('leoChildWrite');
+assert.strictEqual(leoServiceLabel('児発'), '児童発達支援');
+assert.strictEqual(leoServiceLabel('放デイ'), '放課後等デイサービス');
+assert.strictEqual(leoServiceLabel('放課後等デイサービス'), '');
+assert.strictEqual(leoServiceLabel(''), '');
+assert.strictEqual(leoKindOf('児童C', [{ name: '児童C', kind: '児発' }, { name: '児童A', kind: '放デイ' }]), '児発');
+assert.strictEqual(leoKindOf('児童　C', [{ name: '児童 C', kind: '児発' }]), '児発');
+assert.strictEqual(leoKindOf('知らない', [{ name: '児童C', kind: '児発' }]), '');
+assert.strictEqual(leoKindOf('同名', [{ name: '同名', kind: '児発' }, { name: '同名', kind: '放デイ' }]), '');
+assert.strictEqual(leoCardService('児童C', [{ name: '児童C', kind: '児発' }], '放課後等デイサービス'), '児童発達支援');
+assert.strictEqual(leoCardService('児童A', [{ name: '児童A', kind: '放デイ' }], '放課後等デイサービス'), '放課後等デイサービス');
+assert.strictEqual(leoCardService('日誌だけ', [], '児発'), '児童発達支援');
+assert.strictEqual(leoCardService('日誌だけ', [], '放デイ'), '放課後等デイサービス');
+assert.strictEqual(leoCardService('不明', [], '放課後等デイサービス'), '未設定');
+assert.strictEqual(leoCardService('不明', [], ''), '未設定');
+assert.strictEqual(JSON.stringify(leoChildWrite({ kind: '児発' }, '児童C')), JSON.stringify({ row: { name: '児童C', kind: '児発' } }));
+assert.strictEqual(JSON.stringify(leoChildWrite({ kind: '放デイ' }, '児童A')), JSON.stringify({ row: { name: '児童A', kind: '放デイ' } }));
+assert.strictEqual(JSON.stringify(leoChildWrite({ kind: '' }, '不明')), JSON.stringify({ skip: true }));
+assert.strictEqual(leoChildWrite({ kind: '', jukyusha_no: '0123456789', city_no: '123456' }, '不明').error, 'サービス種別は、児発か放デイを選んでください。');
+const full = leoChildWrite({ kind: '児発', jukyusha_no: '0123456789', city_no: '123456', cap_monthly: '4600', contract_days: '10', mushouka: false }, '児童C');
+assert.strictEqual(full.row.kind, '児発');
+assert.strictEqual(full.row.jukyusha_no, '0123456789');
+assert.strictEqual(full.row.cap_monthly, 4600);
+assert.strictEqual(full.row.contract_days, 10);
 const warnHtml = leoKidWarnHtml(['送迎の配慮：<見本>', 'メモ：半分']);
 assert.ok(warnHtml.includes('⚠ 送迎の配慮：&lt;見本&gt;'));
 assert.ok(warnHtml.includes('⚠ メモ：半分'));
@@ -177,11 +204,11 @@ assert.ok(!yotei.includes('if (DEMO) return old.call(this)'));
 assert.ok(yotei.includes('leoSougeiMineHtml'));
 assert.ok(yotei.includes('same(e.staff, me)'));
 assert.ok(leo.includes('120000') && leo.includes('visibilitychange') && leo.includes('SG_EDIT'));
-const planFn = between(leo, 'function leoKidPlanHtml', 'function leoSougeiMineHtml');
+const planFn = between(leo, 'function leoKidPlanHtml', 'function leoKindOf');
 assert.ok(!planFn.includes('source_url') && !planFn.includes('target="_blank"') && !planFn.includes('PDF未登録'));
 assert.ok(planFn.includes('本計画PDFはまだ登録されていません'));
 assert.ok(leo.includes('元の計画書を開く'));
-assert.ok(index.includes('leo.js?v=20261102nikki'));
+assert.ok(index.includes('leo.js?v=20261102nikki2'));
 const leoMergeNikki = grab('leoMergeNikki');
 const portalPick = [{ day, kind: '迎え', kids: ['児童A'], staff: '職員X', start_time: '14:50', place: '見本公園', source: 'portal', updated_at: '2099-01-01T00:00:00.000Z', kid_times: { '児童A': '14:50' }, kid_places: { '児童A': '見本公園' } }];
 const picked = leoMergeNikki(nikki, portalPick);
@@ -297,5 +324,27 @@ vm.runInContext(`
   const absentKids = await LEO_VIEWS.kids();
   if (!absentKids.includes('欠席：') || !absentKids.includes('欠席（欠席時対応加算）') || !absentKids.includes('連絡 ' + t)) throw new Error('kids lists calendar absence');
   if (absentKids.includes('class="card"')) throw new Error('absent child is not listed as attending');
+  sb = async (path) => {
+    const p = String(path);
+    if (p.includes('leo_nikki')) return [
+      { day: t, kind: '利用', child: '児童C', service: '放課後等デイサービス', pick_driver: '職員X', pick_car: '1号車', drop_driver: '職員Y', drop_car: '1号車', pick_time: '15:00', drop_time: '17:00', pick_place: '見本園', drop_place: '自宅', start_time: '15:50', end_time: '17:00' },
+      { day: t, kind: '利用', child: '児童D', service: '放課後等デイサービス', pick_driver: '職員Y', pick_car: '1号車', drop_driver: '職員Y', drop_car: '1号車', pick_time: '', drop_time: '17:00', pick_place: '', drop_place: '自宅', start_time: '15:00', end_time: '17:00' },
+      { day: t, kind: '利用', child: '児童A', service: '放課後等デイサービス', pick_driver: '職員Y', pick_car: '1号車', drop_driver: '職員Y', drop_car: '1号車', pick_time: '14:00', drop_time: '17:00', pick_place: '見本小学校', drop_place: '自宅', start_time: '14:10', end_time: '17:00' },
+      { day: t, kind: '利用', child: '名簿にいない', service: '放課後等デイサービス', pick_time: '10:00', drop_time: '12:00', start_time: '10:00', end_time: '12:00' },
+    ];
+    if (p.includes('select=name,kind') || p.includes('rpc/leo_child_kinds')) return [
+      { name: '児童C', kind: '児発' },
+      { name: '児童D', kind: '児発' },
+      { name: '児童A', kind: '放デイ' },
+    ];
+    return [];
+  };
+  const svcKids = await LEO_VIEWS.kids();
+  const svcCards = svcKids.split('class="card"').slice(1);
+  if (svcCards.length !== 4) throw new Error('service cards ' + svcCards.length);
+  if (!svcCards[0].includes('児童C') || !svcCards[0].includes('児童発達支援') || svcCards[0].includes('放課後等デイサービス')) throw new Error('児発は児童発達支援');
+  if (!svcCards[1].includes('児童D') || !svcCards[1].includes('児童発達支援')) throw new Error('児童Dも児発');
+  if (!svcCards[2].includes('児童A') || !svcCards[2].includes('放課後等デイサービス')) throw new Error('放デイは放課後等デイサービス');
+  if (!svcCards[3].includes('名簿にいない') || !svcCards[3].includes('未設定') || svcCards[3].includes('放課後等デイサービス')) throw new Error('未知のサービス名は未設定');
 })()
 `, sandbox).then(() => console.log('leo_sougei_plan_test ok')).catch(err => { console.error(err); process.exit(1); });

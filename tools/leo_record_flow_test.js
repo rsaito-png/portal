@@ -51,6 +51,7 @@ assert.ok(sql.includes("coalesce(nk.activity_via, '') <> '手入力'"));
 assert.ok(sql.includes("j.source is null or j.source = 'ポータル'"), 'Google由来の実績は上書きしない');
 assert.ok(sql.includes("where leo_jisseki.source is distinct from 'ポータル'"));
 assert.ok(sql.includes("coalesce(seed, '') <> 'events'"), 'ポータル日誌は同期で消さない');
+assert.ok(sql.includes("when svc in ('児発', '放デイ') then svc"), '種別が分かれば日誌のサービス欄を上書きする');
 assert.ok(sql.includes('欠席（欠席時対応加算）'));
 assert.ok(sql.includes('キャンセル'));
 assert.ok(/n := public\.leo_activity_from_drafts\(p_day\)/.test(sql), 'record_day は 1→2→3');

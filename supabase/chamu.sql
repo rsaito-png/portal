@@ -134,14 +134,21 @@ create table if not exists public.chamu_billing_settings (
   shogu_rate numeric not null default 0.096,
   shogu_item text not null default '5175',
   capacity_scale text not null default '11-20',
-  standard_band text not null default '6時間以上7時間未満',
-  default_start text not null default '10:00',
-  default_end text not null default '16:00',
+  standard_band text not null default '4時間以上5時間未満',
+  default_start text not null default '11:00',
+  default_end text not null default '15:00',
   ishi_gen boolean not null default true,
   updated_at timestamptz not null default now()
 );
 
-insert into public.chamu_billing_settings (id) values (1) on conflict (id) do nothing;
+insert into public.chamu_billing_settings (id, standard_band, default_start, default_end)
+values (1, '4時間以上5時間未満', '11:00', '15:00')
+on conflict (id) do nothing;
+
+-- 再適用時は列の既定だけ合わせる。既存行と日誌・実績は書き換えない。
+alter table public.chamu_billing_settings alter column standard_band set default '4時間以上5時間未満';
+alter table public.chamu_billing_settings alter column default_start set default '11:00';
+alter table public.chamu_billing_settings alter column default_end set default '15:00';
 
 create index if not exists chamu_journal_date on public.chamu_journal (journal_date desc);
 create index if not exists chamu_line_journal on public.chamu_journal_line (journal_id);

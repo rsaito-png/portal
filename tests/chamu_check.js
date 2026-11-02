@@ -19,6 +19,10 @@ assert.strictEqual(defaults.region_code, '06');
 assert.strictEqual(defaults.unit_price, '10.37');
 assert.strictEqual(defaults.shogu_item, '5175');
 assert.strictEqual(defaults.ishi_gen, true);
+assert.strictEqual(defaults.default_start, '11:00');
+assert.strictEqual(defaults.default_end, '15:00');
+assert.strictEqual(defaults.standard_band, '4時間以上5時間未満');
+assert.strictEqual(L.bandOf('11:00', '15:00'), '4時間以上5時間未満');
 assert.strictEqual(L.bandOf('10:00', '16:00'), '6時間以上7時間未満');
 assert.strictEqual(L.bandOf('10:00', '13:00'), '3時間以上4時間未満');
 assert.strictEqual(L.bandOf('10:00', '12:30'), '3時間未満');
@@ -33,8 +37,8 @@ assert.ok(L.validateJournal(form([baseUser({ end_time: '09:00' })])).some(e => e
 assert.ok(L.validateJournal(form([baseUser()]), defaults).length === 0);
 const blank = L.prepareLine(baseUser({ start_time: '', end_time: '' }), defaults);
 assert.strictEqual(blank.filled, true);
-assert.strictEqual(blank.start_time, '10:00');
-assert.strictEqual(blank.end_time, '16:00');
+assert.strictEqual(blank.start_time, '11:00');
+assert.strictEqual(blank.end_time, '15:00');
 
 const plan1 = L.syncPlan([baseUser()], [], defaults);
 assert.strictEqual(plan1.upsert.length, 1);
@@ -116,7 +120,7 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=20261030px'));
+assert.ok(html.includes('chamu.js?v=202611021115'));
 assert.ok(html.includes("id === 'chamu' && sub && typeof renderChamu"));
 assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
 assert.ok(!cfg.includes('1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g'));
@@ -127,7 +131,36 @@ assert.ok(src.includes('createSignPad'));
 assert.ok(!src.includes('bp_journal') && !src.includes('bp_service_records'));
 const sql = fs.readFileSync(path.join(root, 'supabase/chamu.sql'), 'utf8');
 assert.ok(sql.includes('chamu_can()') && sql.includes('chamu_can_bill()') && sql.includes('2410202663'));
+assert.ok(sql.includes("default '11:00'") && sql.includes("default '15:00'") && sql.includes("default '4時間以上5時間未満'"));
+assert.ok(sql.includes("values (1, '4時間以上5時間未満', '11:00', '15:00')"));
+assert.ok(!sql.includes("default '10:00'") && !sql.includes("default '16:00'") && !sql.includes("default '6時間以上7時間未満'"));
+assert.ok(src.includes("default_start: '11:00'") && src.includes("default_end: '15:00'") && src.includes('11:00–15:00'));
+assert.ok(!src.includes("'10:00'") && !src.includes("'16:00'") && !src.includes('10:00–16:00'));
 assert.ok(sql.includes("office = '茶夢'") && sql.includes('enable row level security'));
 assert.ok(!sql.includes('日置') && !sql.includes('0000222844'));
+
+assert.deepStrictEqual(L.translateRequest('  olá  '), { body: { text: 'olá' } });
+assert.strictEqual(L.translateRequest('').error, '訳す文を入れてください');
+assert.strictEqual(L.translateRequest('   ').error, '訳す文を入れてください');
+assert.strictEqual(L.translateRequest('あ'.repeat(2000)).body.text.length, 2000);
+assert.strictEqual(L.translateRequest('あ'.repeat(2001)).error, '2000文字以内にしてください');
+assert.strictEqual(L.translateResult(200, { translated: ' こんにちは ' }).translated, 'こんにちは');
+assert.strictEqual(L.translateResult(200, { translated: '   ' }).error, '翻訳できませんでした');
+assert.strictEqual(L.translateResult(400, { error: '訳す文を入れてください' }).error, '訳す文を入れてください');
+assert.strictEqual(L.translateResult(403, {}).error, 'この操作の権限がありません');
+assert.strictEqual(L.translateResult(404, {}).error, '翻訳の機能がまだ有効になっていません');
+assert.strictEqual(L.translateResult(502, { error: 'xai-secretkeyvalue leak' }).error, '翻訳できませんでした');
+assert.ok(src.includes("cmTranslate('j_note')") || src.includes('cmNoteField(\'j_note\''));
+assert.ok(src.includes('日本語にする') && src.includes('/functions/v1/chamu-translate'));
+assert.ok(src.includes('確認用。保存されるのは上の原文です'));
+assert.ok(src.includes('note: form.note.trim()') && src.includes("support_note: u.present ? (u.support_note || '') : null"));
+assert.ok(!src.includes('XAI_API_KEY'));
+const fn = fs.readFileSync(path.join(root, 'supabase/functions/chamu-translate/index.ts'), 'utf8');
+assert.ok(fn.includes('rpc/chamu_can') && fn.includes('XAI_API_KEY') && fn.includes('grok-4-fast-non-reasoning'));
+assert.ok(fn.includes('https://api.x.ai/v1/chat/completions') && fn.includes('固有名詞') && fn.includes('訳文だけ'));
+assert.ok(!/xai-[A-Za-z0-9]{8,}/.test(fn));
+const toml = fs.readFileSync(path.join(root, 'supabase/config.toml'), 'utf8');
+assert.ok(toml.includes('chamu-translate'));
+assert.ok(!/\[functions\.chamu-translate\][^[]*verify_jwt\s*=\s*false/.test(toml));
 
 console.log('chamu_check ok');

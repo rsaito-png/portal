@@ -1,5 +1,6 @@
 // 茶夢（生活介護）。職員が入れるのは業務日誌だけ。保存すると実績記録票へ自動転記し、署名済みだけ国保連CSVの対象。
 // 請求の計算は rydeen-billing-lib.js のサービス種類22（生活介護）。B型の bp_* は使わない。
+// 自由記述のポルトガル語は「日本語にする」で確認する。訳文は保存せず、原文のまま記録する。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
 const CM_NAV = [['journal', '業務日誌'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
 
@@ -11,8 +12,8 @@ var ChamuLib = (() => {
   const BANDS = ['3時間未満', '3時間以上4時間未満', '4時間以上5時間未満', '5時間以上6時間未満', '6時間以上7時間未満', '7時間以上8時間未満', '8時間以上9時間未満'];
   const DEFAULTS = {
     office_no: '2410202663', office_name: '茶夢', service_type: '22', region_code: '06', unit_price: '10.37',
-    shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '6時間以上7時間未満',
-    default_start: '10:00', default_end: '16:00', ishi_gen: true,
+    shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '4時間以上5時間未満',
+    default_start: '11:00', default_end: '15:00', ishi_gen: true,
   };
   const clip = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
   const time = v => {
@@ -107,6 +108,22 @@ var ChamuLib = (() => {
     });
     return { upsert, del, notes };
   };
+  const TRANSLATE_MAX = 2000;
+  const translateRequest = raw => {
+    const text = String(raw == null ? '' : raw).trim();
+    if (!text) return { error: '訳す文を入れてください' };
+    if (text.length > TRANSLATE_MAX) return { error: '2000文字以内にしてください' };
+    return { body: { text } };
+  };
+  const translateResult = (status, json) => {
+    const translated = json && typeof json.translated === 'string' ? json.translated.trim() : '';
+    if (status >= 200 && status < 300 && translated) return { translated };
+    const err = json && typeof json.error === 'string' ? json.error.trim() : '';
+    if (err && err.length <= 120 && !/xai-|bearer |api[_-]?key|sk-/i.test(err)) return { error: err };
+    if (status === 401 || status === 403) return { error: 'この操作の権限がありません' };
+    if (status === 404) return { error: '翻訳の機能がまだ有効になっていません' };
+    return { error: '翻訳できませんでした' };
+  };
   const tripsOf = t => t === '往復' ? { sog: '両', go: 1, back: 1 } : t === '片道' ? { sog: '往', go: 1, back: 0 } : { sog: 'なし', go: 0, back: 0 };
   const buildBillingInput = (year, month, src) => {
     const settings = settingsOf(src && src.settings);
@@ -168,7 +185,7 @@ var ChamuLib = (() => {
     });
     return { office, users, agg, settings, blocking, warnings, signedCount: signed.length, unsignedCount: inMonth.length - signed.length, preview };
   };
-  return { WEATHER, TRANSPORT, MEAL, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, validateJournal, syncPlan, buildBillingInput };
+  return { WEATHER, TRANSPORT, MEAL, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult };
 })();
 /* /cm-pure */
 
@@ -192,6 +209,11 @@ async function cmGo(fn) { try { await fn(); } catch (e) { cmMsg(e.message || e);
 .cm button.sec{background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c}.cm button.inl{width:auto;padding:8px 14px;margin:2px}
 .cm input[type=checkbox]{width:auto;transform:scale(1.2);margin-right:6px}
 .cm .jr{border:3px solid #1a120c;border-radius:0;padding:10px;margin:8px 0;background:#fff4dc;box-shadow:3px 3px 0 #1a120c;color:#1c140c}
+.cm .cm-lab{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cm .cm-lab label.l{flex:1 1 auto;margin-bottom:0}
+.cm .cm-lab button{width:auto;flex:0 0 auto;margin-top:8px}
+.cm .cm-tr{margin:0 0 8px}.cm .cm-tr .cap{font-size:15px;color:#4e4336;margin:6px 0 4px}
+.cm .cm-tr .ja{background:#fffef8;border:3px solid #1a120c;padding:10px;white-space:pre-wrap;box-shadow:3px 3px 0 #1a120c;font-size:17px;color:#1c140c}
 .cm .ng{background:#fde8e8;border:3px solid #1a120c;border-radius:0;padding:8px 10px;margin:6px 0;white-space:pre-wrap}.cm .okb{background:#e6f4ea;border:3px solid #1a120c;border-radius:0;padding:8px 10px;margin:6px 0}.cm .wn{background:#fff6d6;border:3px solid #1a120c;border-radius:0;padding:8px 10px;margin:6px 0}
 .cm .note{color:#4e4336}.cm img.cm-sg{width:260px;max-width:100%;border:3px solid #1a120c;background:#fff}
 .cm .pad{height:200px;touch-action:none}.cm .pad canvas{width:100%;height:100%;display:block;background:#fff;border:3px solid #1a120c;border-radius:0;touch-action:none}
@@ -267,7 +289,7 @@ async function cmJournal() {
       <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始', (l.start_time || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了', (l.end_time || '').slice(0, 5), 'time')}
         <div><label class="l">送迎</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
         <div><label class="l">食事</label>${cmSel('m_' + k, ChamuLib.MEAL, l.meal || 'あり')}</div>
-        <div style="flex:1 1 100%"><label class="l">支援内容・ご様子</label><textarea id="n_${k}">${cmEsc(l.support_note || '')}</textarea></div></div></div>`;
+        <div style="flex:1 1 100%">${cmNoteField('n_' + k, '支援内容・ご様子', l.support_note || '')}</div></div></div>`;
   };
   cmFrame('journal', `<h3>業務日誌　${cmEsc(date)}</h3><p class="note">職員が入力するのはここだけです。保存すると、出席した日は実績記録票に自動で転記されます。</p>
     <p class="noprint"><button class="sec inl" onclick="CM.st.date='${cmShift(date, -1)}';renderChamu('journal')">＜ 前日</button>
@@ -276,7 +298,7 @@ async function cmJournal() {
     <input type="date" id="j_date" value="${date}" style="width:auto" onchange="CM.st.date=this.value;renderChamu('journal')"></p>
     <div class="card">${cmInp('j_staff', '記入者', (day && day.staff_name) || staff)}
       <div class="row"><div><label class="l">天気</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>${cmInp('j_menu', '献立', (day && day.menu) || '')}</div>
-      <label class="l">全体申し送り</label><textarea id="j_note">${cmEsc((day && day.note) || '')}</textarea></div>
+      ${cmNoteField('j_note', '全体申し送り', (day && day.note) || '')}</div>
     <p class="noprint"><button class="sec inl" onclick="cmBulk()">予定どおり全員を一括入力</button></p>
     ${users.map(card).join('') || '<div class="card">利用者がまだいません。<a href="#chamu/users">利用者</a>から登録してください。</div>'}
     <button onclick="cmSaveJournal()">保存して記録票に転記</button>`);
@@ -284,7 +306,45 @@ async function cmJournal() {
   CM.st.users = users;
   CM.st.defaults = ChamuLib.settingsOf(settings);
 }
+function cmNoteField(id, label, value) {
+  const safe = String(id).replace(/[^A-Za-z0-9_-]/g, '');
+  return `<div class="cm-lab"><label class="l">${cmEsc(label)}</label><button type="button" class="sec inl noprint" id="tr_btn_${safe}" onclick="cmTranslate('${safe}')">日本語にする</button></div><textarea id="${safe}">${cmEsc(value || '')}</textarea><div id="tr_out_${safe}" class="cm-tr noprint"></div>`;
+}
 function cmToggle(id) { const det = document.getElementById('det_' + id); if (det) det.style.display = cmV('p_' + id) === '出席' ? '' : 'none'; }
+async function cmTranslate(id, retried) {
+  if (!/^(j_note|n_[A-Za-z0-9-]+)$/.test(id)) return;
+  const src = document.getElementById(id), box = document.getElementById('tr_out_' + id), btn = document.getElementById('tr_btn_' + id);
+  if (!src || !box) return;
+  const prep = ChamuLib.translateRequest(src.value);
+  if (prep.error) { box.innerHTML = `<div class="ng">${cmEsc(prep.error)}</div>`; return; }
+  const sent = prep.body.text;
+  if (btn) { btn.disabled = true; btn.textContent = '翻訳しています…'; }
+  box.innerHTML = '<div class="note">翻訳しています…</div>';
+  try {
+    let s = {}; try { s = JSON.parse(localStorage.getItem('sess') || '{}'); } catch (e) { s = {}; }
+    if (s.exp && s.exp < Date.now() + 30000 && !retried && typeof refreshSess === 'function') {
+      if (await refreshSess()) { try { s = JSON.parse(localStorage.getItem('sess') || '{}'); } catch (e) { s = {}; } }
+    }
+    let r;
+    try {
+      r = await fetch(C.supabaseUrl + '/functions/v1/chamu-translate', {
+        method: 'POST',
+        headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + (s.token || ''), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sent }),
+      });
+    } catch (e) { throw new Error('翻訳に接続できませんでした'); }
+    if (r.status === 401 && !retried && typeof refreshSess === 'function' && await refreshSess()) return await cmTranslate(id, true);
+    const body = await r.json().catch(() => ({}));
+    const shown = ChamuLib.translateResult(r.status, body);
+    if (shown.error) { box.innerHTML = `<div class="ng">${cmEsc(shown.error)}</div>`; return; }
+    const stale = src.value.trim() !== sent ? '<p class="note">入力が変わっています。必要ならもう一度押してください。</p>' : '';
+    box.innerHTML = `<p class="cap">日本語（確認用。保存されるのは上の原文です）</p><div class="ja">${cmEsc(shown.translated)}</div>${stale}`;
+  } catch (e) {
+    box.innerHTML = `<div class="ng">${cmEsc(e.message || '翻訳に接続できませんでした')}</div>`;
+  } finally {
+    if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = '日本語にする'; }
+  }
+}
 function cmBulk() {
   const d = CM.st.defaults || ChamuLib.DEFAULTS;
   (CM.st.users || []).forEach(u => {
@@ -413,7 +473,7 @@ async function cmBilling() {
   }
   CM.files = files;
   const s = input.settings, blocked = input.blocking.length > 0 || !!err || !files || (files && files.issues.length > 0);
-  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、10:00–16:00、医師未配置減算あり）です。</p>
+  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、11:00–15:00、医師未配置減算あり）です。</p>
     <div class="row">${cmInp('bs_office_no', '事業所番号', s.office_no)}${cmInp('bs_office_name', '事業所名', s.office_name)}
       ${cmInp('bs_region_code', '地域区分コード', s.region_code)}${cmInp('bs_unit_price', '地域区分単価', s.unit_price)}
       ${cmInp('bs_shogu_rate', '処遇改善加算率', s.shogu_rate)}${cmInp('bs_shogu_item', '処遇改善のサービスコード項目', s.shogu_item)}
@@ -446,8 +506,8 @@ async function cmSaveSettings() {
     const row = {
       office_no: office, office_name: cmV('bs_office_name').trim() || '茶夢', service_type: '22', region_code: cmV('bs_region_code').trim() || '06',
       unit_price: cmV('bs_unit_price').trim() || '10.37', shogu_rate: cmV('bs_shogu_rate').trim() || '0.096', shogu_item: cmV('bs_shogu_item').trim() || '5175',
-      capacity_scale: '11-20', standard_band: cmV('bs_band') || ChamuLib.DEFAULTS.standard_band, default_start: ChamuLib.time(cmV('bs_start')) || '10:00',
-      default_end: ChamuLib.time(cmV('bs_end')) || '16:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
+      capacity_scale: '11-20', standard_band: cmV('bs_band') || ChamuLib.DEFAULTS.standard_band, default_start: ChamuLib.time(cmV('bs_start')) || '11:00',
+      default_end: ChamuLib.time(cmV('bs_end')) || '15:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
     };
     const saved = await cmRest('chamu_billing_settings?id=eq.1', { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
     if (!saved || !saved.length) throw new Error('請求設定がありません。supabase/chamu.sql を適用してください');

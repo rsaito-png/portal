@@ -193,7 +193,8 @@ begin
     if exists (select 1 from leo_nikki n where n.day = p_day and public.leo_norm(n.child) = public.leo_norm(r.child)) then
       update leo_nikki n set
         kind = case when n.seed = 'events' and coalesce(n.activity_via, '') <> '手入力' then r.kind else n.kind end,
-        service = coalesce(nullif(btrim(n.service), ''), svc),
+        -- 種別が分かっていれば、日誌に先に入っていた「放課後等デイサービス」などで上書きする。不明なときは今の文字を残す。
+        service = case when svc in ('児発', '放デイ') then svc else coalesce(nullif(btrim(n.service), ''), svc) end,
         start_time = case when r.kind = '利用' and coalesce(btrim(n.start_time), '') = '' then nullif(btrim(r.start_time), '') else n.start_time end,
         end_time = case when r.kind = '利用' and coalesce(btrim(n.end_time), '') = '' then nullif(btrim(r.end_time), '') else n.end_time end,
         pick_driver = coalesce(nullif(btrim(n.pick_driver), ''), p_driver),

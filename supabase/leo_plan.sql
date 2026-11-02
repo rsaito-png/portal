@@ -21,15 +21,16 @@ create table if not exists public.leo_master (
 alter table public.leo_master enable row level security;
 drop policy if exists lm_read on public.leo_master;
 create policy lm_read on public.leo_master for select to authenticated using (public.my_office() = 'レオ' or public.can_bill());
+-- 型表（kind=kata）はレオ所属の職員も書き換える。管理表・配置表は can_manage のまま。同じ内容は leo_kata_staff.sql
 drop policy if exists lm_write on public.leo_master;
-create policy lm_write on public.leo_master for all to authenticated using (public.can_manage()) with check (public.can_manage());
--- 送迎の配慮（児童ごと：座席・チャイルドシート・引き渡し相手・アレルギー等）。レオ職員が見る、管理側が書く
+create policy lm_write on public.leo_master for all to authenticated using ((public.my_office() = 'レオ' and kind = 'kata') or public.can_manage()) with check ((public.my_office() = 'レオ' and kind = 'kata') or public.can_manage());
+-- 送迎の配慮（児童ごと：座席・チャイルドシート・引き渡し相手・アレルギー等）。レオ職員が見て書く。同じ内容は leo_kata_staff.sql
 create table if not exists public.leo_child_care (
   child text primary key, note text check (char_length(note) <= 1000), updated_by uuid default auth.uid(), updated_at timestamptz not null default now());
 alter table public.leo_child_care enable row level security;
 drop policy if exists lcc_read on public.leo_child_care;
 create policy lcc_read on public.leo_child_care for select to authenticated using (public.my_office() = 'レオ' or public.can_bill());
 drop policy if exists lcc_write on public.leo_child_care;
-create policy lcc_write on public.leo_child_care for all to authenticated using (public.can_manage()) with check (public.can_manage());
+create policy lcc_write on public.leo_child_care for all to authenticated using (public.my_office() = 'レオ' or public.can_manage()) with check (public.my_office() = 'レオ' or public.can_manage());
 -- ヒヤリハットの出どころ（ポータル／LINE）
 alter table public.hiyari add column if not exists source text not null default 'ポータル' check (source in ('ポータル','LINE'));
