@@ -104,6 +104,35 @@ create table if not exists public.chamu_journal_line (
   ))
 );
 
+-- 栄養士向け。摂食の目安と分量は請求（食事提供体制加算）に使わない。再実行できる。
+alter table public.chamu_journal add column if not exists rice_portion text;
+alter table public.chamu_journal add column if not exists egg_count text;
+alter table public.chamu_journal add column if not exists tofu_g text;
+alter table public.chamu_journal add column if not exists meat_note text;
+alter table public.chamu_journal add column if not exists fish_g text;
+alter table public.chamu_journal add column if not exists dairy_note text;
+alter table public.chamu_journal_line add column if not exists intake text;
+alter table public.chamu_journal_line add column if not exists intake_note text;
+
+alter table public.chamu_journal drop constraint if exists chamu_journal_portion;
+alter table public.chamu_journal add constraint chamu_journal_portion check (
+  (rice_portion is null or char_length(rice_portion) <= 80)
+  and (egg_count is null or char_length(egg_count) <= 80)
+  and (tofu_g is null or char_length(tofu_g) <= 80)
+  and (meat_note is null or char_length(meat_note) <= 80)
+  and (fish_g is null or char_length(fish_g) <= 80)
+  and (dairy_note is null or char_length(dairy_note) <= 80)
+);
+alter table public.chamu_journal_line drop constraint if exists chamu_line_intake;
+alter table public.chamu_journal_line add constraint chamu_line_intake check (
+  (meal is distinct from 'あり' and intake is null and intake_note is null)
+  or (meal = 'あり' and (
+    (intake is null and intake_note is null)
+    or (intake in ('100%', '80%', '50%') and intake_note is null)
+    or (intake = 'その他' and (intake_note is null or char_length(intake_note) <= 80))
+  ))
+);
+
 create table if not exists public.chamu_service_records (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.chamu_users(id) on delete restrict,
@@ -185,7 +214,10 @@ revoke all on public.chamu_users, public.chamu_journal, public.chamu_journal_lin
 grant select, insert, update, delete on public.chamu_users, public.chamu_journal, public.chamu_journal_line, public.chamu_service_records to authenticated;
 grant select, update on public.chamu_billing_settings to authenticated;
 
-comment on table public.chamu_journal is '茶夢（生活介護）の業務日誌。1日1行。B型の bp_journal とは別。';
+comment on table public.chamu_journal is '茶夢（生活介護）の業務日誌。1日1行。B型の bp_journal とは別。献立と分量は栄養士向け。';
+comment on column public.chamu_journal.rice_portion is '炊いた後のごはんの分量。半量もその量で書く。請求の食事加算には使わない。';
+comment on column public.chamu_journal_line.intake is '摂食の目安。100%・80%・50%・その他、または空。未記入でも保存できる。請求には使わない。';
+comment on column public.chamu_journal_line.meal is '食事提供の有無。ありの日だけ、対象者の食事提供体制加算に数える。';
 comment on table public.chamu_service_records is '茶夢のサービス提供実績。日誌の保存時にスクリプトが転記する。署名済みだけ国保連CSVの対象。';
 comment on table public.chamu_billing_settings is '茶夢の事業所マスタ。サービス種類22、事業所番号2410202663、定員11-20、医師未配置減算あり。';
 

@@ -12,7 +12,7 @@ const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
-  const br = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--font-render-hinting=none'] });
+  const br = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: 'new', protocolTimeout: 60000, args: ['--no-sandbox', '--font-render-hinting=none'] });
   const state = { journalPosts: 0, linePosts: 0, recordPosts: 0, journal: null, lines: [], records: [], fail: '' };
   const user = { id: 'u1', name: '見本 太郎', active: true, sort: 1, kana: 'ミホン', support_level: 4, recipient_no: '0000000001', city_no: '242012', meal_addon: true, transport_class: '2' };
   const profile = [{ nikki_name: '見本職員', duty: '現場支援員', office: '茶夢', nicchu: false, is_chair: false, user_id: '11111111-1111-1111-1111-111111111111' }];
@@ -54,7 +54,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
           if (state.fail === 'deny') return json({ message: 'permission denied' }, 403);
           state.journalPosts++;
           const body = JSON.parse(req.postData() || '{}');
-          state.journal = { id: 'j1', journal_date: body.journal_date, staff_name: body.staff_name, weather: body.weather, menu: body.menu, note: body.note };
+          state.journal = {
+            id: 'j1', journal_date: body.journal_date, staff_name: body.staff_name, weather: body.weather, menu: body.menu, note: body.note,
+            rice_portion: body.rice_portion || null, egg_count: body.egg_count || null, tofu_g: body.tofu_g || null,
+            meat_note: body.meat_note || null, fish_g: body.fish_g || null, dairy_note: body.dairy_note || null,
+          };
           return json([state.journal]);
         }
         return json(journalRows());
@@ -117,6 +121,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const saved = await dialogText(desk);
   ok(state.journalPosts === postsBefore + 1, 'double click saves once (' + state.journalPosts + ')');
   ok(state.linePosts >= 1 && state.recordPosts >= 1, 'journal line and service record posted');
+  ok(state.lines[0] && state.lines[0].meal === 'あり' && state.lines[0].intake == null, 'meal is posted, intake can be blank');
+  ok(state.records[0] && state.records[0].meal === 'あり' && !('intake' in state.records[0]), 'service record gets meal and not intake');
   ok(saved.role === 'dialog' && saved.modal === 'true', 'dialog is modal');
   ok(saved.cls.includes('ok') && saved.title === '保存しました', 'success title: ' + saved.title);
   ok(saved.body === '記録票に転記しました。', 'success body: ' + JSON.stringify(saved.body));
@@ -181,6 +187,47 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(narrow.title === '保存しました' && narrow.body.includes('記録票に転記しました'), 'phone success');
   ok(narrow.box.top >= -1 && narrow.box.bottom <= narrow.vh + 1 && narrow.box.left >= -1 && narrow.box.right <= narrow.vw + 1 && narrow.box.w <= narrow.vw, 'phone dialog fits ' + JSON.stringify(narrow.box));
   await phone.screenshot({ path: path.join(OUT, 'chamu-save-ok-phone.png') });
+
+  const meal = await mkPage(1100, 900);
+  await openJournal(meal);
+  await fillPresent(meal, true);
+  await meal.select('#i_u1', '80%');
+  await meal.$eval('#j_menu', el => { el.value = 'カレー'; });
+  await meal.$eval('#j_rice', el => { el.value = '半量75g'; });
+  await meal.$eval('#j_egg', el => { el.value = '1個'; });
+  await meal.$eval('#j_meat', el => { el.value = '豚肉50g'; });
+  await meal.click('[data-cm-save]');
+  const mealDlg = await dialogText(meal);
+  ok(mealDlg.title === '保存しました' && mealDlg.body.includes('記録票に転記しました'), 'portion save still confirms');
+  ok(!/見本 太郎|0000000001|給与/.test(mealDlg.title + mealDlg.body), 'save dialog still hides personal fields');
+  const line = state.lines.find(l => l.user_id === 'u1');
+  ok(line && line.meal === 'あり' && line.intake === '80%' && line.intake_note == null, 'intake stored on the journal line');
+  ok(state.journal.menu === 'カレー' && state.journal.rice_portion === '半量75g' && state.journal.egg_count === '1個' && state.journal.meat_note === '豚肉50g', 'portion memo stored');
+  ok(state.records.some(r => r.meal === 'あり' && !('intake' in r)), 'addon record stays meal only');
+  await meal.click('#cm_dlg_ok');
+  await meal.evaluate(() => document.getElementById('j_menu').scrollIntoView({ block: 'center' }));
+  await meal.screenshot({ path: path.join(OUT, 'chamu-journal-menu.png') });
+  await meal.evaluate(() => document.getElementById('i_u1').scrollIntoView({ block: 'center' }));
+  await meal.screenshot({ path: path.join(OUT, 'chamu-journal-meal.png') });
+
+  await meal.goto(BASE + 'index.html#chamu/kondate', { waitUntil: 'domcontentloaded' });
+  await meal.waitForSelector('.cm-rep', { timeout: 15000 });
+  const reportText = await meal.$eval('#view', el => el.innerText);
+  ok(reportText.includes('栄養士向け献立報告'), 'report title');
+  ok(reportText.includes('カレー') && reportText.includes('半量75g') && reportText.includes('80%'), 'menu, portion, intake on the report');
+  ok(reportText.includes('makinakahigashi@gmail.com') && reportText.includes('中東真紀'), 'dietitian address is shown for confirmation');
+  ok(!reportText.includes('見本 太郎') && !reportText.includes('0000000001'), 'report hides the service user');
+  ok(reportText.includes('ここから直接は送りません'), 'portal does not send the mail');
+  const href = await meal.$eval('a[href*="mail.google.com"]', el => el.getAttribute('href'));
+  ok(href.includes('view=cm') && !href.includes('/send'), 'gmail link is a draft: ' + href.slice(0, 80));
+  await meal.evaluate(() => document.querySelector('.cm-rep').scrollIntoView({ block: 'center' }));
+  await meal.screenshot({ path: path.join(OUT, 'chamu-kondate-table.png') });
+  await meal.evaluate(() => document.querySelector('pre.cm-mail').scrollIntoView({ block: 'center' }));
+  await meal.screenshot({ path: path.join(OUT, 'chamu-kondate-mail.png') });
+
+  await meal.goto(BASE + 'index.html#chamu/haichi', { waitUntil: 'domcontentloaded' });
+  await meal.waitForFunction(() => document.body.innerText.includes('職員配置表'));
+  ok((await meal.$eval('#view', el => el.innerText)).includes('職員配置'), 'staff shift page still opens');
 
   await br.close();
   if (fails) { console.log('FAILED ' + fails); process.exit(1); }

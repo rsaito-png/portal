@@ -1,9 +1,10 @@
 // 茶夢（生活介護）。職員が入れるのは業務日誌だけ。保存すると実績記録票へ自動転記し、署名済みだけ国保連CSVの対象。
 // 請求の計算は rydeen-billing-lib.js のサービス種類22（生活介護）。B型の bp_* は使わない。
+// 食事のあり／なしだけを実績と食事提供体制加算へ載せる。摂食の目安と分量は栄養士向けで、請求には入れない。
 // 自由記述のポルトガル語は「日本語にする」で確認する。訳文は保存せず、原文のまま記録する。
-// 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表は使わない。
+// 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表も献立シートも使わない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
-const CM_NAV = [['journal', '業務日誌'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
+const CM_NAV = [['journal', '業務日誌'], ['kondate', '献立報告'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
 const CM_SHIFT_Q = 'chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort&order=sort.asc,staff_name.asc';
 
 /* cm-pure */
@@ -11,6 +12,17 @@ var ChamuLib = (() => {
   const WEATHER = ['晴れ', 'くもり', '雨', '雪'];
   const TRANSPORT = ['往復', '片道', 'なし'];
   const MEAL = ['あり', 'なし'];
+  const INTAKE = ['100%', '80%', '50%', 'その他'];
+  const PORTION_MAX = 80;
+  const PORTION_FIELDS = [
+    ['rice_portion', 'ごはん（炊いた後）'],
+    ['egg_count', '卵'],
+    ['tofu_g', '豆腐'],
+    ['meat_note', '肉'],
+    ['fish_g', '魚'],
+    ['dairy_note', '牛乳・乳製品'],
+  ];
+  const textOf = s => String(s == null ? '' : s).trim();
   const BANDS = ['3時間未満', '3時間以上4時間未満', '4時間以上5時間未満', '5時間以上6時間未満', '6時間以上7時間未満', '7時間以上8時間未満', '8時間以上9時間未満'];
   const DEFAULTS = {
     office_no: '2410202663', office_name: '茶夢', service_type: '22', region_code: '06', unit_price: '10.37',
@@ -59,12 +71,29 @@ var ChamuLib = (() => {
     const [y, m] = String(ym).split('-').map(Number);
     return String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0');
   };
+  // 摂食は食事ありのときだけ。空欄可。80% などを請求の単位にはしない。
+  const prepareIntake = line => {
+    if (!line || line.meal !== 'あり') return { intake: null, intake_note: null };
+    const intake = textOf(line.intake);
+    if (!intake) return { intake: null, intake_note: null };
+    if (INTAKE.indexOf(intake) < 0) return { intake, intake_note: textOf(line.intake_note) || null, bad: 'choice' };
+    if (intake !== 'その他') return { intake, intake_note: null };
+    const note = textOf(line.intake_note);
+    if (note.length > PORTION_MAX) return { intake, intake_note: note, bad: 'note' };
+    return { intake, intake_note: note || null };
+  };
   const prepareLine = (line, defaults) => {
     const d = defaults || DEFAULTS;
-    if (!line || !line.present) return { present: false, start_time: null, end_time: null, transport: null, meal: null, support_note: null, filled: false };
+    if (!line || !line.present) return { present: false, start_time: null, end_time: null, transport: null, meal: null, intake: null, intake_note: null, support_note: null, filled: false };
     let start = time(line.start_time), end = time(line.end_time), filled = false;
     if (!start || !end) { filled = true; start = start || time(d.default_start) || DEFAULTS.default_start; end = end || time(d.default_end) || DEFAULTS.default_end; }
-    return { present: true, start_time: start, end_time: end, transport: line.transport, meal: line.meal, support_note: clip(line.support_note, 2000), filled };
+    const eat = prepareIntake(line);
+    return { present: true, start_time: start, end_time: end, transport: line.transport, meal: line.meal, intake: eat.intake, intake_note: eat.intake_note, support_note: clip(line.support_note, 2000), filled };
+  };
+  const prepareHead = form => {
+    const head = { menu: clip(form && form.menu, 500) || null };
+    PORTION_FIELDS.forEach(([k]) => { head[k] = clip(form && form[k], PORTION_MAX) || null; });
+    return head;
   };
   const validateJournal = (form, defaults) => {
     const err = [];
@@ -74,6 +103,9 @@ var ChamuLib = (() => {
     if (form && form.weather && WEATHER.indexOf(form.weather) < 0) err.push('天気が正しくありません');
     if (form && clip(form.menu, 10000).length > 500) err.push('献立は500文字以内にしてください');
     if (form && clip(form.note, 10000).length > 2000) err.push('全体申し送りは2000文字以内にしてください');
+    PORTION_FIELDS.forEach(([k, label]) => {
+      if (form && textOf(form[k]).length > PORTION_MAX) err.push(label + 'は80文字以内にしてください');
+    });
     (form && form.users || []).forEach(u => {
       if (!u) return;
       const n = (u.name || '利用者') + 'さん: ';
@@ -85,6 +117,9 @@ var ChamuLib = (() => {
       else if (b <= a) err.push(n + '終了は開始より後にしてください');
       if (TRANSPORT.indexOf(u.transport) < 0) err.push(n + '送迎を選んでください');
       if (MEAL.indexOf(u.meal) < 0) err.push(n + '食事を選んでください');
+      const eat = prepareIntake(u);
+      if (eat.bad === 'choice') err.push(n + '摂食量は 100%・80%・50%・その他 から選ぶか、空欄にしてください');
+      if (eat.bad === 'note') err.push(n + '摂食のメモは80文字以内にしてください');
       if (clip(u.support_note, 10000).length > 2000) err.push(n + '支援内容は2000文字以内にしてください');
     });
     return err;
@@ -276,7 +311,132 @@ var ChamuLib = (() => {
     });
     return issues;
   };
-  return { WEATHER, TRANSPORT, MEAL, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues };
+  // 栄養士への月次。記号は利用者全員の並び順（欠席だけの停止者は列に出さない）。氏名は受け取らない。
+  const userSymbol = i => {
+    let n = i, s = '';
+    do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+    return s;
+  };
+  const portionMemo = row => PORTION_FIELDS.map(([k, label]) => {
+    const v = clip(row && row[k], PORTION_MAX);
+    return v ? label + ' ' + v : '';
+  }).filter(Boolean).join('、');
+  const menuText = row => {
+    const menu = clip(row && row.menu, 500);
+    const memo = portionMemo(row);
+    if (menu && memo) return menu + '／' + memo;
+    return menu || memo;
+  };
+  const intakeText = line => {
+    if (!line || line.meal !== 'あり') return '';
+    const intake = textOf(line.intake);
+    if (INTAKE.indexOf(intake) < 0) return '';
+    if (intake === 'その他') {
+      const note = clip(line.intake_note, PORTION_MAX);
+      return note ? 'その他（' + note + '）' : 'その他';
+    }
+    return intake;
+  };
+  const mealCell = line => {
+    if (!line || line.present === false) return '';
+    return line.meal === 'あり' || line.meal === 'なし' ? line.meal : '';
+  };
+  const menuReport = (ym, days, users) => {
+    const list = (users || []).filter(u => u && u.id != null && String(u.id) !== '').map(u => ({
+      id: String(u.id),
+      sort: Number.isFinite(+u.sort) ? +u.sort : 0,
+      active: u.active !== false,
+    })).sort((a, b) => a.sort - b.sort || a.id.localeCompare(b.id));
+    const symbolOf = {};
+    list.forEach((u, i) => { symbolOf[u.id] = userSymbol(i); });
+    const seen = {};
+    (days || []).forEach(d => ((d && (d.lines || d.chamu_journal_line)) || []).forEach(l => { if (l && l.user_id) seen[String(l.user_id)] = true; }));
+    const columns = list.filter(u => u.active || seen[u.id]).map(u => ({ id: u.id, symbol: symbolOf[u.id] }));
+    const rows = (days || []).map(d => {
+      const lines = (d && (d.lines || d.chamu_journal_line)) || [];
+      const by = {};
+      lines.forEach(l => { if (l && l.user_id) by[String(l.user_id)] = l; });
+      let count = 0;
+      const cells = columns.map(c => {
+        const line = by[c.id];
+        const meal = mealCell(line);
+        if (meal === 'あり') count += 1;
+        return { symbol: c.symbol, meal, intake: intakeText(line) };
+      });
+      return { date: String((d && d.journal_date) || '').slice(0, 10), menu: menuText(d), count, cells };
+    }).filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.date)).sort((a, b) => a.date < b.date ? -1 : 1);
+    return { ym: String(ym || ''), columns, rows, total: rows.reduce((n, r) => n + r.count, 0) };
+  };
+  const csvCell = v => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t]/.test(s)) s = "'" + s;
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const menuReportCsv = (report, bom) => {
+    const cols = (report && report.columns) || [];
+    const head = ['日付', '献立'].concat(cols.flatMap(c => [c.symbol, c.symbol + '摂食'])).concat(['提供数']);
+    const lines = [head.map(csvCell).join(',')];
+    ((report && report.rows) || []).forEach(r => {
+      const rec = [r.date, r.menu];
+      (r.cells || []).forEach(c => { rec.push(c.meal, c.intake); });
+      rec.push(r.count);
+      lines.push(rec.map(csvCell).join(','));
+    });
+    const text = lines.join('\r\n') + '\r\n';
+    return bom === false ? text : '\uFEFF' + text;
+  };
+  const menuReportHtml = report => {
+    const cols = (report && report.columns) || [];
+    const head = '<tr><th>日付</th><th>献立</th>' + cols.map(c => '<th>' + escHtml(c.symbol) + '</th><th>' + escHtml(c.symbol) + '摂食</th>').join('') + '<th>提供数</th></tr>';
+    const body = ((report && report.rows) || []).map(r => '<tr><td>' + escHtml(r.date) + '</td><td class="menu">' + escHtml(r.menu) + '</td>'
+      + (r.cells || []).map(c => '<td>' + escHtml(c.meal) + '</td><td>' + escHtml(c.intake) + '</td>').join('')
+      + '<td>' + escHtml(r.count) + '</td></tr>').join('');
+    const blank = body ? '' : '<tr><td colspan="' + (3 + cols.length * 2) + '">この月の日誌はまだありません。</td></tr>';
+    return '<div class="cm-rep"><table>' + head + blank + body + '</table></div>';
+  };
+  const DIETITIAN = { name: '中東真紀', email: 'makinakahigashi@gmail.com' };
+  const wareki = ym => {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
+    if (!m) return '';
+    const y = +m[1], month = +m[2];
+    if (month < 1 || month > 12) return '';
+    if (y < 2019) return y + '年' + month + '月';
+    const n = y - 2018;
+    return (n === 1 ? '令和元年' : '令和' + n + '年') + month + '月';
+  };
+  // 下書きだけ。Gmail の view=cm は作成画面で、送信APIではない。長い月は本文を案内にし、表はCSV。
+  const menuMail = report => {
+    const src = report || { ym: '', columns: [], rows: [], total: 0 };
+    const when = wareki(src.ym);
+    const subject = '茶夢　献立報告　' + (when || '月次') + '分';
+    const table = menuReportCsv(src, false).replace(/\r\n/g, '\n').trimEnd();
+    const cover = [
+      DIETITIAN.name + ' 様',
+      '',
+      'お世話になっております。生活介護事業所「茶夢」です。',
+      (when || '今月') + '分の献立報告をお送りします。',
+      '',
+      '利用者は記号（A、B、C…）のみで、氏名は書いていません。',
+      '摂食量は現場の目安です（100%・80%・50%・その他）。空欄は未記入です。',
+      'ごはんは炊いた後の分量です。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけを書いています。',
+    ];
+    const tail = ['食事を提供した回数の合計は ' + (src.total || 0) + ' です。', 'どうぞよろしくお願いいたします。', '茶夢'];
+    const body = cover.concat(['', table, '']).concat(tail).join('\n');
+    const shortBody = cover.concat(['', '詳細の表は、CSVを添付しています。', '']).concat(tail).join('\n');
+    const links = text => {
+      const mailto = 'mailto:' + DIETITIAN.email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
+      const q = new URLSearchParams({ view: 'cm', fs: '1', to: DIETITIAN.email, su: subject, body: text });
+      return { mailto, gmail: 'https://mail.google.com/mail/?' + q.toString() };
+    };
+    const fullLinks = links(body);
+    const shortened = fullLinks.gmail.length > 7500;
+    const used = shortened ? links(shortBody) : fullLinks;
+    return {
+      to: DIETITIAN.email, toName: DIETITIAN.name, subject, body, draftBody: shortened ? shortBody : body, shortened,
+      csv: menuReportCsv(src, true), filename: 'chamu-kondate-' + (src.ym || 'month') + '.csv', mailto: used.mailto, gmail: used.gmail,
+    };
+  };
+  return { WEATHER, TRANSPORT, MEAL, INTAKE, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail };
 })();
 /* /cm-pure */
 
@@ -360,6 +520,9 @@ async function cmGo(fn, opt) {
 .cm-dlg .b{margin:0;white-space:pre-wrap;font-size:1em;line-height:1.55;color:#1c140c}
 .cm-dlg button{margin-top:16px}
 .cm .note{color:#4e4336}.cm img.cm-sg{width:260px;max-width:100%;border:3px solid #1a120c;background:#fff}
+.cm .cm-rep{overflow-x:auto}.cm .cm-rep table{border-collapse:collapse;min-width:640px}.cm .cm-rep th,.cm .cm-rep td{border:2px solid #1a120c;padding:4px 6px;font-size:15px;background:#fffef8}
+.cm .cm-rep td.menu{white-space:normal;min-width:16em}.cm pre.cm-mail{white-space:pre-wrap;background:#fffef8;border:3px solid #1a120c;padding:10px;font-size:15px;box-shadow:3px 3px 0 #1a120c}
+.cm a.btn{display:inline-block;background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c;padding:8px 14px;margin:2px;text-decoration:none}
 .cm .pad{height:200px;touch-action:none}.cm .pad canvas{width:100%;height:100%;display:block;background:#fff;border:3px solid #1a120c;border-radius:0;touch-action:none}
 @media print{header,.back,.cm-nav,.noprint,#help,#out,.cm-dlg{display:none!important}body{background:#fff}main{max-width:none;padding:0}}`;
   document.head.appendChild(st);
@@ -379,6 +542,7 @@ async function cmRest(path, opt, retried) {
     let msg = '保存できませんでした（' + r.status + '）';
     try { const j = await r.json(); if (j.message) msg = j.message; } catch (e) { /* 本文なし */ }
     if (r.status === 401 || r.status === 403 || /row-level security|permission denied/i.test(msg)) msg = 'この操作の権限がありません。';
+    if (/intake|rice_portion|egg_count|tofu_g|meat_note|fish_g|dairy_note/.test(msg)) msg += ' supabase/chamu.sql を適用してください。';
     throw new Error(msg);
   }
   if (r.status === 204) return null;
@@ -420,7 +584,7 @@ async function renderChamu(sub) {
   } catch (e) { return cmShow(cmBack() + `<div class="card"><p>${cmEsc(e.message || e)}</p><p class="note">茶夢の表がまだないときは、supabase/chamu.sql を適用してください。</p></div>`); }
   if (CM.can !== true) return cmShow(cmBack() + '<div class="card"><p>茶夢の記録は、茶夢の職員と、事務・会長が使えます。</p><p class="note">茶夢の職員として使うには、管理者に所属（staff_profiles の office）を「茶夢」にしてもらってください。</p></div>');
   if (sub === 'billing' && CM.bill !== true) return cmFrame('billing', '<div class="card"><p>国保連CSVは、事務・茶夢の管理者・会長だけが作れます。</p></div>');
-  const page = { journal: cmJournal, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
+  const page = { journal: cmJournal, kondate: cmKondate, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
   try { await page(); } catch (e) { cmFrame(sub, `<div class="ng">${cmEsc(e.message || e)}</div>`); }
 }
 
@@ -441,6 +605,9 @@ async function cmJournal() {
       <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始', (l.start_time || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了', (l.end_time || '').slice(0, 5), 'time')}
         <div><label class="l">送迎</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
         <div><label class="l">食事</label>${cmSel('m_' + k, ChamuLib.MEAL, l.meal || 'あり')}</div>
+        <div id="eat_${k}" style="flex:1 1 100%;${(l.meal || 'あり') === 'あり' ? '' : 'display:none'}"><label class="l">摂食（任意）</label>${cmSel('i_' + k, ChamuLib.INTAKE, l.intake || '', '未記入')}
+          <p class="note">ざっくりで大丈夫です（100%・80%・50%・その他）。未記入でも保存できます。</p>
+          <div id="eatn_${k}" style="${l.intake === 'その他' ? '' : 'display:none'}">${cmInp('in_' + k, 'その他の目安（任意）', l.intake_note || '', 'text', 'maxlength="80" placeholder="例: 半分も残した"')}</div></div>
         <div style="flex:1 1 100%">${cmNoteField('n_' + k, '支援内容・ご様子', l.support_note || '')}</div></div></div>`;
   };
   cmFrame('journal', `<h3>業務日誌　${cmEsc(date)}</h3><p class="note">職員が入力するのはここだけです。保存すると、出席した日は実績記録票に自動で転記されます。</p>
@@ -450,12 +617,25 @@ async function cmJournal() {
     <input type="date" id="j_date" value="${date}" style="width:auto" onchange="CM.st.date=this.value;renderChamu('journal')"></p>
     ${shift.error ? '<div class="card"><h4>この日の配置</h4><p class="note">配置表を読めませんでした。supabase/chamu_shift.sql を適用してください。</p></div>' : ChamuLib.dayShiftHtml(date, shift.rows)}
     <div class="card">${cmInp('j_staff', '記入者', (day && day.staff_name) || staff)}
-      <div class="row"><div><label class="l">天気</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>${cmInp('j_menu', '献立', (day && day.menu) || '')}</div>
+      <div><label class="l">天気</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>
+      <label class="l">献立</label><textarea id="j_menu" maxlength="500" placeholder="例: ごはん、味噌汁、豚肉の生姜焼き">${cmEsc((day && day.menu) || '')}</textarea>
+      <p class="note">栄養士への分量です。空欄でも保存できます。ごはんは炊いた後の量（半量も、その量で書いてください）。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけです。</p>
+      <div class="row">${cmInp('j_rice', 'ごはん（炊いた後）', (day && day.rice_portion) || '', 'text', 'maxlength="80" placeholder="例: 150g/人、半量は75g"')}
+        ${cmInp('j_egg', '卵（個数）', (day && day.egg_count) || '', 'text', 'maxlength="80" placeholder="例: 1個"')}
+        ${cmInp('j_tofu', '豆腐（1人分）', (day && day.tofu_g) || '', 'text', 'maxlength="80" placeholder="例: 150g"')}
+        ${cmInp('j_meat', '肉（1人分）', (day && day.meat_note) || '', 'text', 'maxlength="80" placeholder="例: 豚肉50g、ハム1枚、ソーセージ1本"')}
+        ${cmInp('j_fish', '魚（1人分）', (day && day.fish_g) || '', 'text', 'maxlength="80" placeholder="例: 80g"')}
+        ${cmInp('j_dairy', '牛乳・乳製品', (day && day.dairy_note) || '', 'text', 'maxlength="80" placeholder="例: 200g（なければ空欄）"')}</div>
       ${cmNoteField('j_note', '全体申し送り', (day && day.note) || '')}</div>
     <p class="noprint"><button class="sec inl" onclick="cmBulk()">予定どおり全員を一括入力</button></p>
     ${users.map(card).join('') || '<div class="card">利用者がまだいません。<a href="#chamu/users">利用者</a>から登録してください。</div>'}
     <button type="button" data-cm-save onclick="cmSaveJournal()">保存して記録票に転記</button>`);
-  users.forEach(u => { const el = document.getElementById('p_' + u.id); if (el) el.onchange = () => cmToggle(u.id); });
+  users.forEach(u => {
+    const p = document.getElementById('p_' + u.id), m = document.getElementById('m_' + u.id), i = document.getElementById('i_' + u.id);
+    if (p) p.onchange = () => cmToggle(u.id);
+    if (m) m.onchange = () => cmMealToggle(u.id);
+    if (i) i.onchange = () => cmMealToggle(u.id);
+  });
   CM.st.users = users;
   CM.st.defaults = ChamuLib.settingsOf(settings);
 }
@@ -473,7 +653,12 @@ function cmNoteField(id, label, value) {
   const safe = String(id).replace(/[^A-Za-z0-9_-]/g, '');
   return `<div class="cm-lab"><label class="l">${cmEsc(label)}</label><button type="button" class="sec inl noprint" id="tr_btn_${safe}" onclick="cmTranslate('${safe}')">日本語にする</button></div><textarea id="${safe}">${cmEsc(value || '')}</textarea><div id="tr_out_${safe}" class="cm-tr noprint"></div>`;
 }
-function cmToggle(id) { const det = document.getElementById('det_' + id); if (det) det.style.display = cmV('p_' + id) === '出席' ? '' : 'none'; }
+function cmMealToggle(id) {
+  const eat = document.getElementById('eat_' + id), note = document.getElementById('eatn_' + id);
+  if (eat) eat.style.display = cmV('m_' + id) === 'あり' ? '' : 'none';
+  if (note) note.style.display = cmV('i_' + id) === 'その他' ? '' : 'none';
+}
+function cmToggle(id) { const det = document.getElementById('det_' + id); if (det) det.style.display = cmV('p_' + id) === '出席' ? '' : 'none'; cmMealToggle(id); }
 async function cmTranslate(id, retried) {
   if (!/^(j_note|n_[A-Za-z0-9-]+)$/.test(id)) return;
   const src = document.getElementById(id), box = document.getElementById('tr_out_' + id), btn = document.getElementById('tr_btn_' + id);
@@ -518,9 +703,10 @@ function cmBulk() {
 function cmReadJournal(date) {
   return {
     journal_date: date, staff_name: cmV('j_staff'), weather: cmV('j_weather'), menu: cmV('j_menu'), note: cmV('j_note'),
-      users: (CM.st.users || []).map(u => ({
+    rice_portion: cmV('j_rice'), egg_count: cmV('j_egg'), tofu_g: cmV('j_tofu'), meat_note: cmV('j_meat'), fish_g: cmV('j_fish'), dairy_note: cmV('j_dairy'),
+    users: (CM.st.users || []).map(u => ({
       user_id: u.id, name: u.name, present: cmV('p_' + u.id) === '' ? null : cmV('p_' + u.id) === '出席', start_time: cmV('s_' + u.id), end_time: cmV('e_' + u.id),
-      transport: cmV('t_' + u.id), meal: cmV('m_' + u.id), support_note: cmV('n_' + u.id),
+      transport: cmV('t_' + u.id), meal: cmV('m_' + u.id), intake: cmV('i_' + u.id), intake_note: cmV('in_' + u.id), support_note: cmV('n_' + u.id),
     })),
   };
 }
@@ -534,17 +720,22 @@ async function cmSaveJournal() {
       const errs = ChamuLib.validateJournal(form, defaults);
       if (errs.length) throw new Error(errs.join('\n'));
       const prepared = form.users.map(u => ({ user_id: u.user_id, name: u.name, ...ChamuLib.prepareLine(u, defaults) }));
+      const head = ChamuLib.prepareHead(form);
       const dayRows = await cmRest('chamu_journal?on_conflict=journal_date', {
         method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({ journal_date: date, staff_name: form.staff_name.trim(), weather: form.weather || null, menu: form.menu.trim() || null, note: form.note.trim() || null, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({
+          journal_date: date, staff_name: form.staff_name.trim(), weather: form.weather || null, menu: head.menu, note: form.note.trim() || null,
+          rice_portion: head.rice_portion, egg_count: head.egg_count, tofu_g: head.tofu_g, meat_note: head.meat_note, fish_g: head.fish_g, dairy_note: head.dairy_note,
+          updated_at: new Date().toISOString(),
+        }),
       });
       const day = dayRows && dayRows[0];
       if (!day || !day.id) throw new Error('日誌を保存できませんでした。もう一度押してください。');
       if (prepared.length) await cmRest('chamu_journal_line?on_conflict=journal_id,user_id', {
         method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify(prepared.map(u => ({
-          journal_id: day.id, user_id: u.user_id, present: u.present, start_time: u.start_time, end_time: u.end_time,
-          transport: u.transport, meal: u.meal, support_note: u.present ? (u.support_note || '') : null,
+        journal_id: day.id, user_id: u.user_id, present: u.present, start_time: u.start_time, end_time: u.end_time,
+        transport: u.transport, meal: u.meal, intake: u.intake, intake_note: u.intake_note, support_note: u.present ? (u.support_note || '') : null,
         }))),
       });
       const notes = prepared.filter(u => u.filled).map(u => `${u.name}: 時刻空欄→${u.start_time}-${u.end_time}補完`).concat(await cmApplySync(date, prepared, defaults));
@@ -567,6 +758,56 @@ async function cmApplySync(date, prepared, defaults) {
   });
   for (const id of plan.del) await cmRest('chamu_service_records?id=eq.' + id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   return plan.notes.filter(n => n.indexOf('時刻空欄') < 0);
+}
+
+async function cmKondate() {
+  const month = CM.st.kmonth || cmToday().slice(0, 7);
+  const last = ChamuLib.lastDay(month);
+  let users = [], days = [], err = '';
+  try {
+    [users, days] = await Promise.all([
+      cmRest('chamu_users?select=id,sort,active&order=sort.asc,id.asc'),
+      cmRest(`chamu_journal?journal_date=gte.${month}-01&journal_date=lte.${month}-${last}&select=journal_date,menu,rice_portion,egg_count,tofu_g,meat_note,fish_g,dairy_note,chamu_journal_line(user_id,present,meal,intake,intake_note)&order=journal_date.asc`),
+    ]);
+  } catch (e) { err = String((e && e.message) || e); }
+  users = users || []; days = days || [];
+  const report = ChamuLib.menuReport(month, days, users);
+  CM.st.kmonth = month;
+  CM.st.report = report;
+  const mail = ChamuLib.menuMail(report);
+  const drafts = report.rows.length ? `<div class="card"><h4>中東真紀さんへのメール（まだ送っていません）</h4>
+    <p>宛先: ${cmEsc(mail.toName)}（${cmEsc(mail.to)}）<br>件名: ${cmEsc(mail.subject)}</p>
+    <pre class="cm-mail">${cmEsc(mail.body)}</pre>
+    ${mail.shortened ? '<p class="note">本文が長いため、開く下書きは案内文だけです。CSVを添付してください。画面の表と、上の全文が中身です。</p>' : '<p class="note">下書きの本文に表を入れています。CSVも添付できます。</p>'}
+    <p><button type="button" class="sec inl" onclick="cmKondateCsv()">CSVをダウンロード</button>
+      <button type="button" class="sec inl" onclick="cmCopyMail()">本文をコピー</button></p>
+    <p><a class="btn" href="${cmEsc(mail.gmail)}" target="_blank" rel="noopener">Gmailで下書きを開く</a>
+      <a class="btn" href="${cmEsc(mail.mailto)}">メールアプリで下書きを開く</a></p>
+    <p class="note">送信は、開いたメールの画面で内容を確認してから行ってください。ここから直接は送りません。</p></div>` : '<div class="card"><p>この月の日誌はまだありません。下書きは作りません。</p></div>';
+  cmFrame('kondate', `<h3>栄養士向け献立報告</h3>
+    <p class="note">ポータルの日誌が正です。Googleの表には書きません。氏名は出さず、記号だけです。記号は利用者の並び順（Aから）で、並びを変えると記号も変わります。記録のない停止中の人は列に出しません。</p>
+    <p class="note">日誌の「食事＝あり」は、保存すると実績記録票へ転記されます。国保連の食事提供体制加算は、署名済みで、利用者の加算対象の日だけです。摂食量と分量は請求に入れません。</p>
+    <div class="row noprint">${cmInp('k_m', '月', month, 'month')}<div style="align-self:end"><button type="button" class="sec inl" onclick="CM.st.kmonth=cmV('k_m');renderChamu('kondate')">表示</button></div></div>
+    ${err ? `<div class="ng">${cmEsc(err)}<br>supabase/chamu.sql を適用してください。</div>` : ''}
+    <div class="card"><p><b>${cmEsc(month)}</b>　${report.rows.length}日　提供数の合計 ${report.total}</p>
+      ${ChamuLib.menuReportHtml(report)}</div>
+    ${drafts}`);
+}
+function cmKondateCsv() {
+  const mail = ChamuLib.menuMail(CM.st.report || { ym: CM.st.kmonth || '', columns: [], rows: [], total: 0 });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([mail.csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = mail.filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function cmCopyMail() {
+  const text = ChamuLib.menuMail(CM.st.report || {}).body || '';
+  const done = ok => cmMsg(ok ? '本文をコピーしました。下書きに貼れます。' : '本文を選択してコピーしてください。', !!ok);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => done(true)).catch(() => done(false));
+    return;
+  }
+  done(false);
 }
 
 async function cmRecords() {
