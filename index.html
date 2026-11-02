@@ -222,6 +222,9 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 // 事業所画面の本体。o.groups があれば「次にやること＋大ボタン（最大6〜8）」、無ければ従来のタイル一覧
 const visTiles = o => o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()));
 const shortName = (o, n) => (o.short || {})[n] || n;
+// 茶夢・金斗雲はメニューに日本語＋ポルトガル語を併記（o.pt）
+const ptL = (o, n, label) => o && o.pt && o.pt[n] ? `${label === undefined ? n : label}<em class="pt" style="display:block;font-size:.72em;font-style:normal;opacity:.75">${o.pt[n]}</em>` : (label === undefined ? n : label);
+const ptH = (o, ja, pt) => o && o.pt ? `${ja} <span style="font-weight:normal;font-size:.8em;opacity:.75">/ ${pt}</span>` : ja;
 const myDuty = () => DUTY === '管理者' ? '管理者' : DUTY === '児発管' ? '児発管' : ROLE === '事務' ? '事務' : '現場支援員';
 function groupList(o) {
   const vis = visTiles(o), used = new Set(); o.groups.forEach(g => g[2].forEach(n => used.add(n)));
@@ -277,20 +280,20 @@ async function leoHomeStatus() {
 }
 function officeBody(o) {
   if (o.home && o.groups) { setTimeout(leoHomeStatus, 0); if (typeof leoHomeCal === 'function') setTimeout(leoHomeCal, 0); return leoHomeBody(o); }
-  if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(t, o.color)).join('')}</div>`;
+  if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(o.pt ? [t[0], ptL(o, t[1]), ...t.slice(2)] : t, o.color)).join('')}</div>`;
   const vis = visTiles(o);
   const nx = ((o.next || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
-  const next = nx.length ? `<h3 class="nx">次にやること</h3><div class="nxl">${nx.map(t => `<a class="nxc" href="${t[2]}" style="border-left:8px solid ${o.color}"><span>${t[0]}</span><b>${shortName(o, t[1])}</b><small>${t[3]}</small></a>`).join('')}</div>` : '';
+  const next = nx.length ? `<h3 class="nx">${ptH(o, '次にやること', 'Próximas tarefas')}</h3><div class="nxl">${nx.map(t => `<a class="nxc" href="${t[2]}" style="border-left:8px solid ${o.color}"><span>${t[0]}</span><b>${ptL(o, t[1], shortName(o, t[1]))}</b><small>${t[3]}</small></a>`).join('')}</div>` : '';
   const gs = groupList(o);
-  const btns = gs.map(g => g.tiles.length === 1 && g.tiles[0][2] ? `<a class="tile big" href="${g.tiles[0][2]}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`
-    : `<a class="tile big" href="#${o.id}/g${g.k}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${g.label}</a>`).join('');
-  return `${next}<h3 class="nx">メニュー</h3><div class="grid">${btns}</div>`;
+  const btns = gs.map(g => g.tiles.length === 1 && g.tiles[0][2] ? `<a class="tile big" href="${g.tiles[0][2]}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${ptL(o, g.label)}</a>`
+    : `<a class="tile big" href="#${o.id}/g${g.k}" style="border-top:4px solid ${o.color}"><span>${g.icon}</span>${ptL(o, g.label)}</a>`).join('');
+  return `${next}<h3 class="nx">${ptH(o, 'メニュー', 'Menu')}</h3><div class="grid">${btns}</div>`;
 }
 // 大ボタンの先（1階層）。#leo/g0 など
 function groupView(o, k) {
   const g = groupList(o).find(x => String(x.k) === k); if (!g) return false;
   $('view').innerHTML = `<button class="back" onclick="location.hash='${o.id}'">← ${o.name}へ</button>
-    <h3 style="color:${o.color};font-size:20px">${g.icon} ${g.label}</h3><div class="grid">${g.tiles.map(t => tl(t, shortName(o, t[1]), '', o.color)).join('')}</div>`;
+    <h3 style="color:${o.color};font-size:20px">${g.icon} ${ptL(o, g.label)}</h3><div class="grid">${g.tiles.map(t => tl(t, ptL(o, t[1], shortName(o, t[1])), '', o.color)).join('')}</div>`;
   if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
   return true;
 }

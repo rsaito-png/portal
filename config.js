@@ -85,7 +85,9 @@ window.PORTAL_CONFIG = {
       ['📅', '土日スケジュール', 'gl:g23', '金斗雲の土日（居宅介護・日中一時）。別タブで開く', 'main'],
       ['☀️', '支援記録', '#nicchu/log', '日ごとの支援日誌（金斗雲の訪問記録とは別）', 'main'],
       ['🖨️', '実績記録票（印刷）', '#nicchu/jisseki', '第８号様式。紙に印刷して市役所へ郵送', 'main'] ] },
-    { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f', tiles: [
+    { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f',
+      pt: { '業務日誌': 'Diário de trabalho', '職員配置表': 'Escala de funcionários', '勤務実績及び利用者の実績表': 'Registro de trabalho e de usuários', 'サービス提供実績記録票': 'Registro de serviços prestados', '利用者': 'Usuários', '献立報告': 'Relatório do cardápio', 'ヒヤリハット週報': 'Relatório semanal de quase-acidentes', '国保連CSV': 'CSV de cobrança (Kokuhoren)', '個別支援計画': 'Plano de apoio individual', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
+      tiles: [
       ['📓', '業務日誌', '#chamu/journal', '職員が入力するのはここだけ（実績記録票に自動で転記）', 'main'],
       ['👥', '職員配置表', '#chamu/haichi', '曜日ごとの常勤・非常勤（見るだけ）', 'main'],
       ['🗓️', '勤務実績及び利用者の実績表', '#chamu/kinmu', '三重県の様式。配置はレオと共通、利用者数は生活介護'],
@@ -98,6 +100,8 @@ window.PORTAL_CONFIG = {
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227',
+      pt: { '打刻': 'Ponto', '記録記入': 'Preencher registro', 'スケジュール表': 'Escala / agenda', '今月の記録': 'Registros deste mês', '利用者・契約': 'Usuários e contratos', '請求情報': 'Informações de cobrança', 'その他': 'Outros',
+        '出退勤打刻': 'Registrar entrada/saída', '土日スケジュール': 'Agenda de sábado e domingo', '利用契約書・重要事項説明書': 'Contrato e explicação de itens importantes', '居宅介護計画の同意': 'Consentimento do plano de cuidados', 'サービス提供実績記録表': 'Registro de serviços prestados', '記録・署名チェック': 'Verificar registros e assinaturas', '台帳': 'Livro de registros', 'アセスメント・会議録': 'Avaliação e atas de reunião', 'ヒヤリハット週報': 'Relatório semanal de quase-acidentes', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
       // GAS・印刷タイルは外し、ポータル記録中心。請求CSV専用画面(#kintoun/seikyu)は未作成→実績記録表に請求用JSONあり
       groups: [
         ['⏰', '打刻', ['出退勤打刻']],
