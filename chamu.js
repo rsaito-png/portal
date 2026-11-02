@@ -12,8 +12,8 @@ var ChamuLib = (() => {
   const BANDS = ['3時間未満', '3時間以上4時間未満', '4時間以上5時間未満', '5時間以上6時間未満', '6時間以上7時間未満', '7時間以上8時間未満', '8時間以上9時間未満'];
   const DEFAULTS = {
     office_no: '2410202663', office_name: '茶夢', service_type: '22', region_code: '06', unit_price: '10.37',
-    shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '6時間以上7時間未満',
-    default_start: '10:00', default_end: '16:00', ishi_gen: true,
+    shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '4時間以上5時間未満',
+    default_start: '11:00', default_end: '15:00', ishi_gen: true,
   };
   const clip = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
   const time = v => {
@@ -473,7 +473,7 @@ async function cmBilling() {
   }
   CM.files = files;
   const s = input.settings, blocked = input.blocking.length > 0 || !!err || !files || (files && files.issues.length > 0);
-  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、10:00–16:00、医師未配置減算あり）です。</p>
+  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、11:00–15:00、医師未配置減算あり）です。</p>
     <div class="row">${cmInp('bs_office_no', '事業所番号', s.office_no)}${cmInp('bs_office_name', '事業所名', s.office_name)}
       ${cmInp('bs_region_code', '地域区分コード', s.region_code)}${cmInp('bs_unit_price', '地域区分単価', s.unit_price)}
       ${cmInp('bs_shogu_rate', '処遇改善加算率', s.shogu_rate)}${cmInp('bs_shogu_item', '処遇改善のサービスコード項目', s.shogu_item)}
@@ -506,8 +506,8 @@ async function cmSaveSettings() {
     const row = {
       office_no: office, office_name: cmV('bs_office_name').trim() || '茶夢', service_type: '22', region_code: cmV('bs_region_code').trim() || '06',
       unit_price: cmV('bs_unit_price').trim() || '10.37', shogu_rate: cmV('bs_shogu_rate').trim() || '0.096', shogu_item: cmV('bs_shogu_item').trim() || '5175',
-      capacity_scale: '11-20', standard_band: cmV('bs_band') || ChamuLib.DEFAULTS.standard_band, default_start: ChamuLib.time(cmV('bs_start')) || '10:00',
-      default_end: ChamuLib.time(cmV('bs_end')) || '16:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
+      capacity_scale: '11-20', standard_band: cmV('bs_band') || ChamuLib.DEFAULTS.standard_band, default_start: ChamuLib.time(cmV('bs_start')) || '11:00',
+      default_end: ChamuLib.time(cmV('bs_end')) || '15:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
     };
     const saved = await cmRest('chamu_billing_settings?id=eq.1', { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
     if (!saved || !saved.length) throw new Error('請求設定がありません。supabase/chamu.sql を適用してください');

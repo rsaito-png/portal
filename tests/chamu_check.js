@@ -19,6 +19,10 @@ assert.strictEqual(defaults.region_code, '06');
 assert.strictEqual(defaults.unit_price, '10.37');
 assert.strictEqual(defaults.shogu_item, '5175');
 assert.strictEqual(defaults.ishi_gen, true);
+assert.strictEqual(defaults.default_start, '11:00');
+assert.strictEqual(defaults.default_end, '15:00');
+assert.strictEqual(defaults.standard_band, '4時間以上5時間未満');
+assert.strictEqual(L.bandOf('11:00', '15:00'), '4時間以上5時間未満');
 assert.strictEqual(L.bandOf('10:00', '16:00'), '6時間以上7時間未満');
 assert.strictEqual(L.bandOf('10:00', '13:00'), '3時間以上4時間未満');
 assert.strictEqual(L.bandOf('10:00', '12:30'), '3時間未満');
@@ -33,8 +37,8 @@ assert.ok(L.validateJournal(form([baseUser({ end_time: '09:00' })])).some(e => e
 assert.ok(L.validateJournal(form([baseUser()]), defaults).length === 0);
 const blank = L.prepareLine(baseUser({ start_time: '', end_time: '' }), defaults);
 assert.strictEqual(blank.filled, true);
-assert.strictEqual(blank.start_time, '10:00');
-assert.strictEqual(blank.end_time, '16:00');
+assert.strictEqual(blank.start_time, '11:00');
+assert.strictEqual(blank.end_time, '15:00');
 
 const plan1 = L.syncPlan([baseUser()], [], defaults);
 assert.strictEqual(plan1.upsert.length, 1);
@@ -116,7 +120,7 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=20261102tr'));
+assert.ok(html.includes('chamu.js?v=202611021115'));
 assert.ok(html.includes("id === 'chamu' && sub && typeof renderChamu"));
 assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
 assert.ok(!cfg.includes('1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g'));
@@ -127,6 +131,11 @@ assert.ok(src.includes('createSignPad'));
 assert.ok(!src.includes('bp_journal') && !src.includes('bp_service_records'));
 const sql = fs.readFileSync(path.join(root, 'supabase/chamu.sql'), 'utf8');
 assert.ok(sql.includes('chamu_can()') && sql.includes('chamu_can_bill()') && sql.includes('2410202663'));
+assert.ok(sql.includes("default '11:00'") && sql.includes("default '15:00'") && sql.includes("default '4時間以上5時間未満'"));
+assert.ok(sql.includes("values (1, '4時間以上5時間未満', '11:00', '15:00')"));
+assert.ok(!sql.includes("default '10:00'") && !sql.includes("default '16:00'") && !sql.includes("default '6時間以上7時間未満'"));
+assert.ok(src.includes("default_start: '11:00'") && src.includes("default_end: '15:00'") && src.includes('11:00–15:00'));
+assert.ok(!src.includes("'10:00'") && !src.includes("'16:00'") && !src.includes('10:00–16:00'));
 assert.ok(sql.includes("office = '茶夢'") && sql.includes('enable row level security'));
 assert.ok(!sql.includes('日置') && !sql.includes('0000222844'));
 
