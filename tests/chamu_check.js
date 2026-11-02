@@ -120,7 +120,11 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=202611021115'));
+assert.ok(html.includes('chamu.js?v=202611021500'));
+assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
+assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
+assert.strictEqual(L.journalSavedNotice(['  ', '利用者A: 時刻空欄→11:00-15:00補完']).body, '記録票に転記しました。\n利用者A: 時刻空欄→11:00-15:00補完');
+assert.ok(!/給与|受給者証/.test(L.journalSavedNotice(['利用者A: 署名を取り直してください。']).body));
 assert.ok(html.includes("id === 'chamu' && sub && typeof renderChamu"));
 assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
 assert.ok(!cfg.includes('1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g'));
@@ -154,6 +158,12 @@ assert.ok(src.includes("cmTranslate('j_note')") || src.includes('cmNoteField(\'j
 assert.ok(src.includes('日本語にする') && src.includes('/functions/v1/chamu-translate'));
 assert.ok(src.includes('確認用。保存されるのは上の原文です'));
 assert.ok(src.includes('note: form.note.trim()') && src.includes("support_note: u.present ? (u.support_note || '') : null"));
+const saveFn = src.slice(src.indexOf('async function cmSaveJournal'), src.indexOf('async function cmApplySync'));
+assert.ok(saveFn.includes('cmJournal()') && saveFn.indexOf('await cmJournal()') < saveFn.indexOf('cmNotice('));
+assert.ok(saveFn.includes('journalSavedNotice') && saveFn.includes("notice: '保存できませんでした'"));
+assert.ok(saveFn.includes('日誌を保存できませんでした。もう一度押してください。'));
+assert.ok(src.includes('function cmNotice') && src.includes("el.id = 'cm_dlg'") && src.includes('通信できませんでした'));
+assert.ok(src.includes('data-cm-save') && src.includes('保存して記録票に転記'));
 assert.ok(!src.includes('XAI_API_KEY'));
 const fn = fs.readFileSync(path.join(root, 'supabase/functions/chamu-translate/index.ts'), 'utf8');
 assert.ok(fn.includes('rpc/chamu_can') && fn.includes('XAI_API_KEY') && fn.includes('grok-4-fast-non-reasoning'));
