@@ -3,7 +3,7 @@
 // 自由記述のポルトガル語は「日本語にする」で確認する。訳文は保存せず、原文のまま記録する。
 // 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表は使わない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
-const CM_NAV = [['journal', '業務日誌'], ['haichi', '職員配置'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
+const CM_NAV = [['journal', '業務日誌'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
 const CM_SHIFT_Q = 'chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort&order=sort.asc,staff_name.asc';
 
 /* cm-pure */
@@ -408,6 +408,10 @@ const cmInp = (id, label, val, type, extra) => `<div><label class="l">${label}</
 
 async function renderChamu(sub) {
   sub = sub || 'journal';
+  if (sub === 'kinmu' && typeof kmOpen === 'function') {
+    document.body.classList.add('wide-sheet');
+    return kmOpen('chamu');
+  }
   if (typeof DEMO !== 'undefined' && DEMO) return cmShow(cmBack() + '<div class="card"><p>見本モードでは、茶夢の日誌は使えません。ログインしてお使いください。</p></div>');
   cmShow(cmBack() + '<p>読み込み中…</p>');
   try {
@@ -463,7 +467,7 @@ async function cmHaichi() {
   } catch (e) {
     body = '<div class="card"><p>配置表を読めませんでした。</p><p class="note">supabase/chamu_shift.sql を適用してください。</p></div>';
   }
-  cmFrame('haichi', `<h3>職員配置表</h3><p class="note">曜日を見ると、その日に誰がいるかが分かります。日誌の日付にも、同じ曜日の配置を出します。</p>${body}`);
+  cmFrame('haichi', `<h3>職員配置表</h3><p class="note">曜日を見ると、その日に誰がいるかが分かります。日誌の日付にも、同じ曜日の配置を出します。月ごとの三重県様式は <a href="#chamu/kinmu">勤務実績及び利用者の実績表</a> です。</p>${body}`);
 }
 function cmNoteField(id, label, value) {
   const safe = String(id).replace(/[^A-Za-z0-9_-]/g, '');

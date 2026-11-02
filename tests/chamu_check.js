@@ -120,13 +120,14 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=202611021600'));
+assert.ok(html.includes('chamu.js?v=202611021700'));
+assert.ok(html.includes('leo_kinmu.js?v=20261102kinmu'));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
 assert.strictEqual(L.journalSavedNotice(['  ', '利用者A: 時刻空欄→11:00-15:00補完']).body, '記録票に転記しました。\n利用者A: 時刻空欄→11:00-15:00補完');
 assert.ok(!/給与|受給者証/.test(L.journalSavedNotice(['利用者A: 署名を取り直してください。']).body));
 assert.ok(html.includes("id === 'chamu' && sub && typeof renderChamu"));
-assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/haichi") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
+assert.ok(cfg.includes("#chamu/journal") && cfg.includes("#chamu/haichi") && cfg.includes("#chamu/kinmu") && cfg.includes("#chamu/records") && cfg.includes("#chamu/billing") && cfg.includes("#chamu/users"));
 assert.ok(!cfg.includes('1FAIpQLScQvvpN0PxPNc6hUVuSth5OWDPY0wl_dkKgMOF1gpb5a5036g'));
 assert.ok(cfg.includes('#rydeen/journal') && cfg.includes('#rydeen/billing'));
 assert.ok(src.includes('職員が入力するのはここだけ'));
