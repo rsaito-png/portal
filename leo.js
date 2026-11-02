@@ -953,7 +953,7 @@ async function saveNikki() {
 }
 
 async function renderLeoView(name) {
-  document.body.classList.toggle('wide-sheet', name === 'kata' || name === 'master');
+  document.body.classList.toggle('wide-sheet', name === 'kata' || name === 'master' || name === 'kinmu');
   $('view').innerHTML = '<p>読み込み中…</p>';
   await loadDuty();
   try {
