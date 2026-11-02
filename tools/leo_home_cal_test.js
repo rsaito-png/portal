@@ -270,7 +270,7 @@ assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /�
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
 const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, ['出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く', '不具合・修正の依頼']));
 const uncovered = leo.tiles.map(t => t[1]).filter(n => !groupNames.has(n) && !onHome.has(n)).sort();
-assert.strictEqual(uncovered.join('|'), ['公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '受給者証の入力（保護者から）', '職員配置表', '書類', '送迎 型表', '配置表・型表・管理表・送迎の配慮の入力', '日誌の元シート', '実績記録（見るだけ）'].sort().join('|'));
+assert.strictEqual(uncovered.join('|'), ['公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '受給者証の入力（保護者から）', '職員配置表', '書類', '送迎 型表', '配置表・型表・管理表・送迎の配慮の入力', '日誌の元シート', '実績記録（児童ごと）'].sort().join('|'));
 ['出退勤打刻', 'ヒヤリハット', '今日の利用児童', 'LINE報告を書く', '不具合・修正の依頼', '日誌（児童ごと）', '上限額管理', '今日やること（児発管）'].forEach(n => assert.ok(!groupNames.has(n), '毎日やると重ねない: ' + n));
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 assert.ok(!leo.groups[0][2].includes('LINE報告を書く'), 'LINE報告は現場に重ねない');
