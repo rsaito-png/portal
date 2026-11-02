@@ -188,7 +188,7 @@ const draftHtml = () => vm.runInContext('LEO_VIEWS.linedraft()', sandbox);
   const posts = calls.filter(c => c.method !== 'GET');
   assert.ok(posts.some(c => c.method === 'POST' && c.path === 'leo_line_drafts' && c.body.includes('加藤 湊') && c.body.includes(day)));
   assert.ok(posts.some(c => c.method === 'POST' && c.path === 'rpc/leo_activity_from_drafts' && c.body.includes(day)));
-  assert.ok(!posts.some(c => c.path === 'leo_edits'), '日誌の行が無い日は leo_edits に書かない');
+  assert.ok(!posts.some(c => c.path === 'leo_edits'), '活動記録はポータルのRPCへ。Googleの直し依頼には出さない');
   assert.strictEqual(els.ln_x_m.textContent, '保存し、日誌の活動記録へ転記しました。');
 
   installSb({
@@ -197,8 +197,8 @@ const draftHtml = () => vm.runInContext('LEO_VIEWS.linedraft()', sandbox);
   });
   await sandbox.saveLine('児童A', 'ln_x', 9);
   assert.ok(calls.some(c => c.method === 'PATCH' && c.path.includes('leo_line_drafts?id=eq.9')));
-  const edit = calls.find(c => c.method === 'POST' && c.path === 'leo_edits');
-  assert.ok(edit && edit.body.includes('activity') && edit.body.includes('公園で遊んだ。') && edit.body.includes('"row_key":"4"'));
+  assert.ok(calls.some(c => c.method === 'POST' && c.path === 'rpc/leo_activity_from_drafts'));
+  assert.ok(!calls.some(c => c.path === 'leo_edits'), '日誌の行があってもシートへ書き戻さない');
 
   sandbox.DEMO = true;
   const n = calls.length;
@@ -209,8 +209,10 @@ const draftHtml = () => vm.runInContext('LEO_VIEWS.linedraft()', sandbox);
 
   const src = read('leo.js');
   assert.ok(src.includes('rpc/leo_activity_from_drafts'));
-  assert.ok(src.includes("target: 'nikki'"));
-  assert.ok(read('index.html').includes('leo.js?v=20261102line'));
+  assert.ok(src.includes('rpc/leo_record_day'));
+  assert.ok(src.includes('rpc/leo_nikki_apply'));
+  assert.ok(!src.includes("target: 'nikki'"), '活動の書き戻し依頼を出さない');
+  assert.ok(read('index.html').includes('leo.js?v=20261102record'));
 
   console.log('leo_line_kids_test: ok');
 })().catch(e => { console.error(e); process.exit(1); });

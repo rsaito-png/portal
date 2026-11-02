@@ -496,11 +496,12 @@ const LEO_VIEWS = {
   },
   async nikki() {
     PERIOD = 'today';
+    if (!DEMO) await leoRecordDay(today());
     const rows = (await loadNikki()).filter(r => r.kind === '利用');
     let act = [];
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${today()}`); } catch (e) { }
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">直したらすぐ日誌に反映されます（1分ほど）。日誌のほうが先に変わっていたときは反映せず「衝突」になります。食事・おやつは日誌で直接直してください。活動記録はLINE下書きからの自動転記分も表示します。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事・おやつはここでは直しません。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
       rows.map(r => { const a = A[String(r.child || '').replace(/\s/g, '')], actVal = (a && a.text) || r.activity || '';
         return `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
         ${NIKKI_FIELDS.map(([f, l]) => {
@@ -510,9 +511,13 @@ const LEO_VIEWS = {
             ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}">${esc(shown)}</textarea></label>`
             : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}" value="${esc(shown)}"></label>`;
         }).join('')}</div>`; }).join('') +
-      `<button onclick="saveNikki()">直した所を送る</button><div id="saved"></div>`;
+      `<button onclick="saveNikki()">保存して実績へ載せる</button><div id="saved"></div>`;
   },
   async jisseki() {
+    if (!DEMO) {
+      const t = today();
+      try { await sb('rpc/leo_record_span', { method: 'POST', body: JSON.stringify({ p_from: t.slice(0, 8) + '01', p_to: t }) }); } catch (e) { }
+    }
     const rows = DEMO ? DEMO_DATA.jisseki : await sb('leo_jisseki?order=day.desc,child&limit=200');
     let nk = [];
     if (DEMO) nk = DEMO_DATA.nikki;
@@ -527,12 +532,12 @@ const LEO_VIEWS = {
       if (!prev || (n.kind === '利用' && prev.kind !== '利用')) by[k] = n;
     });
     const trip = r => filingTripDrivers(by[DEMO ? r.child : (r.day + r.child)]);
-    return `<h3>実績記録（見るだけ）</h3>${demoNote()}<p class="note">利用料・加算などの請求の項目はここには出しません。迎え・送りの担当は届け出上の名前です。</p>
+    return `<h3>実績記録（見るだけ）</h3>${demoNote()}<p class="note">日誌の出席・欠席から自動で載ります（日付・児童・出席/欠席・開始終了）。国保連の請求は簡易入力に手で打ってください。利用料・加算はここには出しません。迎え・送りの担当は届け出上の名前です。</p>
       <table><tr><th>日付</th><th>児童</th><th>状況</th><th>時間</th><th>迎え</th><th>送り</th></tr>${rows.map(r => {
       const d = trip(r);
       return `<tr><td>${esc(r.day)}</td><td>${esc(r.child)}</td><td>${esc(r.status)}</td><td>${esc(r.start_time)}〜${esc(r.end_time)}</td><td>${esc(d.pick)}</td><td>${esc(d.drop)}</td></tr>`;
     }).join('')}</table>
-      <p class="note">直したいときは日誌側で直すと、夜の転記で実績にも入ります。</p>`;
+      <p class="note">直すのは日誌です。保存すると、この実績に入ります。</p>`;
   },
 };
 
@@ -694,19 +699,31 @@ LEO_VIEWS.home = async function () {
     `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、表の入力・送迎の配慮は <a href="#leo/master">入力画面</a>、児童ごとの受給者証・送迎・連絡先は <a href="#leo/userinfo">利用者情報</a> から。</p>`;
 };
 
+async function leoRecordDay(day) {
+  if (typeof DEMO !== 'undefined' && DEMO) return null;
+  if (!day) return null;
+  try { return await sb('rpc/leo_record_day', { method: 'POST', body: JSON.stringify({ p_day: day }) }); }
+  catch (e) { return null; }
+}
 async function saveNikki() {
-  const ch = [];
+  const by = {};
+  let n = 0;
   for (const i of document.querySelectorAll('.rec input, .rec textarea')) {
     const edit = nikkiEditValue(i.dataset.f, i.dataset.old, i.value);
     if (!edit) continue;
-    ch.push({ target: 'nikki', day: today(), row_key: i.dataset.row, field: i.dataset.f, old_value: edit.old_value, new_value: edit.new_value });
+    (by[i.dataset.row] || (by[i.dataset.row] = {}))[i.dataset.f] = edit.new_value;
     i.dataset.old = edit.new_value;
+    n += 1;
   }
-  if (!ch.length) { $('saved').textContent = '変更はありません。'; return; }
-  if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${ch.length}件の修正）。`; return; }
-  try { await sb('leo_edits', { method: 'POST', body: JSON.stringify(ch), headers: { Prefer: 'return=minimal' } });
-    $('saved').textContent = `${ch.length}件を送りました。1分ほどで日誌に反映されます。`; }
-  catch (e) { $('saved').textContent = e.message; }
+  const rows = Object.entries(by);
+  if (!rows.length) { $('saved').textContent = '変更はありません。'; return; }
+  if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${n}件の修正）。`; return; }
+  try {
+    for (const [row, fields] of rows) {
+      await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: today(), p_row: Number(row), p_fields: fields }) });
+    }
+    $('saved').textContent = `${rows.length}人分を日誌に保存し、実績へ転記しました。`;
+  } catch (e) { $('saved').textContent = e.message; }
 }
 
 async function renderLeoView(name) {
@@ -1668,14 +1685,6 @@ async function saveLine(child, id, did) {
     if (did) await sb(`leo_line_drafts?id=eq.${did}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ body, updated_at: new Date().toISOString() }) });
     else await sb('leo_line_drafts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ day: LINE_DAY, child, body, author_name: name }) });
     await sb('rpc/leo_activity_from_drafts', { method: 'POST', body: JSON.stringify({ p_day: LINE_DAY }) });
-    try {
-      const [nk, ac] = await Promise.all([
-        sb(`leo_nikki?day=eq.${LINE_DAY}&child=eq.${encodeURIComponent(child)}&kind=eq.利用&select=row_no,activity`),
-        sb(`leo_activity?day=eq.${LINE_DAY}&child=eq.${encodeURIComponent(child)}&select=text`)]);
-      const row = nk[0], text = (ac[0] && ac[0].text || '').trim();
-      if (row && text && !String(row.activity || '').trim())
-        await sb('leo_edits', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify([{ target: 'nikki', day: LINE_DAY, row_key: String(row.row_no), field: 'activity', old_value: row.activity || '', new_value: text.slice(0, 4000) }]) });
-    } catch (e) { }
     m.textContent = '保存し、日誌の活動記録へ転記しました。'; } catch (e) { m.textContent = e.message; }
 }
 async function copyLine(id, child, did) {
@@ -1690,6 +1699,7 @@ LEO_VIEWS.diary = async function () {
   let rows, drafts, act = [];
   if (DEMO) ({ rows, drafts } = DIA_DEMO);
   else {
+    await leoRecordDay(DIA_DAY);
     const [n, d, a] = await Promise.all([
       sb(`leo_nikki?day=eq.${DIA_DAY}&kind=in.(利用,欠席)&order=row_no`),
       sb(`leo_diary_draft?day=eq.${DIA_DAY}`).catch(() => null),
@@ -1703,7 +1713,7 @@ LEO_VIEWS.diary = async function () {
   const idOf = k => 'dr_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
   return `<h3>日誌（児童ごと）</h3>${demoNote()}
     <p class="ptabs"><button onclick="DIA_DAY=addDays(DIA_DAY,-1);renderLeoView('diary')">← 前の日</button> <b>${fmtDay(DIA_DAY)}</b> <button onclick="DIA_DAY=addDays(DIA_DAY,1);renderLeoView('diary')">次の日 →</button></p>
-    <p class="note">活動記録は、Google日誌の内容に加え、LINE下書きから自動転記された分も表示します。下の「下書き」欄への保存だけでは日誌には入りません（トップの「LINEの下書き」から保存してください）。迎え・送りの名前は届け出上の担当です。</p>
+    <p class="note">予定の利用児童を日誌に出します。LINE報告を保存すると、活動記録がここに入ります（である調のボット文があればそれを使い、無ければ補います）。下書きを保存しても活動記録に入ります。出席・欠席はサービス提供実績へ自動で載ります。国保連は簡易入力への手打ちです。迎え・送りの名前は届け出上の担当です。</p>
     ${noTable ? '<p style="color:#c00">下書きの保存場所がまだありません（管理者が準備中です）。</p>' : ''}
     ${rows.map(r => { const k = r.child, d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
       return `<details class="card" ${d ? '' : 'open'} style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
@@ -1718,7 +1728,8 @@ async function saveDiary(child, id) {
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try { const author = await myName();
     await sb('leo_diary_draft?on_conflict=child,day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child, day: DIA_DAY, body, author, updated_at: new Date().toISOString() }) });
-    m.textContent = '保存しました。'; } catch (e) { m.textContent = e.message; }
+    await sb('rpc/leo_activity_from_drafts', { method: 'POST', body: JSON.stringify({ p_day: DIA_DAY }) });
+    m.textContent = '保存し、日誌の活動記録へ転記しました。'; } catch (e) { m.textContent = e.message; }
 }
 
 // ===== LINEの下書き（トップのタブ）：利用児童ごとに報告文を書く → leo_line_drafts ＋ 日誌の活動記録（leo_activity）へ自動転記 =====
@@ -1782,15 +1793,6 @@ async function ldSave(child, id, did) {
     // 旧画面・日誌（児童ごと）と共有するため diary_draft にも残す（無くても転記は進む）
     try { await sb('leo_diary_draft?on_conflict=child,day', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child, day: LD_DAY, body, author, updated_at: new Date().toISOString() }) }); } catch (e) { }
     await sb('rpc/leo_activity_from_drafts', { method: 'POST', body: JSON.stringify({ p_day: LD_DAY }) });
-    // Google日誌のQ列が空なら、直し依頼として活動記録を送る（1分ほどで反映）
-    try {
-      const [nk, ac] = await Promise.all([
-        sb(`leo_nikki?day=eq.${LD_DAY}&child=eq.${encodeURIComponent(child)}&kind=eq.利用&select=row_no,activity`),
-        sb(`leo_activity?day=eq.${LD_DAY}&child=eq.${encodeURIComponent(child)}&select=text`)]);
-      const row = nk[0], text = (ac[0] && ac[0].text || '').trim();
-      if (row && text && !String(row.activity || '').trim())
-        await sb('leo_edits', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify([{ target: 'nikki', day: LD_DAY, row_key: String(row.row_no), field: 'activity', old_value: row.activity || '', new_value: text.slice(0, 4000) }]) });
-    } catch (e) { }
     m.style.color = '#080'; m.textContent = '✔ 保存し、日誌の活動記録へ転記しました';
     $(id + '_s').textContent = '✅ 書いた';
     const aa = $(id + '_a'); if (aa) aa.textContent = '／日誌 自動（簡易）';
