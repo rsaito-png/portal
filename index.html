@@ -141,7 +141,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo_driver.js?v=20261026b"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261102snack"></script>
+<script src="leo.js?v=20261102todo"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=20261030kinwrite"></script>
@@ -155,7 +155,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="kin_contract.js?v=202610221354"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
-<script src="report.js?v=202610200935"></script>
+<script src="report.js?v=20261102todo"></script>
 <script src="ht.js?v=20261030px"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
@@ -255,7 +255,7 @@ function leoHomeBody(o) {
   // 不具合・修正の依頼は毎日やる・現場・事務・計画には重ねない。who の下、管理系ルーティンの前に単独で出す。
   const fix = vis.filter(t => t[1] === '不具合・修正の依頼').map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('');
   const fixRow = fix ? `<div class="grid">${fix}</div>` : '';
-  return `<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
+  return `<div id="my_todo"></div><div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#dakoku', '⏰', '出退勤打刻', '', '')}
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
@@ -279,7 +279,7 @@ async function leoHomeStatus() {
   } catch (e) { }
 }
 function officeBody(o) {
-  if (o.home && o.groups) { setTimeout(leoHomeStatus, 0); if (typeof leoHomeCal === 'function') setTimeout(leoHomeCal, 0); return leoHomeBody(o); }
+  if (o.home && o.groups) { setTimeout(leoHomeStatus, 0); if (typeof myTodoBox === 'function') setTimeout(myTodoBox, 0); if (typeof leoHomeCal === 'function') setTimeout(leoHomeCal, 0); return leoHomeBody(o); }
   if (!o.groups) return `<div class="grid">${visTiles(o).map(t => tileHtml(o.pt ? [t[0], ptL(o, t[1]), ...t.slice(2)] : t, o.color)).join('')}</div>`;
   const vis = visTiles(o);
   const nx = ((o.next || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);

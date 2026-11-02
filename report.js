@@ -20,7 +20,7 @@ async function renderReport() {
       <p>または1行でOK：<textarea id="sr_b" rows="3" maxlength="2000" style="width:100%;font-size:16px" placeholder="今日やったこと">${esc(t && !t.no_problem ? t.body || '' : '')}</textarea></p>
       <p>困りごと（あれば）：<textarea id="sr_t" rows="2" maxlength="2000" style="width:100%;font-size:16px">${esc(t?.trouble || '')}</textarea></p>
       <button onclick="srSend(false)" style="font-size:18px;padding:10px 24px">送る</button> <span id="sr_m" class="note"></span></div>
-      <h3>私のToDo（指示）</h3>${todos.length ? todos.map(x => `<div class="card"><b>${esc(x.title)}</b>${x.due ? `<small>　期限 ${esc(x.due)}</small>` : ''}
+      <h3>私のToDo（指示）</h3>${todos.length ? todos.map(x => `<div class="card"><b>${esc(x.title)}</b>${x.link && /^#[\w/-]*$/.test(x.link) ? ` <a href="${x.link}">→ 開いて直す</a>` : ''}${x.due ? `<small>　期限 ${esc(x.due)}</small>` : ''}
         <p><select id="st_${x.id}" onchange="srTodo(${x.id})">${Object.entries(srST).map(([k, v]) => `<option value="${k}"${k === x.status ? ' selected' : ''}>${v}</option>`).join('')}</select>
         <input id="sn_${x.id}" maxlength="1000" placeholder="一言（任意）" value="${esc(x.note || '')}" style="width:60%" onchange="srTodo(${x.id})"> <span id="sm_${x.id}" class="note"></span></p></div>`).join('') : '<p>いまの指示はありません。</p>'}
       <h3>最近の注進</h3>${reps.map(r => `<p>${esc(r.day)}　${r.no_problem ? '問題なし' : esc(r.body || '')}${r.trouble ? '　⚠️' + esc(r.trouble) : ''}</p>`).join('') || '<p>まだありません。</p>'}`;
@@ -70,5 +70,14 @@ async function todoBadge() {
   if (DEMO) return;
   try { const me = srMe(), t = await sb(`staff_todo?assignee=eq.${me}&status=eq.open&select=id`);
     const a = document.querySelector('a[href="#report"]'); if (a && t.length && !a.querySelector('.badge')) a.insertAdjacentHTML('afterbegin', `<span class="badge">新しい指示 ${t.length}</span>`);
+  } catch (e) { }
+}
+
+// レオのホームの上に「私への依頼」（自分宛ての未完了）を出す
+async function myTodoBox() {
+  const el = document.getElementById('my_todo'); if (!el || DEMO || typeof sb !== 'function') return;
+  try { const t = await sb(`staff_todo?assignee=eq.${srMe()}&status=neq.done&order=due.asc.nullslast,created_at&select=id,title,link,due,status`);
+    el.innerHTML = t.length ? `<h3 class="nx">📌 私への依頼（${t.length}）</h3>` + t.map(x => { const ok = x.link && /^#[\w/-]*$/.test(x.link);
+      return `<a class="card" href="${ok ? x.link : '#report'}" style="display:block;text-decoration:none;color:#222;border-left:6px solid #d33"><b>${esc(x.title)}</b>${x.due ? `<small>　期限 ${esc(x.due)}</small>` : ''}${x.status === 'doing' ? '<small>　やっている</small>' : ''}</a>`; }).join('') + '<p class="note">終わったら <a href="#report">注進</a> の「私のToDo」で「済」にしてください。</p>' : '';
   } catch (e) { }
 }

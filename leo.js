@@ -748,6 +748,29 @@ async function hyCheck(id) {
     renderLeoView('hiyari'); } catch (e) { alert(e.message); }
 }
 
+// 今日やることの1行を、担当者別の依頼（staff_todo）の形にする。source_key で二重に出さない
+let LEO_HOME_TODO = [];
+function leoTodoItem(x) {
+  const href = x[3], title = String(x[2]).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  const kind = (href.match(/^#leo\/(\w+)/) || [])[1] || 'other';
+  let key = 'leo:' + kind + ':open';
+  if (kind === 'plan') key = 'leo:plan:' + title.split('さん　')[0].replace(/[\s　]/g, '');
+  else if (kind === 'kakunin') key = 'leo:kakunin:' + today().slice(0, 7);
+  else if (kind === 'edits') key = 'leo:edits:衝突';
+  return { kind, key, title, link: href };
+}
+async function leoPublishTodos() {
+  const m = document.getElementById('lt_pub');
+  if (DEMO) { if (m) m.textContent = '見本モードなので出しません。'; return; }
+  if (!LEO_HOME_TODO.length) return;
+  try { const r = await sb('rpc/leo_publish_home_todos', { method: 'POST', body: JSON.stringify({ p_items: LEO_HOME_TODO }) });
+    const by = {}; r.forEach(x => { by[x.name] = (by[x.name] || 0) + 1; });
+    const nNew = r.filter(x => x.action === '新規').length;
+    if (m) m.textContent = `${r.length}件（新規 ${nNew}・更新 ${r.length - nNew}）：` + Object.entries(by).map(([k, v]) => `${k} ${v}件`).join('、');
+    setTimeout(() => renderLeoView('home'), 1500);
+  } catch (e) { if (m) m.textContent = e.message; }
+}
+
 // ===== 児発管ホーム：今日やること（一画面に、やることだけ） =====
 LEO_VIEWS.home = async function () {
   const todo = [];
@@ -766,8 +789,12 @@ LEO_VIEWS.home = async function () {
   // 4. 直した所の衝突（日誌に反映できなかったもの）
   try { if (canManage()) { const e = DEMO ? DEMO_DATA.edits : await sb('leo_edits?status=eq.衝突&select=id'); const n = e.filter(x => !x.status || x.status === '衝突').length; if (n) todo.push([1, '🔧', `日誌の直しが反映できなかったもの ${n}件`, '#leo/edits', '日誌を見て、必要ならもう一度直す']); } } catch (e) { }
   todo.sort((a, b) => a[0] - b[0]);
-  return `<h3>今日やること（児発管）</h3>${demoNote()}<p class="note">上から順に片づければ大丈夫です。終わったものは自動で消えます。</p>` +
-    (todo.length ? todo.map(([p, i, t, href, sub]) => `<a class="card rec" href="${href}" style="display:block;text-decoration:none;color:#222;${p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800'}"><span style="font-size:22px">${i}</span> <b>${t}</b><br><small>${sub}</small></a>`).join('')
+  LEO_HOME_TODO = todo.map(leoTodoItem);
+  let sent = {};
+  try { if (!DEMO && canManage()) (await sb('rpc/leo_home_todo_status', { method: 'POST', body: '{}' })).forEach(r => { sent[r.source_key] = r.name; }); } catch (e) { }
+  const pub = canManage() && todo.length ? `<p><button onclick="leoPublishTodos()" ${DEMO ? 'disabled title="見本モードでは出しません"' : ''}>📌 担当者別の依頼にする</button> <span id="lt_pub" class="note">児発管の分は児発管へ、保護者の実績確認は事務（宮本）へ「私への依頼」として出します。同じものは二重に出しません。</span></p>` : '';
+  return `<h3>今日やること（児発管）</h3>${demoNote()}<p class="note">上から順に片づければ大丈夫です。終わったものは自動で消えます。</p>${pub}` +
+    (todo.length ? todo.map(([p, i, t, href, sub], k) => { const who = sent[LEO_HOME_TODO[k].key]; return `<a class="card rec" href="${href}" style="display:block;text-decoration:none;color:#222;${p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800'}"><span style="font-size:22px">${i}</span> <b>${t}</b>${who ? `　<small class="badge">依頼済：${esc(who)}</small>` : ''}<br><small>${sub}</small></a>`; }).join('')
       : '<p>今日やることはありません。</p>') +
     `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、型表と送迎の配慮は <a href="#leo/kata">送迎 型表</a>（現場もここから直せます）、管理表・配置表は <a href="#leo/master">入力画面</a>、児童ごとの受給者証・送迎・連絡先は <a href="#leo/userinfo">利用者情報</a> から。</p>`;
 };
