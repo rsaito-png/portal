@@ -444,16 +444,7 @@ const LEO_VIEWS = {
     }).join('');
   },
   async kata() {
-    const [rows, LEFT] = await Promise.all([sheetRows('kata'), loadLeftIndex()]), tday = today();
-    const active = rows.filter(r => !leftDone(LEFT, r['児童名'], tday));
-    const dows = [...new Set(active.map(r => r['曜日']).filter(Boolean))].sort((a, b) => '月火水木金土日'.indexOf(a) - '月火水木金土日'.indexOf(b));
-    const cell = r => `${esc(r['児童名'])}${leftMark(LEFT, r['児童名'], tday)}`;
-    const leftNames = [...new Set(rows.filter(r => leftDone(LEFT, r['児童名'], tday)).map(r => r['児童名']).filter(Boolean))];
-    return `<h3>送迎 型表（曜日ごと・見るだけ）</h3>${demoNote()}<p class="note">いつもの予定です。その日の変更は日誌・カレンダーが正です。退所した児童は下に分けて表示しています（型表の行は残したまま、保存はしていません）。</p>` + dows.map(w =>
-      `<h4>${w}曜日</h4><div class="sheet-scroll"><table class="kata-view"><tr><th>児童</th><th>迎え</th><th>送り</th></tr>${active.filter(r => r['曜日'] === w).map(r => r['保護者送迎']
-        ? `<tr><td>${cell(r)}</td><td colspan="2">保護者送迎（${esc(r['利用開始'])}〜${esc(r['利用終了'])}）</td></tr>`
-        : `<tr><td>${cell(r)}</td><td>${esc(r['迎え開始'])} ${esc(r['迎え担当'])}<br><small>${esc(r['迎え場所'])}</small></td><td>${esc(r['送り終了'])} ${esc(r['送り担当'])}<br><small>${esc(r['送り場所（空欄なら自宅）'])}</small></td></tr>`).join('')}</table></div>`).join('')
-      + (leftNames.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:bold">退所した児童（${leftNames.length}人）</summary><p class="note">型表には残しています。退所日の翌日以降の利用予定・カレンダー・送迎には出しません。</p><ul>${leftNames.map(n => `<li>${esc(n)}${leftMark(LEFT, n, tday)}</li>`).join('')}</ul></details>` : '');
+    return renderMasterEditor('kata');
   },
   async keikaku() {
     const [rows, LEFT] = await Promise.all([sheetRows('keikaku'), loadLeftIndex()]);
@@ -510,7 +501,7 @@ const LEO_VIEWS = {
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${today()}`); } catch (e) { }
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
     const meals = leoMealByChild(bundle.meals);
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
       leoDayLogHtml(today(), bundle.log, 'nk', bundle.missing) +
       rows.map(r => { const a = A[String(r.child || '').replace(/\s/g, '')], actVal = (a && a.text) || r.activity || '';
         return `<div class="card rec"><b>${esc(r.child)}</b>（${esc(r.service)}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
@@ -722,7 +713,7 @@ LEO_VIEWS.home = async function () {
   return `<h3>今日やること（児発管）</h3>${demoNote()}<p class="note">上から順に片づければ大丈夫です。終わったものは自動で消えます。</p>` +
     (todo.length ? todo.map(([p, i, t, href, sub]) => `<a class="card rec" href="${href}" style="display:block;text-decoration:none;color:#222;${p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800'}"><span style="font-size:22px">${i}</span> <b>${t}</b><br><small>${sub}</small></a>`).join('')
       : '<p>今日やることはありません。</p>') +
-    `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、表の入力・送迎の配慮は <a href="#leo/master">入力画面</a>、児童ごとの受給者証・送迎・連絡先は <a href="#leo/userinfo">利用者情報</a> から。</p>`;
+    `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、型表と送迎の配慮は <a href="#leo/kata">送迎 型表</a>（現場もここから直せます）、管理表・配置表は <a href="#leo/master">入力画面</a>、児童ごとの受給者証・送迎・連絡先は <a href="#leo/userinfo">利用者情報</a> から。</p>`;
 };
 
 async function leoRecordDay(day) {
@@ -915,7 +906,7 @@ async function renderLeoView(name) {
   await loadDuty();
   try {
     $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button>` + await LEO_VIEWS[name]();
-    if (name === 'master') fitMasterSheet();
+    if (name === 'master' || name === 'kata') fitMasterSheet();
   }
   catch (e) { $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button><p>${esc(e.message)}</p>`; }
 }
@@ -1658,8 +1649,9 @@ async function staffMon(name, term, cur) {
   } catch (e) { bad('失敗しました：' + esc(e.message)); }
   finally { if (B) B.disabled = false; }
 }
-// ===== 配置表・型表・管理表の入力（児発管・管理者・事務）＋ 送迎の配慮 =====
+// ===== 型表・送迎の配慮はレオの職員が直す。管理表・配置表は児発管・管理者・事務 =====
 const MASTER_LABEL = { kata: '送迎 型表', keikaku: '個別支援計画 管理表', haichi: '職員配置表', care: '送迎の配慮（児童ごと）' };
+const STAFF_MASTER_LABEL = { kata: '送迎 型表', care: '送迎の配慮（児童ごと）' };
 let MASTER_KIND = 'kata';
 // 型表の画面上の列順だけ。data-c は保存されている列名のまま（迎え時間＝迎え開始、送り時間＝送り終了、送り場所＝送り場所（空欄なら自宅））。ここに無い列は今の順でうしろ。
 const KATA_COL_SLOTS = [
@@ -1685,23 +1677,42 @@ function kataColLabel(c) {
   return c;
 }
 LEO_VIEWS.master = async function () {
-  if (!canManage()) return '<p>この画面は児発管・管理者・事務だけです。</p>';
-  const tabs = '<p class="ptabs">' + Object.entries(MASTER_LABEL).map(([k, l]) => `<button class="${k === MASTER_KIND ? 'on' : ''}" onclick="MASTER_KIND='${k}';renderLeoView('master')">${l}</button>`).join('') + '</p>';
+  return renderMasterEditor('master');
+};
+function masterLabels(view) {
+  return view === 'kata' ? STAFF_MASTER_LABEL : MASTER_LABEL;
+}
+function masterSheetNote(kind, saved) {
+  if (kind === 'kata') {
+    return saved
+      ? 'ポータルに保存した型表が正です。行を足して直し、「保存」できます。その日だけの変更は日誌・カレンダーです。Googleの表へは書き戻しません。'
+      : 'まだポータルに保存していません。下は古いGoogleの写しです。直して「保存」すると、ポータルの型表が正になります（Googleの表は変わりません）。';
+  }
+  return (saved
+    ? 'ポータルで入力した内容です（ポータルの画面はこちらを使います）。'
+    : 'まだポータルで入力していません。下はGoogleの表の写しです。「保存」するとポータルの表になります（Googleの表は変わりません）。');
+}
+async function renderMasterEditor(view) {
+  if (view !== 'kata' && !canManage()) return '<p>この画面は児発管・管理者・事務だけです。</p>';
+  const labels = masterLabels(view);
+  if (!labels[MASTER_KIND]) MASTER_KIND = 'kata';
+  const tabs = '<p class="ptabs">' + Object.entries(labels).map(([k, l]) => `<button class="${k === MASTER_KIND ? 'on' : ''}" onclick="MASTER_KIND='${k}';renderLeoView('${view}')">${l}</button>`).join('') + '</p>';
   if (MASTER_KIND === 'care') {
     const [kids, cc, LEFT] = await Promise.all([[...new Set((await sheetRows('kata')).map(r => r['児童名']).filter(Boolean))], DEMO ? [{ child: '児童A', note: '（見本）助手席の後ろ。降車時は母へ直接引き渡し。' }] : sb('leo_child_care'), loadLeftIndex()]);
     const C2 = Object.fromEntries(cc.map(x => [x.child, x.note])), tday = today();
-    return `<h3>送迎の配慮</h3>${demoNote()}${tabs}<p class="note">座席・チャイルドシート・引き渡す相手・酔いやすさ・アレルギーなど。送迎画面で運転手に出ます。退所の印は表示だけです（ここを保存しても型表は変わりません）。</p>
+    return `<h3>送迎の配慮</h3>${demoNote()}${tabs}<p class="note">座席・チャイルドシート・引き渡す相手・酔いやすさ・アレルギーなど。送迎画面で運転手に出ます。レオの職員が直せます。退所の印は表示だけです（ここを保存しても型表は変わりません）。</p>
       ${kids.map(k => `<label>${esc(k)}${leftDone(LEFT, k, tday) ? '（退所）' : leftOnOf(LEFT, k) ? '（退所予定）' : ''}<input class="care" data-c="${esc(k)}" value="${esc(C2[k] || '')}"></label>`).join('')}<button onclick="saveCare()">保存</button><div id="ms_msg"></div>`;
   }
   const own = DEMO ? [] : await sb(`leo_master?kind=eq.${MASTER_KIND}&order=row_no`), g = DEMO ? DEMO_DATA[MASTER_KIND] : (await sb(`leo_sheet?kind=eq.${MASTER_KIND}&order=row_no`)).map(r => r.data);
   const rows = own.length ? own.map(r => r.data) : g;
   let cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
   if (MASTER_KIND === 'kata') cols = orderKataCols(cols);
-  return `<h3>${MASTER_LABEL[MASTER_KIND]}の入力</h3>${demoNote()}${tabs}
-    <p class="note">${own.length ? 'ポータルで入力した内容です（ポータルの画面はこちらを使います）。' : 'まだポータルで入力していません。下はGoogleの表の写しです。「保存」するとポータルの表になります（Googleの表は変わりません）。'}11/1まではGoogleの表も今まで通り使ってください。文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
+  const title = MASTER_KIND === 'kata' ? '送迎 型表' : `${labels[MASTER_KIND]}の入力`;
+  return `<h3>${title}</h3>${demoNote()}${tabs}
+    <p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
     <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)"></td>`).join('')}</tr>`).join('')}</table></div>
-    <button onclick="renderLeoView('master').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
-};
+    <button onclick="renderLeoView('${view}').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
+}
 // 型表などの入力欄。短い列は中身（曜日は1文字、時刻は HH:MM）に合わせ、見出しは折り返す。保存する中身は変えない。
 function masterTextPx(text, font) {
   const probe = document.createElement('span');
@@ -1897,7 +1908,7 @@ LEO_VIEWS.diary = async function () {
   const idOf = k => 'dr_' + btoa(unescape(encodeURIComponent(k))).replace(/=/g, '');
   return `<h3>日誌（児童ごと）</h3>${demoNote()}
     <p class="ptabs"><button onclick="DIA_DAY=addDays(DIA_DAY,-1);renderLeoView('diary')">← 前の日</button> <b>${fmtDay(DIA_DAY)}</b> <button onclick="DIA_DAY=addDays(DIA_DAY,1);renderLeoView('diary')">次の日 →</button></p>
-    <p class="note">予定の利用児童を日誌に出します。LINE報告を保存すると、活動記録がここに入ります（である調のボット文があればそれを使い、無ければ補います）。下書きを保存しても活動記録に入ります。出席・欠席はサービス提供実績へ自動で載ります。国保連は簡易入力への手打ちです。迎え・送りの名前は届け出上の担当です。</p>
+    <p class="note">ポータルの日誌が正です。下書きも食事も、この画面で保存できます（元のGoogleシートは使いません）。予定の利用児童を日誌に出します。LINE報告を保存すると、活動記録がここに入ります（である調のボット文があればそれを使い、無ければ補います）。下書きを保存しても活動記録に入ります。出席・欠席はサービス提供実績へ自動で載ります。国保連は簡易入力への手打ちです。迎え・送りの名前は届け出上の担当です。</p>
     ${leoDayLogHtml(DIA_DAY, bundle.log, 'dr', bundle.missing)}
     ${noTable ? '<p style="color:#c00">下書きの保存場所がまだありません（管理者が準備中です）。</p>' : ''}
     ${rows.map(r => { const k = r.child, d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
