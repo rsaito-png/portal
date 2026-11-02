@@ -50,7 +50,7 @@ insert into public.leo_master (kind, data) values
   ('kata', '{"児童名":"山根 一輝","曜日":"月","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","迎え開始":"14:30","迎え担当":"職員A","迎え順":"1","迎え場所":"下野小学校","送り終了":"17:00","送り担当":"職員B","送り順":"1","送り場所（空欄なら自宅）":""}'),
   ('kata', '{"児童名":"山根 一輝","曜日":"木","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","迎え開始":"14:30","迎え担当":"職員A","迎え順":"1","迎え場所":"下野小学校","送り終了":"17:00","送り担当":"職員B","送り順":"1","送り場所（空欄なら自宅）":""}'),
   ('kata', '{"児童名":"市川 湊","曜日":"月","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","迎え開始":"14:30","迎え担当":"職員A","迎え順":"2","迎え場所":"海蔵こども園","送り終了":"17:00","送り担当":"職員B","送り順":"2","送り場所（空欄なら自宅）":"自宅"}'),
-  ('kata', '{"児童名":"児童D","曜日":"月","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","迎え開始":"14:30","迎え担当":"職員C","迎え順":"1","迎え場所":"","送り終了":"17:00","送り担当":"職員D","送り順":"1","送り場所（空欄なら自宅）":"　 "}'),
+  ('kata', '{"児童名":"児童D","曜日":"月","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","迎え開始":"14:30","迎え担当":"職員C","迎え順":"1","迎え場所":"","送り終了":"17:40","送り担当":"職員D","送り順":"1","送り場所（空欄なら自宅）":"　 "}'),
   ('kata', '{"児童名":"児童E","曜日":"火","利用週":"毎週","利用開始":"15:00","利用終了":"17:00","保護者送迎":"","迎え場所":"","送り終了":"17:00","送り担当":"職員D","送り順":"2","送り場所（空欄なら自宅）":""}');
 
 -- 保護者の回答。場所が入っていればそれが優先、空欄・空白だけなら型表。
@@ -62,7 +62,7 @@ insert into public.leo_schedule_weekday (child, month, dow, use, school_time, pi
   ('山根 一輝', '2026-11-01', '月', true, '14:30', '下野こども園', ''),
   ('山根 一輝', '2026-11-01', '木', true, '14:30', null, null),
   ('市川　湊',  '2026-11-01', '月', true, '14:30', '　 ', '旧送り先'),
-  ('児童D',     '2026-11-01', '月', true, '14:30', ' ', null),
+  ('児童D',     '2026-11-01', '月', true, '14:10', ' ', null),
   ('児童E',     '2026-11-01', '火', true, '15:00', '', '　');
 insert into public.leo_schedule_answer (child, month, answer) values
   ('山根 一輝', '2026-11-01', '{}'), ('市川　湊', '2026-11-01', '{}'), ('児童D', '2026-11-01', '{}'), ('児童E', '2026-11-01', '{}');
@@ -76,6 +76,9 @@ create function pg_temp.kp(p jsonb, p_day date, p_kind text, p_kid text) returns
 create function pg_temp.has_kp(p jsonb, p_day date, p_kind text, p_kid text) returns boolean language sql as $$
   select exists (select 1 from jsonb_array_elements(p->'events') e
   where e->>'kind' = p_kind and (e->>'day')::date = p_day and (e->'kids') ? p_kid) $$;
+create function pg_temp.kt(p jsonb, p_day date, p_kind text, p_kid text) returns text language sql as $$
+  select e->'kid_times'->>p_kid from jsonb_array_elements(p->'events') e
+  where e->>'kind' = p_kind and (e->>'day')::date = p_day and (e->'kids') ? p_kid $$;
 
 do $$
 declare p jsonb; r text; n int;
@@ -121,6 +124,14 @@ begin
   select e->>'place' into r from jsonb_array_elements(p->'events') e
     where e->>'kind' = '送り' and (e->>'day')::date = '2026-11-02' and (e->'kids') ? '児童D';
   if r is not null then raise exception 'FAIL blank-only 送り place must be null: [%]', r; end if;
+
+  -- 送り時刻は型表の送り終了。利用終了や、迎えの学校お迎え時刻では埋めない。
+  if pg_temp.kt(p, '2026-11-02', '送り', '児童D') is distinct from '17:40' then
+    raise exception 'FAIL 児童D 送り時刻は型表の送り終了: %', pg_temp.kt(p, '2026-11-02', '送り', '児童D'); end if;
+  if pg_temp.kt(p, '2026-11-02', '迎え', '児童D') is distinct from '14:10' then
+    raise exception 'FAIL 児童D 迎えは回答の学校お迎え時刻: %', pg_temp.kt(p, '2026-11-02', '迎え', '児童D'); end if;
+  if pg_temp.kt(p, '2026-11-02', '送り', '山根 一輝') is distinct from '17:00' then
+    raise exception 'FAIL 一輝 送り時刻が学校お迎え時刻に置き換わっている: %', pg_temp.kt(p, '2026-11-02', '送り', '山根 一輝'); end if;
 end $$;
 
 -- 確定（commit）：場所は上の優先順位どおり。place は空欄・自宅を除く。
@@ -140,6 +151,8 @@ begin
   select * into r from public.leo_events where kind = '送り' and day = '2026-11-02' and '児童D' = any(kids) and source = 'kata';
   if r.kid_places->>'児童D' <> '' or r.place is not null then
     raise exception 'FAIL commit D blank: % [%]', r.kid_places, r.place; end if;
+  if r.kid_times->>'児童D' is distinct from '17:40' then
+    raise exception 'FAIL commit D 送り時刻 %', r.kid_times; end if;
   select * into r from public.leo_events where kind = '送り' and day = '2026-11-02' and '山根 一輝' = any(kids) and source = 'kata';
   if r.kid_places->>'山根 一輝' <> '' then raise exception 'FAIL commit 一輝 送り blank %', r.kid_places; end if;
   select * into r from public.leo_events where kind = '送り' and day = '2026-11-09' and '山根 一輝' = any(kids) and source = 'kata';

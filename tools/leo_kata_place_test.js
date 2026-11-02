@@ -13,6 +13,9 @@ for (const x of b) {
   assert(/coalesce\(nullif\(btrim\(w\.drop_place, E' \\t　'\), ''\), s\.dplace\)/.test(x), '回答の送り場所（空白だけは空欄扱い）→型表の順になっていない');
   assert(/where v\.kind|v\.kind = '送り場所変更'/.test(x) || /送り場所変更/.test(x), '送り場所変更の例外が消えている');
   assert(/set dplace = v\.place/.test(x), '送り場所変更の上書きが消えている');
+  assert(/jsonb_object_agg\(child, nullif\(btrim\(pe\), ''\)\) kt/.test(x), '送りの児童ごとの時刻が送り終了になっていない');
+  assert(!/jsonb_object_agg\(child, ke\) kt/.test(x), '送りの児童ごとの時刻に利用終了が残っている');
+  assert(/nullif\(btrim\(kata\.k->>'送り時間'\), ''\)/.test(x), '列名が送り時間の行を読んでいない');
 }
 const dep = fs.readFileSync('supabase/leo_schedule_build.sql', 'utf8');
 const commit = dep.slice(dep.indexOf('create or replace function public.leo_sched_commit'), dep.indexOf('revoke all on function public.leo_sched_plan, public.leo_sched_commit'));

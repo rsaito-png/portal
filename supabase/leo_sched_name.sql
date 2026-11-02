@@ -223,7 +223,7 @@ begin
   create temp table _nres (kata text, answer text, kind text) on commit drop;
   insert into _nres select * from public.leo_sched_name_rows(p_month);
   insert into _lsv
-  select d.day, public.leo_name_canon(kata.k->>'児童名'), d.dow, kata.k->>'利用開始', kata.k->>'利用終了', nullif(kata.k->>'迎え開始', ''), nullif(kata.k->>'送り終了', ''),
+  select d.day, public.leo_name_canon(kata.k->>'児童名'), d.dow, kata.k->>'利用開始', kata.k->>'利用終了', nullif(kata.k->>'迎え開始', ''), nullif(btrim(coalesce(nullif(btrim(kata.k->>'送り終了'), ''), nullif(btrim(kata.k->>'送り時間'), ''))), ''),
     leo_sched_staff(kata.k->>'迎え担当'), leo_sched_staff(kata.k->>'送り担当'), nullif(kata.k->>'迎え順', '')::int, nullif(kata.k->>'送り順', '')::int, coalesce(kata.k->>'保護者送迎', ''),
     coalesce(btrim(kata.k->>'迎え場所', E' \t　'), ''), coalesce(btrim(kata.k->>'送り場所（空欄なら自宅）', E' \t　'), ''), false, false
   from (select d::date as day, (array['日','月','火','水','木','金','土'])[extract(dow from d)::int + 1] as dow from generate_series(p_month, last_day, interval '1 day') d) d
@@ -303,7 +303,7 @@ begin
       ev := ev || jsonb_build_array(jsonb_build_object('day', v.day, 'kind', '休み', 'child', v.child, 'title', v.child || '　休み'));
     elsif v.kind in ('追加利用') then
       if not exists (select 1 from _lsv where child = v.child and day = v.day) and v.day <> all(closed) then
-        insert into _lsv select v.day, v.child, d.dow, k->>'利用開始', k->>'利用終了', nullif(k->>'迎え開始', ''), nullif(k->>'送り終了', ''),
+        insert into _lsv select v.day, v.child, d.dow, k->>'利用開始', k->>'利用終了', nullif(k->>'迎え開始', ''), nullif(btrim(coalesce(nullif(btrim(k->>'送り終了'), ''), nullif(btrim(k->>'送り時間'), ''))), ''),
             leo_sched_staff(k->>'迎え担当'), leo_sched_staff(k->>'送り担当'), nullif(k->>'迎え順', '')::int, nullif(k->>'送り順', '')::int, coalesce(k->>'保護者送迎', ''),
             coalesce(btrim(k->>'迎え場所', E' \t　'), ''), coalesce(btrim(k->>'送り場所（空欄なら自宅）', E' \t　'), ''), false, false
           from (select (array['日','月','火','水','木','金','土'])[extract(dow from v.day)::int + 1] dow) d,
@@ -349,8 +349,10 @@ begin
       'place', (select string_agg(distinct x, '、') from jsonb_each_text(g.kp) e(k, x) where coalesce(x, '') <> '' and x <> '自宅'), 'title', '☆' || array_to_string(g.kids, '→')));
     if g.staff is null then warn := warn || jsonb_build_array(jsonb_build_object('child', array_to_string(g.kids, '・'), 'msg', to_char(g.day, 'MM/DD') || ' 迎えの担当が決まっていません')); end if;
   end loop;
+  -- 送りの児童ごとの時刻は送り終了（画面の送り時間）。利用終了は乗り始める時刻なので、ここには入れない。
+  -- 保護者の学校お迎え時刻は迎え（ps）だけを置き換える。送り時刻の回答欄は無い。母の迎えは pe を空にして送りを作らない。
   for g in select day, dst staff, array_agg(child order by dord nulls last, ke) kids, min(ke) st, max(pe) en,
-        jsonb_object_agg(child, dplace) kp, jsonb_object_agg(child, ke) kt
+        jsonb_object_agg(child, dplace) kp, jsonb_object_agg(child, nullif(btrim(pe), '')) kt
       from (select *, sum(case when pm is null or ke >= pm then 1 else 0 end) over (partition by day, dst order by ke, dord) grp
             from (select *, max(coalesce(pe, ke)) over (partition by day, dst order by ke, dord rows between unbounded preceding and 1 preceding) pm from _lsv where not parent_pick and (pe is not null or dst is not null)) a) b
       group by day, dst, grp loop
