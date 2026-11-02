@@ -550,6 +550,7 @@ const LEO_VIEWS = {
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${today()}`); } catch (e) { }
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
     const meals = leoMealByChild(bundle.meals);
+    LEO_SNACK_YEN = bundle.yen !== false;
     return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
       leoDayLogHtml(today(), bundle.log, 'nk', bundle.missing) +
       rows.map(r => { const a = A[String(r.child || '').replace(/\s/g, '')], actVal = (a && a.text) || r.activity || '';
@@ -561,7 +562,8 @@ const LEO_VIEWS = {
             ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}">${esc(shown)}</textarea></label>`
             : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}" value="${esc(shown)}"></label>`;
         }).join('')}
-        ${leoMealBox(r.child, meals[leoMealNorm(r.child)], r, false, false)}</div>`; }).join('') +
+        ${leoMealBox(r.child, meals[leoMealNorm(r.child)], r, false, false, true)}</div>`; }).join('') +
+      (bundle.yen === false ? '<p class="note">おやつの金額を保存するには、supabase/leo_meal_snack_yen.sql を実行してください。あり／なしはこれまでどおり保存できます。</p>' : '') +
       `<button onclick="saveNikki()">保存して実績へ載せる</button><div id="saved"></div>`;
   },
   async jisseki() {
@@ -781,7 +783,8 @@ function leoDemoExtras(day) {
   if (day !== t) return { log: null, meals: [] };
   return {
     log: { day: t, meal_menu: '（見本）白米、餃子、人参と玉葱のナムル、味噌汁', notes: '（見本）午後はホールで体を動かした。' },
-    meals: [{ day: t, child: '児童A', meal: 'あり', snack: 'あり', meal_note: '（見本）餃子の皮を6枚。白米は4分の3。', day_note: '' }],
+    meals: [{ day: t, child: '児童A', meal: 'あり', snack: 'あり', snack_yen: 100, meal_note: '（見本）餃子の皮を6枚。白米は4分の3。', day_note: '' },
+      { day: t, child: '児童B', meal: 'なし', snack: 'なし', snack_yen: null, meal_note: '', day_note: '' }],
   };
 }
 function leoDemoJisseki(month) {
@@ -804,22 +807,48 @@ async function leoLoadDayBundle(day) {
   let log = [], meals = [], missing = false;
   try { log = await sb(`leo_day_log?day=eq.${day}&select=day,meal_menu,notes`); }
   catch (e) { missing = true; log = []; }
-  try { meals = await sb(`leo_meal_record?day=eq.${day}&select=day,child,meal,snack,meal_note,day_note`); }
-  catch (e) { missing = true; meals = []; }
-  return { log: (log && log[0]) || null, meals: meals || [], missing };
+  const mealPack = await leoFetchMeals(`day=eq.${day}`);
+  meals = mealPack.rows; missing = missing || mealPack.missing;
+  return { log: (log && log[0]) || null, meals, missing, yen: mealPack.yen };
 }
 async function leoLoadMonthMeals(a, b) {
-  try {
-    const rows = await sb(`leo_meal_record?day=gte.${a}&day=lte.${b}&select=day,child,meal,snack,meal_note,day_note`);
-    return { rows: rows || [], missing: false };
-  } catch (e) { return { rows: [], missing: true }; }
+  const mealPack = await leoFetchMeals(`day=gte.${a}&day=lte.${b}`);
+  return { rows: mealPack.rows, missing: mealPack.missing };
 }
-function leoMealSelect(field, value) {
+const LEO_MEAL_COLS = 'day,child,meal,snack,meal_note,day_note';
+async function leoFetchMeals(filter) {
+  if (typeof DEMO !== 'undefined' && DEMO) return { rows: [], missing: false, yen: true };
+  try {
+    const rows = await sb(`leo_meal_record?${filter}&select=${LEO_MEAL_COLS},snack_yen`);
+    return { rows: rows || [], missing: false, yen: true };
+  } catch (e) {
+    try {
+      const rows = await sb(`leo_meal_record?${filter}&select=${LEO_MEAL_COLS}`);
+      return { rows: rows || [], missing: false, yen: false };
+    } catch (e2) { return { rows: [], missing: true, yen: false }; }
+  }
+}
+function leoMealSelect(field, value, extra) {
   const v = leoMealFlag(value);
   const opt = (val, label) => `<option value="${val}"${v === val ? ' selected' : ''}>${label}</option>`;
-  return `<select data-kind="meal" data-f="${field}" style="width:100%">${opt('', '未記入')}${opt('あり', 'あり')}${opt('なし', 'なし')}</select>`;
+  const width = extra ? 'width:8em' : 'width:100%';
+  return `<select data-kind="meal" data-f="${field}" ${extra || ''} style="${width}">${opt('', '未記入')}${opt('あり', 'あり')}${opt('なし', 'なし')}</select>`;
 }
-function leoMealBox(child, rec, sheet, withDay, withNote) {
+function leoSnackYenSync(sel) {
+  const box = sel && sel.closest ? sel.closest('[data-meal-child]') : null;
+  const yen = box && box.querySelector('[data-snack-yen]');
+  if (!yen) return;
+  const on = sel.value === 'あり';
+  yen.hidden = !on;
+  const input = yen.querySelector('input');
+  if (input) input.disabled = !on;
+}
+function leoSnackYenShown(rec) {
+  if (!rec || rec.snack_yen == null || rec.snack_yen === '') return '';
+  const y = typeof leoSnackYenValue === 'function' ? leoSnackYenValue(rec.snack_yen) : { n: Number(rec.snack_yen) };
+  return y && !y.empty && !y.bad ? String(y.n) : '';
+}
+function leoMealBox(child, rec, sheet, withDay, withNote, withYen) {
   const meal = leoMealPrefill(rec && rec.meal, sheet && sheet.meal);
   const snack = leoMealPrefill(rec && rec.snack, sheet && sheet.snack);
   const hint = [];
@@ -831,10 +860,12 @@ function leoMealBox(child, rec, sheet, withDay, withNote) {
   sheetBit('おやつ', sheet && sheet.snack);
   // 今日の日誌だけ内容欄を出さない（withNote=false）。保存時は欄が無いので meal_note を送らず、入っている内容は残す。
   const note = withNote === false ? '' : `<label>内容（何をどのくらい）<textarea data-kind="meal" data-f="meal_note" rows="3">${esc((rec && rec.meal_note) || '')}</textarea></label>`;
+  const yenOn = snack === 'あり';
+  const yen = withYen ? `<span data-snack-yen ${yenOn ? '' : 'hidden'}>　金額<input type="number" min="0" step="1" inputmode="numeric" data-kind="meal" data-f="snack_yen" value="${esc(leoSnackYenShown(rec))}" style="width:6em" ${yenOn ? '' : 'disabled'}>円</span>` : '';
   return `<div data-meal-child="${esc(child)}">
     <label>食事提供${leoMealSelect('meal', meal)}</label>
     ${note}
-    <label>おやつ提供${leoMealSelect('snack', snack)}</label>
+    <label>おやつ提供${leoMealSelect('snack', snack, withYen ? 'onchange="leoSnackYenSync(this)"' : '')}${yen}</label>
     ${withDay ? `<label>この日の記録<textarea data-kind="meal" data-f="day_note" rows="3">${esc((rec && rec.day_note) || '')}</textarea></label>` : ''}
     ${hint.length ? `<p class="note">${esc(hint.join(' ／ '))}</p>` : ''}
   </div>`;
@@ -853,6 +884,7 @@ function leoReadMealBoxes(root) {
     const row = { child: box.dataset.mealChild, meal: g('meal') ? g('meal').value : '', snack: g('snack') ? g('snack').value : '' };
     if (g('meal_note')) row.meal_note = g('meal_note').value;
     if (g('day_note')) row.day_note = g('day_note').value;
+    if (g('snack_yen')) row.snack_yen = g('snack_yen').disabled ? '' : g('snack_yen').value;
     return row;
   });
 }
@@ -878,6 +910,7 @@ async function saveLeoDayLog(day, prefix) {
     m.textContent = '総合日誌を保存しました。';
   } catch (e) { m.textContent = e.message; }
 }
+let LEO_SNACK_YEN = true;
 let JIS_MONTH = today().slice(0, 7);
 let JIS_CHILD = '';
 let JIS_DAY = '';
@@ -940,6 +973,7 @@ async function saveNikki() {
     n += 1;
   }
   const mealForms = leoReadMealBoxes(document.getElementById('view') || document);
+  if (typeof LEO_SNACK_YEN !== 'undefined' && LEO_SNACK_YEN === false) mealForms.forEach(f => { delete f.snack_yen; });
   const mealErr = mealForms.flatMap(f => leoMealBody(f).err);
   const rows = Object.entries(by);
   if (mealErr.length) { $('saved').textContent = mealErr[0]; return; }

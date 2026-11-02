@@ -64,7 +64,7 @@ assert.ok(!between(leo, 'async function saveLine', 'async function copyLine').in
 assert.ok(!between(leo, 'async function ldSave', 'async function ldCopy').includes('leo_edits'));
 assert.ok(between(leo, 'LEO_VIEWS.diary = async function', 'async function saveDiary').includes('leoRecordDay(DIA_DAY)'));
 assert.ok(between(leo, 'async nikki()', 'async jisseki()').includes('leoRecordDay(today())'));
-assert.ok(between(leo, 'async jisseki()', '// 保護者の実績確認').includes('rpc/leo_record_span'));
+assert.ok(between(leo, 'async jisseki()', 'LEO_VIEWS.kakunin').includes('rpc/leo_record_span'));
 assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoView').includes('rpc/leo_nikki_apply'));
 assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoView').includes('nikkiEditValue'));
 assert.ok(sql.includes('kata_drop'), '空の送り時刻は型表で埋める');

@@ -15,6 +15,14 @@
     if (s === 'なし' || s === '無' || s === '無し') return 'なし';
     return '';
   }
+  function leoSnackYenValue(raw) {
+    const s = String(raw == null ? '' : raw).normalize('NFKC').trim().replace(/[,\s円]/g, '');
+    if (!s) return { empty: true };
+    if (!/^[0-9]+$/.test(s)) return { bad: true };
+    const n = Number(s);
+    if (!Number.isSafeInteger(n) || n < 0) return { bad: true };
+    return { n };
+  }
   function leoMealPrefill(saved, sheet) {
     const own = leoMealFlag(saved);
     if (own) return own;
@@ -42,6 +50,14 @@
     if (mealRaw && !meal) err.push('食事提供は「あり」か「なし」にしてください');
     if (snackRaw && !snack) err.push('おやつ提供は「あり」か「なし」にしてください');
     const body = { meal: meal || null, snack: snack || null };
+    // 金額欄が画面に無いときはキーを付けない。児童ごとの日誌や実績の保存で、入っている金額を消さない。
+    if (Object.prototype.hasOwnProperty.call(f, 'snack_yen')) {
+      if (snack === 'あり') {
+        const y = leoSnackYenValue(f.snack_yen);
+        if (y.empty || y.bad) err.push('おやつが「あり」のときは、金額を0円以上の整数で入れてください');
+        else body.snack_yen = y.n;
+      } else body.snack_yen = null;
+    }
     // 内容欄が画面に無いときはキーを付けない。保存が空文字で入っている内容を消さない。
     if (Object.prototype.hasOwnProperty.call(f, 'meal_note')) {
       if (String(f.meal_note || '').trim().length > 500) err.push('食事の内容は500文字以内にしてください');
@@ -80,7 +96,7 @@
     const touch = day => by[day] || (by[day] = {
       day, status: '', start_time: '', end_time: '', service: '', pick_driver: '', drop_driver: '',
       sheet_meal: '', sheet_snack: '', activity: '', kind: '', row_no: null, source: '',
-      meal: '', snack: '', meal_note: '', day_note: '',
+      meal: '', snack: '', snack_yen: null, meal_note: '', day_note: '',
     });
     (jisseki || []).forEach(r => {
       if (!same(r.child) || !inMonth(r.day)) return;
@@ -114,6 +130,7 @@
       const row = touch(r.day);
       row.meal = r.meal || '';
       row.snack = r.snack || '';
+      row.snack_yen = r.snack_yen == null || r.snack_yen === '' ? null : r.snack_yen;
       row.meal_note = r.meal_note || '';
       row.day_note = r.day_note || '';
     });
@@ -123,7 +140,7 @@
     return { days, use, abs };
   }
   const api = {
-    leoMealNorm, leoClip, leoMealFlag, leoMealPrefill, leoDayLogBody, leoMealBody,
+    leoMealNorm, leoClip, leoMealFlag, leoMealPrefill, leoSnackYenValue, leoDayLogBody, leoMealBody,
     leoMealByChild, leoJissekiChildren, leoChildMonth,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
