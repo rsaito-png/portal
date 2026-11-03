@@ -143,7 +143,7 @@ window.PORTAL_CONFIG = {
       ['🏠', 'B型システム ホーム', '#rydeen/home', '今日の状況（B型の権限が必要。利用者はここから今日の作業へ）'],
       ['📣', 'SNS代行（LINE素材受信）', '', 'LINE受信で自動下書き・要確認'],
       ['📁', '書類', '', '準備中'] ] },
-    { id: 'ryozan', name: '梁山泊', kind: '共同生活援助', color: '#6b4f8a', tiles: [
+    { id: 'ryozan', name: '梁山泊', kind: 'シェアハウス', color: '#6b4f8a', tiles: [
       ['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤。事業所の近くだけ', 'main'],
       ['🍱', '食事メニュー', '#ryozan/meal', 'その日の食事メニューを書く', 'main'] ] },
     { id: 'suishodama', logo: 'img/logo/suishodama.webp', logoFit: 'contain', name: '水晶玉', kind: '相談支援', color: '#8e5bb5', tiles: [
