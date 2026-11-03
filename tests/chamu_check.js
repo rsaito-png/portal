@@ -125,8 +125,12 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=202611031400'));
+assert.ok(html.includes('chamu.js?v=20261103pc'));
 assert.ok(html.includes('leo.js?v=20261103extra'));
+assert.ok(src.includes('@media screen and (min-width:900px)'));
+assert.ok(src.includes('font-size:51px') && src.includes('font-size:17px'));
+assert.ok(src.includes('.cm textarea{min-height:72px}') && src.includes('.cm textarea{min-height:216px}'));
+assert.ok(src.includes('class="cm-who"'));
 assert.ok(html.includes('leo_kinmu.js?v=20261102read'));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });

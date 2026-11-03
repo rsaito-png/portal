@@ -346,6 +346,12 @@ a { color: var(--px-gold); }
   font-size: 16px;
 }
 
+@media screen and (min-width: 900px) {
+  body.portal #help { font-size: 32px; line-height: 1.55; }
+  #uk_fab, #uk_help_btn { font-size: 32px; padding: 18px 22px; }
+  main { padding-bottom: 120px; }
+}
+
 main { padding-bottom: 84px; }
 
 .step i {

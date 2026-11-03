@@ -38,41 +38,45 @@ h3{font-size:25px;color:#555;margin:20px 0 8px}
 .tile .badge{display:inline-block;font-size:23px;margin-bottom:4px}
 h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.tile{min-width:0}.nxc{display:block;overflow:hidden;min-width:0;background:#fff;border-radius:14px;padding:20px 16px;text-decoration:none;color:#222;box-shadow:0 1px 4px #0003}.nxc span{font-size:30px;margin-right:10px}.nxc b{font-size:22px}.nxc small{display:block;color:#777;font-size:14px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile.big{padding:30px 10px;font-size:20px;font-weight:bold}.tile small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* PC: 文字を大きく・レイアウトを広く（2026-10-30） */
+/* PC: スマホ基準より大きく（茶夢の15〜17pxは chamu.js で約3倍。ここは画面が崩れない範囲） */
 @media (min-width: 900px) {
-  body{font-size:28px;line-height:1.55}
-  header{padding:22px 28px;font-size:32px}
-  main{max-width:1200px;padding:32px 36px}
-  .card{padding:28px;border-radius:16px}
-  input,button{font-size:28px;padding:18px;margin:10px 0;border-radius:12px}
+  body{font-size:36px;line-height:1.5}
+  header{padding:22px 28px;font-size:40px}
+  main{max-width:1360px;padding:32px 40px}
+  .card{padding:32px;border-radius:16px}
+  input,button{font-size:36px;padding:18px 20px;margin:10px 0;border-radius:12px}
   .grid{gap:20px}
-  .tile{padding:36px 18px;font-size:30px;border-radius:16px}
-  .tile.main{padding:48px 18px;font-size:34px}
-  .tile.big{padding:40px 16px;font-size:30px}
+  .tile{padding:36px 18px;font-size:36px;border-radius:16px}
+  .tile.main{padding:48px 18px;font-size:42px}
+  .tile.big{padding:40px 16px;font-size:38px}
   .tile span{font-size:72px}
-  .tile small{font-size:22px;margin-top:8px}
-  .office{padding:28px 20px;min-height:80px;gap:16px}
-  .office .lg{width:64px;height:64px}
-  .office small{font-size:22px}
-  h3{font-size:40px;margin:28px 0 14px}
-  h3.nx{font-size:32px;margin:28px 0 16px}
-  h4{font-size:32px;margin:22px 0 12px}
+  .tile small{font-size:28px;margin-top:8px}
+  .office{padding:28px 20px;min-height:88px;gap:16px}
+  .office .lg{width:72px;height:72px}
+  .office small{font-size:28px}
+  h3{font-size:48px;margin:28px 0 14px}
+  h3.nx{font-size:40px;margin:28px 0 16px}
+  h4{font-size:40px;margin:22px 0 12px}
   .nxc{padding:28px 22px;border-radius:18px}
-  .nxc span{font-size:48px}
-  .nxc b{font-size:32px}
-  .nxc small{font-size:22px;margin-top:10px;white-space:normal}
+  .nxc span{font-size:52px}
+  .nxc b{font-size:36px}
+  .nxc small{font-size:28px;margin-top:10px;white-space:normal}
   .nxl{gap:18px}
-  .back{font-size:26px;padding:14px 22px}
-  #out{font-size:26px;padding:10px 16px}
-  .note{font-size:24px}
-  .rec label{font-size:26px}
-  .rec textarea{font-size:28px;padding:12px}
-  table{font-size:26px}
-  td,th{padding:10px 8px}
-  .sample{font-size:28px}
-  .badge{font-size:22px;padding:2px 10px}
-  .ptabs button{font-size:24px;padding:12px 20px}
-  #help{font-size:22px!important}
+  .back{font-size:32px;padding:14px 22px}
+  #out{font-size:32px;padding:12px 18px}
+  .note{font-size:32px}
+  .rec label{font-size:32px}
+  .rec textarea{font-size:36px;padding:14px}
+  table{font-size:32px}
+  td,th{padding:12px 10px}
+  table.msheet{font-size:22px}
+  table.msheet th{font-size:18px}
+  table.msheet input{font-size:22px;padding:6px 8px}
+  table.kata-view,table.sougei-view{font-size:28px}
+  .sample{font-size:34px}
+  .badge{font-size:26px;padding:4px 12px}
+  .ptabs button{font-size:32px;padding:14px 22px}
+  #help{font-size:32px!important}
 }
 .sg{max-width:760px}
 .sg-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
@@ -108,13 +112,13 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 .sg summary{cursor:pointer;color:#555}
 @media (min-width: 900px){
   .sg-amount b{font-size:64px}
-  .sg-h{font-size:40px}
+  .sg-h{font-size:48px}
 }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
-<link rel="stylesheet" href="theme-retro.css?v=20261030px">
+<link rel="stylesheet" href="theme-retro.css?v=20261103pc">
 </head><body class="portal">
 <header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
@@ -171,7 +175,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="uketsuke.js?v=20261030px"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261102wage"></script>
-<script src="chamu.js?v=202611031400"></script>
+<script src="chamu.js?v=20261103pc"></script>
 <script src="leo_kinmu_lib.js?v=20261102f1400"></script>
 <script src="leo_kinmu.js?v=20261102read"></script>
 <script src="dakoku-lib.js?v=20261030dakoku"></script>

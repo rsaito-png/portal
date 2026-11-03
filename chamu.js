@@ -504,7 +504,7 @@ async function cmGo(fn, opt) {
   st.textContent = `.cm-nav{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}.cm-nav a{background:#fff4dc;border:3px solid #1a120c;border-radius:0;padding:10px 14px;text-decoration:none;color:#1c140c;font-size:17px;box-shadow:3px 3px 0 #1a120c}
 .cm-nav a.on{background:var(--main);color:#fff8e8;border-color:#1a120c}
 .cm label.l{display:block;font-size:16px;color:#4e4336;margin-top:8px}.cm textarea,.cm select{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:3px solid #1a120c;border-radius:0;margin:4px 0;background:#fffef8}.cm textarea{min-height:72px}
-.cm .row{display:flex;gap:10px;flex-wrap:wrap}.cm .row>*{flex:1;min-width:140px}
+.cm .row{display:flex;gap:10px;flex-wrap:wrap}.cm .row>*{flex:1;min-width:140px}.cm .cm-who{flex:0 0 160px;min-width:160px}
 .cm button.sec{background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c}.cm button.inl{width:auto;padding:8px 14px;margin:2px}
 .cm input[type=checkbox]{width:auto;transform:scale(1.2);margin-right:6px}
 .cm .jr{border:3px solid #1a120c;border-radius:0;padding:10px;margin:8px 0;background:#fff4dc;box-shadow:3px 3px 0 #1a120c;color:#1c140c}
@@ -523,11 +523,48 @@ async function cmGo(fn, opt) {
 .cm-dlg.bad .t{color:#8e1b1b}
 .cm-dlg .b{margin:0;white-space:pre-wrap;font-size:1em;line-height:1.55;color:#1c140c}
 .cm-dlg button{margin-top:16px}
-.cm .note{color:#4e4336}.cm img.cm-sg{width:260px;max-width:100%;border:3px solid #1a120c;background:#fff}
+.cm .note{color:#4e4336}body.portal .cm>.note{color:#fff6e4}.cm img.cm-sg{width:260px;max-width:100%;border:3px solid #1a120c;background:#fff}
 .cm .cm-rep{overflow-x:auto}.cm .cm-rep table{border-collapse:collapse;min-width:640px}.cm .cm-rep th,.cm .cm-rep td{border:2px solid #1a120c;padding:4px 6px;font-size:15px;background:#fffef8}
 .cm .cm-rep td.menu{white-space:normal;min-width:16em}.cm pre.cm-mail{white-space:pre-wrap;background:#fffef8;border:3px solid #1a120c;padding:10px;font-size:15px;box-shadow:3px 3px 0 #1a120c}
 .cm a.btn{display:inline-block;background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c;padding:8px 14px;margin:2px;text-decoration:none}
 .cm .pad{height:200px;touch-action:none}.cm .pad canvas{width:100%;height:100%;display:block;background:#fff;border:3px solid #1a120c;border-radius:0;touch-action:none}
+@media screen and (min-width:900px){
+.cm{font-size:48px;line-height:1.45}
+.cm h3{font-size:60px;line-height:1.3}
+.cm h4{font-size:50px;line-height:1.3}
+.cm-nav{gap:18px;margin:20px 0 28px}
+.cm-nav a{font-size:50px;padding:22px 28px;line-height:1.25}
+.cm label.l{font-size:48px;margin-top:16px;line-height:1.35}
+.cm textarea,.cm select,.cm input:not([type=checkbox]){font-size:51px;padding:20px 22px;margin:10px 0;line-height:1.35;min-height:92px}
+.cm textarea{min-height:216px}
+.cm button{font-size:48px;padding:20px 26px;line-height:1.3}
+.cm button.inl,.cm a.btn{font-size:46px;padding:18px 26px;margin:8px 12px 8px 0}
+.cm .row{gap:22px}
+.cm .row>*{min-width:420px}
+.cm .jr>.row{align-items:flex-start!important}
+.cm .cm-who{flex:0 0 auto;min-width:8em}
+.cm input[type=time],.cm input[type=date]{min-width:0}
+.cm .jr{padding:26px;margin:22px 0}
+.cm .cm-lab{gap:16px}
+.cm input[type=checkbox]{width:44px;height:44px;transform:none;margin:10px 16px 10px 0}
+.cm .cm-tr{margin:0 0 18px}
+.cm .cm-tr .cap{font-size:45px;margin:14px 0 10px}
+.cm .cm-tr .ja{font-size:51px;padding:22px;line-height:1.45}
+.cm .ng,.cm .okb,.cm .wn{font-size:46px;padding:18px 22px;margin:14px 0;line-height:1.45}
+.cm .note{font-size:45px;line-height:1.5}
+.cm-dlg{font-size:46px}
+.cm-dlg .box{max-width:22em;padding:36px 32px 28px;max-height:min(86vh,1200px)}
+.cm-dlg .t{font-size:1.2em}
+.cm-dlg .b{font-size:1em}
+.cm-dlg button{font-size:46px;padding:18px 28px}
+.cm table,.cm .cm-rep th,.cm .cm-rep td{font-size:45px}
+.cm .cm-rep table{min-width:1100px}
+.cm .cm-rep th,.cm .cm-rep td{padding:12px 14px}
+.cm table.cm-shift{font-size:48px}
+.cm table.cm-shift th,.cm table.cm-shift td{font-size:48px;padding:14px 16px}
+.cm pre.cm-mail{font-size:45px;padding:22px;line-height:1.45}
+.cm .pad{height:480px}
+}
 @media print{header,.back,.cm-nav,.noprint,#help,#out,.cm-dlg{display:none!important}body{background:#fff}main{max-width:none;padding:0}}`;
   document.head.appendChild(st);
 })();
@@ -606,7 +643,7 @@ async function cmJournal() {
   const card = u => {
     const l = by[u.id] || {}, chosen = l.user_id ? (l.present ? '出席' : '欠席') : '', k = u.id;
     const meal = l.meal || 'あり', intake = l.intake || (meal === 'あり' ? ChamuLib.INTAKE_DEFAULT : '');
-    return `<div class="jr"><div class="row" style="align-items:end"><div style="flex:0 0 160px"><b>${cmEsc(u.name)}</b></div><div><label class="l">出欠 / Presença</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
+    return `<div class="jr"><div class="row" style="align-items:end"><div class="cm-who"><b>${cmEsc(u.name)}</b></div><div><label class="l">出欠 / Presença</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
       <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始 / Início', (l.start_time || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了 / Fim', (l.end_time || '').slice(0, 5), 'time')}
         <div><label class="l">送迎 / Transporte</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
         <div><label class="l">食事 / Refeição</label>${cmSel('m_' + k, ChamuLib.MEAL, meal)}</div>
