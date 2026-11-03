@@ -89,7 +89,7 @@ supabase functions deploy meet-events --project-ref zvrardoyxocmqhvyddnf
 supabase functions deploy jippi-checkout --project-ref zvrardoyxocmqhvyddnf
 ```
 
-`jippi-checkout` はレオの実費画面が使う。JWT 検証はオンのまま（`--no-verify-jwt` は付けない）。シークレットは上の Square 3つを共有する。先に `supabase/leo_jippi.sql` を実行し、`pay_link_amount` 列を足す（再実行できる）。
+`jippi-checkout` はレオの実費画面が使う。JWT 検証はオンのまま（`--no-verify-jwt` は付けない）。シークレットは上の Square 3つを共有する。先に `supabase/leo_jippi.sql` を実行し、`pay_link_amount` と `burden`（利用料・手打ち）列を足す（再実行できる）。支払額は lunch+snack+burden。
 
 `config.toml` を読まないデプロイでは、次の2つに `--no-verify-jwt` を付けます。`sct-checkout` と `sct-certificate` には付けません。
 

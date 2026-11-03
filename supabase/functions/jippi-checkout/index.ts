@@ -1,5 +1,5 @@
 // レオ実費（leo_jippi）の Square 支払いリンク（CreatePaymentLink の quick_pay）を作る。
-// 呼べるのは can_manage（児発管・管理者・事務）だけ。金額は DB の lunch+snack。リクエストの金額は見ない。
+// 呼べるのは can_manage（児発管・管理者・事務）だけ。金額は DB の lunch+snack+burden。リクエストの金額は見ない。
 // シークレットはストレスチェック研修と同じ SQUARE_ACCESS_TOKEN / SQUARE_LOCATION_ID / SQUARE_ENVIRONMENT。
 // 値はこのファイルに書かない。画面にも出さない。
 // 0円は作らない。pay_link があり、pay_link_amount が今の合計と同じなら作り直さない。
@@ -85,12 +85,12 @@ Deno.serve(async (req) => {
   if (typeof body.child === "string" && !child) return json({ error: "児童名が空です" }, 400);
   if (child && (child.length > 80 || /[\u0000-\u001f]/.test(child))) return json({ error: "児童名を確認してください" }, 400);
 
-  let path = "leo_jippi?ym=eq." + ym + "&select=ym,child,lunch,snack,pay_link,pay_link_amount&order=child";
+  let path = "leo_jippi?ym=eq." + ym + "&select=ym,child,lunch,snack,burden,pay_link,pay_link_amount&order=child";
   if (child) path += "&child=eq." + encodeURIComponent(child);
   const list = await userFetch(req, path);
   if (!list.ok) {
     const msg = errMessage(list.body);
-    if (msg.includes("pay_link_amount")) return json({ error: "pay_link_amount 列がありません。supabase/leo_jippi.sql を実行してください。" }, 500);
+    if (msg.includes("burden") || msg.includes("pay_link_amount")) return json({ error: "burden または pay_link_amount 列がありません。supabase/leo_jippi.sql を実行してください。" }, 500);
     return json({ error: "実費を読めませんでした" }, 500);
   }
   const rows = Array.isArray(list.body) ? list.body as Record<string, unknown>[] : [];

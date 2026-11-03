@@ -1,5 +1,5 @@
-// レオ実費の支払いリンクを作り直すかどうか。金額は lunch+snack（円）。
-// 0円は作らない。https の pay_link があり、作ったときの金額（pay_link_amount）と同じなら作り直さない。
+// レオ実費の支払いリンクを作り直すかどうか。金額は lunch+snack+burden（円）。
+// burden が無い行は 0。0円は作らない。https の pay_link があり、作ったときの金額（pay_link_amount）と同じなら作り直さない。
 // 金額が違う、または金額を記録していないリンクは、新しいリンクで上書きする。
 export const JIPPI_MAX_YEN = 100000;
 
@@ -10,13 +10,15 @@ export function jippiPaymentNote(ym: string) {
 export function jippiNeedsLink(row: {
   lunch?: unknown;
   snack?: unknown;
+  burden?: unknown;
   pay_link?: unknown;
   pay_link_amount?: unknown;
 }): { action: "zero" | "unchanged" | "create" | "bad"; amount: number } {
   const lunch = Number(row.lunch);
   const snack = Number(row.snack);
-  if (!Number.isInteger(lunch) || !Number.isInteger(snack) || lunch < 0 || snack < 0) return { action: "bad", amount: 0 };
-  const amount = lunch + snack;
+  const burden = row.burden == null || row.burden === "" ? 0 : Number(row.burden);
+  if (!Number.isInteger(lunch) || !Number.isInteger(snack) || !Number.isInteger(burden) || lunch < 0 || snack < 0 || burden < 0) return { action: "bad", amount: 0 };
+  const amount = lunch + snack + burden;
   if (amount === 0) return { action: "zero", amount: 0 };
   if (amount > JIPPI_MAX_YEN) return { action: "bad", amount };
   const link = typeof row.pay_link === "string" ? row.pay_link.trim() : "";
