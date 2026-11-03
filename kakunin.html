@@ -9,6 +9,8 @@ table{width:100%;border-collapse:collapse;font-size:15px}td,th{border-bottom:1px
 table.money th{font-weight:normal;width:46%}table.money td{text-align:right;font-variant-numeric:tabular-nums}
 label{display:block;margin:12px 0 4px;font-weight:bold}input[type=text],textarea{width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #bbb;border-radius:8px}
 .ch label{font-weight:normal;margin:6px 0;font-size:17px}button{font-size:18px;width:100%;padding:14px;border:0;border-radius:8px;background:#e8833a;color:#fff;margin-top:14px}
+details.days{margin-top:10px;border:1px solid #eee;border-radius:8px;background:#fafafa}details.days summary{cursor:pointer;padding:12px;font-size:15px;color:#e8833a;font-weight:bold;list-style-position:inside}
+details.days table{font-size:15px;background:#fff}details.days td,details.days th{padding:8px 10px}details.days td.y{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}details.days tr.sum td{font-weight:bold;border-top:2px solid #ddd}
 a.pay{display:block;text-align:center;margin-top:10px;padding:12px;border-radius:8px;background:#fff;color:#e8833a;border:1px solid #e8833a;text-decoration:none;font-weight:bold}
 canvas{border:1px solid #bbb;border-radius:8px;width:100%;height:150px;touch-action:none;background:#fff}.sub{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:6px 12px;font-size:14px;margin:4px 0}
 .note{color:#777;font-size:13px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00}
@@ -28,7 +30,8 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST',
   headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const DEMO_DATA = { child: '児童A（見本）', month: '2026-11', last: null,
-  jippi: { found: true, lunch: 1200, snack: 400, burden: 4600, total: 6200, pay_link: 'https://square.link/u/demo' },
+  jippi: { found: true, lunch: 1200, snack: 400, burden: 4600, total: 6200, pay_link: 'https://square.link/u/demo',
+    days: [{ day: '2026-11-02', lunch: 0, snack: 150 }, { day: '2026-11-04', lunch: 0, snack: 250 }, { day: '2026-11-09', lunch: 1200, snack: 0 }] },
   rows: [
   { day: '2026-11-02', status: '利用', start: '14:45', end: '17:00' }, { day: '2026-11-04', status: '利用', start: '14:45', end: '17:00' },
   { day: '2026-11-06', status: '欠席', start: '', end: '' }, { day: '2026-11-09', status: '利用', start: '10:00', end: '16:00' } ] };
@@ -41,6 +44,20 @@ const fmt = d => {
 };
 const yen = n => Number(n || 0).toLocaleString('ja-JP') + '円';
 const JIPPI_NOTE = '<p class="note">合計は、利用料（利用者負担額）・お昼代・おやつ代を足した金額です。お支払いページ（Square）の金額と同じです。</p>';
+// 日別明細：お昼代・おやつ代だけ（利用料は月額なので日別にしない）。品目は出さず「おやつ」で統一。
+// 日別の合計が月のお昼代・おやつ代と1円でも違えば出さない（矛盾を保護者に見せない）。初期は閉じた状態
+function daysHtml(j, lunch, snack) {
+  const ds = Array.isArray(j.days) ? j.days.filter(d => Number(d.lunch || 0) > 0 || Number(d.snack || 0) > 0) : [];
+  if (!ds.length || lunch + snack <= 0) return '';
+  const sl = ds.reduce((a, d) => a + Number(d.lunch || 0), 0), ss = ds.reduce((a, d) => a + Number(d.snack || 0), 0);
+  if (sl !== lunch || ss !== snack) return '';
+  const showLunch = lunch > 0, showSnack = snack > 0;
+  const head = `<tr><th>日付</th>${showLunch ? '<th class="y">お昼</th>' : ''}${showSnack ? '<th class="y">おやつ</th>' : ''}</tr>`;
+  const body = ds.map(d => `<tr><td>${fmt(d.day)}</td>${showLunch ? `<td class="y">${Number(d.lunch || 0) ? yen(d.lunch) : '－'}</td>` : ''}${showSnack ? `<td class="y">${Number(d.snack || 0) ? yen(d.snack) : '－'}</td>` : ''}</tr>`).join('');
+  const sum = `<tr class="sum"><td>計</td>${showLunch ? `<td class="y">${yen(lunch)}</td>` : ''}${showSnack ? `<td class="y">${yen(snack)}</td>` : ''}</tr>`;
+  return `<details class="days" id="jippi-days"><summary>日別の明細を見る（${ds.length}日）</summary><table>${head}${body}${sum}</table>
+    <p class="note" style="padding:0 10px">利用料は月ごとの金額なので、日別には入りません。</p></details>`;
+}
 function jippiHtml(j) {
   if (!j) return `<div class="card" id="jippi"><b>実費負担（利用料・お昼代・おやつ代）</b><p class="err">実費を表示できませんでした。時間をおいて開き直してください。確認自体は送れます。</p>
     ${JIPPI_NOTE}</div>`;
@@ -50,7 +67,7 @@ function jippiHtml(j) {
     ? `<a class="pay" href="${esc(j.pay_link)}" target="_blank" rel="noopener">お支払いページを開く</a><p class="note">支払いは、確認の前でもあとでも大丈夫です。</p>`
     : (none ? '' : '<p class="note">支払い用のリンクはまだありません。リンクが無くても、確認は送れます。</p>');
   return `<div class="card" id="jippi"><b>実費負担（利用料・お昼代・おやつ代）</b>
-    ${none ? '<p id="jippi-none">この月の実費負担はありません。</p>' : `<table class="money"><tr><th>利用料</th><td id="jippi-burden">${yen(burden)}</td></tr><tr><th>お昼代</th><td id="jippi-lunch">${yen(lunch)}</td></tr><tr><th>おやつ代</th><td id="jippi-snack">${yen(snack)}</td></tr><tr><th>合計</th><td id="jippi-total"><b>${yen(total)}</b></td></tr></table>`}
+    ${none ? '<p id="jippi-none">この月の実費負担はありません。</p>' : `<table class="money"><tr><th>利用料</th><td id="jippi-burden">${yen(burden)}</td></tr><tr><th>お昼代</th><td id="jippi-lunch">${yen(lunch)}</td></tr><tr><th>おやつ代</th><td id="jippi-snack">${yen(snack)}</td></tr><tr><th>合計</th><td id="jippi-total"><b>${yen(total)}</b></td></tr></table>${daysHtml(j, lunch, snack)}`}
     ${pay}
     ${JIPPI_NOTE}</div>`;
 }
