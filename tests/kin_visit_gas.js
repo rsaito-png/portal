@@ -94,13 +94,14 @@ assert.ok(html.includes("sub === 'visit'"));
 const win = {};
 vm.runInNewContext(fs.readFileSync(path.join(root, 'config.js'), 'utf8'), { window: win });
 const office = win.PORTAL_CONFIG.offices.find(o => o.id === 'kintoun');
-assert.deepStrictEqual(Array.from(office.groups.slice(0, 4), g => g[1]), ['打刻', '記録記入', 'スケジュール表', '今月の記録']);
+assert.deepStrictEqual(Array.from(office.groups.slice(0, 3), g => g[1]), ['記録記入', 'スケジュール表', '今月の記録']);
+assert.ok(!office.groups.some(g => g[1] === '打刻'));
 assert.ok(!office.groups.some(g => g[1] === '毎日の記録'));
 assert.ok(!src.includes('毎日の記録') && !fs.readFileSync(path.join(root, 'config.js'), 'utf8').includes('毎日の記録'));
 const byName = Object.fromEntries(office.tiles.map(t => [t[1], t[2]]));
 assert.strictEqual(byName['記録記入'], '#kintoun/write');
 assert.strictEqual(byName['今月の記録'], '#kintoun/visit');
-assert.strictEqual(byName['出退勤打刻'], '#dakoku');
+assert.ok(!byName['出退勤打刻']);
 assert.strictEqual(byName['土日スケジュール'], 'gl:g23');
 assert.ok(!office.tiles.some(t => t[1] === '訪問記録'));
 
