@@ -21,14 +21,14 @@ canvas{border:1px solid #bbb;border-radius:8px;width:100%;height:150px;touch-act
 <script src="config.js"></script>
 <script>
 // 保護者向け：ログインなし。リンクのトークンで、その児童・その月の実績と実費だけを表示（ほかの児童の情報は出さない）
-// 実費はお昼代・おやつ代。利用者負担額は載せない。一度の送信で実績と実費の両方を確認したことになる
+// 実費は利用料（利用者負担額）・お昼代・おやつ代。合計は Square の支払いリンクの金額と同じ。一度の送信で実績と実費の両方を確認したことになる
 const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search);
 const DEMO = q.get('demo') === '1', T = q.get('t') || '';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST',
   headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const DEMO_DATA = { child: '児童A（見本）', month: '2026-11', last: null,
-  jippi: { found: true, lunch: 1200, snack: 400, total: 1600, pay_link: 'https://square.link/u/demo' },
+  jippi: { found: true, lunch: 1200, snack: 400, burden: 4600, total: 6200, pay_link: 'https://square.link/u/demo' },
   rows: [
   { day: '2026-11-02', status: '利用', start: '14:45', end: '17:00' }, { day: '2026-11-04', status: '利用', start: '14:45', end: '17:00' },
   { day: '2026-11-06', status: '欠席', start: '', end: '' }, { day: '2026-11-09', status: '利用', start: '10:00', end: '16:00' } ] };
@@ -40,17 +40,19 @@ const fmt = d => {
   return `${get('month')}/${get('day')}（${wk[get('weekday')] || ''}）`;
 };
 const yen = n => Number(n || 0).toLocaleString('ja-JP') + '円';
+const JIPPI_NOTE = '<p class="note">合計は、利用料（利用者負担額）・お昼代・おやつ代を足した金額です。お支払いページ（Square）の金額と同じです。</p>';
 function jippiHtml(j) {
-  if (!j) return `<div class="card" id="jippi"><b>実費負担（お昼代・おやつ代）</b><p class="err">実費を表示できませんでした。時間をおいて開き直してください。確認自体は送れます。</p>
-    <p class="note">実費はお昼代とおやつ代だけです。利用者負担額（国保連の請求）はここには入りません。</p></div>`;
-  const lunch = Number(j.lunch || 0), snack = Number(j.snack || 0), total = lunch + snack, none = !j.found || total <= 0;
+  if (!j) return `<div class="card" id="jippi"><b>実費負担（利用料・お昼代・おやつ代）</b><p class="err">実費を表示できませんでした。時間をおいて開き直してください。確認自体は送れます。</p>
+    ${JIPPI_NOTE}</div>`;
+  const lunch = Number(j.lunch || 0), snack = Number(j.snack || 0), burden = Number(j.burden || 0);
+  const total = lunch + snack + burden, none = !j.found || total <= 0;
   const pay = !none && /^https:\/\//.test(j.pay_link || '')
     ? `<a class="pay" href="${esc(j.pay_link)}" target="_blank" rel="noopener">お支払いページを開く</a><p class="note">支払いは、確認の前でもあとでも大丈夫です。</p>`
     : (none ? '' : '<p class="note">支払い用のリンクはまだありません。リンクが無くても、確認は送れます。</p>');
-  return `<div class="card" id="jippi"><b>実費負担（お昼代・おやつ代）</b>
-    ${none ? '<p id="jippi-none">この月の実費負担はありません。</p>' : `<table class="money"><tr><th>お昼代</th><td id="jippi-lunch">${yen(lunch)}</td></tr><tr><th>おやつ代</th><td id="jippi-snack">${yen(snack)}</td></tr><tr><th>合計</th><td id="jippi-total"><b>${yen(total)}</b></td></tr></table>`}
+  return `<div class="card" id="jippi"><b>実費負担（利用料・お昼代・おやつ代）</b>
+    ${none ? '<p id="jippi-none">この月の実費負担はありません。</p>' : `<table class="money"><tr><th>利用料</th><td id="jippi-burden">${yen(burden)}</td></tr><tr><th>お昼代</th><td id="jippi-lunch">${yen(lunch)}</td></tr><tr><th>おやつ代</th><td id="jippi-snack">${yen(snack)}</td></tr><tr><th>合計</th><td id="jippi-total"><b>${yen(total)}</b></td></tr></table>`}
     ${pay}
-    <p class="note">実費はお昼代とおやつ代だけです。利用者負担額（国保連の請求）はここには入りません。</p></div>`;
+    ${JIPPI_NOTE}</div>`;
 }
 
 async function load() {

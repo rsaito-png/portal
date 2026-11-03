@@ -160,7 +160,7 @@ const idx = fs.readFileSync(root + 'index.html', 'utf8');
 await t('見本に実費が出て、送信は1回', () => {
   if (!html.includes('lunch: 1200') || !html.includes('snack: 400') || !html.includes('この月の実費負担はありません')) throw new Error('demo');
   if (!html.includes('下の送信で、上のご利用実績と実費負担の両方を確認したことになります。')) throw new Error('copy');
-  if (!html.includes('利用者負担額（国保連の請求）はここには入りません')) throw new Error('burden');
+  if (!html.includes('利用料（利用者負担額）・お昼代・おやつ代を足した金額') || !html.includes('id="jippi-burden"')) throw new Error('burden');
   if ((html.match(/onclick="send\(\)"/g) || []).length !== 1) throw new Error('buttons');
   if (!html.includes('value="内容に相違ありません"') || !html.includes('value="相違があります"')) throw new Error('values');
 });
@@ -169,7 +169,7 @@ await t('職員一覧は確認した実費を読む。請求画面の関数は�
   if (!leo.includes('確認した実費') || !leo.includes('リンクに出る実費')) throw new Error('labels');
   if (!leo.includes("LEO_VIEWS.jippi") && !fs.readFileSync(root + 'leo_jippi.js', 'utf8').includes('LEO_VIEWS.jippi')) throw new Error('jippi view');
   if (!fs.readFileSync(root + 'leo_jippi.js', 'utf8').includes('この月のリンクを作成／更新')) throw new Error('checkout');
-  if (!idx.includes('leo.js?v=20261102kakunin')) throw new Error('cache');
+  if (!idx.includes('leo.js?v=20261103fee')) throw new Error('cache');
 });
 await t('取得SQLは児童と月で1行だけ結合する', () => {
   const fn = SQL.slice(SQL.indexOf('function public.leo_confirm_get'), SQL.indexOf('function public.leo_confirm_submit'));

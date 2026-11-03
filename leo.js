@@ -622,35 +622,37 @@ const LEO_VIEWS = {
 let KK_MONTH = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
 const KK_URL = t => location.origin + location.pathname.replace(/[^/]*$/, '') + 'kakunin.html?t=' + t;
 const kkYen = n => Number(n || 0).toLocaleString('ja-JP') + '円';
-function kkJippiHtml(found, lunch, snack, label) {
+function kkJippiHtml(found, lunch, snack, burden, label) {
   if (found == null) return `<br><small>${label}：記録なし（実費を載せる前の回答）</small>`;
-  const t = Number(lunch || 0) + Number(snack || 0);
+  const t = Number(lunch || 0) + Number(snack || 0) + Number(burden || 0);
   if (!found || t <= 0) return `<br><small>${label}：実費なし</small>`;
-  return `<br><small>${label}：お昼 ${kkYen(lunch)}・おやつ ${kkYen(snack)}・合計 ${kkYen(t)}</small>`;
+  // burden が null＝利用料を載せる前の回答（そのときの保護者画面には利用料が出ていない）
+  const b = burden == null ? '利用料 記録なし・' : `利用料 ${kkYen(burden)}・`;
+  return `<br><small>${label}：${b}お昼 ${kkYen(lunch)}・おやつ ${kkYen(snack)}・合計 ${kkYen(t)}</small>`;
 }
 LEO_VIEWS.kakunin = async function () {
   if (!canManage()) return '<p>この画面は児発管・管理者・事務の方だけが使えます。</p>';
   let links, conf, jippi;
   if (DEMO) {
     links = [{ token: 'demo1', child: '児童A', month: KK_MONTH }, { token: 'demo2', child: '児童B', month: KK_MONTH }, { token: 'demo3', child: '児童C', month: KK_MONTH }];
-    conf = [{ token: 'demo1', confirm: '内容に相違ありません', parent_name: '保護者A', comment: null, signature: 'x', submitted_at: new Date().toISOString(), jippi_found: true, jippi_lunch: 1200, jippi_snack: 400 },
-            { token: 'demo2', confirm: '相違があります', parent_name: '保護者B', comment: '（見本）6日は利用していません', signature: null, submitted_at: new Date().toISOString(), jippi_found: false, jippi_lunch: 0, jippi_snack: 0 }];
-    jippi = [{ child: '児童A', lunch: 1200, snack: 400 }, { child: '児童C', lunch: 800, snack: 200 }];
+    conf = [{ token: 'demo1', confirm: '内容に相違ありません', parent_name: '保護者A', comment: null, signature: 'x', submitted_at: new Date().toISOString(), jippi_found: true, jippi_lunch: 1200, jippi_snack: 400, jippi_burden: 4600 },
+            { token: 'demo2', confirm: '相違があります', parent_name: '保護者B', comment: '（見本）6日は利用していません', signature: null, submitted_at: new Date().toISOString(), jippi_found: false, jippi_lunch: 0, jippi_snack: 0, jippi_burden: 0 }];
+    jippi = [{ child: '児童A', lunch: 1200, snack: 400, burden: 4600 }, { child: '児童C', lunch: 800, snack: 200, burden: 0 }];
   } else {
     links = await sb(`leo_confirm_links?month=eq.${KK_MONTH}&order=child`);
-    conf = links.length ? await sb(`leo_confirmations?select=token,confirm,parent_name,comment,signature,submitted_at,jippi_found,jippi_lunch,jippi_snack&token=in.(${links.map(l => l.token).join(',')})&order=id.desc`) : [];
-    jippi = await sb(`leo_jippi?ym=eq.${KK_MONTH}&select=child,lunch,snack`);
+    conf = links.length ? await sb(`leo_confirmations?select=token,confirm,parent_name,comment,signature,submitted_at,jippi_found,jippi_lunch,jippi_snack,jippi_burden&token=in.(${links.map(l => l.token).join(',')})&order=id.desc`) : [];
+    jippi = await sb(`leo_jippi?ym=eq.${KK_MONTH}&select=child,lunch,snack,burden`);
   }
   const last = {}; conf.forEach(c => { if (!last[c.token]) last[c.token] = c; });
   const now = {}; jippi.forEach(r => { now[r.child] = r; });
   const done = links.filter(l => last[l.token]).length;
   return `<h3>保護者の実績・実費の確認</h3>${demoNote()}
-    <p class="note">児童ごとの専用リンクです（推測できない番号つき）。保護者には、その児童のその月のご利用実績と実費負担（お昼代・おやつ代）だけが見えます。「コピー」して公式LINEで送ってください。利用者負担額は載せません。</p>
+    <p class="note">児童ごとの専用リンクです（推測できない番号つき）。保護者には、その児童のその月のご利用実績と実費負担（利用料・お昼代・おやつ代）だけが見えます。合計は Square の支払いリンクと同じ金額です。「コピー」して公式LINEで送ってください。</p>
     <p>対象月 <input type="month" value="${KK_MONTH}" style="width:auto" onchange="KK_MONTH=this.value;renderLeoView('kakunin')">
     <button style="width:auto" onclick="kkMake()">この月のリンクを作る</button></p>
     <p>確認済み <b>${done}</b> ／ ${links.length}人</p>` +
     (links.length ? `<table><tr><th>児童</th><th>確認</th><th>リンク</th></tr>${links.map(l => { const c = last[l.token];
-      const money = c ? kkJippiHtml(c.jippi_found, c.jippi_lunch, c.jippi_snack, '確認した実費') : kkJippiHtml(!!now[l.child], now[l.child] && now[l.child].lunch, now[l.child] && now[l.child].snack, 'リンクに出る実費');
+      const money = c ? kkJippiHtml(c.jippi_found, c.jippi_lunch, c.jippi_snack, c.jippi_burden, '確認した実費') : kkJippiHtml(!!now[l.child], now[l.child] && now[l.child].lunch, now[l.child] && now[l.child].snack, now[l.child] ? Number(now[l.child].burden || 0) : 0, 'リンクに出る実費');
       return `<tr${c && c.confirm === '相違があります' ? ' style="background:#fdecec"' : ''}><td>${esc(l.child)}</td>
       <td>${c ? `${esc(c.confirm)}<br><small>${esc(c.parent_name)}・${new Date(c.submitted_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}${c.signature ? '・署名あり' : ''}</small>${c.comment ? `<br><small>${esc(c.comment)}</small>` : ''}` : '<span style="color:#d33">未確認</span>'}${money}</td>
       <td><button style="width:auto;padding:6px 10px" onclick="kkCopy('${l.token}', this)">コピー</button></td></tr>`; }).join('')}</table>`
