@@ -1,0 +1,120 @@
+/* 星心会 職員ポータル — 官吏・衙門の執務室テーマ（サンプル）
+   html.th-yamen のときだけ効く。?theme=retro で従来レトロに戻る。
+   色・枠・書体だけ。並び・機能・会長ページ（#chair）の中身は変えない。 */
+html.th-yamen {
+  --ym-red: #7a1414; --ym-red-2: #a3201c; --ym-lacquer: #4a0b0b;
+  --ym-black: #140a08; --ym-gold: #d4a945; --ym-gold-2: #f0d48a;
+  --ym-ivory: #f6ecd2; --ym-ivory-2: #e9d9b3; --ym-ink: #2a1a10; --ym-seal: #b3261e;
+  --ym-font: "Shippori Mincho", "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif CJK JP", serif;
+}
+html.th-yamen body.portal {
+  font-family: var(--ym-font);
+  color: var(--ym-ivory);
+  background-color: var(--ym-lacquer);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(212,169,69,.18), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 2px, transparent 2px 28px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 2px, transparent 2px 28px),
+    linear-gradient(180deg, #5c0f0f, #330707);
+  background-attachment: fixed;
+}
+html.th-yamen body.portal, html.th-yamen body.portal button, html.th-yamen body.portal input,
+html.th-yamen body.portal select, html.th-yamen body.portal textarea { font-family: var(--ym-font); }
+
+/* 帯：漆黒＋金縁の扁額 */
+html.th-yamen body.portal header {
+  background: linear-gradient(180deg, #1d0e0a, var(--ym-black));
+  border-bottom: 3px double var(--ym-gold);
+  box-shadow: 0 4px 0 var(--ym-red), 0 8px 18px rgba(0,0,0,.5);
+  color: var(--ym-gold-2); letter-spacing: .12em; font-weight: 700;
+}
+html.th-yamen body.portal header button, html.th-yamen body.portal #out {
+  background: transparent; color: var(--ym-gold-2); border: 1px solid var(--ym-gold);
+  box-shadow: none; border-radius: 2px;
+}
+
+/* 挨拶：扁額「今日之務」 */
+html.th-yamen body.portal #hi {
+  background: var(--ym-black); color: var(--ym-gold-2);
+  border: 2px solid var(--ym-gold); outline: 1px solid var(--ym-gold); outline-offset: -7px;
+  padding: 16px 18px; border-radius: 2px; text-align: center; letter-spacing: .08em;
+  box-shadow: 0 6px 16px rgba(0,0,0,.45);
+}
+html.th-yamen body.portal #hi::before {
+  content: "今日之務"; display: block; font-size: 1.6em; font-weight: 800; letter-spacing: .4em;
+  color: var(--ym-gold); text-shadow: 0 2px 0 #000; margin-bottom: 4px;
+}
+
+/* 見出し：金の飾り罫 */
+html.th-yamen body.portal h2, html.th-yamen body.portal h3, html.th-yamen body.portal h4,
+html.th-yamen body.portal #view > h3, html.th-yamen body.portal #view > h4 {
+  color: var(--ym-gold-2); background: none; border: 0; box-shadow: none;
+  letter-spacing: .15em; text-shadow: 0 1px 0 #000;
+}
+html.th-yamen body.portal #view > h3::before, html.th-yamen body.portal h3.nx::before { content: "❖ "; color: var(--ym-gold); }
+html.th-yamen body.portal #view > h3::after {
+  content: ""; display: block; height: 2px; margin-top: 6px;
+  background: linear-gradient(90deg, var(--ym-gold), transparent);
+}
+
+/* タイル：象牙色の巻物パネル */
+html.th-yamen body.portal .tile, html.th-yamen body.portal .nxc, html.th-yamen body.portal a.tile {
+  position: relative;
+  background: linear-gradient(180deg, var(--ym-ivory), var(--ym-ivory-2));
+  color: var(--ym-ink) !important;
+  border: 2px solid var(--ym-gold) !important;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 4px var(--ym-ivory), inset 0 0 0 5px rgba(122,20,20,.35), 0 6px 14px rgba(0,0,0,.45);
+  font-weight: 700; image-rendering: auto;
+  transition: transform .15s, box-shadow .15s;
+}
+html.th-yamen body.portal .tile::before, html.th-yamen body.portal .tile::after {
+  content: ""; position: absolute; left: -4px; right: -4px; height: 7px;
+  background: linear-gradient(180deg, #6b4a1a, var(--ym-gold), #6b4a1a); border-radius: 4px;
+}
+html.th-yamen body.portal .tile::before { top: -5px; }
+html.th-yamen body.portal .tile::after { bottom: -5px; }
+html.th-yamen body.portal .tile small, html.th-yamen body.portal .nxc small,
+html.th-yamen body.portal .office small { color: #6b4a33 !important; font-weight: 500; }
+html.th-yamen body.portal .tile.office { border-left: 6px solid var(--c, var(--ym-red)) !important; }
+@media (hover: hover) {
+  html.th-yamen body.portal .tile:hover, html.th-yamen body.portal .nxc:hover {
+    transform: translateY(-3px);
+    box-shadow: inset 0 0 0 4px var(--ym-ivory), inset 0 0 0 5px rgba(122,20,20,.5), 0 0 0 2px var(--ym-gold-2), 0 10px 22px rgba(0,0,0,.55);
+  }
+}
+
+/* 朱印：未処理・未読バッジ */
+html.th-yamen body.portal .badge, html.th-yamen body.portal .tile .badge {
+  background: var(--ym-seal) !important; color: #fff3e6 !important;
+  border: 2px solid #fff3e6; outline: 2px solid var(--ym-seal);
+  border-radius: 3px; padding: 2px 8px; box-shadow: none; font-weight: 800;
+  transform: rotate(-4deg);
+}
+
+/* ボタン：朱漆＋金 */
+html.th-yamen body.portal button, html.th-yamen body.portal .btn, html.th-yamen body.portal a.btn {
+  background: linear-gradient(180deg, var(--ym-red-2), var(--ym-red));
+  color: var(--ym-ivory); border: 1px solid var(--ym-gold); border-radius: 3px;
+  box-shadow: 0 3px 0 #2a0505;
+}
+html.th-yamen body.portal button.btn-ghost { background: transparent; color: var(--ym-gold-2); }
+
+/* ログイン・カード類：巻物 */
+html.th-yamen body.portal .card {
+  background: linear-gradient(180deg, var(--ym-ivory), var(--ym-ivory-2)); color: var(--ym-ink);
+  border: 2px solid var(--ym-gold); border-radius: 3px; box-shadow: 0 8px 20px rgba(0,0,0,.5);
+}
+html.th-yamen body.portal input, html.th-yamen body.portal select, html.th-yamen body.portal textarea {
+  background: #fffaf0; color: var(--ym-ink); border: 1px solid #8a6a3a; border-radius: 2px; box-shadow: none;
+}
+html.th-yamen body.portal #help, html.th-yamen body.portal #home > p:not(#hi), html.th-yamen body.portal .note { color: var(--ym-ivory-2); }
+
+/* 下の標語 */
+html.th-yamen body.portal #home::after {
+  content: "仁を以て務め、礼を以て接し、誠を以て民に寄り添う";
+  display: block; text-align: center; margin: 28px 0 8px; color: var(--ym-gold);
+  letter-spacing: .2em; font-size: 14px; opacity: .85;
+}
+@media (prefers-reduced-motion: reduce) { html.th-yamen body.portal .tile { transition: none; } }
+@media print { html.th-yamen body.portal { background: #fff; color: #000; } }

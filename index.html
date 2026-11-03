@@ -119,6 +119,10 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
 <link rel="stylesheet" href="theme-retro.css?v=20261103pc">
+<script>/* テーマ切替：未指定=官吏(yamen)、?theme=retro で従来。localStorage に覚える */
+(function(){try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')localStorage.setItem('portalTheme',q);var t=q||localStorage.getItem('portalTheme')||'yamen';if(t==='yamen')document.documentElement.classList.add('th-yamen');}catch(e){document.documentElement.classList.add('th-yamen');}})();</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="theme-yamen.css?v=20261103a">
 </head><body class="portal">
 <header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
