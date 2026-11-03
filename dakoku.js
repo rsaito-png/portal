@@ -27,6 +27,14 @@ function dkCfg() {
   const c = (window.PORTAL_CONFIG && window.PORTAL_CONFIG.dakoku) || {};
   return { gasUrl: String(c.gasUrl || '').trim(), token: String(c.token || '').trim() };
 }
+// 職員の割り当て事業所（所属＋兼務）で打刻対象を絞る。1つなら固定、複数なら選択（初期は所属）、0なら従来どおり全件。
+function dkAssigned(all) {
+  const mine = typeof MY_OFFICE === 'string' ? MY_OFFICE : '';
+  const extra = typeof EXTRA_OFFICES !== 'undefined' && Array.isArray(EXTRA_OFFICES) ? EXTRA_OFFICES : [];
+  const names = [mine, ...extra].filter((n, i, a) => n && a.indexOf(n) === i);
+  const hit = names.map(n => all.find(o => o.name === n)).filter(Boolean);
+  return hit.length ? hit : all;
+}
 function dkRemember(office, email, id) {
   try { sessionStorage.setItem('dakoku:' + office + ':' + email, id); } catch (e) { /* 記憶できなくても打刻はできる */ }
 }
@@ -81,7 +89,7 @@ function dkGeo() {
   });
 }
 function dkView() {
-  const offices = Dakoku.visibleOffices(DK.data && DK.data.offices);
+  const offices = dkAssigned(Dakoku.visibleOffices(DK.data && DK.data.offices));
   const office = offices.find(o => o.name === DK.office) || null;
   const resolved = office ? Dakoku.resolveStaff({ email: DK.sess.email, staff: DK.data.staff, office: office.name, chosenId: DK.staffId }) : { staff: null, mode: 'pick', list: [] };
   const judge = office ? Dakoku.judge(DK.locating ? null : DK.pos, office) : { ok: false, distance: null, reason: offices.length ? '事業所を選んでください / Escolha o local' : '打刻できる事業所がありません / Nenhum local disponível para registro' };
@@ -161,7 +169,7 @@ async function dkLocate() {
 }
 function dkDemoPos() {
   if (!DK.sess.demo || !DK.data) return;
-  const office = Dakoku.visibleOffices(DK.data.offices).find(o => o.name === DK.office);
+  const office = dkAssigned(Dakoku.visibleOffices(DK.data.offices)).find(o => o.name === DK.office);
   if (!office || office.lat == null) return;
   DK_LOC_SEQ++;
   DK.pos = { lat: office.lat, lng: office.lng, accuracy: 5, demo: true };
@@ -173,7 +181,7 @@ function dkPickOffice(name) {
   DK.staffId = dkRecall(name, DK.sess.email);
   DK.recent = []; DK.msg = '';
   DK.posError = '';
-  const office = (DK.data && Dakoku.visibleOffices(DK.data.offices).find(o => o.name === name)) || null;
+  const office = (DK.data && dkAssigned(Dakoku.visibleOffices(DK.data.offices)).find(o => o.name === name)) || null;
   if (office && Dakoku.gpsRequired(office)) {
     DK.pos = null;
     dkLocate();
@@ -249,7 +257,7 @@ async function renderDakoku() {
     $('view').innerHTML = back + `<div class="dk"><h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><div class="ng">${dkEsc(e.message || e)}</div><p class="meta">手順は dakoku-gas/README.md です。</p></div>`;
     return;
   }
-  const offices = Dakoku.visibleOffices(DK.data.offices);
+  const offices = dkAssigned(Dakoku.visibleOffices(DK.data.offices));
   if (!DK.office || !offices.some(o => o.name === DK.office)) DK.office = offices.length ? offices[0].name : '';
   if (!DK.staffId) DK.staffId = dkRecall(DK.office, DK.sess.email);
   const cur = offices.find(o => o.name === DK.office);
