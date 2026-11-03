@@ -75,7 +75,14 @@ async function ryMe() {
   const uid = ryUid(); if (!uid) return null;
   const p = await rb(`bp_profiles?id=eq.${uid}&select=role,display_name,office`);
   if (p.length) RYD.me = { uid, role: p[0].role, name: p[0].display_name, office: p[0].office };
-  else { const s = await rb('staff_profiles?select=office,nikki_name').catch(() => []); const m = s.find(x => x.office === 'RYDEEN'); if (m) RYD.me = { uid, role: 'admin', name: m.nikki_name || ryTok().email || '', office: 'RYDEEN' }; }
+  else {
+    const s = await rb(`staff_profiles?user_id=eq.${uid}&select=office,role,nikki_name,full_name`).catch(() => []); const m = s[0];
+    const nm = m ? (m.full_name || m.nikki_name) : '';
+    let corp = !!(m && m.role === '事務');
+    if (!corp) corp = await rb('rpc/bp_is_corp_admin', { method: 'POST', body: {} }).then(r => r === true).catch(() => false);
+    if (corp) RYD.me = { uid, role: 'admin', name: nm || ryTok().email || '', office: 'RYDEEN' };
+    else if (m && m.office === 'RYDEEN') RYD.me = { uid, role: 'admin', name: m.nikki_name || ryTok().email || '', office: 'RYDEEN' };
+  }
   return RYD.me;
 }
 const ryLoadNames = async () => { const w = await rb('bp_profiles?role=eq.worker&select=id,display_name&order=display_name'); RYD.workers = w; RYD.wname = Object.fromEntries(w.map(x => [x.id, x.display_name])); return w; };
