@@ -39,7 +39,7 @@ assert.ok(sql.includes('leo_jisseki_from_nikki'));
 assert.ok(sql.includes("kind = '欠席'"));
 assert.ok(!sql.includes("'キャンセル'"), 'この関数はキャンセルを作らない');
 assert.ok(sql.includes('leo_day_flags_absent_note_required'));
-assert.ok(html.includes('leo.js?v=20261102todo2'));
+assert.ok(html.includes('leo.js?v=20261103extra'));
 
 const sandbox = {
   DEMO: true,

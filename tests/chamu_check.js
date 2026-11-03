@@ -20,7 +20,9 @@ assert.strictEqual(defaults.unit_price, '10.37');
 assert.strictEqual(defaults.shogu_item, '5175');
 assert.strictEqual(defaults.ishi_gen, true);
 assert.strictEqual(defaults.default_start, '11:00');
-assert.strictEqual(defaults.default_end, '15:00');
+assert.strictEqual(defaults.default_end, '14:00');
+assert.strictEqual(L.INTAKE_DEFAULT, '100%');
+assert.strictEqual(L.RICE_DEFAULT, '150g');
 assert.strictEqual(defaults.standard_band, '4時間以上5時間未満');
 assert.strictEqual(L.bandOf('11:00', '15:00'), '4時間以上5時間未満');
 assert.strictEqual(L.bandOf('10:00', '16:00'), '6時間以上7時間未満');
@@ -38,7 +40,10 @@ assert.ok(L.validateJournal(form([baseUser()]), defaults).length === 0);
 const blank = L.prepareLine(baseUser({ start_time: '', end_time: '' }), defaults);
 assert.strictEqual(blank.filled, true);
 assert.strictEqual(blank.start_time, '11:00');
-assert.strictEqual(blank.end_time, '15:00');
+assert.strictEqual(blank.end_time, '14:00');
+const filledEat = L.prepareLine(baseUser({ intake: '', intake_note: '残した' }), defaults);
+assert.strictEqual(filledEat.intake, '100%');
+assert.strictEqual(filledEat.intake_note, null);
 
 const plan1 = L.syncPlan([baseUser()], [], defaults);
 assert.strictEqual(plan1.upsert.length, 1);
@@ -120,7 +125,8 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=202611021830'));
+assert.ok(html.includes('chamu.js?v=202611031400'));
+assert.ok(html.includes('leo.js?v=20261103extra'));
 assert.ok(html.includes('leo_kinmu.js?v=20261102read'));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
@@ -137,10 +143,15 @@ assert.ok(src.includes('createSignPad'));
 assert.ok(!src.includes('bp_journal') && !src.includes('bp_service_records'));
 const sql = fs.readFileSync(path.join(root, 'supabase/chamu.sql'), 'utf8');
 assert.ok(sql.includes('chamu_can()') && sql.includes('chamu_can_bill()') && sql.includes('2410202663'));
-assert.ok(sql.includes("default '11:00'") && sql.includes("default '15:00'") && sql.includes("default '4時間以上5時間未満'"));
-assert.ok(sql.includes("values (1, '4時間以上5時間未満', '11:00', '15:00')"));
-assert.ok(!sql.includes("default '10:00'") && !sql.includes("default '16:00'") && !sql.includes("default '6時間以上7時間未満'"));
-assert.ok(src.includes("default_start: '11:00'") && src.includes("default_end: '15:00'") && src.includes('11:00–15:00'));
+assert.ok(sql.includes("default '11:00'") && sql.includes("default '14:00'") && sql.includes("default '4時間以上5時間未満'"));
+assert.ok(sql.includes("values (1, '4時間以上5時間未満', '11:00', '14:00')"));
+assert.ok(sql.includes("default_end = '15:00'"));
+assert.ok(!sql.includes("default '15:00'") && !sql.includes("default '10:00'") && !sql.includes("default '16:00'") && !sql.includes("default '6時間以上7時間未満'"));
+assert.ok(sql.includes('extra_offices') && sql.includes("'茶夢' = any (coalesce(extra_offices, '{}'::text[]))"));
+assert.ok(src.includes("default_start: '11:00'") && src.includes("default_end: '14:00'") && src.includes("|| '14:00'") && src.includes('11:00–14:00'));
+assert.ok(!src.includes("default_end: '15:00'") && !src.includes("|| '15:00'") && !src.includes('11:00–15:00'));
+assert.ok(src.includes('初期は100%') && src.includes('初期は150g') && src.includes('ChamuLib.INTAKE_DEFAULT') && src.includes('ChamuLib.RICE_DEFAULT'));
+assert.ok(!src.includes('未記入でも保存できます') && !src.includes('Pode salvar sem preencher'));
 assert.ok(!src.includes("default_start: '10:00'") && !src.includes("|| '10:00'") && !src.includes("'16:00'") && !src.includes('10:00–16:00'));
 assert.ok(sql.includes("office = '茶夢'") && sql.includes('enable row level security'));
 assert.ok(!sql.includes('日置') && !sql.includes('0000222844'));
@@ -269,8 +280,9 @@ assert.deepStrictEqual(L.validateJournal(form([baseUser({ meal: 'なし', intake
 assert.ok(L.validateJournal(form([baseUser({ intake: '73%' })])).some(e => e.includes('摂食')));
 assert.ok(L.validateJournal({ ...form([baseUser()]), rice_portion: 'あ'.repeat(81) }).some(e => e.includes('ごはん')));
 assert.deepStrictEqual(L.prepareHead({ menu: ' カレー ', rice_portion: '', egg_count: '1個', tofu_g: '  ', meat_note: '', fish_g: '', dairy_note: '' }), {
-  menu: 'カレー', rice_portion: null, egg_count: '1個', tofu_g: null, meat_note: null, fish_g: null, dairy_note: null,
+  menu: 'カレー', rice_portion: '150g', egg_count: '1個', tofu_g: null, meat_note: null, fish_g: null, dairy_note: null,
 });
+assert.strictEqual(L.prepareHead({ rice_portion: '半量75g' }).rice_portion, '半量75g');
 const mealPlan = L.syncPlan([baseUser({ meal: 'あり', intake: '80%' })], [], defaults);
 assert.strictEqual(mealPlan.upsert[0].meal, 'あり');
 assert.ok(!('intake' in mealPlan.upsert[0]) && !('intake_note' in mealPlan.upsert[0]));

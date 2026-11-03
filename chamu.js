@@ -27,8 +27,10 @@ var ChamuLib = (() => {
   const DEFAULTS = {
     office_no: '2410202663', office_name: '茶夢', service_type: '22', region_code: '06', unit_price: '10.37',
     shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '4時間以上5時間未満',
-    default_start: '11:00', default_end: '15:00', ishi_gen: true,
+    default_start: '11:00', default_end: '14:00', ishi_gen: true,
   };
+  const RICE_DEFAULT = '150g';
+  const INTAKE_DEFAULT = '100%';
   const clip = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
   const time = v => {
     const m = /^(\d{1,2}):(\d{2})/.exec(String(v || '').trim());
@@ -71,11 +73,10 @@ var ChamuLib = (() => {
     const [y, m] = String(ym).split('-').map(Number);
     return String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0');
   };
-  // 摂食は食事ありのときだけ。空欄可。80% などを請求の単位にはしない。
+  // 摂食は食事ありのときだけ。空なら初期の100%。80% などを請求の単位にはしない。
   const prepareIntake = line => {
     if (!line || line.meal !== 'あり') return { intake: null, intake_note: null };
-    const intake = textOf(line.intake);
-    if (!intake) return { intake: null, intake_note: null };
+    const intake = textOf(line.intake) || INTAKE_DEFAULT;
     if (INTAKE.indexOf(intake) < 0) return { intake, intake_note: textOf(line.intake_note) || null, bad: 'choice' };
     if (intake !== 'その他') return { intake, intake_note: null };
     const note = textOf(line.intake_note);
@@ -92,7 +93,10 @@ var ChamuLib = (() => {
   };
   const prepareHead = form => {
     const head = { menu: clip(form && form.menu, 500) || null };
-    PORTION_FIELDS.forEach(([k]) => { head[k] = clip(form && form[k], PORTION_MAX) || null; });
+    PORTION_FIELDS.forEach(([k]) => {
+      const v = clip(form && form[k], PORTION_MAX);
+      head[k] = k === 'rice_portion' ? (v || RICE_DEFAULT) : (v || null);
+    });
     return head;
   };
   const validateJournal = (form, defaults) => {
@@ -118,7 +122,7 @@ var ChamuLib = (() => {
       if (TRANSPORT.indexOf(u.transport) < 0) err.push(n + '送迎を選んでください');
       if (MEAL.indexOf(u.meal) < 0) err.push(n + '食事を選んでください');
       const eat = prepareIntake(u);
-      if (eat.bad === 'choice') err.push(n + '摂食量は 100%・80%・50%・その他 から選ぶか、空欄にしてください');
+      if (eat.bad === 'choice') err.push(n + '摂食量は 100%・80%・50%・その他 から選んでください');
       if (eat.bad === 'note') err.push(n + '摂食のメモは80文字以内にしてください');
       if (clip(u.support_note, 10000).length > 2000) err.push(n + '支援内容は2000文字以内にしてください');
     });
@@ -417,8 +421,8 @@ var ChamuLib = (() => {
       (when || '今月') + '分の献立報告をお送りします。',
       '',
       '利用者は記号（A、B、C…）のみで、氏名は書いていません。',
-      '摂食量は現場の目安です（100%・80%・50%・その他）。空欄は未記入です。',
-      'ごはんは炊いた後の分量です。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけを書いています。',
+      '摂食量は現場の目安です（100%・80%・50%・その他）。初期は100%です。',
+      'ごはんは炊いた後の分量です。初期は150gです。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけを書いています。',
     ];
     const tail = ['食事を提供した回数の合計は ' + (src.total || 0) + ' です。', 'どうぞよろしくお願いいたします。', '茶夢'];
     const body = cover.concat(['', table, '']).concat(tail).join('\n');
@@ -436,7 +440,7 @@ var ChamuLib = (() => {
       csv: menuReportCsv(src, true), filename: 'chamu-kondate-' + (src.ym || 'month') + '.csv', mailto: used.mailto, gmail: used.gmail,
     };
   };
-  return { WEATHER, TRANSPORT, MEAL, INTAKE, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail };
+  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail };
 })();
 /* /cm-pure */
 
@@ -582,7 +586,7 @@ async function renderChamu(sub) {
     CM.can = await cmRpc('chamu_can');
     CM.bill = await cmRpc('chamu_can_bill');
   } catch (e) { return cmShow(cmBack() + `<div class="card"><p>${cmEsc(e.message || e)}</p><p class="note">茶夢の表がまだないときは、supabase/chamu.sql を適用してください。</p></div>`); }
-  if (CM.can !== true) return cmShow(cmBack() + '<div class="card"><p>茶夢の記録は、茶夢の職員と、事務・会長が使えます。</p><p class="note">茶夢の職員として使うには、管理者に所属（staff_profiles の office）を「茶夢」にしてもらってください。</p></div>');
+  if (CM.can !== true) return cmShow(cmBack() + '<div class="card"><p>茶夢の記録は、茶夢の職員と、事務・会長が使えます。</p><p class="note">茶夢の職員として使うには、管理者に所属（staff_profiles の office）か兼務（extra_offices）へ「茶夢」を入れてもらってください。</p></div>');
   if (sub === 'billing' && CM.bill !== true) return cmFrame('billing', '<div class="card"><p>国保連CSVは、事務・茶夢の管理者・会長だけが作れます。</p></div>');
   const page = { journal: cmJournal, kondate: cmKondate, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
   try { await page(); } catch (e) { cmFrame(sub, `<div class="ng">${cmEsc(e.message || e)}</div>`); }
@@ -601,12 +605,13 @@ async function cmJournal() {
   CM.st.date = date;
   const card = u => {
     const l = by[u.id] || {}, chosen = l.user_id ? (l.present ? '出席' : '欠席') : '', k = u.id;
+    const meal = l.meal || 'あり', intake = l.intake || (meal === 'あり' ? ChamuLib.INTAKE_DEFAULT : '');
     return `<div class="jr"><div class="row" style="align-items:end"><div style="flex:0 0 160px"><b>${cmEsc(u.name)}</b></div><div><label class="l">出欠 / Presença</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
       <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始 / Início', (l.start_time || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了 / Fim', (l.end_time || '').slice(0, 5), 'time')}
         <div><label class="l">送迎 / Transporte</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
-        <div><label class="l">食事 / Refeição</label>${cmSel('m_' + k, ChamuLib.MEAL, l.meal || 'あり')}</div>
-        <div id="eat_${k}" style="flex:1 1 100%;${(l.meal || 'あり') === 'あり' ? '' : 'display:none'}"><label class="l">摂食（任意） / Quanto comeu (opcional)</label>${cmSel('i_' + k, ChamuLib.INTAKE, l.intake || '', '未記入')}
-          <p class="note">ざっくりで大丈夫です（100%・80%・50%・その他）。未記入でも保存できます。<br>Pode ser aproximado. Pode salvar sem preencher.</p>
+        <div><label class="l">食事 / Refeição</label>${cmSel('m_' + k, ChamuLib.MEAL, meal)}</div>
+        <div id="eat_${k}" style="flex:1 1 100%;${meal === 'あり' ? '' : 'display:none'}"><label class="l">摂食 / Quanto comeu</label>${cmSel('i_' + k, ChamuLib.INTAKE, intake, '未記入')}
+          <p class="note">ざっくりで大丈夫です。初期は100%です（80%・50%・その他も選べます）。<br>Pode ser aproximado. O padrão é 100%.</p>
           <div id="eatn_${k}" style="${l.intake === 'その他' ? '' : 'display:none'}">${cmInp('in_' + k, 'その他の目安（任意） / Outro (opcional)', l.intake_note || '', 'text', 'maxlength="80" placeholder="例: 半分も残した"')}</div></div>
         <div style="flex:1 1 100%">${cmNoteField('n_' + k, '支援内容・ご様子 / Apoio e estado da pessoa', l.support_note || '')}</div></div></div>`;
   };
@@ -619,8 +624,8 @@ async function cmJournal() {
     <div class="card">${cmInp('j_staff', '記入者 / Quem preencheu', (day && day.staff_name) || staff)}
       <div><label class="l">天気 / Tempo</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>
       <label class="l">献立 / Cardápio</label><textarea id="j_menu" maxlength="500" placeholder="例: ごはん、味噌汁、豚肉の生姜焼き">${cmEsc((day && day.menu) || '')}</textarea>
-      <p class="note">栄養士への分量です。空欄でも保存できます。ごはんは炊いた後の量（半量も、その量で書いてください）。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけです。<br>Quantidades para a nutricionista. Pode deixar em branco. Arroz: peso depois de cozido.</p>
-      <div class="row">${cmInp('j_rice', 'ごはん（炊いた後） / Arroz (cozido)', (day && day.rice_portion) || '', 'text', 'maxlength="80" placeholder="例: 150g/人、半量は75g"')}
+      <p class="note">栄養士への分量です。ごはん（炊いた後）の初期は150gです。半量の日は、その量に書き換えてください。卵・豆腐・肉・魚・牛乳は空欄でも保存できます。<br>Quantidades para a nutricionista. Arroz (cozido) começa em 150g. Ovos, tofu, carne, peixe e leite podem ficar em branco.</p>
+      <div class="row">${cmInp('j_rice', 'ごはん（炊いた後） / Arroz (cozido)', (day && String(day.rice_portion || '').trim()) || ChamuLib.RICE_DEFAULT, 'text', 'maxlength="80" placeholder="半量の例: 75g"')}
         ${cmInp('j_egg', '卵（個数） / Ovos (qtd.)', (day && day.egg_count) || '', 'text', 'maxlength="80" placeholder="例: 1個"')}
         ${cmInp('j_tofu', '豆腐（1人分） / Tofu (por pessoa)', (day && day.tofu_g) || '', 'text', 'maxlength="80" placeholder="例: 150g"')}
         ${cmInp('j_meat', '肉（1人分） / Carne (por pessoa)', (day && day.meat_note) || '', 'text', 'maxlength="80" placeholder="例: 豚肉50g、ハム1枚、ソーセージ1本"')}
@@ -654,8 +659,10 @@ function cmNoteField(id, label, value) {
   return `<div class="cm-lab"><label class="l">${cmEsc(label)}</label><button type="button" class="sec inl noprint" id="tr_btn_${safe}" onclick="cmTranslate('${safe}')" title="Traduzir para japonês">日本語にする</button><span class="note noprint"> ← Traduzir para japonês</span></div><textarea id="${safe}">${cmEsc(value || '')}</textarea><div id="tr_out_${safe}" class="cm-tr noprint"></div>`;
 }
 function cmMealToggle(id) {
-  const eat = document.getElementById('eat_' + id), note = document.getElementById('eatn_' + id);
-  if (eat) eat.style.display = cmV('m_' + id) === 'あり' ? '' : 'none';
+  const eat = document.getElementById('eat_' + id), note = document.getElementById('eatn_' + id), intake = document.getElementById('i_' + id);
+  const on = cmV('m_' + id) === 'あり';
+  if (eat) eat.style.display = on ? '' : 'none';
+  if (on && intake && !intake.value) intake.value = ChamuLib.INTAKE_DEFAULT;
   if (note) note.style.display = cmV('i_' + id) === 'その他' ? '' : 'none';
 }
 function cmToggle(id) { const det = document.getElementById('det_' + id); if (det) det.style.display = cmV('p_' + id) === '出席' ? '' : 'none'; cmMealToggle(id); }
@@ -888,7 +895,7 @@ async function cmBilling() {
   }
   CM.files = files;
   const s = input.settings, blocked = input.blocking.length > 0 || !!err || !files || (files && files.issues.length > 0);
-  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、11:00–15:00、医師未配置減算あり）です。</p>
+  const setForm = CM.bill ? `<div class="card"><h4>事業所の請求設定</h4><p class="note">初期値は日誌シートの事業所マスタ（事業所番号 2410202663、種類22、地域06、単価10.37、処遇改善Ⅱロ 9.6%・項目5175、定員11-20、11:00–14:00、医師未配置減算あり）です。</p>
     <div class="row">${cmInp('bs_office_no', '事業所番号', s.office_no)}${cmInp('bs_office_name', '事業所名', s.office_name)}
       ${cmInp('bs_region_code', '地域区分コード', s.region_code)}${cmInp('bs_unit_price', '地域区分単価', s.unit_price)}
       ${cmInp('bs_shogu_rate', '処遇改善加算率', s.shogu_rate)}${cmInp('bs_shogu_item', '処遇改善のサービスコード項目', s.shogu_item)}
@@ -922,7 +929,7 @@ async function cmSaveSettings() {
       office_no: office, office_name: cmV('bs_office_name').trim() || '茶夢', service_type: '22', region_code: cmV('bs_region_code').trim() || '06',
       unit_price: cmV('bs_unit_price').trim() || '10.37', shogu_rate: cmV('bs_shogu_rate').trim() || '0.096', shogu_item: cmV('bs_shogu_item').trim() || '5175',
       capacity_scale: '11-20', standard_band: cmV('bs_band') || ChamuLib.DEFAULTS.standard_band, default_start: ChamuLib.time(cmV('bs_start')) || '11:00',
-      default_end: ChamuLib.time(cmV('bs_end')) || '15:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
+      default_end: ChamuLib.time(cmV('bs_end')) || '14:00', ishi_gen: cmC('bs_ishi'), updated_at: new Date().toISOString(),
     };
     const saved = await cmRest('chamu_billing_settings?id=eq.1', { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
     if (!saved || !saved.length) throw new Error('請求設定がありません。supabase/chamu.sql を適用してください');

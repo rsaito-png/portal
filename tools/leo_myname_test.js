@@ -40,7 +40,7 @@ const fakeSb = calls => async path => {
   assert.strictEqual(await vm.runInContext('myName()', sbx), '宮本　幸子');
   assert.ok(calls[0].includes('user_id=eq.' + UID) && calls[0].includes('select=nikki_name'), calls[0]);
   assert.strictEqual(await vm.runInContext('loadDuty().then(() => DUTY)', sbx), '事務');
-  assert.ok(calls[1].includes('user_id=eq.' + UID) && calls[1].includes('select=duty'), calls[1]);
+  assert.ok(calls[1].includes('user_id=eq.' + UID) && calls[1].includes('select=duty') && calls[1].includes('extra_offices'), calls[1]);
   // 自分の行が無いときは先頭の他人にフォールバックしない
   sbx = mkSandbox(JSON.stringify({ token: jwt({ sub: '99999999-0000-0000-0000-000000000009' }) }));
   Object.assign(sbx, { __sb: fakeSb([]) }); vm.runInContext('sb = globalThis.__sb', sbx);
@@ -56,5 +56,24 @@ const fakeSb = calls => async path => {
   Object.assign(sbx, { __sb: fakeSb(calls) }); vm.runInContext('sb = globalThis.__sb', sbx);
   assert.strictEqual(await vm.runInContext('myName()', sbx), vm.runInContext('DEMO_DATA.me', sbx));
   assert.strictEqual(calls.length, 0);
+  // 兼務: 主所属に extra_offices の事業所を足す。nicchu の日中一時と同じ並び。事務は全部。
+  sbx = mkSandbox(JSON.stringify({ token: jwt({ sub: UID }) }));
+  const both = [{ user_id: UID, duty: '現場支援員', office: '金斗雲', nicchu: false, is_chair: false, extra_offices: ['茶夢'], full_name: '見本', nikki_name: '見本' }];
+  Object.assign(sbx, { __sb: async () => both, ROLE: '職員' });
+  sbx.C.offices = [
+    { id: 'leo', name: 'レオ' }, { id: 'kintoun', name: '金斗雲' }, { id: 'chamu', name: '茶夢' }, { id: 'nicchu', name: '日中一時支援' },
+  ];
+  vm.runInContext('sb = globalThis.__sb; ROLE = "職員"', sbx);
+  await vm.runInContext('loadDuty()', sbx);
+  assert.deepStrictEqual(vm.runInContext('EXTRA_OFFICES', sbx), ['茶夢']);
+  assert.deepStrictEqual(vm.runInContext('visibleOffices().map(o => o.name)', sbx), ['金斗雲', '茶夢']);
+  assert.strictEqual(vm.runInContext('canOpenOffice({ id: "chamu", name: "茶夢" })', sbx), true);
+  assert.strictEqual(vm.runInContext('canOpenOffice({ id: "leo", name: "レオ" })', sbx), false);
+  vm.runInContext('NICCHU = true', sbx);
+  assert.deepStrictEqual(vm.runInContext('visibleOffices().map(o => o.name)', sbx), ['金斗雲', '茶夢', '日中一時支援']);
+  vm.runInContext('ROLE = "事務"', sbx);
+  assert.deepStrictEqual(vm.runInContext('visibleOffices().map(o => o.id)', sbx), ['leo', 'kintoun', 'chamu', 'nicchu']);
+  vm.runInContext('ROLE = "職員"; EXTRA_OFFICES = "{茶夢}"', sbx);
+  assert.deepStrictEqual(vm.runInContext('visibleOffices().map(o => o.name)', sbx), ['金斗雲', '茶夢', '日中一時支援']);
   console.log('leo_myname_test OK');
 })().catch(e => { console.error(e); process.exit(1); });

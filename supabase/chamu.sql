@@ -3,6 +3,10 @@
 -- 再実行できる。利用者の実名・受給者証はこのファイルに書かない（supabase/chamu_seed.sql を管理者が実行する）。
 -- 適用: Supabase SQL Editor にこのファイルを貼って Run。または apply_migration。
 
+-- 兼務。主所属は office、もう一つの事業所名は extra_offices。個人名は書かない。再実行できる。
+alter table public.staff_profiles add column if not exists extra_offices text[] not null default '{}';
+comment on column public.staff_profiles.extra_offices is '兼務する事業所名。主所属の office に加えて、トップの事業所一覧と茶夢の利用可否に使う。';
+
 create or replace function public.chamu_can()
 returns boolean
 language sql
@@ -17,7 +21,11 @@ as $$
       select 1 from public.staff_profiles
       where user_id = auth.uid()
         and active
-        and (office = '茶夢' or role = '事務')
+        and (
+          office = '茶夢'
+          or role = '事務'
+          or '茶夢' = any (coalesce(extra_offices, '{}'::text[]))
+        )
     ),
     false)
 $$;
@@ -165,19 +173,22 @@ create table if not exists public.chamu_billing_settings (
   capacity_scale text not null default '11-20',
   standard_band text not null default '4時間以上5時間未満',
   default_start text not null default '11:00',
-  default_end text not null default '15:00',
+  default_end text not null default '14:00',
   ishi_gen boolean not null default true,
   updated_at timestamptz not null default now()
 );
 
 insert into public.chamu_billing_settings (id, standard_band, default_start, default_end)
-values (1, '4時間以上5時間未満', '11:00', '15:00')
+values (1, '4時間以上5時間未満', '11:00', '14:00')
 on conflict (id) do nothing;
 
--- 再適用時は列の既定だけ合わせる。既存行と日誌・実績は書き換えない。
+-- 再適用時は列の既定を合わせる。既定終了が古い初期値 15:00 の行だけ 14:00 にする。手で変えた値、日誌、実績は書き換えない。
 alter table public.chamu_billing_settings alter column standard_band set default '4時間以上5時間未満';
 alter table public.chamu_billing_settings alter column default_start set default '11:00';
-alter table public.chamu_billing_settings alter column default_end set default '15:00';
+alter table public.chamu_billing_settings alter column default_end set default '14:00';
+update public.chamu_billing_settings
+  set default_end = '14:00', updated_at = now()
+  where id = 1 and default_end = '15:00';
 
 create index if not exists chamu_journal_date on public.chamu_journal (journal_date desc);
 create index if not exists chamu_line_journal on public.chamu_journal_line (journal_id);
@@ -215,8 +226,8 @@ grant select, insert, update, delete on public.chamu_users, public.chamu_journal
 grant select, update on public.chamu_billing_settings to authenticated;
 
 comment on table public.chamu_journal is '茶夢（生活介護）の業務日誌。1日1行。B型の bp_journal とは別。献立と分量は栄養士向け。';
-comment on column public.chamu_journal.rice_portion is '炊いた後のごはんの分量。半量もその量で書く。請求の食事加算には使わない。';
-comment on column public.chamu_journal_line.intake is '摂食の目安。100%・80%・50%・その他、または空。未記入でも保存できる。請求には使わない。';
+comment on column public.chamu_journal.rice_portion is '炊いた後のごはんの分量。初期は150g。半量もその量で書く。請求の食事加算には使わない。';
+comment on column public.chamu_journal_line.intake is '摂食の目安。100%・80%・50%・その他。食事ありの初期は100%（画面が空欄を100%で埋める）。請求には使わない。';
 comment on column public.chamu_journal_line.meal is '食事提供の有無。ありの日だけ、対象者の食事提供体制加算に数える。';
 comment on table public.chamu_service_records is '茶夢のサービス提供実績。日誌の保存時にスクリプトが転記する。署名済みだけ国保連CSVの対象。';
 comment on table public.chamu_billing_settings is '茶夢の事業所マスタ。サービス種類22、事業所番号2410202663、定員11-20、医師未配置減算あり。';

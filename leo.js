@@ -676,16 +676,22 @@ let DUTY = '現場支援員';
 let MY_OFFICE = '';
 let NICCHU = false;
 let IS_CHAIR = false;
+let EXTRA_OFFICES = [];
 const canManage = () => ROLE === '事務' || ['管理者', '児発管'].includes(DUTY);
 let MY_FULL_NAME = '';
 const canLeoHomeTodo = () => canManage() || ['安藤尚子', '加藤幸弘'].includes(MY_FULL_NAME);
-// トップの事業所タイル：事務・管理者・会長は全部、それ以外は所属＋（nicchuなら日中一時）
+function extraOfficeList(v) {
+  const raw = Array.isArray(v) ? v : (typeof v === 'string' ? v.replace(/^\{|\}$/g, '').split(',') : []);
+  return raw.map(s => String(s || '').trim().replace(/^"|"$/g, '')).filter(Boolean);
+}
+// トップの事業所タイル：事務・管理者・会長は全部、それ以外は所属＋兼務（extra_offices）＋（nicchuなら日中一時）
 function visibleOffices() {
   if (typeof DEMO !== 'undefined' && DEMO) return C.offices;
   if (ROLE === '事務' || DUTY === '管理者' || IS_CHAIR) return C.offices;
   const names = new Set();
   if (MY_OFFICE) names.add(MY_OFFICE);
   if (NICCHU) names.add('日中一時支援');
+  extraOfficeList(EXTRA_OFFICES).forEach(n => names.add(n));
   const list = C.offices.filter(o => names.has(o.name));
   return list.length ? list : C.offices.filter(o => o.name === MY_OFFICE);
 }
@@ -698,16 +704,17 @@ function canOpenOffice(o) {
 async function loadDuty() {
   if (DEMO) {
     DUTY = new URLSearchParams(location.search).get('duty') || (ROLE === '事務' ? '管理者' : '現場支援員');
-    MY_OFFICE = ''; NICCHU = false; IS_CHAIR = false;
+    MY_OFFICE = ''; NICCHU = false; IS_CHAIR = false; EXTRA_OFFICES = [];
     MY_FULL_NAME = (new URLSearchParams(location.search).get('name') || '').replace(/[\s　]/g, '');
     return;
   }
   try {
-    const p = await sb(leoMyProfileQ('duty,office,nicchu,is_chair,full_name,nikki_name'));
+    const p = await sb(leoMyProfileQ('duty,office,nicchu,is_chair,extra_offices,full_name,nikki_name'));
     DUTY = p[0]?.duty || '現場支援員';
     MY_OFFICE = p[0]?.office || '';
     NICCHU = !!p[0]?.nicchu;
     IS_CHAIR = !!p[0]?.is_chair;
+    EXTRA_OFFICES = extraOfficeList(p[0]?.extra_offices);
     MY_FULL_NAME = String(p[0]?.full_name || p[0]?.nikki_name || '').replace(/[\s　]/g, '');
   } catch (e) { }
 }
