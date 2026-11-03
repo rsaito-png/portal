@@ -39,7 +39,7 @@ function listen() { return new Promise(r => server.listen(PORT, '127.0.0.1', r))
       const json = (b, s = 200) => req.respond({ status: s, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(b) });
       if (req.method() === 'OPTIONS') return req.respond({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
       if (u.includes('/rpc/leo_confirm_get')) {
-        return json({ child: '見本 太郎', month: '2026-11', last: null, rows: [{ day: '2026-11-02', status: '利用', start: '14:45', end: '17:00' }],
+        return json({ child: '見本 太郎', month: '2026-11', last: null, rows: [{ day: '2026-11-02', status: '出席', start: '14:45', end: '17:00' }, { day: '2026-11-04', status: '利用', start: '14:45', end: '17:00' }, { day: '2026-11-06', status: '欠席', start: '', end: '' }],
           jippi: { found: true, lunch: 600, snack: 300, total: 900, pay_link: null } });
       }
       if (u.includes('/rpc/leo_confirm_submit')) {
@@ -56,7 +56,8 @@ function listen() { return new Promise(r => server.listen(PORT, '127.0.0.1', r))
   await demo.goto(`http://127.0.0.1:${PORT}/kakunin.html?demo=1`, { waitUntil: 'networkidle0' });
   const text = () => demo.$eval('#m', e => e.innerText);
   ok((await text()).includes('児童A（見本）'), '見本：児童名');
-  ok((await text()).includes('11/2（月）') && (await text()).includes('利用'), '見本：実績の日付と状況');
+  ok((await text()).includes('11/2（月）') && (await text()).includes('出席'), '見本：実績の日付と状況');
+  ok((await text()).includes('利用 3回'), '見本：利用回数は出席を数える（欠席は数えない）');
   ok((await text()).includes('お昼代') && (await text()).includes('1,200円'), '見本：お昼代');
   ok((await text()).includes('おやつ代') && (await text()).includes('400円'), '見本：おやつ代');
   ok((await text()).includes('合計') && (await text()).includes('6,200円'), '見本：合計（利用料込み）');
@@ -78,6 +79,7 @@ function listen() { return new Promise(r => server.listen(PORT, '127.0.0.1', r))
   await live.goto(`http://127.0.0.1:${PORT}/kakunin.html?t=${TOK}`, { waitUntil: 'networkidle0' });
   const liveText = await live.$eval('#m', e => e.innerText);
   ok(liveText.includes('見本 太郎') && liveText.includes('600円') && liveText.includes('300円') && liveText.includes('900円'), 'トークン：返った児童の実績と実費');
+  ok(liveText.includes('利用 2回'), 'トークン：利用回数は「出席」と昔の「利用」を数え、欠席は数えない');
   ok(!liveText.includes('児童A（見本）') && !liveText.includes('1,200円'), 'トークン：見本や他の金額は出ない');
   ok(liveText.includes('支払い用のリンクはまだありません'), 'トークン：リンクが無くても確認できる');
   ok(!(await live.$('a.pay')), 'トークン：支払いリンクは無い');

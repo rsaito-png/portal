@@ -29,12 +29,14 @@ const DEMO = q.get('demo') === '1', T = q.get('t') || '';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST',
   headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+// 実績の status は「出席」（日誌から）。昔の書き方「利用」も数える。欠席は数えない（職員画面 leo_meal.js と同じ）
+const isUse = r => r.status === '出席' || r.status === '利用';
 const DEMO_DATA = { child: '児童A（見本）', month: '2026-11', last: null,
   jippi: { found: true, lunch: 1200, snack: 400, burden: 4600, total: 6200, pay_link: 'https://square.link/u/demo',
     days: [{ day: '2026-11-02', lunch: 0, snack: 150 }, { day: '2026-11-04', lunch: 0, snack: 250 }, { day: '2026-11-09', lunch: 1200, snack: 0 }] },
   rows: [
-  { day: '2026-11-02', status: '利用', start: '14:45', end: '17:00' }, { day: '2026-11-04', status: '利用', start: '14:45', end: '17:00' },
-  { day: '2026-11-06', status: '欠席', start: '', end: '' }, { day: '2026-11-09', status: '利用', start: '10:00', end: '16:00' } ] };
+  { day: '2026-11-02', status: '出席', start: '14:45', end: '17:00' }, { day: '2026-11-04', status: '出席', start: '14:45', end: '17:00' },
+  { day: '2026-11-06', status: '欠席', start: '', end: '' }, { day: '2026-11-09', status: '出席', start: '10:00', end: '16:00' } ] };
 const fmt = d => {
   const x = new Date(d + 'T00:00:00+09:00');
   const p = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }).formatToParts(x);
@@ -82,7 +84,7 @@ async function load() {
   const [y, mo] = d.month.split('-').map(Number);
   $m().innerHTML = `<div class="card"><b>${esc(d.child)}</b> さん　${y}年${mo}月のご利用実績
     <table><tr><th>日付</th><th>状況</th><th>時間</th></tr>${d.rows.map(r => `<tr><td>${fmt(r.day)}</td><td>${esc(r.status)}</td><td>${r.start ? esc(r.start) + '〜' + esc(r.end) : ''}</td></tr>`).join('') || '<tr><td colspan=3>この月の記録はまだありません</td></tr>'}</table>
-    <p class="note">利用 ${d.rows.filter(r => r.status === '利用').length}回</p></div>
+    <p class="note">利用 ${d.rows.filter(isUse).length}回</p></div>
     ${jippiHtml(d.jippi)}
     ${d.last ? `<p class="ok">${new Date(d.last.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} に「${esc(d.last.confirm)}」でご回答いただいています。内容を直すときは、もう一度送ってください。</p>` : ''}
     <div class="card"><p class="note">下の送信で、上のご利用実績と実費負担の両方を確認したことになります。</p><label>確認</label><div class="ch">
