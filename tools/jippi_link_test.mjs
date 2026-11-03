@@ -77,7 +77,7 @@ ok(ui.includes("if (DEMO)") && ui.indexOf('見本モードでは呼び出しま�
 ok(!ui.includes('SQUARE_ACCESS_TOKEN'), 'token is not in the page');
 ok(hook.includes('sct_payments') && hook.includes('leo-jippi') && !hook.includes('leo_jippi'), 'webhook still matches only sct payments');
 ok(read('supabase/config.toml').includes('[functions.square-webhook]') && !read('supabase/config.toml').includes('[functions.jippi-checkout]'), 'jippi keeps jwt verification');
-ok(read('index.html').includes('leo_jippi.js?v=20261103burden'), 'page loads the new script');
+ok(/leo_jippi\.js\?v=\d{8}/.test(read('index.html')), 'page loads the script with a version');
 const imp = read('tools/jippi_import.py');
 ok(imp.includes('burden') && !imp.includes("'burden'") && !imp.includes('"burden"'), 'import leaves hand-entered burden alone');
 
@@ -117,7 +117,7 @@ vm.runInContext(read('leo_jippi.js'), sandbox, { filename: 'leo_jippi.js' });
 const demoHtml = await sandbox.LEO_VIEWS.jippi();
 ok(demoHtml.includes('<th>利用料</th>') && demoHtml.includes('id="jb0"'), 'demo shows burden input');
 ok(demoHtml.includes('900円') && demoHtml.includes('value="0"'), 'demo total is lunch+snack+0');
-const line = sandbox.jiText({ child: '児童 A', guardian: '保護者A', lunch: 600, snack: 300, burden: 4600, pay_link: 'https://square.link/u/abc' });
+const line = sandbox.jiText({ child: '児童 A', guardian: '保護者A', lunch: 600, snack: 300, burden: 4600, pay_link: 'https://square.link/u/abc', pay_link_amount: 5500 });
 ok(line.includes('・利用料 4,600円') && line.includes('・お昼代 600円') && line.includes('・おやつ代 300円') && line.includes('・合計 5,500円'), 'line text includes burden');
 ok(line.includes('https://square.link/u/abc'), 'line text keeps the pay link');
 
@@ -131,7 +131,8 @@ ok(sandbox.__html.includes('5,500円') && sandbox.__html.includes('value="4600"'
 ok(sandbox.__html.includes('見本モードなので保存しません'), 'demo says it does not save');
 
 sandbox.DEMO = false;
-rows = [{ ym: '2026-10', child: '児童A', guardian: '保護者A', lunch: 600, snack: 300, burden: 0, pay_link: 'https://square.link/u/old', pay_link_amount: 900, sent: false }];
+// リンクなしの行：保存だけ（金額が変わったリンクの作り直しは jiMake 側で別に確認）
+rows = [{ ym: '2026-10', child: '児童A', guardian: '保護者A', lunch: 600, snack: 300, burden: 0, pay_link: null, pay_link_amount: null, sent: false }];
 await sandbox.LEO_VIEWS.jippi();
 sandbox.$('jb0').value = '4,600';
 await sandbox.jiBurden(0);
@@ -146,5 +147,14 @@ await sandbox.jiBurden(0);
 eq(patches.length, before, 'invalid burden is not saved');
 ok(els.jmsg.textContent.includes('整数'), 'invalid burden message');
 
+// 日別明細（職員画面）：合えば警告なし、ずれれば金額つきで警告して明細は出す
+const okDays = sandbox.jiDaysHtml([{ day: '2026-10-01', lunch: 0, snack: 145 }, { day: '2026-10-02', lunch: 0, snack: 620 }, { day: '2026-10-05', lunch: 0, snack: 0 }], 0, 765);
+ok(okDays.includes('<details') && okDays.includes('日別の明細を見る（2日）') && !okDays.includes('ずれ') && !okDays.includes('<th>お昼</th>') && okDays.includes('10/1（木）'), 'staff daily details match');
+const badDays = sandbox.jiDaysHtml([{ day: '2026-10-01', lunch: 0, snack: 646 }], 0, 765);
+ok(badDays.includes('⚠ ずれあり') && badDays.includes('119円ずれています') && badDays.includes('646円'), 'staff daily details warn on mismatch');
+ok(sandbox.jiDaysHtml([], 0, 0) === '', 'no details when nothing');
+sandbox.DEMO = true;
+const demo2 = await sandbox.LEO_VIEWS.jippi();
+ok(demo2.includes('ji-days') && demo2.includes('colspan="8"'), 'jippi rows show daily details');
 console.log(fails ? 'failed ' + fails + '/' + n : 'jippi ok ' + n);
 process.exit(fails ? 1 : 0);

@@ -59,7 +59,7 @@ function listen() { return new Promise(r => server.listen(PORT, '127.0.0.1', r))
   ok((await text()).includes('11/2（月）') && (await text()).includes('利用'), '見本：実績の日付と状況');
   ok((await text()).includes('お昼代') && (await text()).includes('1,200円'), '見本：お昼代');
   ok((await text()).includes('おやつ代') && (await text()).includes('400円'), '見本：おやつ代');
-  ok((await text()).includes('合計') && (await text()).includes('1,600円'), '見本：合計');
+  ok((await text()).includes('合計') && (await text()).includes('6,200円'), '見本：合計（利用料込み）');
   ok((await text()).includes('利用者負担額'), '見本：利用者負担額は含まれない旨');
   ok((await text()).includes('両方を確認したことになります'), '見本：一度の送信で両方');
   ok(await demo.$eval('a.pay', e => e.href.startsWith('https://')), '見本：支払いリンクはある');
@@ -112,8 +112,8 @@ function listen() { return new Promise(r => server.listen(PORT, '127.0.0.1', r))
   await staff.goto(`http://127.0.0.1:${PORT}/index.html?demo=1&role=事務#leo/kakunin`, { waitUntil: 'networkidle0' });
   await staff.waitForFunction(() => document.body.innerText.includes('保護者の実績・実費の確認'));
   const staffText = await staff.evaluate(() => document.body.innerText);
-  ok(staffText.includes('確認した実費：お昼 1,200円') && staffText.includes('確認した実費：実費なし'), '職員：確認した実費');
-  ok(staffText.includes('リンクに出る実費：お昼 800円'), '職員：未確認の案内額');
+  ok(staffText.includes('確認した実費：利用料 4,600円・お昼 1,200円') && staffText.includes('確認した実費：実費なし'), '職員：確認した実費');
+  ok(staffText.includes('リンクに出る実費：利用料 0円・お昼 800円'), '職員：未確認の案内額');
   ok(staffText.includes('この月のリンクを作成／更新') === false, '職員の確認一覧に請求の作成ボタンは出ない');
   await staff.screenshot({ path: path.join(OUT, 'kakunin-staff-demo.png'), fullPage: true });
 

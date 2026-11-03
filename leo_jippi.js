@@ -21,6 +21,30 @@ const jiSummary = r => {
   if (r.missing) p.push('この月にその児童はいません');
   return p.join('、') || '対象がありません。';
 };
+// 日別明細（保護者ページ kakunin.html と同じ折りたたみ）。品目は出さず「おやつ」で統一、利用料は月額なので日別にしない。
+// 職員画面では月の金額と日別合計が違っても出し、ずれを警告する（保護者ページでは出さない）
+function jiDaysHtml(days, lunch, snack) {
+  lunch = Number(lunch || 0); snack = Number(snack || 0);
+  const ds = (days || []).filter(d => d && d.day && (Number(d.lunch || 0) > 0 || Number(d.snack || 0) > 0)).sort((a, b) => a.day < b.day ? -1 : 1);
+  if (!ds.length && lunch + snack <= 0) return '';
+  const sl = ds.reduce((a, d) => a + Number(d.lunch || 0), 0), ss = ds.reduce((a, d) => a + Number(d.snack || 0), 0);
+  const warn = [];
+  if (sl !== lunch) warn.push(`お昼は月の金額（${jiYen(lunch)}）と日別の合計（${jiYen(sl)}）が${jiYen(Math.abs(lunch - sl))}ずれています`);
+  if (ss !== snack) warn.push(`おやつは月の金額（${jiYen(snack)}）と日別の合計（${jiYen(ss)}）が${jiYen(Math.abs(snack - ss))}ずれています`);
+  const showLunch = lunch > 0 || sl > 0, showSnack = snack > 0 || ss > 0;
+  const wd = d => { const t = new Date(d + 'T00:00:00+09:00'); return `${t.getMonth() + 1}/${t.getDate()}（${'日月火水木金土'[t.getDay()]}）`; };
+  const cell = v => `<td style="text-align:right;white-space:nowrap">${Number(v || 0) ? jiYen(v) : '－'}</td>`;
+  const table = ds.length ? `<table style="border-collapse:collapse;margin:6px 0;font-size:14px"><tr><th style="text-align:left">日付</th>${showLunch ? '<th>お昼</th>' : ''}${showSnack ? '<th>おやつ</th>' : ''}</tr>
+    ${ds.map(d => `<tr style="border-top:1px solid #eee"><td style="padding:2px 10px 2px 0">${wd(d.day)}</td>${showLunch ? cell(d.lunch) : ''}${showSnack ? cell(d.snack) : ''}</tr>`).join('')}
+    <tr style="border-top:2px solid #ccc;font-weight:bold"><td>日別の計</td>${showLunch ? cell(sl) : ''}${showSnack ? cell(ss) : ''}</tr></table>` : '<p class="note">日別のデータがありません（取り込み前）。</p>';
+  return `<details class="ji-days"${warn.length ? ' data-warn="1"' : ''}><summary style="cursor:pointer;color:#e8833a">日別の明細を見る（${ds.length}日）${warn.length ? ' <b style="color:#b00">⚠ ずれあり</b>' : ''}</summary>
+    ${warn.map(w => `<p style="color:#b00;margin:4px 0">⚠ ${w}。保護者ページには明細が出ません。</p>`).join('')}${table}</details>`;
+}
+async function jiDaysFor(ym) {
+  if (DEMO) return [{ child: '児童A', day: ym + '-02', lunch: 600, snack: 150 }, { child: '児童A', day: ym + '-06', lunch: 0, snack: 150 }, { child: '児童C', day: ym + '-09', lunch: 800, snack: 150 }];
+  try { return await sb(`leo_jippi_day?ym=eq.${ym}&select=child,day,lunch,snack&order=day`); } catch (e) { return []; }
+}
+const jiDaysBy = list => { const m = {}; (list || []).forEach(d => { if (d && d.day) (m[d.child] = m[d.child] || []).push(d); }); return m; };
 function jiDemoRows() {
   if (!JI_DEMO) JI_DEMO = [{ child: '児童A', guardian: '保護者A', lunch: 600, snack: 300, burden: 0, pay_link: null, pay_link_amount: null, sent: false }];
   JI_DEMO.forEach(r => { r.ym = JI_MONTH; });
@@ -34,6 +58,7 @@ function jiText(r) {
 LEO_VIEWS.jippi = async function () {
   if (!canManage()) return '<p>この画面は児発管・管理者・事務の方だけが使えます。</p>';
   JI_ROWS = DEMO ? jiDemoRows() : await sb(`leo_jippi?ym=eq.${JI_MONTH}&order=child`);
+  const days = jiDaysBy(JI_ROWS.length ? await jiDaysFor(JI_MONTH) : []);
   const [y, m] = JI_MONTH.split('-').map(Number), sum = JI_ROWS.reduce((s, r) => s + jiAmt(r), 0), sent = JI_ROWS.filter(r => r.sent).length, stale = JI_ROWS.filter(jiStale).length;
   return `<h3>利用料実費請求</h3>${demoNote()}
     <p class="note">利用料（利用者負担額）は手打ち、お昼代・おやつ代は取り込みです。文面をコピーして、公式LINEで保護者に送ってください。ポータルからは送りません。</p>
@@ -47,7 +72,7 @@ LEO_VIEWS.jippi = async function () {
       <td>${jiYen(r.lunch)}</td><td>${jiYen(r.snack)}</td><td><b>${jiYen(jiAmt(r))}</b></td>
       <td><input id="jl${i}" value="${esc(r.pay_link || '')}" placeholder="https://…" style="width:14em" onchange="jiLink(${i})">${jiStale(r) ? `<br><small style="color:#b00">⚠ ${jiYen(r.pay_link_amount || 0)}のときのリンクです。作り直してください</small>` : (jiLinkOk(r) ? `<br><small><a href="${esc(r.pay_link)}" target="_blank" rel="noopener">開いて確認</a>（${jiYen(r.pay_link_amount)}）</small>` : '')}<br><button onclick="jiMake(${i})" ${jiAmt(r) > 0 ? '' : 'disabled title="0円はリンクを作りません"'}>${jiStale(r) ? 'この人のリンクを作り直す' : 'この人のリンク'}</button></td>
       <td><button onclick="jiCopy(${i})" ${jiLinkOk(r) ? '' : (jiStale(r) ? 'disabled title="金額が変わっています。リンクを作り直してからコピーします"' : 'disabled title="支払いリンクを入れてからコピーします"')}>コピー</button></td>
-      <td><label><input type="checkbox" ${r.sent ? 'checked' : ''} onchange="jiSent(${i},this.checked)"> ${r.sent && r.sent_at ? `<small>${esc(r.sent_at.slice(5, 10))}</small>` : '送信済み'}</label></td></tr>`).join('')}</table>
+      <td><label><input type="checkbox" ${r.sent ? 'checked' : ''} onchange="jiSent(${i},this.checked)"> ${r.sent && r.sent_at ? `<small>${esc(r.sent_at.slice(5, 10))}</small>` : '送信済み'}</label></td></tr>${(() => { const h = jiDaysHtml(days[r.child], r.lunch, r.snack); return h ? `<tr><td colspan="8" style="padding:0 0 8px">${h}</td></tr>` : ''; })()}`).join('')}</table>
     <p id="jmsg" class="note">${esc(JI_MSG)}</p>
     <p class="note">お昼代・おやつ代が違うときは、日誌を直してから取り込み直します。利用料はこの欄に手で入れます（取り込みでは上書きしません）。変えたあとはリンクを作り直してください。支払いリンクは、この画面から随時作成できます。金額が同じリンクは作り直しません。</p>`;
 };
