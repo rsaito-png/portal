@@ -70,7 +70,10 @@ ok(!fn.includes('sct_payments?') && !fn.includes('SQUARE_ACCESS_TOKEN='), 'check
 ok(fn.includes('古いリンクは Square 上では無効化しない'), 'old links are left active');
 ok(ui.includes('この月のリンクを作成／更新') && ui.includes('この人のリンク'), 'buttons');
 ok(ui.includes('この画面から随時作成できます') && ui.includes('金額が同じリンクは作り直しません'), 'note');
-ok(ui.includes('利用料（利用者負担額）は手打ち、お昼代・おやつ代は取り込みです'), 'hand entry note');
+ok(ui.includes('利用料（利用者負担額）は手打ちです。お昼代は今日の日誌で食事が「あり」の日が1回300円'), 'hand entry note');
+ok(ui.includes('今日の日誌を直すとここに反映されます'), 'fees follow the diary');
+ok(!ui.includes('毎月3日ごろ、実績記録の「一覧」から取り込みます'), 'sheet import note is gone');
+ok(read('tools/jippi_import.py').includes('【旧】') && read('tools/jippi_import.py').includes('上書きする'), 'sheet import is marked legacy');
 ok(ui.includes('jiBurden') && ui.includes('jiAmt(r)') && ui.includes('・利用料'), 'burden input, total, and line text');
 ok(!ui.includes('利用者負担額は含みません'), 'old exclusion note is gone');
 ok(ui.includes("if (DEMO)") && ui.indexOf('見本モードでは呼び出しません') < ui.indexOf("'/functions/v1/jippi-checkout'"), 'demo does not call the function');

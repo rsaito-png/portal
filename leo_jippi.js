@@ -1,5 +1,5 @@
 // レオ 利用料実費請求（#leo/jippi）：利用料（手打ち）・お昼代・おやつ代を児童ごとに。LINE文面をコピー→担当者が公式LINEで手動送信。保護者への自動送信はしない
-// お昼・おやつ：実績記録「一覧」タブから取り込み（tools/jippi_import.py）。利用料は自動計算しない。支払いリンクはこの画面から作る（Squareのトークンは Edge Function だけ。画面には出さない）
+// お昼・おやつ：今日の日誌（leo_meal_record）を保存すると、日別と月合計にたまる。昼食は「あり」の日が1回300円、おやつは「あり」のときの金額。利用料は手打ちで、自動計算しない。支払いリンクはこの画面から作る（Squareのトークンは Edge Function だけ。画面には出さない）
 let JI_MONTH = (() => { const t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; })();
 let JI_ROWS = [];
 let JI_MSG = '';
@@ -36,7 +36,7 @@ function jiDaysHtml(days, lunch, snack) {
   const cell = v => `<td style="text-align:right;white-space:nowrap">${Number(v || 0) ? jiYen(v) : '－'}</td>`;
   const table = ds.length ? `<table style="border-collapse:collapse;margin:6px 0;font-size:14px"><tr><th style="text-align:left">日付</th>${showLunch ? '<th>お昼</th>' : ''}${showSnack ? '<th>おやつ</th>' : ''}</tr>
     ${ds.map(d => `<tr style="border-top:1px solid #eee"><td style="padding:2px 10px 2px 0">${wd(d.day)}</td>${showLunch ? cell(d.lunch) : ''}${showSnack ? cell(d.snack) : ''}</tr>`).join('')}
-    <tr style="border-top:2px solid #ccc;font-weight:bold"><td>日別の計</td>${showLunch ? cell(sl) : ''}${showSnack ? cell(ss) : ''}</tr></table>` : '<p class="note">日別のデータがありません（取り込み前）。</p>';
+    <tr style="border-top:2px solid #ccc;font-weight:bold"><td>日別の計</td>${showLunch ? cell(sl) : ''}${showSnack ? cell(ss) : ''}</tr></table>` : '<p class="note">日別のデータがありません（今日の日誌に食事・おやつがまだありません）。</p>';
   return `<details class="ji-days"${warn.length ? ' data-warn="1"' : ''}><summary style="cursor:pointer;color:#e8833a">日別の明細を見る（${ds.length}日）${warn.length ? ' <b style="color:#b00">⚠ ずれあり</b>' : ''}</summary>
     ${warn.map(w => `<p style="color:#b00;margin:4px 0">⚠ ${w}。保護者ページには明細が出ません。</p>`).join('')}${table}</details>`;
 }
@@ -61,11 +61,11 @@ LEO_VIEWS.jippi = async function () {
   const days = jiDaysBy(JI_ROWS.length ? await jiDaysFor(JI_MONTH) : []);
   const [y, m] = JI_MONTH.split('-').map(Number), sum = JI_ROWS.reduce((s, r) => s + jiAmt(r), 0), sent = JI_ROWS.filter(r => r.sent).length, stale = JI_ROWS.filter(jiStale).length;
   return `<h3>利用料実費請求</h3>${demoNote()}
-    <p class="note">利用料（利用者負担額）は手打ち、お昼代・おやつ代は取り込みです。文面をコピーして、公式LINEで保護者に送ってください。ポータルからは送りません。</p>
+    <p class="note">利用料（利用者負担額）は手打ちです。お昼代は今日の日誌で食事が「あり」の日が1回300円、おやつ代はその日に入れた金額です。文面をコピーして、公式LINEで保護者に送ってください。ポータルからは送りません。</p>
     <p class="ptabs"><button onclick="JI_MSG='';JI_MONTH=jiMk(-1);renderLeoView('jippi')">← 前の月</button> <b>${y}年${m}月分</b> <button onclick="JI_MSG='';JI_MONTH=jiMk(1);renderLeoView('jippi')">次の月 →</button></p>
     ${JI_ROWS.length ? `<p>${JI_ROWS.length}人・合計 ${jiYen(sum)}・送信済み ${sent}/${JI_ROWS.length}</p>
     ${stale ? `<p class="err" style="color:#b00">金額が変わって古いままの支払いリンクが ${stale}件あります。「この月のリンクを作成／更新」を押すと、今の合計で作り直します。</p>` : ''}
-    <p><button onclick="jiMake()">この月のリンクを作成／更新</button></p>` : '<p>この月の実費データはまだありません。毎月3日ごろ、実績記録の「一覧」から取り込みます。</p>'}
+    <p><button onclick="jiMake()">この月のリンクを作成／更新</button></p>` : '<p>この月の実費データはまだありません。今日の日誌で食事・おやつを入れると、ここにたまります。</p>'}
     <table class="tbl" style="width:100%;border-collapse:collapse"><tr><th>児童</th><th>利用料</th><th>お昼代</th><th>おやつ代</th><th>合計</th><th>Squareの支払いリンク</th><th>文面</th><th>送った</th></tr>
     ${JI_ROWS.map((r, i) => `<tr style="border-top:1px solid #ddd"><td>${esc(r.child)}<br><small>${esc(r.guardian || '')}</small></td>
       <td><input id="jb${i}" inputmode="numeric" autocomplete="off" value="${Number(r.burden) || 0}" style="width:6em" onchange="jiBurden(${i})"></td>
@@ -74,7 +74,7 @@ LEO_VIEWS.jippi = async function () {
       <td><button onclick="jiCopy(${i})" ${jiLinkOk(r) ? '' : (jiStale(r) ? 'disabled title="金額が変わっています。リンクを作り直してからコピーします"' : 'disabled title="支払いリンクを入れてからコピーします"')}>コピー</button></td>
       <td><label><input type="checkbox" ${r.sent ? 'checked' : ''} onchange="jiSent(${i},this.checked)"> ${r.sent && r.sent_at ? `<small>${esc(r.sent_at.slice(5, 10))}</small>` : '送信済み'}</label></td></tr>${(() => { const h = jiDaysHtml(days[r.child], r.lunch, r.snack); return h ? `<tr><td colspan="8" style="padding:0 0 8px">${h}</td></tr>` : ''; })()}`).join('')}</table>
     <p id="jmsg" class="note">${esc(JI_MSG)}</p>
-    <p class="note">お昼代・おやつ代が違うときは、日誌を直してから取り込み直します。利用料はこの欄に手で入れます（取り込みでは上書きしません）。変えたあとはリンクを作り直してください。支払いリンクは、この画面から随時作成できます。金額が同じリンクは作り直しません。</p>`;
+    <p class="note">お昼代・おやつ代は、今日の日誌を直すとここに反映されます。利用料はこの欄に手で入れます（日誌では上書きしません）。金額が変わったあとの支払いリンクは古いままなので、作り直してください。支払いリンクは、この画面から随時作成できます。金額が同じリンクは作り直しません。</p>`;
 };
 async function jiPatch(i, body) {
   const r = JI_ROWS[i];
