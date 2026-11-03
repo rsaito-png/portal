@@ -8,6 +8,9 @@ let JI_DEMO = null;
 const jiMk = d => { const [y, m] = JI_MONTH.split('-').map(Number), n = new Date(y, m - 1 + d, 1); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; };
 const jiYen = n => Number(n).toLocaleString('ja-JP') + '円';
 const jiAmt = r => Number(r.lunch) + Number(r.snack) + Number(r.burden || 0);
+// 保存済みリンクが今の合計で作られたものか。違えば古い金額のリンク（Square の支払いリンクは金額固定なので作り直すしかない）
+const jiStale = r => !!r.pay_link && Number(r.pay_link_amount) !== jiAmt(r);
+const jiLinkOk = r => !!r.pay_link && !jiStale(r);
 const jiSay = t => { JI_MSG = t; const m = $('jmsg'); if (m) m.textContent = t; };
 const jiSummary = r => {
   const p = [];
@@ -25,23 +28,25 @@ function jiDemoRows() {
 }
 function jiText(r) {
   const m = +JI_MONTH.slice(5), name = String(r.child).replace(/\s/g, '');
-  return `${r.guardian ? r.guardian + '様\n' : ''}レオ（${gl('name:leo_contact','担当')}）です。${m}月分の実費のご案内です。\n\n${name}さん\n・利用料 ${jiYen(r.burden || 0)}\n・お昼代 ${jiYen(r.lunch)}\n・おやつ代 ${jiYen(r.snack)}\n・合計 ${jiYen(jiAmt(r))}\n\nお支払いはこちらからお願いします。\n${r.pay_link || '（支払いリンク未作成）'}\n\nよろしくお願いします。\nレオ ${gl('name:leo_contact','')}`;
+  const link = jiLinkOk(r) ? r.pay_link : '（支払いリンク未作成）';
+  return `${r.guardian ? r.guardian + '様\n' : ''}レオ（${gl('name:leo_contact','担当')}）です。${m}月分の実費のご案内です。\n\n${name}さん\n・利用料 ${jiYen(r.burden || 0)}\n・お昼代 ${jiYen(r.lunch)}\n・おやつ代 ${jiYen(r.snack)}\n・合計 ${jiYen(jiAmt(r))}\n\nお支払いはこちらからお願いします。\n${link}\n\nよろしくお願いします。\nレオ ${gl('name:leo_contact','')}`;
 }
 LEO_VIEWS.jippi = async function () {
   if (!canManage()) return '<p>この画面は児発管・管理者・事務の方だけが使えます。</p>';
   JI_ROWS = DEMO ? jiDemoRows() : await sb(`leo_jippi?ym=eq.${JI_MONTH}&order=child`);
-  const [y, m] = JI_MONTH.split('-').map(Number), sum = JI_ROWS.reduce((s, r) => s + jiAmt(r), 0), sent = JI_ROWS.filter(r => r.sent).length;
+  const [y, m] = JI_MONTH.split('-').map(Number), sum = JI_ROWS.reduce((s, r) => s + jiAmt(r), 0), sent = JI_ROWS.filter(r => r.sent).length, stale = JI_ROWS.filter(jiStale).length;
   return `<h3>利用料実費請求</h3>${demoNote()}
     <p class="note">利用料（利用者負担額）は手打ち、お昼代・おやつ代は取り込みです。文面をコピーして、公式LINEで保護者に送ってください。ポータルからは送りません。</p>
     <p class="ptabs"><button onclick="JI_MSG='';JI_MONTH=jiMk(-1);renderLeoView('jippi')">← 前の月</button> <b>${y}年${m}月分</b> <button onclick="JI_MSG='';JI_MONTH=jiMk(1);renderLeoView('jippi')">次の月 →</button></p>
     ${JI_ROWS.length ? `<p>${JI_ROWS.length}人・合計 ${jiYen(sum)}・送信済み ${sent}/${JI_ROWS.length}</p>
+    ${stale ? `<p class="err" style="color:#b00">金額が変わって古いままの支払いリンクが ${stale}件あります。「この月のリンクを作成／更新」を押すと、今の合計で作り直します。</p>` : ''}
     <p><button onclick="jiMake()">この月のリンクを作成／更新</button></p>` : '<p>この月の実費データはまだありません。毎月3日ごろ、実績記録の「一覧」から取り込みます。</p>'}
     <table class="tbl" style="width:100%;border-collapse:collapse"><tr><th>児童</th><th>利用料</th><th>お昼代</th><th>おやつ代</th><th>合計</th><th>Squareの支払いリンク</th><th>文面</th><th>送った</th></tr>
     ${JI_ROWS.map((r, i) => `<tr style="border-top:1px solid #ddd"><td>${esc(r.child)}<br><small>${esc(r.guardian || '')}</small></td>
       <td><input id="jb${i}" inputmode="numeric" autocomplete="off" value="${Number(r.burden) || 0}" style="width:6em" onchange="jiBurden(${i})"></td>
       <td>${jiYen(r.lunch)}</td><td>${jiYen(r.snack)}</td><td><b>${jiYen(jiAmt(r))}</b></td>
-      <td><input id="jl${i}" value="${esc(r.pay_link || '')}" placeholder="https://…" style="width:14em" onchange="jiLink(${i})"><br><button onclick="jiMake(${i})" ${jiAmt(r) > 0 ? '' : 'disabled title="0円はリンクを作りません"'}>この人のリンク</button></td>
-      <td><button onclick="jiCopy(${i})" ${r.pay_link ? '' : 'disabled title="支払いリンクを入れてからコピーします"'}>コピー</button></td>
+      <td><input id="jl${i}" value="${esc(r.pay_link || '')}" placeholder="https://…" style="width:14em" onchange="jiLink(${i})">${jiStale(r) ? `<br><small style="color:#b00">⚠ ${jiYen(r.pay_link_amount || 0)}のときのリンクです。作り直してください</small>` : (jiLinkOk(r) ? `<br><small><a href="${esc(r.pay_link)}" target="_blank" rel="noopener">開いて確認</a>（${jiYen(r.pay_link_amount)}）</small>` : '')}<br><button onclick="jiMake(${i})" ${jiAmt(r) > 0 ? '' : 'disabled title="0円はリンクを作りません"'}>${jiStale(r) ? 'この人のリンクを作り直す' : 'この人のリンク'}</button></td>
+      <td><button onclick="jiCopy(${i})" ${jiLinkOk(r) ? '' : (jiStale(r) ? 'disabled title="金額が変わっています。リンクを作り直してからコピーします"' : 'disabled title="支払いリンクを入れてからコピーします"')}>コピー</button></td>
       <td><label><input type="checkbox" ${r.sent ? 'checked' : ''} onchange="jiSent(${i},this.checked)"> ${r.sent && r.sent_at ? `<small>${esc(r.sent_at.slice(5, 10))}</small>` : '送信済み'}</label></td></tr>`).join('')}</table>
     <p id="jmsg" class="note">${esc(JI_MSG)}</p>
     <p class="note">お昼代・おやつ代が違うときは、日誌を直してから取り込み直します。利用料はこの欄に手で入れます（取り込みでは上書きしません）。変えたあとはリンクを作り直してください。支払いリンクは、この画面から随時作成できます。金額が同じリンクは作り直しません。</p>`;
@@ -58,7 +63,10 @@ async function jiBurden(i) {
   const n = raw === '' ? 0 : Number(raw);
   const total = Number(JI_ROWS[i].lunch) + Number(JI_ROWS[i].snack) + n;
   if (total > 100000) { jiSay('合計が100000円を超えています。'); return; }
-  if (await jiPatch(i, { burden: n })) { jiSay('保存しました。'); renderLeoView('jippi'); }
+  if (!(await jiPatch(i, { burden: n }))) return;
+  // 合計が変わったら、そのままにせず Square のリンクも今の合計で作り直す（0円なら作らない）
+  if (JI_ROWS[i].pay_link && jiStale(JI_ROWS[i]) && jiAmt(JI_ROWS[i]) > 0) { await jiMake(i, '保存しました。'); return; }
+  jiSay('保存しました。'); renderLeoView('jippi');
 }
 async function jiLink(i) {
   const v = $('jl' + i).value.trim();
@@ -87,7 +95,7 @@ async function jiFn(body, retried) {
   if (!r.ok) throw new Error((data && data.error) || ('作れませんでした（' + r.status + '）'));
   return data || {};
 }
-async function jiMake(i) {
+async function jiMake(i, prefix) {
   if (JI_BUSY) return;
   const rows = i == null ? JI_ROWS : (JI_ROWS[i] ? [JI_ROWS[i]] : []);
   if (!rows.length) { jiSay('この月の実費データはまだありません。'); return; }
@@ -110,7 +118,7 @@ async function jiMake(i) {
   try {
     const body = { ym: JI_MONTH };
     if (i != null) body.child = rows[0].child;
-    jiSay(jiSummary(await jiFn(body)));
+    jiSay((prefix || '') + jiSummary(await jiFn(body)));
   } catch (e) { jiSay(e.message); }
   try { await renderLeoView('jippi'); }
   finally { JI_BUSY = false; }
