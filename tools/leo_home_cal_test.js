@@ -264,7 +264,7 @@ assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '個別支
 assert.strictEqual(leo.mine['現場支援員'].join('|'), '日誌（児童ごと）');
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
-assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|今日やること（児発管）|日誌（見る・直す）|配置表・型表・管理表・送迎の配慮の入力|利用料実費請求');
+assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|今日やること（児発管）|日誌（見る・直す）|配置表・型表・管理表・送迎の配慮の入力');
 assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|上限額管理');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
@@ -304,7 +304,7 @@ function renderLeoHome(role, duty) {
   assert.ok(body.indexOf('href="#uketsuke"') > dailyEnd, role + '/' + duty + ' は毎日やるの外');
   assert.strictEqual(body.split('不具合・修正の依頼').length - 1, 1, 'ホームに一度だけ: ' + role + '/' + duty);
   assert.strictEqual(body.split('href="#uketsuke"').length - 1, 1);
-  ['出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く'].forEach(label => {
+  ['今日の利用児童', 'ヒヤリハット', 'LINE報告を書く'].forEach(label => {
     assert.ok(daily.includes(label), label);
   });
 });
@@ -329,10 +329,10 @@ const kanri = renderLeoHome('職員', '児発管');
   assert.ok(sec.indexOf('今日やること') < sec.indexOf('今日の日誌'), '日誌は今日やることのあと');
   assert.ok(sec.indexOf('今日の日誌') < sec.indexOf('配置表・型表・管理表'), '入力画面は日誌のあと');
   assert.ok(sec.includes('href="#leo/master"'), '中村の欄に入力画面');
-  assert.ok(sec.indexOf('配置表・型表・管理表') < sec.indexOf('利用料実費請求'), '実費は入力画面のあと');
-  assert.ok(sec.includes('href="#leo/jippi"'), '中村の欄に利用料実費請求');
+  assert.ok(!sec.includes('利用料実費請求') && !sec.includes('href="#leo/jippi"'), '中村の欄から実費を外す');
+  assert.ok(!leo.who[0][1].includes('利用料実費請求'), '中村の一覧から実費を外す');
   assert.strictEqual(leo.tiles.find(t => t[2] === '#leo/jippi')[6], '児発管', '実費画面の役割は変えない');
-  assert.ok(leo.who[1][1].includes('利用料実費請求'), '宮本の欄にも残す');
+  assert.ok(leo.who[1][1].includes('利用料実費請求'), '宮本の欄には残す');
   assert.ok(leo.groups[1][2].includes('利用料実費請求'), '事務・計画にも残す');
   assert.ok(!leo.who[1][1].includes('配置表・型表・管理表・送迎の配慮の入力'), '宮本の欄には置かない');
   assert.ok(leo.groups[0][2].includes('送迎 型表'), '現場の型表はそのまま');
