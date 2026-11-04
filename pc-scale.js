@@ -8,7 +8,7 @@
       if(e.dataset&&e.dataset.pcs)return;
       var t=e.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='SVG'||t==='svg'||t==='CANVAS'||t==='BR')return;
       var cs=getComputedStyle(e),fs=parseFloat(cs.fontSize);
-      if(fs&&fs<26){var n=Math.max(26,Math.round(fs*1.8));if(n>40)n=40;e.style.setProperty('font-size',n+'px','important');}
+      if(fs&&fs<30){var n=Math.max(30,Math.round(fs*2.2));if(n>48)n=48;e.style.setProperty('font-size',n+'px','important');}
       var mw=cs.maxWidth;if(mw&&/px$/.test(mw)){var w=parseFloat(mw);if(w>=400&&w<1100)e.style.setProperty('max-width','1200px','important');}
       if((t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||t==='BUTTON')&&e.type!=='checkbox'&&e.type!=='radio'){if(parseFloat(cs.height)<56)e.style.setProperty('min-height','60px','important');}
       if(e.dataset)e.dataset.pcs='1';
