@@ -267,7 +267,12 @@ function sgCss() {
 .sgm td button .sub{font-size:9px;color:#2e6b4f;font-weight:700;line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden}
 .sgm td button .sub.use{color:#222;background:#f8b500;border-radius:3px;padding:0 3px}
 .sgm td button .sub.off{color:#b33}
-.sgm td button.today{background:#fff4e4;box-shadow:inset 0 0 0 2px #e8833a}
+.sgm td button.today,
+html.th-yamen body.portal .sgm td button.today{background:#fff6d0;color:#1c140c;border:3px solid #c9a227;box-shadow:none;height:auto;min-height:44px;overflow:visible}
+.sgm td button.today b,
+html.th-yamen body.portal .sgm td button.today b{color:#1c140c}
+.sgm td button.today .sg-tday,
+html.th-yamen body.portal .sgm td button.today .sg-tday{color:#1c140c;font-size:10px;font-weight:800;line-height:1.1;letter-spacing:.02em}
 .sgm td.dim button{opacity:.4}
 .sgm-err{color:#c00;font-size:13px;margin:4px}
 .sg-top{display:flex;align-items:center;flex-wrap:nowrap;gap:3px;margin:0 0 8px}
@@ -307,11 +312,23 @@ function sgCss() {
 .sg-foot{color:#888;font-size:12px;line-height:1.45;margin:6px 0 0}
 @media (max-width:420px){
   .sgm td button{height:30px}
+  .sgm td button.today,
+  html.th-yamen body.portal .sgm td button.today{height:auto;min-height:44px}
   .sgm td button b{font-size:12px}
   .sgm-h b{font-size:14px}
   .sg-top{gap:2px}
   .sg-top b{font-size:13px}
   .sg-top button{padding:4px 5px;font-size:12px}
+}
+@media (min-width:900px){
+  .sgm td button.today,
+  html.th-yamen body.portal .sgm td button.today{min-height:56px}
+  .sgm td button.today b,
+  html.th-yamen body.portal .sgm td button.today b{font-size:20px}
+  .sgm td button.today .sg-tday,
+  html.th-yamen body.portal .sgm td button.today .sg-tday{font-size:14px}
+  .sgm td button.today .sub,
+  html.th-yamen body.portal .sgm td button.today .sub{font-size:13px}
 }
 </style>`;
 }
@@ -325,8 +342,10 @@ function sgMonthHtml(ym, evs, todayStr) {
     const n = es.filter(e => e.kind === '利用').length;
     const trips = es.filter(e => e.kind === '迎え' || e.kind === '送り').length;
     const sub = closed ? '<span class="sub off">休</span>' : n ? `<span class="sub use">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
-    const cls = [d === todayStr ? 'today' : '', sgYm(d) !== ym ? '' : ''].filter(Boolean).join(' ');
-    rows += `<td class="${sgYm(d) !== ym ? 'dim' : ''}"><button type="button" class="${cls}" onclick="sgOpenDay('${d}')" aria-label="${+d.slice(5, 7)}/${+d.slice(8)} ${closed ? '休所' : '利用' + n + '人'}"><b>${+d.slice(8)}</b>${sub}</button></td>`;
+    const isToday = d === todayStr;
+    const cls = isToday ? 'today' : '';
+    const mark = isToday ? '<span class="sg-tday">今日</span>' : '';
+    rows += `<td class="${sgYm(d) !== ym ? 'dim' : ''}"><button type="button" class="${cls}" onclick="sgOpenDay('${d}')" aria-label="${+d.slice(5, 7)}/${+d.slice(8)}${isToday ? ' 今日' : ''} ${closed ? '休所' : '利用' + n + '人'}"><b>${+d.slice(8)}</b>${sub}${mark}</button></td>`;
     if (cell % 7 === 6) rows += '</tr>';
   }
   return `<div class="sgm">${sgCss()}<div class="sgm-h"><button type="button" onclick="sgShiftMonth(-1)" aria-label="前の月">◀</button><b>${y}年${m}月</b><button type="button" onclick="sgShiftMonth(1)" aria-label="次の月">▶</button><button type="button" class="sg-today" onclick="sgThisMonth()">今月</button></div><table>${rows}</table></div>`;
@@ -430,15 +449,23 @@ async function sgLoad(a, b, mode, anchor) {
   evs = evs.filter(e => typeof leoCalHidden !== 'function' || !leoCalHidden(e));
   return evs.filter(e => e.day >= a && e.day <= b);
 }
+function sgTodayJst() {
+  if (typeof today === 'function') {
+    const t = today();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(t || ''))) return t;
+  }
+  try { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }); }
+  catch (e) { return ''; }
+}
 async function leoHomeCal() {
   const el = document.getElementById('leo_home_cal');
   if (!el) return;
-  const ym = SG_HOME_MONTH || sgYm(typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10));
+  const ym = SG_HOME_MONTH || sgYm(sgTodayJst());
   SG_HOME_MONTH = ym;
   try {
     const g = sgGrid(ym);
     const evs = await sgLoad(g.start, g.end, 'month', ym + '-01');
-    el.innerHTML = sgMonthHtml(ym, evs, typeof today === 'function' ? today() : '');
+    el.innerHTML = sgMonthHtml(ym, evs, sgTodayJst());
   } catch (e) { el.innerHTML = `<p class="sgm-err">${sgEsc(e.message)}</p>`; }
 }
 async function renderSgDay(day) {
@@ -504,7 +531,7 @@ window.sgShiftMonth = n => {
   SG_HOME_MONTH = sgAdd(cur, 30 * n).slice(0, 7);
   if (typeof leoHomeCal === 'function') leoHomeCal();
 };
-window.sgThisMonth = () => { SG_HOME_MONTH = sgYm(typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10)); leoHomeCal(); };
+window.sgThisMonth = () => { SG_HOME_MONTH = sgYm(sgTodayJst()); leoHomeCal(); };
 window.sgShiftDay = (d, n) => sgOpenDay(sgAdd(d, n));
 window.sgToggleMine = () => {
   SG_MINE = !SG_MINE;
