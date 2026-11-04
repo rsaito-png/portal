@@ -12,3 +12,7 @@
   --r-sm:8px;--r-md:12px;--r-pill:999px;
   --shadow:0 1px 3px rgba(0,0,0,.08);
 }
+/* PC拡大スケール（2026-11-04 会長「PCで文字が小さすぎる」） */
+@media (min-width:960px){
+  :root{--fs-xs:16px;--fs-sm:18px;--fs-md:20px;--fs-lg:26px;--fs-xl:32px;--content-w:1040px}
+}

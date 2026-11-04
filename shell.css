@@ -36,3 +36,24 @@ html body.ui-app .back,html body.ui-app .btn-ghost{background:var(--surface)!imp
 html body.ui-app .badge{background:var(--danger)!important;color:var(--surface)!important;border-radius:var(--r-pill)!important}
 html body.ui-app #msg{color:var(--danger)!important}
 html body.ui-app .daily-sky{background:var(--surface)!important;border:1px solid var(--line)!important;border-left:4px solid var(--warning)!important;border-radius:var(--r-md)!important;color:var(--text)!important}
+
+/* ---- PC表示：金斗雲 サービス実施記録入力(.kv-gas) を広く・大きく ---- */
+@media (min-width:960px){
+  html body .kv-gas{max-width:var(--content-w,1040px);font-size:20px;padding:16px 8px 40px}
+  html body .kv-gas .gas-card{padding:28px 32px 32px}
+  html body .kv-gas h3,html body .kv-gas h4{font-size:30px!important}
+  html body .kv-gas .gas-sub,html body .kv-gas .gas-hint,html body .kv-gas .gas-note{font-size:18px}
+  html body .kv-gas .gas-lab{font-size:20px;margin-bottom:8px}
+  html body .kv-gas .gas-pt,html body .kv-gas .kv-prev-lab{font-size:16px}
+  html body .kv-gas .gas-req{font-size:15px}
+  html body .kv-gas .gas-in,html body .kv-gas select.gas-in,html body .kv-gas textarea.gas-in{font-size:20px!important;min-height:56px;padding:12px 16px}
+  html body .kv-gas textarea.gas-in{min-height:120px}
+  html body .kv-gas .gas-field{margin-bottom:20px}
+  html body .kv-gas button{font-size:19px!important}
+  html body .kv-gas .gas-btn{padding:14px 8px}
+  html body .kv-gas .gas-go{font-size:22px!important;padding:18px 12px}
+  html body .kv-gas .sv-h{font-size:20px}
+  html body .kv-gas .instr-content,html body .kv-gas .kv-instr-body,html body .kv-gas .ack{font-size:21px!important}
+  html body .kv-gas .visit-date,html body .kv-gas .visit-time{font-size:26px}
+  html body .kv-gas .gas-canvas{height:300px}
+}
