@@ -105,6 +105,9 @@ assert.ok(month.includes('sub use'), '利用人数は山吹色');
 assert.ok(month.includes('background:#f8b500') && month.includes('.sub.use{color:#222'), '人数は黄地に黒文字');
 assert.ok(month.includes('class="sub off">休'), '休所');
 assert.ok(month.includes('class="today"'), '今日の印');
+assert.strictEqual((month.match(/class="sg-tday">今日/g) || []).length, 1, '今日のラベルは1日だけ');
+assert.ok(month.includes('html.th-yamen body.portal .sgm td button.today'), '官吏テーマの赤いボタンより今日を優先する');
+assert.ok(month.includes('border:3px solid #c9a227') && month.includes('background:#fff6d0') && month.includes('color:#1c140c'), '今日は金枠のクリーム色に黒い文字');
 assert.ok(!month.includes('毎日やる'), 'ホームのボタンはカレンダーに含めない');
 
 const { allDay, timed } = sgSplit(evs.filter(e => e.day === '2026-10-26'));
