@@ -764,13 +764,13 @@ LEO_VIEWS.hiyari = async function () {
   const isNew = r => unread ? unread.has(r.id) : r.id > seen;
   const notRead = r => staff.filter(p => !(readers[r.id] || new Set()).has(p.user_id)).map(p => p.nikki_name);
   const dt = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return `<h3>ヒヤリハット</h3>${demoNote()}<p class="note">ヒヤッとしたこと・ハッとしたことは、小さなことでも書いてください。全員で読んで、同じことを起こさないための記録です（責める記録ではありません）。</p>
+  return `<h3>ヒヤリハット</h3>${demoNote()}<p class="note">ヒヤッとしたこと・ハッとしたこと、けがや事故につながりそうだったこと、再発防止のため全員で共有したいことを書いてください。すぐ直せて問題にならなかった軽微なことは書かなくて大丈夫です。全員で読んで、同じことを起こさないための記録です（責める記録ではありません）。</p>
     <details class="card" ${/new=1|from=line/.test(location.hash + location.search) ? "open" : ""}><summary><b>＋ 報告する</b></summary>
       <div class="rec"><label>いつ<input type="datetime-local" id="hy_at"></label>
       <label>どこで<input id="hy_place" placeholder="例：送迎車、公園、室内"></label>
       <label>種類<select id="hy_kind">${HY_KINDS.map(k => `<option>${k}</option>`).join('')}</select></label>
       <label>関わった児童（イニシャルでも可）<input id="hy_child" maxlength="40"></label>
-      <label>何があったか（具体的に）<textarea id="hy_what" rows="4"></textarea></label>
+      <label>何があったか（具体的に）<textarea id="hy_what" rows="4" placeholder="けがや事故につながりそうだったことを具体的に（軽微なことは不要）"></textarea></label>
       <label>その場でしたこと<textarea id="hy_resp" rows="2"></textarea></label>
       <label>次に起こさないための工夫（思いつけば）<textarea id="hy_prev" rows="2"></textarea></label>
       <button onclick="hySave()">送る</button><div id="hy_msg"></div></div></details>
