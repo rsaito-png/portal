@@ -39,7 +39,13 @@ assert.ok(sql.includes('leo_jisseki_from_nikki'));
 assert.ok(sql.includes("kind = '欠席'"));
 assert.ok(!sql.includes("'キャンセル'"), 'この関数はキャンセルを作らない');
 assert.ok(sql.includes('leo_day_flags_absent_note_required'));
-assert.ok(html.includes('leo.js?v=20261103extra'));
+assert.ok(html.includes('leo.js?v=20261104nikkipick'));
+assert.ok(nikkiFn.includes('leoNikkiKidBar'));
+assert.ok(nikkiFn.includes('leoNikkiChildWrap'));
+assert.ok(leo.includes('function nikkiShowChild'));
+assert.ok(saveFn.includes("document.querySelectorAll('#view .rec input, #view .rec textarea')"), '保存は表示中だけでなく欄の入力を全部見る');
+assert.ok(!saveFn.includes(':visible'));
+assert.ok(!saveFn.includes('.nk-child:not([hidden])'));
 
 const sandbox = {
   DEMO: true,
@@ -89,12 +95,35 @@ assert.ok(select.includes('児童A') && select.includes('児童C'));
 assert.ok(!select.includes('児童D'), 'すでに欠席の子は追加欄に出さない');
 assert.ok(!select.includes('児童B'), '退所した子は追加欄に出さない');
 
+const barAt = nikkiHtml.indexOf('class="nk-kids"');
+const firstCard = nikkiHtml.indexOf('class="nk-child"');
+assert.ok(barAt > 0 && firstCard > barAt, '児童ボタンがカードより前');
+assert.ok(nikkiHtml.indexOf('id="nk_day"') < barAt, '総合日誌はボタンの上に残る');
+assert.ok(nikkiHtml.indexOf('id="nk_abs_add"') > firstCard, '欠席の追加は児童カードの後');
+const bar = nikkiHtml.slice(barAt, firstCard);
+for (const name of ['児童A', '児童B', '児童C', '児童D']) assert.ok(bar.includes(name), name + ' のボタン');
+assert.ok(bar.includes('nk-kid abs') && bar.includes('欠席'), '欠席の子は赤い印');
+assert.ok(bar.includes('data-nk-fill') && bar.includes('●'), '記入済みの印');
+assert.ok(bar.includes('data-nk-dirty'), '未保存の印の場所');
+const opens = [...nikkiHtml.matchAll(/<div class="nk-child"[^>]*>/g)].map(m => m[0]);
+assert.strictEqual(opens.length, 4, '利用3人と欠席1人の欄が全部ある');
+assert.ok(!/\shidden/.test(opens[0]), '最初の子だけ開く');
+assert.ok(opens.slice(1).every(s => /\shidden/.test(s)), 'ほかの子の入力は隠すが消さない');
+const hiddenB = nikkiHtml.slice(nikkiHtml.indexOf('data-child="児童B"'));
+assert.ok(hiddenB.includes('data-f="activity"') && hiddenB.includes('data-f="pick_time"'), '隠した児童Bの入力がHTMLに残る');
+assert.ok(hiddenB.includes('data-f="snack_yen"'), '隠した児童Bのおやつ金額欄も残る');
+assert.strictEqual(sandbox.leoNikkiFilledAbs({ absent_support: false, absent_note: '' }), false);
+assert.strictEqual(sandbox.leoNikkiFilledAbs({ absent_note: '連絡した' }), true);
+assert.strictEqual(sandbox.leoNikkiFilledUse({ pick_time: '' }, '', null), false);
+assert.strictEqual(sandbox.leoNikkiFilledUse({ pick_time: '14:30' }, '', null), true);
+
 const diaryHtml = await vm.runInContext('LEO_VIEWS.diary()', sandbox);
 assert.ok(diaryHtml.includes('児童D') && diaryHtml.includes('加算対応をした'));
 assert.ok(diaryHtml.includes('saveAbsDiary(this)'));
 assert.ok(diaryHtml.includes('id="dr_abs_child"'));
 assert.ok(diaryHtml.includes('児童A') && diaryHtml.includes('下書き'));
 assert.ok(!diaryHtml.includes('請求の印'));
+assert.ok(!diaryHtml.includes('nk-kids'), '児童ごとの日誌は従来の並び');
 
 assert.strictEqual(sandbox.leoAbsError([{ child: '児童A', absent_support: true, absent_note: '  ' }]),
   '児童Aさん：加算対応をしたときは、連絡した相手と話した内容を書いてください。');
@@ -154,6 +183,69 @@ assert.strictEqual(body[0].child, '児童A');
 assert.strictEqual(body[0].absent_support, true);
 assert.strictEqual(body[0].absent_note, '母より発熱。次は金曜。');
 assert.ok(saved.textContent.includes('欠席時対応を保存しました'));
+
+const inputA = { dataset: { f: 'pick_time', old: '14:30', row: '9' }, value: '14:35' };
+const inputB = { dataset: { f: 'end_time', old: '17:30', row: '10' }, value: '17:45' };
+const hiddenView = {
+  querySelectorAll(sel) {
+    if (sel === '[data-abs="1"]' || sel === '[data-meal-child]') return [];
+    return [];
+  },
+};
+sandbox.document.getElementById = id => (id === 'view' ? hiddenView : id === 'saved' ? saved : null);
+sandbox.document.querySelectorAll = sel => (sel === '#view .rec input, #view .rec textarea' ? [inputA, inputB] : []);
+calls.length = 0;
+await sandbox.saveNikki();
+const applied = calls.filter(c => c.path === 'rpc/leo_nikki_apply').map(c => JSON.parse(c.body));
+assert.strictEqual(applied.length, 2, '隠した児童の修正も保存する');
+assert.deepStrictEqual(applied.map(b => b.p_row).sort((a, b) => a - b), [9, 10]);
+assert.strictEqual(applied.find(b => b.p_row === 10).p_fields.end_time, '17:45');
+
+function fakeKid(i, hidden) {
+  const attrs = { 'data-nk-i': String(i), hidden: hidden ? '' : undefined };
+  return {
+    attrs,
+    getAttribute: k => (k in attrs ? attrs[k] : null),
+    setAttribute(k, v) { attrs[k] = v; },
+    removeAttribute(k) { delete attrs[k]; },
+    classList: { toggle(name, on) { this.on = !!on; } },
+  };
+}
+const cards = [fakeKid(0, false), fakeKid(1, true)];
+const btn0 = { ...fakeKid(0, false), querySelector: () => ({ hidden: true }) };
+const btn1 = { ...fakeKid(1, false), querySelector: () => ({ hidden: true }) };
+const switchView = {
+  querySelectorAll(sel) {
+    if (sel === '.nk-child') return cards;
+    if (sel === '.nk-kids [data-nk-i]') return [btn0, btn1];
+    return [];
+  },
+  querySelector(sel) { return sel.includes('"1"') ? btn1 : btn0; },
+};
+sandbox.document.getElementById = id => (id === 'view' ? switchView : null);
+sandbox.nikkiShowChild(1);
+assert.ok('hidden' in cards[0].attrs && !('hidden' in cards[1].attrs), '押した子だけ表示し、入力は残す');
+assert.strictEqual(btn1.attrs['aria-selected'], 'true');
+assert.strictEqual(btn0.attrs['aria-selected'], 'false');
+sandbox.nikkiShowChild(0);
+assert.ok(!('hidden' in cards[0].attrs) && 'hidden' in cards[1].attrs);
+
+const dirtyMark = { hidden: true };
+const dirtyBtn = { querySelector: sel => (sel === '[data-nk-dirty]' ? dirtyMark : null) };
+const dirtyCard = {
+  getAttribute: () => '1',
+  querySelectorAll: () => [{ disabled: false, type: 'text', dataset: { f: 'pick_time', old: '14:30' }, value: '14:30' }],
+};
+const dirtyView = { querySelector: () => dirtyBtn };
+sandbox.document.getElementById = id => (id === 'view' ? dirtyView : null);
+sandbox.nikkiMarkDirty(dirtyCard);
+assert.strictEqual(dirtyMark.hidden, true, '保存済みと同じ値は未保存にしない');
+dirtyCard.querySelectorAll = () => [{ disabled: false, type: 'text', dataset: { f: 'pick_time', old: '14:30' }, value: '15:00' }];
+sandbox.nikkiMarkDirty(dirtyCard);
+assert.strictEqual(dirtyMark.hidden, false, '直した児童の名前に未保存の印');
+dirtyCard.querySelectorAll = () => [{ disabled: true, type: 'number', dataset: { kind: 'meal', f: 'snack_yen' }, value: '100', defaultValue: '' }];
+sandbox.nikkiMarkDirty(dirtyCard);
+assert.strictEqual(dirtyMark.hidden, true, '無効なおやつ金額は未保存にしない');
 
 const absMsg = { textContent: '' };
 const selfCard = {

@@ -213,8 +213,8 @@ const draftHtml = () => vm.runInContext('LEO_VIEWS.linedraft()', sandbox);
   assert.ok(src.includes('rpc/leo_nikki_apply'));
   assert.ok(!src.includes("target: 'nikki'"), '活動の書き戻し依頼を出さない');
   const page = read('index.html');
-  assert.ok(page.includes('leo.js?v=20261103extra'));
-  assert.ok(page.indexOf('leo_meal.js') < page.indexOf('leo.js?v=20261103extra'), '食事の関数を日誌より先に読む');
+  assert.ok(page.includes('leo.js?v=20261104nikkipick'));
+  assert.ok(page.indexOf('leo_meal.js') < page.indexOf('leo.js?v=20261104nikkipick'), '食事の関数を日誌より先に読む');
 
   console.log('leo_line_kids_test: ok');
 })().catch(e => { console.error(e); process.exit(1); });
