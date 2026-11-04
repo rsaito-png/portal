@@ -2,6 +2,7 @@
 <meta name="theme-color" content="#121a2f">
 <title>星心会 職員ポータル</title>
 <style>
+.daily-sky{margin:4px 0 14px;padding:10px 14px;border:1px solid #c9b27a;border-radius:8px;background:#fffaf0;line-height:1.6;font-size:.95em}.daily-sky .ds-h{font-weight:bold;font-size:.85em;opacity:.75;margin-bottom:2px}.daily-sky .ds-t{margin-top:4px;font-weight:bold}
 :root{--main:#2e6b4f}
 body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222}
 header{background:var(--main);color:#fff;padding:14px 16px;font-size:18px;display:flex;justify-content:space-between;align-items:center}
@@ -122,7 +123,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script>/* テーマ切替：未指定=官吏(yamen)、?theme=retro で従来。localStorage に覚える */
 (function(){try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')localStorage.setItem('portalTheme',q);var t=q||localStorage.getItem('portalTheme')||'yamen';if(t==='yamen')document.documentElement.classList.add('th-yamen');}catch(e){document.documentElement.classList.add('th-yamen');}})();</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="theme-yamen.css?v=20261103a">
+<link rel="stylesheet" href="theme-yamen.css?v=20261104sky">
 <style>
 /* 今日の日誌：児童名のボタン。入力欄は隠すだけで残す（保存は全員分） */
 .nk-kids{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
@@ -384,7 +385,8 @@ async function render() {
   const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談（総務奉行だけが読む）', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   const officesHome = (typeof visibleOffices === 'function' ? visibleOffices() : C.offices);
-  $('view').innerHTML = `<h3>出退勤</h3>
+  $('view').innerHTML = `<div id="daily_sky" class="daily-sky" hidden></div>
+    <h3>出退勤</h3>
     <div class="grid">${tileHtml(['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤。事業所の近くだけ', 'main'])}</div>
     <h3>障害福祉事業</h3>
     <div class="grid">${officesHome.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
@@ -397,6 +399,23 @@ async function render() {
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof lbBadge === 'function') lbBadge();
   chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); sctAdminTile();
+  loadDailySky();
+}
+// 毎日占い（全体の空の動き）。portal_daily_sky の今日（JST）分。取れなければ枠ごと隠す。
+async function loadDailySky() {
+  const el = $('daily_sky'); if (!el) return;
+  let r = null;
+  try {
+    if (DEMO) r = { body: '月は昼に乙女座へ。話は進むが、現場は動かない日。急がず、一つだけ片づける。', tip: '散らかっても慌てず、目の前の一つを拾え。' };
+    else if (typeof sb === 'function') {
+      const day = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+      r = ((await sb(`portal_daily_sky?day=eq.${day}&select=body,tip`)) || [])[0];
+    }
+  } catch (e) { r = null; }
+  if (!r || !r.body || $('daily_sky') !== el) { el.hidden = true; return; }
+  const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  el.innerHTML = `<div class="ds-h">毎日占い</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
+  el.hidden = false;
 }
 async function sctIsAdmin() {
   if (DEMO) return ROLE === '事務' || ROLE === 'sct_admin';

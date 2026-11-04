@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.meet-events]
 verify_jwt = false
+
+[functions.daily-sky]
+verify_jwt = false
