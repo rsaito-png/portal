@@ -137,6 +137,7 @@ function dkRecent_(staffId) {
       at: String(rows[i]['日時'] || ''),
       kind: String(rows[i]['種別(出勤/退勤)'] || ''),
       office: String(rows[i]['事業所'] || ''),
+      lunch: String(rows[i]['昼食提供'] || '') || ((String(rows[i]['端末メモ'] || '').match(/昼食=(はい|いいえ)/) || [])[1] || ''),
     });
   }
   return { ok: true, rows: mine };
@@ -180,6 +181,7 @@ function dkPunch_(b) {
       '経度': lng,
       '端末メモ': memo,
       '生データ備考': note,
+      '昼食提供': (b.lunch === true || b.lunch === 'はい' || b.lunch === 'true') ? 'はい' : 'いいえ',
     });
   } finally { lock.releaseLock(); }
   return { ok: true, at: at, distance: distance, office: office.name, staffId: staff.id, kind: kind };

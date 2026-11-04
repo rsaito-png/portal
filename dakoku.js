@@ -1,7 +1,7 @@
 // 出退勤打刻（#dakoku）。スマホ向け。出勤・退勤だけ。
 // シートへの書き込みは GAS ウェブアプリ経由（config.js の dakoku.gasUrl / dakoku.token）。秘密鍵は置かない。
 // ログインは法人ポータルの sess。メールが職員シートと一致すれば本人、空欄なら名前を選ぶ暫定。
-const DK = { data: null, office: '', staffId: '', pos: null, posError: '', locating: false, msg: '', bad: false, busy: false, recent: [], sess: { email: '', demo: false } };
+const DK = { data: null, office: '', staffId: '', pos: null, posError: '', locating: false, msg: '', bad: false, busy: false, lunch: false, recent: [], sess: { email: '', demo: false } };
 let DK_LOC_SEQ = 0;
 
 (function () {
@@ -108,6 +108,8 @@ function dkBind() {
     else if (act === 'in') dkPunch('出勤');
     else if (act === 'out') dkPunch('退勤');
   };
+  const lu = document.getElementById('dk_lunch');
+  if (lu) lu.onchange = () => { DK.lunch = !!lu.checked; };
   const sel = document.getElementById('dk_staff');
   if (sel) sel.onchange = () => dkPickStaff(sel.value);
   const off = document.getElementById('dk_office');
@@ -140,11 +142,12 @@ function dkPaint() {
   const can = !!(v.judge.ok && v.staff && !DK.busy && !(needGps && DK.locating));
   const dis = can ? '' : ' disabled';
   const msg = DK.msg ? `<div class="${DK.bad ? 'ng' : 'okb'}">${dkEsc(DK.msg)}</div>` : '';
-  const recent = DK.recent.length ? `<ul>${DK.recent.map(r => `<li>${dkEsc(r.at)} ${dkEsc(r.kind)}</li>`).join('')}</ul>` : '<p class="meta">まだありません。 / Nenhum registro ainda.</p>';
+  const recent = DK.recent.length ? `<ul>${DK.recent.map(r => `<li>${dkEsc(r.at)} ${dkEsc(r.kind)}${r.lunch === 'はい' ? ' 🍱昼食あり / com almoço' : ''}</li>`).join('')}</ul>` : '<p class="meta">まだありません。 / Nenhum registro ainda.</p>';
   const demoBtn = DK.sess.demo && v.office && needGps ? '<button type="button" class="loc" data-dk="demo">見本の位置で試す（記録しない） / Testar com local de exemplo</button>' : '';
   const locBtn = needGps ? '<button type="button" class="loc" data-dk="loc">位置を取り直す / Atualizar localização</button>' : '';
   root.innerHTML = `<h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><p class="meta">${dkEsc(who)}</p>${msg}${officeHtml}${staffHtml}${geo}
-    ${v.office ? `<button type="button" class="go" data-dk="in"${dis}>出勤<br><small>Entrada</small></button>
+    ${v.office ? `<label class="dk-lunch" style="display:flex;align-items:center;gap:.5em;margin:.6em 0;font-size:1.05em"><input type="checkbox" id="dk_lunch" style="width:1.4em;height:1.4em"${DK.lunch ? ' checked' : ''}> 昼食提供を受けた / Recebeu refeição (almoço)</label>
+    <button type="button" class="go" data-dk="in"${dis}>出勤<br><small>Entrada</small></button>
     <button type="button" class="go out" data-dk="out"${dis}>退勤<br><small>Saída</small></button>
     ${locBtn}${demoBtn}
     <p class="meta">押し忘れを直す画面は、まだありません。責任者に伝えてください。<br>Esqueceu de registrar? Avise o responsável.</p>
@@ -216,7 +219,7 @@ async function dkPunch(kind) {
   if (!v.judge.ok) { DK.msg = v.judge.reason || '打刻できません / Não é possível registrar'; DK.bad = true; dkPaint(); return; }
   if (DK.sess.demo) {
     const at = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }).replace('T', ' ');
-    DK.recent.unshift({ at: at, kind: kind, office: v.office.name });
+    DK.recent.unshift({ at: at, kind: kind, office: v.office.name, lunch: DK.lunch ? 'はい' : 'いいえ' });
     DK.msg = '見本モードです。' + kind + 'は記録していません。 / Modo de demonstração: ' + (kind === '出勤' ? 'entrada' : 'saída') + ' não gravada.';
     DK.bad = false;
     dkPaint();
@@ -227,7 +230,8 @@ async function dkPunch(kind) {
     const needGps = Dakoku.gpsRequired(v.office);
     const payload = {
       action: 'punch', office: v.office.name, staffId: v.staff.id, kind: kind,
-      email: DK.sess.email, memo: (navigator.userAgent || '').slice(0, 160),
+      email: DK.sess.email, lunch: DK.lunch ? 'はい' : 'いいえ',
+      memo: ('昼食=' + (DK.lunch ? 'はい' : 'いいえ') + '; ' + (navigator.userAgent || '')).slice(0, 160),
     };
     if (needGps && DK.pos) {
       payload.lat = DK.pos.lat;
