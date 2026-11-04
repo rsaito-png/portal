@@ -78,6 +78,7 @@ declare
   svc text;
   p_driver text; p_time text; p_place text;
   d_driver text; d_time text; d_place text; d_src text; kata_drop text;
+  kid_drop text; d_end text; d_start text; dow text;
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
   if p_day is null then raise exception '日付'; end if;
@@ -146,10 +147,12 @@ begin
     if p_driver is null and r.parent_drop then p_driver := '保護者'; end if;
 
     select coalesce(nullif(e.staff, ''), case when r.parent_pick then '保護者' end),
-           coalesce(public.leo_kid_json(e.kid_times, r.child), nullif(btrim(e.start_time), '')),
+           nullif(btrim(public.leo_kid_json(e.kid_times, r.child)), ''),
+           nullif(btrim(e.end_time), ''),
+           nullif(btrim(e.start_time), ''),
            coalesce(public.leo_kid_json(e.kid_places, r.child), e.place),
            e.source
-      into d_driver, d_time, d_place, d_src
+      into d_driver, kid_drop, d_end, d_start, d_place, d_src
       from leo_events e
      where e.day = p_day and e.kind = '送り' and not public.leo_event_hidden(e.source, e.title, e.note)
        and (public.leo_norm(e.child) = public.leo_norm(r.child)
@@ -157,12 +160,16 @@ begin
      order by e.updated_at desc nulls last, e.id desc
      limit 1;
     if d_driver is null and r.parent_pick then d_driver := '保護者'; end if;
-    -- 送り時刻が空のときだけ埋める（下の update は、すでに入っている時刻を残す）。
-    -- 職員がカレンダーで直した予定（source が kata 以外）の時刻が先。
-    -- 次に型表の送り終了（画面の送り時間。列名が「送り時間」の行も読む）。
-    -- 古い確定は児童ごとの時刻に利用終了を入れていたので、それと同じ値は型表で置き換える。
+    -- 送り時刻が空のときだけ埋める（下の update は、すでに入っている drop_time を残す）。
+    -- 着の順。児童ごとの時刻が利用終了と同じときは、古い確定の写しなので着とみなさない。
+    --   1. 児童ごとの着（kid_times。共有便ではその子の送り終了）
+    --   2. 便の end_time（最後の着。型表の行が見つからなくてもここを使う）
+    --   3. 型表の送り終了（画面の送り時間。列名が「送り時間」の行も読む）
+    --   4. 便の start_time（乗り始め。利用終了と同じになりやすい）
+    -- source が kata 以外（カレンダーで職員が直した便）は型表で置き換えない。
     -- 母の迎えの日は施設の送りが無いので型表では埋めない。保護者の回答に送り時刻の欄は無い。
     kata_drop := null;
+    dow := (array['日','月','火','水','木','金','土'])[extract(dow from p_day)::int + 1];
     if not r.parent_pick then
       select nullif(btrim(coalesce(nullif(btrim(k->>'送り終了'), ''), nullif(btrim(k->>'送り時間'), ''))), '')
         into kata_drop
@@ -172,20 +179,28 @@ begin
           select data from leo_sheet where kind = 'kata'
             and not exists (select 1 from leo_master where kind = 'kata')
         ) s
-       where public.leo_name_canon(k->>'児童名') = public.leo_name_canon(r.child)
-         and k->>'曜日' = (array['日','月','火','水','木','金','土'])[extract(dow from p_day)::int + 1]
+       where public.leo_norm(k->>'児童名') = public.leo_norm(r.child)
+         and left(btrim(k->>'曜日'), 1) = dow
          and coalesce(k->>'保護者送迎', '') is distinct from '母の迎え'
-       order by (k->>'児童名' = public.leo_name_canon(k->>'児童名')) desc, k->>'児童名'
+       order by (btrim(k->>'曜日') = dow) desc, (k->>'児童名' = public.leo_name_canon(k->>'児童名')) desc, k->>'児童名'
        limit 1;
     end if;
-    if d_src is distinct from 'kata' and nullif(btrim(d_time), '') is not null then
-      null;
-    elsif d_src = 'kata'
-          and nullif(btrim(d_time), '') is not null
-          and nullif(btrim(d_time), '') is distinct from nullif(btrim(r.end_time), '') then
-      null;
+    if d_src is not null and d_src is distinct from 'kata' then
+      if kid_drop is not null and kid_drop is distinct from nullif(btrim(r.end_time), '') then
+        d_time := kid_drop;
+      elsif d_end is not null and d_end is distinct from nullif(btrim(r.end_time), '') then
+        d_time := d_end;
+      else
+        d_time := coalesce(kid_drop, d_end, d_start);
+      end if;
+    elsif kid_drop is not null and kid_drop is distinct from nullif(btrim(r.end_time), '') then
+      d_time := kid_drop;
+    elsif d_end is not null and d_end is distinct from nullif(btrim(r.end_time), '') then
+      d_time := d_end;
     elsif kata_drop is not null then
       d_time := kata_drop;
+    else
+      d_time := coalesce(kid_drop, d_end, d_start);
     end if;
 
     select c.kind into svc from leo_children c where public.leo_norm(c.name) = public.leo_norm(r.child) limit 1;
@@ -222,6 +237,7 @@ begin
     end if;
     p_driver := null; p_time := null; p_place := null;
     d_driver := null; d_time := null; d_place := null; d_src := null; kata_drop := null;
+    kid_drop := null; d_end := null; d_start := null;
     svc := null;
   end loop;
   return n;

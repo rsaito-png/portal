@@ -128,13 +128,24 @@ function leoKidVal(obj, name) {
   const key = Object.keys(obj).find(k => String(k).replace(/\s/g, '') === want);
   return key && obj[key] != null ? obj[key] : '';
 }
+// 送りの日誌時刻。児童ごとの着（kid_times）が利用終了の写しでなければそれを使う。共有便でもその子の着が先。
+// 無ければ便の end_time（最後の着）、それも利用終了と同じなら start_time（乗り始め）。
+function leoDropClock(e, name, useEnd) {
+  const kid = String(leoKidVal(e && e.kid_times, name) || '').trim();
+  const end = String((e && e.end_time) || '').trim();
+  const start = String((e && e.start_time) || '').trim();
+  const board = String(useEnd || '').trim();
+  if (kid && kid !== board) return kid;
+  if (end && end !== board) return end;
+  return kid || end || start || '';
+}
 function leoPlanJobs(events) {
   const jobs = [];
   for (const e of events || []) {
     if (e.kind !== '迎え' && e.kind !== '送り') continue;
     const kids = (e.kids && e.kids.length) ? e.kids.slice() : (e.child ? [e.child] : ['']);
     kids.forEach(c => jobs.push({
-      day: e.day, t: leoKidVal(e.kid_times, c) || e.start_time || '', k: e.kind, c,
+      day: e.day, t: e.kind === '送り' ? leoDropClock(e, c, '') : (leoKidVal(e.kid_times, c) || e.start_time || ''), k: e.kind, c,
       p: leoKidVal(e.kid_places, c) || e.place || '', dr: e.staff || '', car: e.car || '',
     }));
   }
@@ -220,7 +231,7 @@ function leoMergeNikki(rows, events) {
     } else if (kind === '送り') {
       if (hidden) { row._calDrop = 'del'; row._dropWas = e.staff || row.drop_driver || ''; row.drop_time = ''; row.drop_place = ''; row.drop_driver = ''; }
       else {
-        row.drop_time = leoKidVal(e.kid_times, name) || e.start_time || '';
+        row.drop_time = leoDropClock(e, name, row.end_time);
         row.drop_place = leoKidVal(e.kid_places, name) || e.place || '';
         row.drop_driver = e.staff || '';
         row._calDrop = true;

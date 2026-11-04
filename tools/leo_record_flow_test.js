@@ -70,7 +70,20 @@ assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoVi
 assert.ok(sql.includes('kata_drop'), '空の送り時刻は型表で埋める');
 assert.ok(sql.includes("k->>'送り終了'"), '型表の送り終了を読む');
 assert.ok(sql.includes("d_src is distinct from 'kata'"), 'カレンダーで直した時刻を型表で上書きしない');
+assert.ok(sql.includes('d_end is distinct from nullif(btrim(r.end_time)'), '便の着を利用終了の写しより先に使う');
+assert.ok(sql.includes("public.leo_norm(k->>'児童名')"), '型表の名前は空白を除いて比べる');
+assert.ok(sql.includes("left(btrim(k->>'曜日'), 1)"), '曜日は先頭1文字（水曜も水）');
 assert.ok(/drop_time = coalesce\(nullif\(btrim\(n\.drop_time\), ''\), d_time\)/.test(sql), '入っている送り時刻は残す');
+const arrival = read('supabase/leo_drop_time_arrival.sql');
+function fnBody(s) {
+  const a = s.indexOf('create or replace function public.leo_nikki_from_events');
+  const b = s.indexOf('end $$;', a);
+  assert.ok(a >= 0 && b > a);
+  return s.slice(a, b);
+}
+assert.strictEqual(fnBody(arrival), fnBody(sql), '実行用SQLと record_flow の関数は同じ');
+assert.ok(!/create policy|enable row level security|\bgrant\b/i.test(arrival), '送り時刻のSQLは権限を変えない');
+assert.ok(arrival.includes('/*') && arrival.includes('-- update leo_nikki'), '11月の直しはコメントのまま');
 assert.ok(between(leo, 'async function saveDiary', 'let LD_DAY').includes('rpc/leo_activity_from_drafts'));
 
 console.log('leo_record_flow_test: ok');
