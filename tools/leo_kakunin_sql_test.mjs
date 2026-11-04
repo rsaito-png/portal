@@ -169,7 +169,7 @@ await t('職員一覧は確認した実費を読む。請求画面の関数は�
   if (!leo.includes('確認した実費') || !leo.includes('リンクに出る実費')) throw new Error('labels');
   if (!leo.includes("LEO_VIEWS.jippi") && !fs.readFileSync(root + 'leo_jippi.js', 'utf8').includes('LEO_VIEWS.jippi')) throw new Error('jippi view');
   if (!fs.readFileSync(root + 'leo_jippi.js', 'utf8').includes('この月のリンクを作成／更新')) throw new Error('checkout');
-  if (!idx.includes('leo.js?v=20261104drop2')) throw new Error('cache');
+  if (!idx.includes('leo.js?v=20261104notefold')) throw new Error('cache');
 });
 await t('取得SQLは児童と月で1行だけ結合する', () => {
   const fn = SQL.slice(SQL.indexOf('function public.leo_confirm_get'), SQL.indexOf('function public.leo_confirm_submit'));
