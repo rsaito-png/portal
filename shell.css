@@ -57,3 +57,4 @@ html body.ui-app .daily-sky{background:var(--surface)!important;border:1px solid
   html body .kv-gas .visit-date,html body .kv-gas .visit-time{font-size:26px}
   html body .kv-gas .gas-canvas{height:300px}
 }
+@media (min-width:960px){.ui-topbar{height:80px;font-size:32px}.ui-topbar button{font-size:28px!important}}

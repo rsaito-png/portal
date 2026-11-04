@@ -326,4 +326,5 @@ if (AUTH_HASH.get('access_token') && ['recovery', 'invite', 'signup'].includes(A
 else if (DEMO) bootApp();
 else if (sess() && sess().exp > Date.now() + 60000 && sess().uid) bootApp();
 else if (sess() && sess().refresh) refreshSess().then(ok => { if (ok && sess().uid) bootApp(); });
-</script></body></html>
+</script><script src="pc-scale.js?v=20261104all"></script>
+</body></html>
