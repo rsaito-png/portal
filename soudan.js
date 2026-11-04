@@ -30,3 +30,13 @@ async function hsReply(id) {
   const t = $('hs_r' + id).value.trim(); if (!t) return;
   try { await sb('hr_soudan?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ reply: t, replied_at: new Date().toISOString() }) }); renderSoudan(); } catch (e) { alert('送れませんでした: ' + e.message); }
 }
+// トップの相談所タイルに未回答件数（総務奉行だけ。0件なら出さない）
+async function soudanBadge() {
+  if (typeof DEMO !== 'undefined' && DEMO) return;
+  try {
+    if (!(await lbRpc('is_soumu_bugyo'))) return;
+    const rows = await sb('hr_soudan?select=id&reply=is.null');
+    const n = (rows || []).length, a = document.querySelector('a[href="#soudan"]');
+    if (a && n && !a.querySelector('.badge')) a.insertAdjacentHTML('afterbegin', `<span class="badge">未回答 ${n}</span>`);
+  } catch (e) {}
+}
