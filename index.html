@@ -118,7 +118,6 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
 <link rel="stylesheet" href="theme-retro.css?v=20261103pc">
 <script>/* テーマ切替：未指定=官吏(yamen)、?theme=retro で従来。localStorage に覚える */
 (function(){try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')localStorage.setItem('portalTheme',q);var t=q||localStorage.getItem('portalTheme')||'yamen';if(t==='yamen')document.documentElement.classList.add('th-yamen');}catch(e){document.documentElement.classList.add('th-yamen');}})();</script>
@@ -150,8 +149,11 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
   .nk-fold-mark{min-width:64px;min-height:64px;font-size:36px}
 }
 </style>
-</head><body class="portal">
-<header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="tokens.css?v=20261104ui">
+<link rel="stylesheet" href="shell.css?v=20261104ui">
+</head><body class="portal ui-app">
+<header class="ui-topbar"><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
 <div id="login" class="card"><p>メールアドレスとパスワードでログインしてください。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">

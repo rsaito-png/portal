@@ -1,0 +1,38 @@
+/* せいしんかいUI 共通部品（tokens.css の変数のみ使用） */
+.ui-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-4);box-shadow:var(--shadow);color:var(--text)}
+.ui-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);min-height:44px;padding:0 var(--sp-4);border-radius:var(--r-sm);font:var(--fw-bold) var(--fs-md)/1 var(--font);cursor:pointer;text-decoration:none;border:1px solid transparent}
+.ui-btn-primary{background:var(--primary);color:var(--surface);border-color:var(--primary)}
+.ui-btn-primary:hover,.ui-btn-primary:active{background:var(--primary-active);border-color:var(--primary-active)}
+.ui-btn-secondary{background:var(--surface);color:var(--text);border-color:var(--line)}
+.ui-btn-secondary:hover{border-color:var(--primary)}
+.ui-btn-text{background:transparent;color:var(--primary-active);border-color:transparent}
+.ui-input{height:44px;box-sizing:border-box;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font:var(--fs-md) var(--font)}
+.ui-input:focus{outline:2px solid var(--primary);outline-offset:0}
+.ui-list-row{display:flex;align-items:center;gap:var(--sp-3);min-height:56px;padding:0 var(--sp-4);border-bottom:1px solid var(--line);background:var(--surface);color:var(--text);text-decoration:none}
+.ui-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 var(--sp-1);border-radius:var(--r-pill);background:var(--danger);color:var(--surface);font:var(--fw-bold) var(--fs-xs)/1 var(--font);box-sizing:border-box}
+.ui-topbar{display:flex;align-items:center;justify-content:space-between;height:56px;padding:0 var(--sp-4);background:var(--navy);color:var(--bg);border-bottom:3px solid var(--accent);font:var(--fw-bold) var(--fs-lg)/1 var(--font);box-sizing:border-box}
+.ui-tabbar{position:fixed;left:0;right:0;bottom:0;height:64px;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);z-index:50}
+.ui-tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text-sub);text-decoration:none;font-size:var(--fs-xs)}
+.ui-tabbar a.on{color:var(--primary-active);font-weight:var(--fw-bold)}
+@media (min-width:960px){
+  .ui-tabbar{top:56px;right:auto;bottom:0;width:240px;height:auto;display:flex;flex-direction:column;padding:var(--sp-4) 0;border-top:0;border-right:1px solid var(--line)}
+  .ui-tabbar a{flex-direction:row;justify-content:flex-start;gap:var(--sp-3);min-height:48px;padding:0 var(--sp-5);font-size:var(--fs-md)}
+}
+.ui-empty{text-align:center;padding:var(--sp-6) var(--sp-4);color:var(--text-sub);background:var(--surface);border:1px dashed var(--line);border-radius:var(--r-md);font-size:var(--fs-md)}
+.ui-back{display:inline-flex;align-items:center;gap:var(--sp-1);min-height:44px;padding:0 var(--sp-3);background:transparent;color:var(--primary-active);border:0;font:var(--fw-bold) var(--fs-md) var(--font);cursor:pointer;text-decoration:none}
+
+/* ---- トップ(index.html)への適用：body.ui-app 限定。旧テーマ(yamen/retro)より優先 ---- */
+html body.ui-app{background:var(--bg)!important;color:var(--text)!important;font-family:var(--font)!important;line-height:var(--lh)}
+html body.ui-app header{background:var(--navy)!important;color:var(--bg)!important;border-bottom:3px solid var(--accent)!important;font-family:var(--font)!important;font-weight:var(--fw-bold);box-shadow:none!important;background-image:none!important}
+html body.ui-app header #out{background:transparent!important;color:var(--bg)!important;border:1px solid var(--bg)!important;border-radius:var(--r-sm)!important;width:auto}
+html body.ui-app h1,html body.ui-app h2,html body.ui-app h3,html body.ui-app h4,html body.ui-app input,html body.ui-app button,html body.ui-app select,html body.ui-app textarea{font-family:var(--font)!important}
+html body.ui-app .card,html body.ui-app .tile,html body.ui-app .nxc{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--line)!important;border-radius:var(--r-md)!important;box-shadow:var(--shadow)!important;background-image:none!important}
+html body.ui-app .office{border-left:6px solid var(--c,var(--line))!important}
+html body.ui-app .tile small,html body.ui-app .nxc small,html body.ui-app .note{color:var(--text-sub)!important}
+html body.ui-app input{border:1px solid var(--line)!important;border-radius:var(--r-sm)!important;background:var(--surface)!important;color:var(--text)!important;min-height:44px}
+html body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.back):not(.btn-ghost){background:var(--primary)!important;color:var(--surface)!important;border:1px solid var(--primary)!important;border-radius:var(--r-sm)!important;min-height:44px;box-shadow:none!important;background-image:none!important}
+html body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.back):not(.btn-ghost):hover{background:var(--primary-active)!important}
+html body.ui-app .back,html body.ui-app .btn-ghost{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--line)!important;border-radius:var(--r-sm)!important;min-height:44px;box-shadow:none!important}
+html body.ui-app .badge{background:var(--danger)!important;color:var(--surface)!important;border-radius:var(--r-pill)!important}
+html body.ui-app #msg{color:var(--danger)!important}
+html body.ui-app .daily-sky{background:var(--surface)!important;border:1px solid var(--line)!important;border-left:4px solid var(--warning)!important;border-radius:var(--r-md)!important;color:var(--text)!important}

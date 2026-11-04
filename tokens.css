@@ -1,0 +1,14 @@
+/* せいしんかいUI デザイントークン（2026-11-04 会長承認） */
+:root{
+  --bg:#FFF8EC;--surface:#FFFFFF;--text:#1C140C;--text-sub:#6B5B4A;--line:#E8DCC6;
+  --primary:#E8833A;--primary-active:#C96A24;--navy:#121A2F;
+  --success:#2E6B4F;--warning:#F2C14E;--danger:#C8372D;--danger-bg:#FDE8E8;
+  --leo:#4A90D9;--kin:#E8833A;--rydeen:#7B5EA7;--chamu:#8B5E3C;--nicchu:#2E9C8F;
+  --accent:var(--primary);
+  --font:"Noto Sans JP","Hiragino Sans",sans-serif;
+  --fs-xs:12px;--fs-sm:14px;--fs-md:16px;--fs-lg:20px;--fs-xl:24px;
+  --fw-normal:400;--fw-bold:700;--lh:1.6;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;
+  --r-sm:8px;--r-md:12px;--r-pill:999px;
+  --shadow:0 1px 3px rgba(0,0,0,.08);
+}
