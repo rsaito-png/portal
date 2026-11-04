@@ -558,10 +558,12 @@ const LEO_VIEWS = {
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
     const meals = leoMealByChild(bundle.meals);
     LEO_SNACK_YEN = bundle.yen !== false;
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
-      leoDayLogHtml(day, bundle.log, 'nk', bundle.missing) +
-      use.map(r => { const a = A[String(r.child || '').replace(/\s/g, '')], actVal = (a && a.text) || r.activity || '';
-        return `<div class="card rec"><b>${esc(r.child)}</b>（${esc(leoCardService(r.child, kinds, r.service))}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
+    const kids = [
+      ...use.map(r => {
+        const a = A[String(r.child || '').replace(/\s/g, '')];
+        const actVal = (a && a.text) || r.activity || '';
+        const mealRec = meals[leoMealNorm(r.child)];
+        const card = `<div class="card rec"><b>${esc(r.child)}</b>（${esc(leoCardService(r.child, kinds, r.service))}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
         ${NIKKI_FIELDS.map(([f, l]) => {
           const raw = f === 'activity' ? actVal : (r[f] ?? '');
           const shown = nikkiShownValue(f, raw);
@@ -569,9 +571,19 @@ const LEO_VIEWS = {
             ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}">${esc(shown)}</textarea></label>`
             : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}" value="${esc(shown)}"></label>`;
         }).join('')}
-        ${leoMealBox(r.child, meals[leoMealNorm(r.child)], r, false, false, true)}</div>`; }).join('') +
+        ${leoMealBox(r.child, mealRec, r, false, false, true)}</div>`;
+        return { child: r.child, kind: '利用', filled: leoNikkiFilledUse(r, actVal, mealRec), html: card };
+      }),
+      ...abs.map(r => {
+        const flag = leoAbsFlag(flags, r.child);
+        return { child: r.child, kind: '欠席', filled: leoNikkiFilledAbs(flag), html: leoAbsCardHtml(r.child, flag) };
+      }),
+    ];
+    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+      leoDayLogHtml(day, bundle.log, 'nk', bundle.missing) +
+      leoNikkiKidBar(kids) +
+      kids.map((k, i) => leoNikkiChildWrap(i, k.kind, k.child, k.html)).join('') +
       (bundle.yen === false ? '<p class="note">おやつの金額を保存するには、supabase/leo_meal_snack_yen.sql を実行してください。あり／なしはこれまでどおり保存できます。</p>' : '') +
-      abs.map(r => leoAbsCardHtml(r.child, leoAbsFlag(flags, r.child))).join('') +
       leoAbsAddHtml('nk', day, leoAbsChoices(rows, kinds, left, day)) +
       `<button onclick="saveNikki()">保存する</button><div id="saved"></div>`;
   },
@@ -1036,6 +1048,78 @@ function leoAbsChoices(rows, kinds, left, day) {
   (rows || []).forEach(r => { if (r && r.kind === '利用') add(r.child); });
   names.sort((a, b) => a.localeCompare(b, 'ja'));
   return names;
+}
+function leoNikkiFilledUse(row, actVal, mealRec) {
+  const r = row || {};
+  if (String(actVal == null ? (r.activity || '') : actVal).trim()) return true;
+  for (const [f] of NIKKI_FIELDS) {
+    if (f === 'activity') continue;
+    if (String(r[f] == null ? '' : r[f]).trim()) return true;
+  }
+  const meal = leoMealPrefill(mealRec && mealRec.meal, r.meal);
+  const snack = leoMealPrefill(mealRec && mealRec.snack, r.snack);
+  if (meal || snack) return true;
+  return mealRec != null && mealRec.snack_yen != null && String(mealRec.snack_yen).trim() !== '';
+}
+function leoNikkiFilledAbs(flag) {
+  const f = flag || {};
+  return !!(f.absent_support || String(f.absent_note || '').trim());
+}
+function leoNikkiKidBar(kids) {
+  if (!kids || !kids.length) return '';
+  const btns = kids.map((k, i) => {
+    const on = i === 0;
+    const abs = k.kind === '欠席';
+    const fill = `<span class="nk-mark" data-nk-fill title="記入あり"${k.filled ? '' : ' hidden'}>●</span>`;
+    return `<button type="button" class="nk-kid${on ? ' on' : ''}${abs ? ' abs' : ''}" role="tab" aria-selected="${on ? 'true' : 'false'}" data-nk-i="${i}" onclick="nikkiShowChild(${i})">${esc(k.child)}${abs ? '<small>欠席</small>' : ''}${fill}<span class="nk-mark" data-nk-dirty hidden title="未保存の修正">＊</span></button>`;
+  }).join('');
+  return `<div class="nk-kids" role="tablist" aria-label="今日の児童">${btns}</div><p class="note">名前を押すと、その子の欄だけ出ます。隠している子に書いた内容も、下の保存で一緒に残ります。</p>`;
+}
+function leoNikkiChildWrap(i, kind, child, inner) {
+  const hide = i === 0 ? '' : ' hidden';
+  return `<div class="nk-child" data-nk-i="${i}" data-nk-kind="${esc(kind)}" data-child="${esc(child)}"${hide} oninput="nikkiMarkDirty(this)" onchange="nikkiMarkDirty(this)">${inner}</div>`;
+}
+function nikkiShowChild(i) {
+  const n = Number(i);
+  if (!Number.isFinite(n)) return;
+  const root = (typeof document !== 'undefined' && document.getElementById && document.getElementById('view')) || document;
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+  root.querySelectorAll('.nk-child').forEach(el => {
+    const on = Number(el.getAttribute('data-nk-i')) === n;
+    if (on) el.removeAttribute('hidden');
+    else el.setAttribute('hidden', '');
+  });
+  root.querySelectorAll('.nk-kids [data-nk-i]').forEach(el => {
+    const on = Number(el.getAttribute('data-nk-i')) === n;
+    if (el.classList && el.classList.toggle) el.classList.toggle('on', on);
+    if (el.setAttribute) el.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+}
+function nikkiControlDirty(el) {
+  if (!el || el.disabled) return false;
+  const kind = el.dataset ? el.dataset.kind : '';
+  if (kind === 'day') return false;
+  if (el.type === 'checkbox') return !!el.checked !== !!el.defaultChecked;
+  if (kind === 'meal' || kind === 'abs') {
+    return String(el.value == null ? '' : el.value) !== String(el.defaultValue == null ? '' : el.defaultValue);
+  }
+  if (el.dataset && el.dataset.f && typeof nikkiEditValue === 'function') return !!nikkiEditValue(el.dataset.f, el.dataset.old, el.value);
+  return false;
+}
+function nikkiCardDirty(card) {
+  if (!card || typeof card.querySelectorAll !== 'function') return false;
+  for (const el of card.querySelectorAll('input, textarea, select')) if (nikkiControlDirty(el)) return true;
+  return false;
+}
+function nikkiMarkDirty(card) {
+  if (!card || typeof document === 'undefined') return;
+  const i = card.getAttribute ? card.getAttribute('data-nk-i') : '';
+  const root = (document.getElementById && document.getElementById('view')) || document;
+  if (!root || typeof root.querySelector !== 'function') return;
+  const btn = root.querySelector('.nk-kids [data-nk-i="' + i + '"]');
+  if (!btn || typeof btn.querySelector !== 'function') return;
+  const mark = btn.querySelector('[data-nk-dirty]');
+  if (mark) mark.hidden = !nikkiCardDirty(card);
 }
 function leoAbsCardHtml(child, flag, withSave) {
   const f = flag || {};

@@ -82,7 +82,7 @@ for (const [a, b] of [
 
 assert.ok(between(leo, 'async haichi()', 'async edits()').includes('filingDriverName'));
 assert.ok(between(leo, 'async nikki()', 'async jisseki()').includes('nikkiShownValue'));
-assert.ok(between(leo, 'async jisseki()', '// 保護者の実績確認').includes('filingTripDrivers'));
+assert.ok(between(leo, 'async jisseki()', '// 保護者の実績・実費の確認').includes('filingTripDrivers'));
 assert.ok(between(leo, 'LEO_VIEWS.diary', 'async function saveDiary').includes('filingDriverName'));
 assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoView').includes('nikkiEditValue'));
 assert.ok(!between(leo, 'LEO_VIEWS.master', 'async function saveMaster').includes('filingDriverName'));

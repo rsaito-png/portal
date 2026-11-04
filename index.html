@@ -123,6 +123,25 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 (function(){try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')localStorage.setItem('portalTheme',q);var t=q||localStorage.getItem('portalTheme')||'yamen';if(t==='yamen')document.documentElement.classList.add('th-yamen');}catch(e){document.documentElement.classList.add('th-yamen');}})();</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap">
 <link rel="stylesheet" href="theme-yamen.css?v=20261103a">
+<style>
+/* 今日の日誌：児童名のボタン。入力欄は隠すだけで残す（保存は全員分） */
+.nk-kids{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.nk-kids button.nk-kid{width:auto;flex:1 1 8.5em;min-width:7.2em;max-width:100%;min-height:48px;margin:0;padding:10px 12px;background:#fff;color:#222;border:2px solid #888;border-radius:10px;box-shadow:none;font-weight:700;line-height:1.25;text-align:center;white-space:normal}
+.nk-kids button.nk-kid.on{background:var(--main);color:#fff;border-color:var(--main)}
+.nk-kids button.nk-kid.abs{background:#fff5f5;color:#b00020;border-color:#d33}
+.nk-kids button.nk-kid.abs.on{background:#d33;color:#fff;border-color:#a10}
+.nk-kids button.nk-kid small{display:inline;margin-left:4px;font-size:.78em;font-weight:800}
+.nk-kids .nk-mark{margin-left:4px;font-size:.85em}
+.nk-child[hidden]{display:none !important}
+html.th-yamen body.portal .nk-kids button.nk-kid{background:#fffaf0;color:#3a2208;border:2px solid #8a6a3a;box-shadow:none}
+html.th-yamen body.portal .nk-kids button.nk-kid.on{background:#7a1414;color:#fff3e6;border-color:#c6a15b}
+html.th-yamen body.portal .nk-kids button.nk-kid.abs{background:#fff0ee;color:#8e1b1b;border-color:#c0392b}
+html.th-yamen body.portal .nk-kids button.nk-kid.abs.on{background:#8e1b1b;color:#fff3e6;border-color:#c6a15b}
+@media (min-width:900px){
+  .nk-kids{gap:12px}
+  .nk-kids button.nk-kid{font-size:32px;min-height:64px;padding:14px 18px}
+}
+</style>
 </head><body class="portal">
 <header><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
@@ -149,7 +168,7 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 <script src="leo_driver.js?v=20261026b"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261103extra"></script>
+<script src="leo.js?v=20261104nikkipick"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=202610162320"></script>
 <script src="kin_visit.js?v=20261030kinwrite"></script>
