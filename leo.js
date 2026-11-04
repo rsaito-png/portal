@@ -590,7 +590,8 @@ const LEO_VIEWS = {
         return { child: r.child, kind: '欠席', filled: leoNikkiFilledAbs(flag), html: leoAbsCardHtml(r.child, flag) };
       }),
     ];
-    return `<h3>今日の日誌（見る・直す）</h3>${demoNote()}<p class="note">ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+    const noteOpen = leoFoldOpen('leo_nikki_note_open');
+    return `<h3 class="nk-fold-h">${leoFoldBtn('leo_nikki_note_open', 'nk_note', '今日の日誌（見る・直す）')}</h3>${demoNote()}<p class="note" id="nk_note"${noteOpen ? '' : ' hidden'}>ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
       leoDayLogHtml(day, bundle.log, 'nk', bundle.missing) +
       leoNikkiKidBar(kids) +
       kids.map((k, i) => leoNikkiChildWrap(i, k.kind, k.child, k.html)).join('') +
@@ -945,9 +946,34 @@ function leoMealBox(child, rec, sheet, withDay, withNote, withYen) {
     ${hint.length ? `<p class="note">${esc(hint.join(' ／ '))}</p>` : ''}
   </div>`;
 }
+function leoFoldOpen(key) {
+  try { return localStorage.getItem(key) === '1'; }
+  catch (e) { return false; }
+}
+function leoFoldBtn(key, id, labelHtml) {
+  const open = leoFoldOpen(key);
+  return `<button type="button" class="nk-fold" id="${id}_btn" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${id}" onclick="leoFoldToggle('${key}','${id}')">${labelHtml}<span class="nk-fold-mark" id="${id}_mark" aria-hidden="true">${open ? '△' : '▽'}</span></button>`;
+}
+function leoFoldToggle(key, id) {
+  const note = document.getElementById(id);
+  const open = !!(note && note.hidden);
+  try { localStorage.setItem(key, open ? '1' : '0'); } catch (e) {}
+  if (note) note.hidden = !open;
+  const mark = document.getElementById(id + '_mark');
+  if (mark) mark.textContent = open ? '△' : '▽';
+  const btn = document.getElementById(id + '_btn');
+  if (btn && btn.setAttribute) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
 function leoDayLogHtml(day, log, prefix, missing) {
-  return `<div class="card rec" id="${prefix}_day"><b>総合日誌</b>　<small>${esc(fmtDay(day))}</small>
-    <p class="note">その日全体の記録です。食事メニューはここに書きます。児童ごとの食事提供は、下の各児童です。ポータルに保存します。Googleの表と国保連の請求には書きません。</p>
+  const title = `<b>総合日誌</b>　<small>${esc(fmtDay(day))}</small>`;
+  const explain = 'その日全体の記録です。食事メニューはここに書きます。児童ごとの食事提供は、下の各児童です。ポータルに保存します。Googleの表と国保連の請求には書きません。';
+  const head = prefix === 'nk' ? leoFoldBtn('leo_nk_day_note_open', 'nk_daynote', title) : title;
+  const dayOpen = prefix === 'nk' && leoFoldOpen('leo_nk_day_note_open');
+  const note = prefix === 'nk'
+    ? `<p class="note" id="nk_daynote"${dayOpen ? '' : ' hidden'}>${explain}</p>`
+    : `<p class="note">${explain}</p>`;
+  return `<div class="card rec" id="${prefix}_day">${head}
+    ${note}
     ${missing ? '<p style="color:#c00">保存場所がまだありません（supabase/leo_meal_log.sql を実行してください）。</p>' : ''}
     <label>食事メニュー<textarea data-kind="day" id="${prefix}_menu" rows="3" maxlength="500">${esc((log && log.meal_menu) || '')}</textarea></label>
     <label>連絡・報告・備考<textarea data-kind="day" id="${prefix}_notes" rows="4" maxlength="4000">${esc((log && log.notes) || '')}</textarea></label>
