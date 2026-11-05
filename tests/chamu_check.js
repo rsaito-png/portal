@@ -126,7 +126,7 @@ const run = (users, records, settings) => {
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
 assert.ok(html.includes('chamu.js?v=20261103pc'));
-assert.ok(html.includes('leo.js?v=20261104notefold'));
+assert.ok(html.includes('leo.js?v=20261105cert'));
 assert.ok(src.includes('@media screen and (min-width:900px)'));
 assert.ok(src.includes('font-size:51px') && src.includes('font-size:17px'));
 assert.ok(src.includes('.cm textarea{min-height:72px}') && src.includes('.cm textarea{min-height:216px}'));

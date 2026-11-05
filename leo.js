@@ -803,7 +803,8 @@ function leoTodoItem(x) {
   const href = x[3], title = String(x[2]).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
   const kind = (href.match(/^#leo\/(\w+)/) || [])[1] || 'other';
   let key = 'leo:' + kind + ':open';
-  if (kind === 'plan') key = 'leo:plan:' + title.split('さん　')[0].replace(/[\s　]/g, '');
+  if (x[5] && x[5].key) key = x[5].key;
+  else if (kind === 'plan') key = 'leo:plan:' + title.split('さん　')[0].replace(/[\s　]/g, '');
   else if (kind === 'kakunin') key = 'leo:kakunin:' + today().slice(0, 7);
   else if (kind === 'edits') key = 'leo:edits:衝突';
   return { kind, key, title, link: href };
@@ -820,13 +821,92 @@ async function leoPublishTodos() {
   } catch (e) { if (m) m.textContent = e.message; }
 }
 
+// 受給者証の終わりの日。利用者情報の受給者証タブ（leo_children.contract_end＝有効期限／給付決定期間の終わり）。
+// 支給決定の終わり（valid_to）と上限額管理の終わり（cap_to）は、列があるときだけ見る。無い列では問い合わせをやり直す。
+const LEO_CERT_PERIODS = [['contract_end', '受給者証'], ['valid_to', '支給決定'], ['cap_to', '上限額管理']];
+function leoAddDays(iso, n) {
+  const t = new Date(String(iso).slice(0, 10) + 'T00:00:00+09:00');
+  t.setTime(t.getTime() + n * 86400000);
+  return t.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+}
+function leoDaySpan(fromIso, toIso) {
+  const a = new Date(String(fromIso).slice(0, 10) + 'T00:00:00+09:00').getTime();
+  const b = new Date(String(toIso).slice(0, 10) + 'T00:00:00+09:00').getTime();
+  return Math.round((b - a) / 86400000);
+}
+function leoCertMd(iso, todayStr) {
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  const ty = Number(String(todayStr).slice(0, 4));
+  return (y === ty ? '' : y + '/') + m + '/' + d;
+}
+function leoCertDemoRows(todayStr) {
+  return [
+    { name: '児童A', contract_end: leoAddDays(todayStr, 3) },
+    { name: '児童C', contract_end: leoAddDays(todayStr, -2) },
+    { name: '児童B', contract_end: leoAddDays(todayStr, 1) },
+    { name: '児童D', contract_end: leoAddDays(todayStr, 0) },
+    { name: '児童E', contract_end: leoAddDays(todayStr, 21) },
+  ];
+}
+async function leoCertRows() {
+  if (typeof DEMO !== 'undefined' && DEMO) return leoCertDemoRows(today());
+  try { return await sb('leo_children?select=name,contract_end,valid_to,cap_to&order=name'); }
+  catch (e) {
+    try { return await sb('leo_children?select=name,contract_end&order=name'); }
+    catch (e2) { return []; }
+  }
+}
+// 終わりの日が今日から7日以内、または過ぎている子。退所した子は出さない。日付を先に直すと、次に開いたとき消える。
+function leoCertTodos(rows, leftIdx, todayStr) {
+  const items = [];
+  for (const r of rows || []) {
+    const name = r && r.name;
+    if (!name || String(name).startsWith('※')) continue;
+    if (typeof leftDone === 'function' && leftDone(leftIdx, name, todayStr)) continue;
+    for (const [field, label] of LEO_CERT_PERIODS) {
+      const end = String(r[field] || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) continue;
+      const diff = leoDaySpan(todayStr, end);
+      if (diff > 7) continue;
+      const over = diff < 0;
+      const md = leoCertMd(end, todayStr);
+      const text = `${esc(name)}の${label}が ${md} で${over ? '切れています' : '切れます'}`;
+      const title = over ? `<span style="color:#d33">${text}</span>` : text;
+      const href = '#leo/userinfo?child=' + encodeURIComponent(name) + '&tab=jukyusha';
+      const sub = `<a href="${href}">この子の利用者情報</a>　<a href="#leo/jukyusha">受給者証の入力</a>`;
+      const key = 'leo:cert:' + String(name).replace(/[\s　]/g, '') + ':' + field;
+      items.push({ p: over ? 0 : 1, diff, row: [over ? 0 : 1, '📄', title, href, sub, { key }] });
+    }
+  }
+  items.sort((a, b) => a.p - b.p || a.diff - b.diff);
+  return items.map(x => x.row);
+}
+function leoUserinfoFromHash() {
+  const raw = String(location.hash || '').slice(1);
+  const i = raw.indexOf('?');
+  if (i < 0) return;
+  const q = new URLSearchParams(raw.slice(i + 1));
+  const child = q.get('child');
+  if (!child) return;
+  UI.sel = child;
+  UI.adding = false;
+  if (q.get('tab') === 'jukyusha') UI.tab = 'jukyusha';
+  try { history.replaceState(null, '', location.pathname + location.search + '#leo/userinfo'); } catch (e) {}
+}
+
 // ===== 児発管ホーム：今日やること（一画面に、やることだけ） =====
+// 中村 友香がする、の「今日やること」も、加藤・安藤の同じ名前も、この画面（#leo/home）を開く。
 LEO_VIEWS.home = async function () {
   const todo = [];
   // 1. 個別支援計画：個別支援計画（管理）と同じ進み具合。退所済み、次の計画が退所日よりあと、本案まで終わった子、急ぎでない子は出さない
   try {
     const [D0, LEFT] = await Promise.all([planData(), loadLeftIndex()]); const tday = today(), t = new Date(tday + 'T00:00:00+09:00');
     planHomeTodos(D0, LEFT, tday, t).forEach(item => todo.push(item));
+  } catch (e) { }
+  // 受給者証。児発管（中村 友香）が開く今日やることに出す。依頼を出す人だけの欄にはしない。
+  try {
+    const [rows, LEFT] = await Promise.all([leoCertRows(), loadLeftIndex()]);
+    leoCertTodos(rows, LEFT, today()).forEach(item => todo.push(item));
   } catch (e) { }
   // 2. ヒヤリハット：確認がまだのもの
   try { const h = (await hyRows()).filter(r => r.status === '未確認'); if (h.length) todo.push([0, '⚠️', `ヒヤリハットの確認 ${h.length}件`, '#leo/hiyari', '読んで、再発防止の工夫を書いて「確認した」を押す']); } catch (e) { }
@@ -843,7 +923,10 @@ LEO_VIEWS.home = async function () {
   try { if (!DEMO && canLeoHomeTodo()) (await sb('rpc/leo_home_todo_status', { method: 'POST', body: '{}' })).forEach(r => { sent[r.source_key] = r.name; }); } catch (e) { }
   const pub = canLeoHomeTodo() && todo.length ? `<p><button onclick="leoPublishTodos()" ${DEMO ? 'disabled title="見本モードでは出しません"' : ''}>📌 担当者別の依頼にする</button> <span id="lt_pub" class="note">児発管の分は児発管へ、保護者の実績確認は事務（宮本）へ「私への依頼」として出します。同じものは二重に出しません。</span></p>` : '';
   return `<h3>今日やること（児発管）</h3>${demoNote()}<p class="note">上から順に片づければ大丈夫です。終わったものは自動で消えます。</p>${pub}` +
-    (todo.length ? todo.map(([p, i, t, href, sub], k) => { const who = sent[LEO_HOME_TODO[k].key]; return `<a class="card rec" href="${href}" style="display:block;text-decoration:none;color:#222;${p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800'}"><span style="font-size:22px">${i}</span> <b>${t}</b>${who ? `　<small class="badge">依頼済：${esc(who)}</small>` : ''}<br><small>${sub}</small></a>`; }).join('')
+    (todo.length ? todo.map(([p, i, t, href, sub], k) => { const who = sent[LEO_HOME_TODO[k].key]; const edge = p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800';
+      const head = `<span style="font-size:22px">${i}</span> <b>${t}</b>${who ? `　<small class="badge">依頼済：${esc(who)}</small>` : ''}<br><small>${sub}</small>`;
+      if (String(sub).includes('<a ')) return `<div class="card rec" style="display:block;${edge}">${head}</div>`;
+      return `<a class="card rec" href="${href}" style="display:block;text-decoration:none;color:#222;${edge}">${head}</a>`; }).join('')
       : '<p>今日やることはありません。</p>') +
     `<p class="note">計画の記録は <a href="#leo/plan">個別支援計画</a>、型表と送迎の配慮は <a href="#leo/kata">送迎 型表</a>（現場もここから直せます）、管理表・配置表は <a href="#leo/master">入力画面</a>、児童ごとの受給者証・送迎・連絡先は <a href="#leo/userinfo">利用者情報</a> から。</p>`;
 };
@@ -1452,6 +1535,7 @@ window.jcAdd = async () => {
   } catch (e) { m.textContent = '記録できませんでした：' + e.message; }
 };
 LEO_VIEWS.userinfo = async function () {
+  leoUserinfoFromHash();
   const mg = canManage();
   const safeSheet = async kind => { try { return await sheetRows(kind); } catch (e) { return []; } };
   const [kids, kinds, infos, cares, nk, asses, plans, kataRows, keiRows] = DEMO ? [DEMO_BILL.kids, DEMO_BILL.kids, DEMO_LEFT_INFOS, [], DEMO_BILL.nikki, DEMO_ASSESS, [], DEMO_DATA.kata, DEMO_DATA.keikaku] : await Promise.all([mg ? sb('leo_children?order=name') : [], leoChildKinds(), sb('leo_child_info?order=name').catch(() => []), sb('leo_child_care').catch(() => []), billData().then(d => d.nikki).catch(() => []), sb('leo_child_assess?order=name').catch(() => []), sb('leo_child_plan').catch(() => []), safeSheet('kata'), safeSheet('keikaku')]);
