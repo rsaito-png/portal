@@ -30,7 +30,7 @@ var ChamuLib = (() => {
     shogu_rate: '0.096', shogu_item: '5175', capacity_scale: '11-20', standard_band: '4時間以上5時間未満',
     default_start: '11:00', default_end: '14:00', ishi_gen: true,
   };
-  const RICE_DEFAULT = '150g';
+  const RICE_DEFAULT = '200g';
   const INTAKE_DEFAULT = '100%';
   const clip = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
   const time = v => {
@@ -423,7 +423,7 @@ var ChamuLib = (() => {
       '',
       '利用者は記号（A、B、C…）のみで、氏名は書いていません。',
       '摂食量は現場の目安です（100%・80%・50%・その他）。初期は100%です。',
-      'ごはんは炊いた後の分量です。初期は150gです。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけを書いています。',
+      'ごはんは炊いた後の分量です。初期は200gです。たんぱく質は卵・豆腐・肉・魚・牛乳・乳製品だけを書いています。',
     ];
     const tail = ['食事を提供した回数の合計は ' + (src.total || 0) + ' です。', 'どうぞよろしくお願いいたします。', '茶夢'];
     const body = cover.concat(['', table, '']).concat(tail).join('\n');
@@ -708,7 +708,7 @@ async function cmJournal() {
     <div class="card">${cmStaffFieldHtml(CM.st.profile, day && day.staff_name)}
       <div><label class="l">天気 / Tempo</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>
       <label class="l">献立 / Cardápio</label><textarea id="j_menu" maxlength="500" placeholder="例: ごはん、味噌汁、豚肉の生姜焼き">${cmEsc((day && day.menu) || '')}</textarea>
-      <p class="note">栄養士への分量です。ごはん（炊いた後）の初期は150gです。半量の日は、その量に書き換えてください。卵・豆腐・肉・魚・牛乳は空欄でも保存できます。<br>Quantidades para a nutricionista. Arroz (cozido) começa em 150g. Ovos, tofu, carne, peixe e leite podem ficar em branco.</p>
+      <p class="note">栄養士への分量です。ごはん（炊いた後）の初期は200gです。半量の日は、その量に書き換えてください。卵・豆腐・肉・魚・牛乳は空欄でも保存できます。<br>Quantidades para a nutricionista. Arroz (cozido) começa em 200g. Ovos, tofu, carne, peixe e leite podem ficar em branco.</p>
       <div class="row">${cmInp('j_rice', 'ごはん（炊いた後） / Arroz (cozido)', (day && String(day.rice_portion || '').trim()) || ChamuLib.RICE_DEFAULT, 'text', 'maxlength="80" placeholder="半量の例: 75g"')}
         ${cmInp('j_egg', '卵（個数） / Ovos (qtd.)', (day && day.egg_count) || '', 'text', 'maxlength="80" placeholder="例: 1個"')}
         ${cmInp('j_tofu', '豆腐（1人分） / Tofu (por pessoa)', (day && day.tofu_g) || '', 'text', 'maxlength="80" placeholder="例: 150g"')}

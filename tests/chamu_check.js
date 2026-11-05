@@ -22,7 +22,7 @@ assert.strictEqual(defaults.ishi_gen, true);
 assert.strictEqual(defaults.default_start, '11:00');
 assert.strictEqual(defaults.default_end, '14:00');
 assert.strictEqual(L.INTAKE_DEFAULT, '100%');
-assert.strictEqual(L.RICE_DEFAULT, '150g');
+assert.strictEqual(L.RICE_DEFAULT, '200g');
 assert.strictEqual(defaults.standard_band, '4時間以上5時間未満');
 assert.strictEqual(L.bandOf('11:00', '15:00'), '4時間以上5時間未満');
 assert.strictEqual(L.bandOf('10:00', '16:00'), '6時間以上7時間未満');
@@ -126,7 +126,7 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=20261105rec'));
+assert.ok(html.includes('chamu.js?v=20261105rice'));
 assert.ok(html.includes('leo.js?v=20261105cert'));
 assert.ok(src.includes('@media screen and (min-width:900px)'));
 assert.ok(src.includes('font-size:51px') && src.includes('font-size:17px'));
@@ -155,7 +155,7 @@ assert.ok(!sql.includes("default '15:00'") && !sql.includes("default '10:00'") &
 assert.ok(sql.includes('extra_offices') && sql.includes("'茶夢' = any (coalesce(extra_offices, '{}'::text[]))"));
 assert.ok(src.includes("default_start: '11:00'") && src.includes("default_end: '14:00'") && src.includes("|| '14:00'") && src.includes('11:00–14:00'));
 assert.ok(!src.includes("default_end: '15:00'") && !src.includes("|| '15:00'") && !src.includes('11:00–15:00'));
-assert.ok(src.includes('初期は100%') && src.includes('初期は150g') && src.includes('ChamuLib.INTAKE_DEFAULT') && src.includes('ChamuLib.RICE_DEFAULT'));
+assert.ok(src.includes('初期は100%') && src.includes('初期は200g') && !src.includes('初期は150g') && src.includes('começa em 200g') && !src.includes('começa em 150g') && src.includes('ChamuLib.INTAKE_DEFAULT') && src.includes('ChamuLib.RICE_DEFAULT'));
 assert.ok(!src.includes('未記入でも保存できます') && !src.includes('Pode salvar sem preencher'));
 assert.ok(!src.includes("default_start: '10:00'") && !src.includes("|| '10:00'") && !src.includes("'16:00'") && !src.includes('10:00–16:00'));
 assert.ok(sql.includes("office = '茶夢'") && sql.includes('enable row level security'));
@@ -285,9 +285,10 @@ assert.deepStrictEqual(L.validateJournal(form([baseUser({ meal: 'なし', intake
 assert.ok(L.validateJournal(form([baseUser({ intake: '73%' })])).some(e => e.includes('摂食')));
 assert.ok(L.validateJournal({ ...form([baseUser()]), rice_portion: 'あ'.repeat(81) }).some(e => e.includes('ごはん')));
 assert.deepStrictEqual(L.prepareHead({ menu: ' カレー ', rice_portion: '', egg_count: '1個', tofu_g: '  ', meat_note: '', fish_g: '', dairy_note: '' }), {
-  menu: 'カレー', rice_portion: '150g', egg_count: '1個', tofu_g: null, meat_note: null, fish_g: null, dairy_note: null,
+  menu: 'カレー', rice_portion: '200g', egg_count: '1個', tofu_g: null, meat_note: null, fish_g: null, dairy_note: null,
 });
 assert.strictEqual(L.prepareHead({ rice_portion: '半量75g' }).rice_portion, '半量75g');
+assert.strictEqual(L.prepareHead({ rice_portion: '150g' }).rice_portion, '150g');
 const mealPlan = L.syncPlan([baseUser({ meal: 'あり', intake: '80%' })], [], defaults);
 assert.strictEqual(mealPlan.upsert[0].meal, 'あり');
 assert.ok(!('intake' in mealPlan.upsert[0]) && !('intake_note' in mealPlan.upsert[0]));
@@ -355,7 +356,7 @@ assert.ok(src.includes('chamu_users?select=id,sort,active'));
 assert.ok(src.includes('makinakahigashi@gmail.com') && src.includes("view: 'cm'") && src.includes('https://mail.google.com/mail/?'));
 assert.ok(src.includes('ここから直接は送りません') && src.includes('Gmailで下書きを開く'));
 assert.ok(!src.includes('https://mail.google.com/mail/send'));
-assert.ok(sql.includes('chamu_line_intake') && sql.includes('rice_portion') && sql.includes("intake in ('100%', '80%', '50%')"));
+assert.ok(sql.includes('chamu_line_intake') && sql.includes('rice_portion') && sql.includes('初期は200g') && !sql.includes('初期は150g') && sql.includes("intake in ('100%', '80%', '50%')"));
 assert.ok(sql.includes('請求には使わない'));
 assert.ok(sql.includes('chamu_record_name') && sql.includes('staff_profiles_chamu_record_name_len'));
 assert.ok(sql.includes('利用者署名と国保連CSVには使わない'));

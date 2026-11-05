@@ -235,7 +235,7 @@ grant select, insert, update, delete on public.chamu_users, public.chamu_journal
 grant select, update on public.chamu_billing_settings to authenticated;
 
 comment on table public.chamu_journal is '茶夢（生活介護）の業務日誌。1日1行。B型の bp_journal とは別。献立と分量は栄養士向け。';
-comment on column public.chamu_journal.rice_portion is '炊いた後のごはんの分量。初期は150g。半量もその量で書く。請求の食事加算には使わない。';
+comment on column public.chamu_journal.rice_portion is '炊いた後のごはんの分量。初期は200g。半量もその量で書く。請求の食事加算には使わない。';
 comment on column public.chamu_journal_line.intake is '摂食の目安。100%・80%・50%・その他。食事ありの初期は100%（画面が空欄を100%で埋める）。請求には使わない。';
 comment on column public.chamu_journal_line.meal is '食事提供の有無。ありの日だけ、対象者の食事提供体制加算に数える。';
 comment on table public.chamu_service_records is '茶夢のサービス提供実績。日誌の保存時にスクリプトが転記する。署名済みだけ国保連CSVの対象。';

@@ -113,6 +113,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   const desk = await mkPage(1100, 820);
   await openJournal(desk);
+  const rice0 = await desk.$eval('#j_rice', el => el.value);
+  ok(rice0 === '200g', 'new journal rice field starts at 200g (' + rice0 + ')');
   await fillPresent(desk, true);
   await desk.evaluate(() => document.querySelector('[data-cm-save]').scrollIntoView({ block: 'end' }));
   const postsBefore = state.journalPosts;
@@ -122,7 +124,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(state.journalPosts === postsBefore + 1, 'double click saves once (' + state.journalPosts + ')');
   ok(state.linePosts >= 1 && state.recordPosts >= 1, 'journal line and service record posted');
   ok(state.lines[0] && state.lines[0].meal === 'あり' && state.lines[0].intake === '100%', 'blank intake becomes 100%');
-  ok(state.journal && state.journal.rice_portion === '150g', 'blank rice becomes 150g');
+  ok(state.journal && state.journal.rice_portion === '200g', 'blank rice becomes 200g');
   ok(state.records[0] && state.records[0].meal === 'あり' && !('intake' in state.records[0]), 'service record gets meal and not intake');
   ok(saved.role === 'dialog' && saved.modal === 'true', 'dialog is modal');
   ok(saved.cls.includes('ok') && saved.title === '保存しました', 'success title: ' + saved.title);
