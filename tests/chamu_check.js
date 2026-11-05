@@ -48,6 +48,7 @@ assert.strictEqual(filledEat.intake_note, null);
 const plan1 = L.syncPlan([baseUser()], [], defaults);
 assert.strictEqual(plan1.upsert.length, 1);
 assert.strictEqual(plan1.upsert[0].signature_data, null);
+assert.ok(!('staff_name' in plan1.upsert[0]), '転記する実績票に記入者名は載せない');
 assert.strictEqual(plan1.upsert[0].signed_at, null);
 assert.strictEqual(plan1.del.length, 0);
 const kept = L.syncPlan([baseUser()], [{ id: 'r1', user_id: 'u1', start_time: '10:00', end_time: '16:00', transport: '往復', meal: 'あり', support_note: '落ち着いて過ごした', signed_at: '2026-10-02T00:00:00Z' }], defaults);
@@ -125,7 +126,7 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=20261103pc'));
+assert.ok(html.includes('chamu.js?v=20261105rec'));
 assert.ok(html.includes('leo.js?v=20261105cert'));
 assert.ok(src.includes('@media screen and (min-width:900px)'));
 assert.ok(src.includes('font-size:51px') && src.includes('font-size:17px'));
@@ -356,5 +357,34 @@ assert.ok(src.includes('ここから直接は送りません') && src.includes('
 assert.ok(!src.includes('https://mail.google.com/mail/send'));
 assert.ok(sql.includes('chamu_line_intake') && sql.includes('rice_portion') && sql.includes("intake in ('100%', '80%', '50%')"));
 assert.ok(sql.includes('請求には使わない'));
+assert.ok(sql.includes('chamu_record_name') && sql.includes('staff_profiles_chamu_record_name_len'));
+assert.ok(sql.includes('利用者署名と国保連CSVには使わない'));
+assert.ok(!sql.includes('dirceotsubo') && !sql.includes('nico705nico'));
+
+const otsubo = { nikki_name: '大坪　シズカ', chamu_record_name: '安藤尚子' };
+const ando = { nikki_name: '安藤　尚子' };
+const saito = { nikki_name: '齊藤連' };
+assert.strictEqual(L.journalStaffField(otsubo, ''), '大坪　シズカ');
+assert.strictEqual(L.journalStaffField(otsubo, '安藤尚子'), '大坪　シズカ');
+assert.strictEqual(L.journalStaffField(otsubo, '安藤　尚子'), '大坪　シズカ');
+assert.strictEqual(L.journalStaffField(otsubo, '安藤'), '大坪　シズカ');
+assert.strictEqual(L.journalStaffField(otsubo, '大坪 シズカ'), '大坪　シズカ');
+assert.strictEqual(L.journalStaffField(otsubo, '齊藤連'), '齊藤連');
+assert.strictEqual(L.journalStaffRecord(otsubo, '大坪　シズカ'), '安藤尚子');
+assert.strictEqual(L.journalStaffRecord(otsubo, '大坪シズカ'), '安藤尚子');
+assert.strictEqual(L.journalStaffRecord(otsubo, '安藤'), '安藤尚子');
+assert.strictEqual(L.journalStaffRecord(otsubo, '安藤　尚子'), '安藤尚子');
+assert.strictEqual(L.journalStaffRecord(otsubo, '齊藤連'), '齊藤連');
+assert.strictEqual(L.journalStaffField(ando, ''), '安藤　尚子');
+assert.strictEqual(L.journalStaffField(ando, '安藤尚子'), '安藤尚子');
+assert.strictEqual(L.journalStaffRecord(ando, '安藤　尚子'), '安藤　尚子');
+assert.strictEqual(L.journalStaffRecord(ando, '安藤尚子'), '安藤尚子');
+assert.strictEqual(L.journalStaffField(saito, '齊藤連'), '齊藤連');
+assert.strictEqual(L.journalStaffRecord(saito, '齊藤連'), '齊藤連');
+assert.strictEqual(L.journalStaffField({}, '職員'), '職員');
+assert.strictEqual(L.journalStaffRecord({}, ''), '');
+assert.ok(src.includes('journalStaffRecord(CM.st.profile, form.staff_name)'));
+assert.ok(src.includes('cm-staff-rec') && src.includes('nikki_name,chamu_record_name'));
+assert.ok(src.includes('leoMyProfileQ'));
 
 console.log('chamu_check ok');

@@ -3,6 +3,7 @@
 // 食事のあり／なしだけを実績と食事提供体制加算へ載せる。摂食の目安と分量は栄養士向けで、請求には入れない。
 // 自由記述のポルトガル語は「日本語にする」で確認する。訳文は保存せず、原文のまま記録する。
 // 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表も献立シートも使わない。
+// 記入者が自分の名前と違う公式名になる人だけ、staff_profiles.chamu_record_name を使う。画面の記入者は本人のまま、保存する staff_name だけ公式名。実績の利用者署名と国保連CSVには載せない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
 const CM_NAV = [['journal', '業務日誌'], ['kondate', '献立報告'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
 const CM_SHIFT_Q = 'chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort&order=sort.asc,staff_name.asc';
@@ -440,7 +441,34 @@ var ChamuLib = (() => {
       csv: menuReportCsv(src, true), filename: 'chamu-kondate-' + (src.ym || 'month') + '.csv', mailto: used.mailto, gmail: used.gmail,
     };
   };
-  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail };
+  const nameKey = s => textOf(s).replace(/[\s\u3000]/g, '');
+  // 自分の名前、または公式名（いま現場が書いている「安藤」のような、公式名の先頭2文字以上も含む）。
+  const writesAsSelf = (profile, typed) => {
+    const record = textOf(profile && profile.chamu_record_name);
+    const name = textOf(typed);
+    if (!record || !name) return false;
+    const nn = nameKey(name), no = nameKey(profile && profile.nikki_name), nr = nameKey(record);
+    if (!nn || !nr) return false;
+    if (no && nn === no) return true;
+    if (nn === nr) return true;
+    return nn.length >= 2 && nr.startsWith(nn);
+  };
+  // 未保存は自分の名前。公式名で保存済みの日を開き直しても、自分には自分の名前を出す。他人の記入はそのまま。
+  const journalStaffField = (profile, saved) => {
+    const own = textOf(profile && profile.nikki_name);
+    const stored = textOf(saved);
+    if (!stored) return own;
+    if (own && writesAsSelf(profile, stored)) return own;
+    return stored;
+  };
+  // 自分の名前で書いたときだけ、日誌の staff_name を公式名にする。
+  const journalStaffRecord = (profile, typed) => {
+    const record = textOf(profile && profile.chamu_record_name);
+    const name = textOf(typed);
+    if (record && writesAsSelf(profile, name)) return record;
+    return name;
+  };
+  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, journalStaffField, journalStaffRecord, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail };
 })();
 /* /cm-pure */
 
@@ -565,7 +593,8 @@ async function cmGo(fn, opt) {
 .cm pre.cm-mail{font-size:45px;padding:22px;line-height:1.45}
 .cm .pad{height:480px}
 }
-@media print{header,.back,.cm-nav,.noprint,#help,#out,.cm-dlg{display:none!important}body{background:#fff}main{max-width:none;padding:0}}`;
+.cm .cm-staff-rec{display:none}
+@media print{header,.back,.cm-nav,.noprint,#help,#out,.cm-dlg{display:none!important}.cm .cm-staff-live{display:none!important}.cm .cm-staff-rec{display:block!important;border:3px solid #1a120c;padding:10px;margin:4px 0;background:#fff}body{background:#fff}main{max-width:none;padding:0}}`;
   document.head.appendChild(st);
 })();
 
@@ -594,7 +623,23 @@ const cmRpc = fn => cmRest('rpc/' + fn, { method: 'POST', body: '{}' });
 async function cmNow() { try { const t = await cmRpc('chamu_now'); return t || new Date().toISOString(); } catch (e) { return new Date().toISOString(); } }
 async function cmUsers(all) { return await cmRest('chamu_users?' + (all ? '' : 'active=eq.true&') + 'select=*&order=sort.asc,name.asc') || []; }
 async function cmSettingsRow() { const rows = await cmRest('chamu_billing_settings?id=eq.1&select=*') || []; return rows[0] || null; }
-async function cmStaffName() { try { const p = await cmRest('staff_profiles?select=nikki_name'); return (p && p[0] && p[0].nikki_name) || ''; } catch (e) { return ''; } }
+async function cmStaffProfile() {
+  const q = cols => (typeof leoMyProfileQ === 'function' ? leoMyProfileQ(cols) : 'staff_profiles?select=' + cols);
+  try {
+    const p = await cmRest(q('nikki_name,chamu_record_name'));
+    return (p && p[0]) || {};
+  } catch (e) {
+    try { const p = await cmRest(q('nikki_name')); return (p && p[0]) || {}; } catch (e2) { return {}; }
+  }
+}
+function cmStaffFieldHtml(profile, saved) {
+  const shown = ChamuLib.journalStaffField(profile, saved);
+  const official = ChamuLib.journalStaffRecord(profile, shown);
+  if (official && official !== shown) {
+    return `<div><label class="l">記入者 / Quem preencheu</label><input id="j_staff" class="cm-staff-live" type="text" value="${cmEsc(shown)}"><div class="cm-staff-rec">${cmEsc(official)}</div></div>`;
+  }
+  return cmInp('j_staff', '記入者 / Quem preencheu', shown);
+}
 function cmScript(src) {
   if (src.indexOf('encoding') >= 0 && window.Encoding) return Promise.resolve();
   if (src.indexOf('rydeen-billing') >= 0 && window.RydBilling) return Promise.resolve();
@@ -631,12 +676,13 @@ async function renderChamu(sub) {
 
 async function cmJournal() {
   const date = CM.st.date || cmToday();
-  const [users, day, settings, staff, shift] = await Promise.all([
+  const [users, day, settings, profile, shift] = await Promise.all([
     cmUsers(false),
     cmRest(`chamu_journal?journal_date=eq.${date}&select=*,chamu_journal_line(*)`).then(a => (a && a[0]) || null),
-    cmSettingsRow(), cmStaffName(),
+    cmSettingsRow(), cmStaffProfile(),
     cmRest(CM_SHIFT_Q).then(a => ({ rows: a || [] })).catch(() => ({ error: true })),
   ]);
+  CM.st.profile = profile || {};
   const lines = (day && day.chamu_journal_line) || [];
   const dfl = ChamuLib.settingsOf(settings);
   const by = {}; lines.forEach(l => { by[l.user_id] = l; });
@@ -659,7 +705,7 @@ async function cmJournal() {
     <button class="sec inl" onclick="CM.st.date='${cmShift(date, 1)}';renderChamu('journal')">翌日 / Próximo dia ＞</button>
     <input type="date" id="j_date" value="${date}" style="width:auto" onchange="CM.st.date=this.value;renderChamu('journal')"></p>
     ${shift.error ? '<div class="card"><h4>この日の配置 / Equipe do dia</h4><p class="note">配置表を読めませんでした。supabase/chamu_shift.sql を適用してください。</p></div>' : ChamuLib.dayShiftHtml(date, shift.rows)}
-    <div class="card">${cmInp('j_staff', '記入者 / Quem preencheu', (day && day.staff_name) || staff)}
+    <div class="card">${cmStaffFieldHtml(CM.st.profile, day && day.staff_name)}
       <div><label class="l">天気 / Tempo</label>${cmSel('j_weather', ChamuLib.WEATHER, (day && day.weather) || '', '（未選択）')}</div>
       <label class="l">献立 / Cardápio</label><textarea id="j_menu" maxlength="500" placeholder="例: ごはん、味噌汁、豚肉の生姜焼き">${cmEsc((day && day.menu) || '')}</textarea>
       <p class="note">栄養士への分量です。ごはん（炊いた後）の初期は150gです。半量の日は、その量に書き換えてください。卵・豆腐・肉・魚・牛乳は空欄でも保存できます。<br>Quantidades para a nutricionista. Arroz (cozido) começa em 150g. Ovos, tofu, carne, peixe e leite podem ficar em branco.</p>
@@ -769,7 +815,7 @@ async function cmSaveJournal() {
       const dayRows = await cmRest('chamu_journal?on_conflict=journal_date', {
         method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
         body: JSON.stringify({
-          journal_date: date, staff_name: form.staff_name.trim(), weather: form.weather || null, menu: head.menu, note: form.note.trim() || null,
+          journal_date: date, staff_name: ChamuLib.journalStaffRecord(CM.st.profile, form.staff_name), weather: form.weather || null, menu: head.menu, note: form.note.trim() || null,
           rice_portion: head.rice_portion, egg_count: head.egg_count, tofu_g: head.tofu_g, meat_note: head.meat_note, fish_g: head.fish_g, dairy_note: head.dairy_note,
           updated_at: new Date().toISOString(),
         }),

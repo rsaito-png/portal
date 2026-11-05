@@ -84,7 +84,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   }
 
   async function openJournal(p) {
-    await p.goto(BASE + 'index.html#chamu/journal', { waitUntil: 'domcontentloaded' });
+    await p.goto(BASE + 'index.html?r=' + Date.now() + '#chamu/journal', { waitUntil: 'domcontentloaded' });
     await p.waitForSelector('[data-cm-save]', { timeout: 15000 });
     await p.evaluate(() => document.fonts && document.fonts.ready);
   }
@@ -229,6 +229,60 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await meal.goto(BASE + 'index.html#chamu/haichi', { waitUntil: 'domcontentloaded' });
   await meal.waitForFunction(() => document.body.innerText.includes('職員配置表'));
   ok((await meal.$eval('#view', el => el.innerText)).includes('職員配置'), 'staff shift page still opens');
+
+  // 記録上の氏名。画面の記入者は本人、保存する staff_name だけ公式名。実績票には載せない。
+  const art = '/opt/cursor/artifacts';
+  fs.mkdirSync(art, { recursive: true });
+  profile[0] = { nikki_name: '大坪　シズカ', chamu_record_name: '安藤尚子', user_id: '11111111-1111-1111-1111-111111111111' };
+  state.journal = { id: 'j1', journal_date: '2026-11-05', staff_name: '安藤尚子', weather: null, menu: null, note: null };
+  state.records = [];
+  const recPage = await mkPage(1100, 900);
+  await openJournal(recPage);
+  ok(await recPage.$eval('#j_staff', el => el.value) === '大坪　シズカ', 'saved official name still shows the writer');
+  ok(await recPage.$eval('.cm-staff-rec', el => el.textContent) === '安藤尚子', 'official name is kept for print');
+  await recPage.evaluate(() => document.getElementById('j_staff').scrollIntoView({ block: 'center' }));
+  await recPage.screenshot({ path: path.join(art, 'chamu-otsubo-screen.png') });
+  await recPage.emulateMediaType('print');
+  const printed = await recPage.evaluate(() => ({
+    live: getComputedStyle(document.getElementById('j_staff')).display,
+    rec: getComputedStyle(document.querySelector('.cm-staff-rec')).display,
+    text: document.querySelector('.cm-staff-rec').textContent,
+  }));
+  ok(printed.live === 'none' && printed.rec === 'block' && printed.text === '安藤尚子', 'print shows official name ' + JSON.stringify(printed));
+  await recPage.evaluate(() => document.querySelector('.cm-staff-rec').scrollIntoView({ block: 'center' }));
+  await recPage.screenshot({ path: path.join(art, 'chamu-otsubo-print.png') });
+  await recPage.emulateMediaType('screen');
+  await fillPresent(recPage, true);
+  await recPage.$eval('#j_staff', (el, v) => { el.value = v; }, '大坪　シズカ');
+  await recPage.click('[data-cm-save]');
+  const recDlg = await dialogText(recPage);
+  ok(recDlg.title === '保存しました', 'mapped save still confirms');
+  ok(state.journal && state.journal.staff_name === '安藤尚子', 'saved staff_name is official: ' + (state.journal && state.journal.staff_name));
+  ok(state.records[0] && !('staff_name' in state.records[0]), 'service record has no staff name');
+  await recPage.click('#cm_dlg_ok');
+  ok(await recPage.$eval('#j_staff', el => el.value) === '大坪　シズカ', 'reopen after save still shows the writer');
+
+  state.journal = { id: 'j1', journal_date: '2026-11-05', staff_name: '齊藤連', weather: null, menu: null, note: null };
+  await openJournal(recPage);
+  ok(await recPage.$eval('#j_staff', el => el.value) === '齊藤連', 'another writer stays on the form');
+  ok(await recPage.$('.cm-staff-rec') === null, 'no print alias for someone else');
+
+  profile[0] = { nikki_name: '安藤　尚子', user_id: '22222222-2222-2222-2222-222222222222' };
+  state.journal = { id: 'j2', journal_date: '2026-11-05', staff_name: '安藤尚子', weather: null, menu: null, note: null };
+  const ando = await mkPage(1100, 900);
+  await openJournal(ando);
+  ok(await ando.$eval('#j_staff', el => el.value) === '安藤尚子', 'ando sees the saved name');
+  ok(await ando.$('.cm-staff-rec') === null, 'ando has no record-name alias');
+  state.journal = null;
+  await openJournal(ando);
+  ok(await ando.$eval('#j_staff', el => el.value) === '安藤　尚子', 'ando default is her own nikki_name');
+  await fillPresent(ando, true);
+  await ando.$eval('#j_staff', (el, v) => { el.value = v; }, '安藤　尚子');
+  await ando.click('[data-cm-save]');
+  const andoDlg = await dialogText(ando);
+  ok(andoDlg.title === '保存しました' && state.journal.staff_name === '安藤　尚子', 'ando save keeps her own name: ' + (state.journal && state.journal.staff_name));
+  await ando.click('#cm_dlg_ok');
+  ok(await ando.$eval('#j_staff', el => el.value) === '安藤　尚子', 'ando reopen shows what she saved');
 
   await br.close();
   if (fails) { console.log('FAILED ' + fails); process.exit(1); }

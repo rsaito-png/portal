@@ -7,6 +7,15 @@
 alter table public.staff_profiles add column if not exists extra_offices text[] not null default '{}';
 comment on column public.staff_profiles.extra_offices is '兼務する事業所名。主所属の office に加えて、トップの事業所一覧と茶夢の利用可否に使う。';
 
+-- 茶夢の日誌だけ。自分の名前で記入したとき、公式の staff_name に入れる氏名。空なら置き換えない。
+-- 人員配置の記録名が本人と違う人だけ、管理者が値を入れる。個人名はこのファイルに書かない。
+-- 実績の利用者署名と国保連CSVには使わない。
+alter table public.staff_profiles add column if not exists chamu_record_name text;
+comment on column public.staff_profiles.chamu_record_name is '茶夢の業務日誌で、記入者が自分の名前を書いたときに staff_name へ入れる公式の氏名。空なら置き換えない。利用者署名と国保連CSVには使わない。';
+alter table public.staff_profiles drop constraint if exists staff_profiles_chamu_record_name_len;
+alter table public.staff_profiles add constraint staff_profiles_chamu_record_name_len
+  check (chamu_record_name is null or char_length(btrim(chamu_record_name)) between 1 and 60);
+
 create or replace function public.chamu_can()
 returns boolean
 language sql
