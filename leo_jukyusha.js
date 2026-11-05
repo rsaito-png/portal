@@ -18,7 +18,7 @@ async function jfNames() {
   const seen = new Map(); [...a, ...b].forEach(r => { if (r.name && !String(r.name).startsWith('※') && !seen.has(jfKey(r.name))) seen.set(jfKey(r.name), r.name); });
   return [...seen.values()];
 }
-const JF_CSS = `.jf button{width:auto;padding:8px 14px;margin:4px 6px 4px 0;font-size:15px}.jf input[type=checkbox]{width:auto;margin:0 6px 0 0}.jf select{width:auto;min-width:12em}
+const JF_CSS = `.jf button:not(.nk-fold){width:auto;padding:8px 14px;margin:4px 6px 4px 0;font-size:15px}.jf input[type=checkbox]{width:auto;margin:0 6px 0 0}.jf select{width:auto;min-width:12em}
 .jf-card{border:1px solid #ccd;border-radius:8px;background:#fff;padding:10px 14px;margin:12px 0}.jf-card h4{margin:2px 0 8px}.jf-tbl{width:100%;border-collapse:collapse}.jf-tbl th,.jf-tbl td{border-top:1px solid #e5e5ee;padding:6px 4px;text-align:left;vertical-align:top;font-size:14px}
 .jf-f input[type=text],.jf-f input[type=date],.jf-f select{width:100%;box-sizing:border-box;font-size:15px;padding:6px}.jf-cur{color:#555;white-space:pre-wrap}.jf-diff td:nth-child(3){background:#fff4e8}.jf-diff td:first-child{border-left:4px solid #e8833a}.jf-same{color:#2e6b4f;font-size:12px}
 .jf-warn{background:#fde8e8;color:#b00;padding:8px 10px;border-radius:6px;margin:8px 0;font-weight:bold}.jf-bar{position:sticky;bottom:0;background:#fff;border-top:2px solid #e8833a;padding:8px 0;margin-top:10px}.jf small{color:#666}`;
@@ -28,18 +28,26 @@ LEO_VIEWS.jukyusha = async function () {
   JF.err = '';
   const [names, subs] = await Promise.all([jfNames(), DEMO ? JF_DEMO.subs : sb('leo_jf_subs?select=id,child,status,created_at,note&order=id.desc&limit=60').catch(e => { JF.err = e.message; return []; })]);
   const pend = subs.filter(s => s.status === 'pending').length;
-  return `<div class="jf"><h3>受給者証の入力（保護者から）</h3>${demoNote()}<style>${JF_CSS}</style>
-    <p class="note">保護者が、広げた受給者証を見ながら入力した内容を、いまの利用者情報と見くらべて確認し、利用者情報（受給者証番号・負担上限月額など）に入れる画面です。<b>職員が確認して「確認して反映」を押すまで、利用者情報は変わりません。</b>写真は受け取りません。入力した内容は、事務・管理者・児発管だけが見られます。</p>
-    <div class="jf-card"><h4>1. 保護者にリンクを送る</h4>
-      <p class="note">児童を選んでリンクをコピーし、公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。リンクは30日有効です。児童が一覧にいないときは、先に<a href="#leo/userinfo">利用者情報</a>で追加してください。</p>
+  const introOpen = leoFoldOpen('leo_jf_intro_open');
+  const linkOpen = leoFoldOpen('leo_jf_link_note_open');
+  const subsOpen = leoFoldOpen('leo_jf_subs_open');
+  const pendLabel = pend ? `<span style="color:#e8833a">確認待ち ${pend}件</span>` : '確認待ちはありません';
+  return `<div class="jf"><h3 class="nk-fold-h">${leoFoldBtn('leo_jf_intro_open', 'jf_intro', '受給者証の入力（保護者から）')}</h3>${demoNote()}<style>${JF_CSS}</style>
+    <p class="note" id="jf_intro"${introOpen ? '' : ' hidden'}>保護者が、広げた受給者証を見ながら入力した内容を、いまの利用者情報と見くらべて確認し、利用者情報（受給者証番号・負担上限月額など）に入れる画面です。<b>職員が確認して「確認して反映」を押すまで、利用者情報は変わりません。</b>写真は受け取りません。入力した内容は、事務・管理者・児発管だけが見られます。</p>
+    <div class="jf-card"><h4 class="nk-fold-h">${leoFoldBtn('leo_jf_link_note_open', 'jf_link_note', '1. 保護者にリンクを送る')}</h4>
+      <div id="jf_link_note"${linkOpen ? '' : ' hidden'}>
+        <p class="note">児童を選んでリンクをコピーし、公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。リンクは30日有効です。児童が一覧にいないときは、先に<a href="#leo/userinfo">利用者情報</a>で追加してください。</p>
+        <p class="note" style="margin:4px 0 0">チェックを入れたリンクは、<b>開いた人に、お子さんの前回の内容（お名前・受給者証番号・保護者名・相談支援事業所名など）がそのまま見えます</b>。リンクは、その家庭の保護者の1対1のLINEにだけ送ってください。ほかの児童の情報や、住所・電話・備考は出ません。</p>
+      </div>
       <select id="jf_child" onchange="jfPrior()"><option value="">児童を選ぶ</option>${names.map(n => `<option>${esc(n)}</option>`).join('')}</select>
       <div style="margin:2px 0 4px"><label><input type="checkbox" id="jf_prefill"> 前回の内容を入れておく</label> <small id="jf_prefill_note">（2回め以降のとき。児童を選ぶと、前の入力や利用者情報があれば自動でチェックが入ります）</small></div>
-      <p class="note" style="margin:4px 0 0">チェックを入れたリンクは、<b>開いた人に、お子さんの前回の内容（お名前・受給者証番号・保護者名・相談支援事業所名など）がそのまま見えます</b>。リンクは、その家庭の保護者の1対1のLINEにだけ送ってください。ほかの児童の情報や、住所・電話・備考は出ません。</p>
       <button onclick="jfLink()">リンクをコピー</button></div>
-    <div class="jf-card"><h4>2. 届いた入力（${pend ? `<span style="color:#e8833a">確認待ち ${pend}件</span>` : '確認待ちはありません'}）</h4>
+    <div class="jf-card"><h4 class="nk-fold-h">${leoFoldBtn('leo_jf_subs_open', 'jf_subs', `2. 届いた入力（${pendLabel}）`)}</h4>
+      <div id="jf_subs"${subsOpen ? '' : ' hidden'}>
       ${JF.err ? `<p class="note" style="color:#c00">一覧を読み込めませんでした。管理者が supabase/leo_jukyusha_form.sql を実行したか確認してください。</p>` : ''}
       ${subs.length ? `<table class="jf-tbl"><tr><th>児童</th><th>届いた日時</th><th>状態</th><th></th></tr>${subs.map(s => { const [l, c] = jfSt[s.status] || ['', '#888'];
-        return `<tr><td>${esc(s.child)}</td><td>${jfFmt(s.created_at)}</td><td><b style="color:${c}">${l}</b></td><td><button onclick="jfOpen(${+s.id})">${s.status === 'pending' ? '確認する' : '見る'}</button></td></tr>`; }).join('')}</table>` : '<p class="note">まだ届いていません。</p>'}</div></div>`;
+        return `<tr><td>${esc(s.child)}</td><td>${jfFmt(s.created_at)}</td><td><b style="color:${c}">${l}</b></td><td><button onclick="jfOpen(${+s.id})">${s.status === 'pending' ? '確認する' : '見る'}</button></td></tr>`; }).join('')}</table>` : '<p class="note">まだ届いていません。</p>'}
+      </div></div></div>`;
 };
 window.jfOpen = id => { JF.sel = id; JF.msg = ''; renderLeoView('jukyusha'); window.scrollTo(0, 0); };
 window.jfBack = () => { JF.sel = null; renderLeoView('jukyusha'); };
