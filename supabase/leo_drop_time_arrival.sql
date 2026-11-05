@@ -22,6 +22,10 @@ declare
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
   if p_day is null then raise exception '日付'; end if;
+  if p_day >= greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start()) then
+    perform public.leo_align_event_kids(p_day);
+    perform public.leo_kata_rewrite_day(p_day);
+  end if;
 
   create temporary table if not exists _leo_plan (
     child text, kind text, start_time text, end_time text,
@@ -150,14 +154,24 @@ begin
         kind = case when n.seed = 'events' and coalesce(n.activity_via, '') <> '手入力' then r.kind else n.kind end,
         -- 種別が分かっていれば、日誌に先に入っていた「放課後等デイサービス」などで上書きする。不明なときは今の文字を残す。
         service = case when svc in ('児発', '放デイ') then svc else coalesce(nullif(btrim(n.service), ''), svc) end,
-        start_time = case when r.kind = '利用' and coalesce(btrim(n.start_time), '') = '' then nullif(btrim(r.start_time), '') else n.start_time end,
-        end_time = case when r.kind = '利用' and coalesce(btrim(n.end_time), '') = '' then nullif(btrim(r.end_time), '') else n.end_time end,
-        pick_driver = coalesce(nullif(btrim(n.pick_driver), ''), p_driver),
-        pick_time = coalesce(nullif(btrim(n.pick_time), ''), p_time),
-        pick_place = coalesce(nullif(btrim(n.pick_place), ''), p_place),
-        drop_driver = coalesce(nullif(btrim(n.drop_driver), ''), d_driver),
-        drop_time = coalesce(nullif(btrim(n.drop_time), ''), d_time),
-        drop_place = coalesce(nullif(btrim(n.drop_place), ''), d_place),
+        start_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false),
+        end_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
+        pick_driver = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
+        pick_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_time', n.pick_time, p_time, public.leo_kata_prev(n.day, n.child, 'pick_time'), false),
+        pick_place = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false),
+        drop_driver = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_driver', n.drop_driver, d_driver, public.leo_kata_prev(n.day, n.child, 'drop_driver'), false),
+        drop_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_time', n.drop_time, d_time, public.leo_kata_prev(n.day, n.child, 'drop_time'), coalesce(btrim(n.drop_time), '') <> '' and btrim(n.drop_time) is not distinct from btrim(n.end_time)),
+        drop_place = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false),
+        auto_fill = case when n.day >= public.leo_sync_start() and n.staff_saved_at is null and n.day >= (timezone('Asia/Tokyo', now()))::date then jsonb_build_object(
+          'start_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false),
+          'end_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
+          'pick_driver', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
+          'pick_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_time', n.pick_time, p_time, public.leo_kata_prev(n.day, n.child, 'pick_time'), false),
+          'pick_place', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false),
+          'drop_driver', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_driver', n.drop_driver, d_driver, public.leo_kata_prev(n.day, n.child, 'drop_driver'), false),
+          'drop_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_time', n.drop_time, d_time, public.leo_kata_prev(n.day, n.child, 'drop_time'), coalesce(btrim(n.drop_time), '') <> '' and btrim(n.drop_time) is not distinct from btrim(n.end_time)),
+          'drop_place', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false)
+        ) else n.auto_fill end,
         seed = case when n.day >= date '2026-11-01' then coalesce(n.seed, 'events') else n.seed end
       where n.day = p_day and public.leo_norm(n.child) = public.leo_norm(r.child);
       n := n + 1;
@@ -173,6 +187,10 @@ begin
         case when r.kind = '利用' then nullif(btrim(r.start_time), '') end,
         case when r.kind = '利用' then nullif(btrim(r.end_time), '') end,
         p_driver, p_time, p_place, d_driver, d_time, d_place, 'events');
+      update leo_nikki set auto_fill = jsonb_build_object(
+        'start_time', start_time, 'end_time', end_time, 'pick_driver', pick_driver, 'pick_time', pick_time,
+        'pick_place', pick_place, 'drop_driver', drop_driver, 'drop_time', drop_time, 'drop_place', drop_place)
+      where day = p_day and row_no = base and day >= greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start());
       n := n + 1;
     end if;
     p_driver := null; p_time := null; p_place := null;

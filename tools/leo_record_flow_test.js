@@ -73,8 +73,13 @@ assert.ok(sql.includes("d_src is distinct from 'kata'"), 'カレンダーで直�
 assert.ok(sql.includes('d_end is distinct from nullif(btrim(r.end_time)'), '便の着を利用終了の写しより先に使う');
 assert.ok(sql.includes("public.leo_norm(k->>'児童名')"), '型表の名前は空白を除いて比べる');
 assert.ok(sql.includes("left(btrim(k->>'曜日'), 1)"), '曜日は先頭1文字（水曜も水）');
-assert.ok(/drop_time = coalesce\(nullif\(btrim\(n\.drop_time\), ''\), d_time\)/.test(sql), '入っている送り時刻は残す');
+assert.ok(sql.includes('staff_saved_at'), '職員が保存した行は印が付く');
+assert.ok(sql.includes('leo_auto_field'), '空でない自動値は、未保存の今日以降だけ入れ直す');
+assert.ok(sql.includes("btrim(n.drop_time) is not distinct from btrim(n.end_time)"), '送り時刻が終了と同じときは古い自動値');
+assert.ok(sql.includes('coalesce(staff_saved_at, now())'), '保存したら、そのあと自動では上書きしない');
+assert.ok(sql.includes('p_day >= public.leo_sync_start()'), '開始日より前の保存では印を付けない');
 const arrival = read('supabase/leo_drop_time_arrival.sql');
+const sync = read('supabase/leo_kata_nikki_sync.sql');
 function fnBody(s) {
   const a = s.indexOf('create or replace function public.leo_nikki_from_events');
   const b = s.indexOf('end $$;', a);
@@ -82,6 +87,21 @@ function fnBody(s) {
   return s.slice(a, b);
 }
 assert.strictEqual(fnBody(arrival), fnBody(sql), '実行用SQLと record_flow の関数は同じ');
+assert.strictEqual(fnBody(sync), fnBody(sql), '追従SQLと record_flow の関数は同じ');
+assert.ok(sync.includes("select date '2026-12-01'"), '追従の開始日');
+assert.ok(sync.includes('function public.leo_sync_start()'), '開始日は一つの関数');
+assert.ok(/when p_day < public\.leo_sync_start\(\) then/.test(sync), '開始日より前は空欄だけ');
+{
+  const auto = sync.slice(sync.indexOf('function public.leo_auto_field'), sync.indexOf('create or replace function public.leo_kata_prev'));
+  const cut = auto.indexOf('when p_day < public.leo_sync_start()');
+  const stale = auto.indexOf('or p_stale');
+  assert.ok(cut >= 0 && stale > cut, '送り時刻=終了の入れ直しは開始日より前に走らない');
+}
+assert.ok(sync.includes('NEW.day is null or NEW.day < public.leo_sync_start()'), '開始日より前の便は児童ごとの時刻を揃えない');
+assert.ok(sync.includes('p_day < greatest((timezone(\'Asia/Tokyo\', now()))::date, public.leo_sync_start())'), '作り直しの下限は今日と開始日の遅い方');
+assert.ok(sync.includes('greatest(coalesce(p_from, (timezone(\'Asia/Tokyo\', now()))::date), (timezone(\'Asia/Tokyo\', now()))::date, public.leo_sync_start())'), '再作成の開始も同じ下限');
+assert.ok(!sync.includes("date '2026-11-05'"), '11/05 を個別に直す案内は置かない');
+assert.ok(fnBody(sql).includes('greatest((timezone(\'Asia/Tokyo\', now()))::date, public.leo_sync_start())'), '日誌を開いても開始日より前は予定を作り直さない');
 assert.ok(!/create policy|enable row level security|\bgrant\b/i.test(arrival), '送り時刻のSQLは権限を変えない');
 assert.ok(arrival.includes('/*') && arrival.includes('-- update leo_nikki'), '11月の直しはコメントのまま');
 assert.ok(between(leo, 'async function saveDiary', 'let LD_DAY').includes('rpc/leo_activity_from_drafts'));

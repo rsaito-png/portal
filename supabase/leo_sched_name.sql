@@ -228,11 +228,11 @@ begin
     coalesce(btrim(kata.k->>'迎え場所', E' \t　'), ''), coalesce(btrim(kata.k->>'送り場所（空欄なら自宅）', E' \t　'), ''), false, false
   from (select d::date as day, (array['日','月','火','水','木','金','土'])[extract(dow from d)::int + 1] as dow from generate_series(p_month, last_day, interval '1 day') d) d
   join (
-    select distinct on (public.leo_name_canon(k->>'児童名'), k->>'曜日') k
+    select distinct on (public.leo_norm(k->>'児童名'), left(btrim(k->>'曜日'), 1)) k
     from leo_sched_kata_all() k
     where coalesce(k->>'児童名', '') <> '' and coalesce(k->>'曜日', '') <> ''
-    order by public.leo_name_canon(k->>'児童名'), k->>'曜日', (k->>'児童名' = public.leo_name_canon(k->>'児童名')) desc, k->>'児童名'
-  ) kata on kata.k->>'曜日' = d.dow
+    order by public.leo_norm(k->>'児童名'), left(btrim(k->>'曜日'), 1), (btrim(k->>'曜日') = left(btrim(k->>'曜日'), 1)) desc, (k->>'児童名' = public.leo_name_canon(k->>'児童名')) desc, k->>'児童名'
+  ) kata on left(btrim(kata.k->>'曜日'), 1) = d.dow
   where d.day <> all(closed)
     and (public.leo_left_on(kata.k->>'児童名') is null or d.day <= public.leo_left_on(kata.k->>'児童名'))
     and (case when exists (
