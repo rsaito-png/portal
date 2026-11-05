@@ -73,7 +73,10 @@ assert.ok(sql.includes("d_src is distinct from 'kata'"), 'カレンダーで直�
 assert.ok(sql.includes('d_end is distinct from nullif(btrim(r.end_time)'), '便の着を利用終了の写しより先に使う');
 assert.ok(sql.includes("public.leo_norm(k->>'児童名')"), '型表の名前は空白を除いて比べる');
 assert.ok(sql.includes("left(btrim(k->>'曜日'), 1)"), '曜日は先頭1文字（水曜も水）');
-assert.ok(/drop_time = coalesce\(nullif\(btrim\(n\.drop_time\), ''\), d_time\)/.test(sql), '入っている送り時刻は残す');
+assert.ok(sql.includes('staff_saved_at'), '職員が保存した行は印が付く');
+assert.ok(sql.includes('leo_auto_field'), '空でない自動値は、未保存の今日以降だけ入れ直す');
+assert.ok(sql.includes("btrim(n.drop_time) is not distinct from btrim(n.end_time)"), '送り時刻が終了と同じときは古い自動値');
+assert.ok(sql.includes('coalesce(staff_saved_at, now())'), '保存したら、そのあと自動では上書きしない');
 const arrival = read('supabase/leo_drop_time_arrival.sql');
 function fnBody(s) {
   const a = s.indexOf('create or replace function public.leo_nikki_from_events');
