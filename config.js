@@ -5,6 +5,8 @@ window.PORTAL_CONFIG = {
   themeColor: '#2e6b4f',
   supabaseUrl: 'https://zvrardoyxocmqhvyddnf.supabase.co',
   supabaseKey: 'sb_publishable_C3S0K18If_cNj6gpgIct9w_3NFMdnCT', // 公開用キー（ブラウザに出してよい種類）
+  // false のあいだは「分からないことを送る」を画面に出さない。true にするとボタンと説明が戻る。受付の表と送信の関数はそのまま。
+  askButton: false,
   helpText: '分からないことは、このページの「分からないことを送る」から受付へ送れます。',
   // 役割。ログインユーザーの役割は Supabase の app_metadata.role（未設定なら defaultRole）
   roles: ['職員', '事務'],

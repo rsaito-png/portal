@@ -113,4 +113,11 @@ assert.ok(payload.p_body.includes('【送信元】レオ / 日誌（児童ごと
 assert.ok(payload.p_body.includes('【児童】児童A'));
 assert.ok(payload.p_body.endsWith('活動記録はどこ？'));
 
+assert.strictEqual(C.askButton, false, '分からないことを送るは旗で隠す');
+const ukSrc = fs.readFileSync(require('path').join(__dirname, '../uketsuke.js'), 'utf8');
+const idx = fs.readFileSync(require('path').join(__dirname, '../index.html'), 'utf8');
+assert.ok(ukSrc.includes('function ukAskOn') && ukSrc.includes('if (!ukAskOn())'), '旗がオフのときはボタンを出さない');
+assert.ok(idx.includes('C.askButton ? C.helpText : \'\''), '説明の一行も旗がオフなら出さない');
+assert.ok(ukSrc.includes("rpc/uketsuke_submit"), '送る関数は残す');
+
 console.log('uketsuke-ask: ok');
