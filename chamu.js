@@ -638,13 +638,14 @@ async function cmJournal() {
     cmRest(CM_SHIFT_Q).then(a => ({ rows: a || [] })).catch(() => ({ error: true })),
   ]);
   const lines = (day && day.chamu_journal_line) || [];
+  const dfl = ChamuLib.settingsOf(settings);
   const by = {}; lines.forEach(l => { by[l.user_id] = l; });
   CM.st.date = date;
   const card = u => {
     const l = by[u.id] || {}, chosen = l.user_id ? (l.present ? '出席' : '欠席') : '', k = u.id;
     const meal = l.meal || 'あり', intake = l.intake || (meal === 'あり' ? ChamuLib.INTAKE_DEFAULT : '');
     return `<div class="jr"><div class="row" style="align-items:end"><div class="cm-who"><b>${cmEsc(u.name)}</b></div><div><label class="l">出欠 / Presença</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
-      <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始 / Início', (l.start_time || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了 / Fim', (l.end_time || '').slice(0, 5), 'time')}
+      <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始 / Início', (l.start_time || dfl.default_start || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了 / Fim', (l.end_time || dfl.default_end || '').slice(0, 5), 'time')}
         <div><label class="l">送迎 / Transporte</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
         <div><label class="l">食事 / Refeição</label>${cmSel('m_' + k, ChamuLib.MEAL, meal)}</div>
         <div id="eat_${k}" style="flex:1 1 100%;${meal === 'あり' ? '' : 'display:none'}"><label class="l">摂食 / Quanto comeu</label>${cmSel('i_' + k, ChamuLib.INTAKE, intake, '未記入')}
