@@ -1,10 +1,10 @@
 // 金斗雲の訪問記録。
 // #kintoun/write … 記録記入。GAS「サービス実施記録入力」(index.html v13.6 / Code.gs v11.7) の流れ（通常・同じ建物で連続・まとめて署名）。
-// #kintoun/visit … 今月の記録（一覧と、既存1件を開いて直す）。
+// #kintoun/visit … 今月の記録（一覧と、既存1件を開いて直す。「特記ありだけ」で抽出可）。
 // 「サ責からの指示」はヘルパーの記入欄ではない。利用者（または全員）向けの有効な指示を表示するだけ。
 // 新規保存時に、その提供日に有効な指示ID（無ければ「指示なし」）を instruction_id へ自動で入れる。既存行は上書きしない。
 // 担当ヘルパー名は、新規ではログイン中の職員（full_name、無ければポータルの表示名 nikki_name）。既存行は保存済みの staff_name のまま。空欄でも保存できる。
-const KV = { id: null, month: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7), instructions: [], users: [], visit: null, ctx: null, instrMissing: false };
+const KV = { id: null, month: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7), noteOnly: false, instructions: [], users: [], visit: null, ctx: null, instrMissing: false };
 const KV_REPORT = [
   { k: 'report1', ja: '①意欲', pt: 'Disposição / motivação' },
   { k: 'report2', ja: '②訴え・要望', pt: 'Queixas e pedidos' },
@@ -370,16 +370,36 @@ async function renderKinVisit() {
 }
 async function kvList() {
   const m = KV.month, next = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 1)).toISOString().slice(0, 10);
-  const [vs, us, ins] = await Promise.all([
+  const [vsAll, us, ins] = await Promise.all([
     sb(`kin_visit?visit_date=gte.${m}-01&visit_date=lt.${next}&select=*&order=visit_date.desc,start_time`),
     sb('kin_user?select=id,name&order=name'),
     sb('kin_instruction?select=*&order=id').catch(() => null)
   ]);
   KV.users = us; KV.instructions = ins || []; KV.instrMissing = ins === null;
   const nm = Object.fromEntries(us.map(u => [u.id, u.name]));
-  const rows = vs.map(v => `<tr><td>${esc(v.visit_date)}</td><td>${esc(nm[v.user_id] || '')}</td><td>${v.staff_name ? esc(v.staff_name) : '<span style="color:#c60">（未入力）</span>'}</td><td>${esc(v.service)}</td><td>${esc(v.start_time.slice(0, 5))}〜${esc(v.end_time.slice(0, 5))}</td><td>${v.actual_minutes}分</td><td>${esc(v.addition || '')}</td><td>${v.sign_status === '署名済み' ? '✅' : '⬜未署名'}</td><td>${v.staff_confirmed ? '職✔' : ''}${v.sab_confirmed ? ' サ✔' : ''}</td><td><button onclick="KV.id=${v.id};renderKinVisit()">開く</button></td></tr>`).join('');
-  return `<h3>今月の記録</h3><p>月 <input type="month" id="kv_m" value="${esc(m)}" onchange="KV.month=this.value||KV.month;renderKinVisit()"> <a class="back" href="#kintoun/write">＋記録を書く</a> <button class="back" onclick="location.hash='kintoun/check'">✅記録・署名チェック／署名リンク発行へ</button> ${kvSched()}</p>` +
-    (vs.length ? `<table class="tbl"><tr><th>提供日</th><th>利用者</th><th>職員</th><th>種別</th><th>時間</th><th>実時間</th><th>加算</th><th>署名</th><th>確認</th><th></th></tr>${rows}</table><p>${vs.length}件／未署名 ${vs.filter(v => v.sign_status !== '署名済み').length}件</p>` : '<p>この月の記録はありません。</p>') +
+  const hasNote = v => !!(v.note && String(v.note).trim());
+  const noteN = vsAll.filter(hasNote).length;
+  const vs = KV.noteOnly ? vsAll.filter(hasNote) : vsAll;
+  const filt = `<label style="margin-left:8px;white-space:nowrap"><input type="checkbox" ${KV.noteOnly ? 'checked' : ''} onchange="KV.noteOnly=this.checked;renderKinVisit()"> 特記ありだけ（${noteN}件）</label>`;
+  let rows, head, empty;
+  if (KV.noteOnly) {
+    head = '<tr><th>提供日</th><th>利用者</th><th>職員</th><th>時間</th><th>特記事項・申し送り</th><th></th></tr>';
+    rows = vs.map(v => `<tr><td>${esc(v.visit_date)}</td><td>${esc(nm[v.user_id] || '')}</td><td>${v.staff_name ? esc(v.staff_name) : '<span style="color:#c60">（未入力）</span>'}</td><td>${esc(v.start_time.slice(0, 5))}〜${esc(v.end_time.slice(0, 5))}</td><td style="white-space:pre-wrap;max-width:36em">${esc(String(v.note).trim())}</td><td><button onclick="KV.id=${v.id};renderKinVisit()">開く</button></td></tr>`).join('');
+    empty = '<p>この月に特記のある記録はありません。</p>';
+  } else {
+    head = '<tr><th>提供日</th><th>利用者</th><th>職員</th><th>種別</th><th>時間</th><th>実時間</th><th>加算</th><th>特記</th><th>署名</th><th>確認</th><th></th></tr>';
+    rows = vs.map(v => {
+      const n = hasNote(v) ? String(v.note).trim() : '';
+      const tip = n ? esc(n.length > 40 ? n.slice(0, 40) + '…' : n) : '';
+      return `<tr><td>${esc(v.visit_date)}</td><td>${esc(nm[v.user_id] || '')}</td><td>${v.staff_name ? esc(v.staff_name) : '<span style="color:#c60">（未入力）</span>'}</td><td>${esc(v.service)}</td><td>${esc(v.start_time.slice(0, 5))}〜${esc(v.end_time.slice(0, 5))}</td><td>${v.actual_minutes}分</td><td>${esc(v.addition || '')}</td><td>${n ? `<span title="${esc(n)}">📝${tip}</span>` : ''}</td><td>${v.sign_status === '署名済み' ? '✅' : '⬜未署名'}</td><td>${v.staff_confirmed ? '職✔' : ''}${v.sab_confirmed ? ' サ✔' : ''}</td><td><button onclick="KV.id=${v.id};renderKinVisit()">開く</button></td></tr>`;
+    }).join('');
+    empty = '<p>この月の記録はありません。</p>';
+  }
+  const summary = KV.noteOnly
+    ? `<p>特記あり ${vs.length}件（この月の全記録 ${vsAll.length}件）</p>`
+    : `<p>${vs.length}件／特記あり ${noteN}件／未署名 ${vs.filter(v => v.sign_status !== '署名済み').length}件</p>`;
+  return `<h3>今月の記録</h3><p>月 <input type="month" id="kv_m" value="${esc(m)}" onchange="KV.month=this.value||KV.month;renderKinVisit()"> <a class="back" href="#kintoun/write">＋記録を書く</a> <button class="back" onclick="location.hash='kintoun/check'">✅記録・署名チェック／署名リンク発行へ</button> ${filt} ${kvSched()}</p>` +
+    (vs.length ? `<table class="tbl">${head}${rows}</table>${summary}` : empty) +
     kvCss() + kvInstrAdmin(us, ins);
 }
 function kvInstrAdmin(us, ins) {
