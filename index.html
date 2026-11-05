@@ -172,7 +172,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261105jukyu"></script>
+<script src="config.js?v=20261105jukyut"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -198,7 +198,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
 <script src="sct.js?v=20261030px"></script>
-<script src="chair.js?v=20261026top"></script>
+<script src="chair.js?v=202611052230"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=20261026calov"></script>
 <script src="leo_cal.js?v=20261026calov"></script>
@@ -216,6 +216,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="dakoku-lib.js?v=20261030dakoku"></script>
 <script src="dakoku.js?v=20261104home"></script>
 <script src="soudan.js?v=202611042130"></script>
+<script src="taxcal.js?v=202611052230"></script>
 <script src="banto.js?v=202610211550"></script>
 <script src="sns.js?v=202610271650"></script>
 <script src="leaderboard.js?v=20261026hold"></script>
@@ -373,6 +374,7 @@ async function render() {
   if (id === 'sns' && typeof renderSns === 'function') return renderSns();
   if (id === 'soumu') return renderSoumu();
   if (id === 'shogu' && typeof renderShogu === 'function') return renderShogu(route.slice(1));
+  if (id === 'taxcal' && typeof renderTaxCal === 'function') return renderTaxCal();
   if (id === 'soudan' && typeof renderSoudan === 'function') return renderSoudan();
   if (id === 'leaderboard' && typeof renderLeaderBoard === 'function') return renderLeaderBoard();
   if (id === 'mgr') return renderMgr();
@@ -475,7 +477,8 @@ async function renderSoumu() {
   if (await accAdmin()) {
     const t = '<a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a>';
     const kh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '経理'), kg = kh && kh.nextElementSibling;
-    if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + t + '</div>');
+    const tt = sec.querySelector('a[href="#taxcal"]') ? '' : tileHtml(['🧾', '税カレンダー', '#taxcal', '源泉・住民税（毎月10日）と年次の期限'], '#555');
+    if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', tt + t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + tt + t + '</div>');
   } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
   if (!clerk && !sec.querySelector('a[href="#shogu"]') && (DUTY === '管理者' || (typeof shoguUiCan === 'function' && await shoguUiCan()))) {
     const t = tileHtml(['💴', '処遇改善加算（試作）', '#shogu', '国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作'], '#555');

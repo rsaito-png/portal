@@ -17,6 +17,8 @@ async function chairTile() {
   const html = `<a id="chair_tile" class="tile big" href="#chair" style="display:block;border-top:4px solid #b8860b;margin-bottom:12px"><span>👑</span>会長ページ<small>思いつきを入れる・今日やる3つ</small></a>`;
   const msg = document.getElementById('chair_msg');
   if (msg) msg.insertAdjacentHTML('afterend', html); else v.insertAdjacentHTML('afterbegin', html);
+  const ct = document.getElementById('chair_tile'); // 会長は総務を経ずに税カレンダーへ
+  if (ct && !document.getElementById('taxcal_tile')) ct.insertAdjacentHTML('afterend', `<a id="taxcal_tile" class="tile" href="#taxcal" style="display:block;border-top:4px solid #2e6b4f;margin-bottom:12px"><span>🧾</span>税カレンダー<small>源泉・住民税（毎月10日）と年次の期限</small></a>`);
 }
 // 会長からの一言（職員向け表示）
 async function chairMsgHtml() {
