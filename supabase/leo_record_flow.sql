@@ -82,7 +82,7 @@ declare
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
   if p_day is null then raise exception '日付'; end if;
-  if p_day >= (timezone('Asia/Tokyo', now()))::date then
+  if p_day >= greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start()) then
     perform public.leo_align_event_kids(p_day);
     perform public.leo_kata_rewrite_day(p_day);
   end if;
@@ -222,7 +222,7 @@ begin
         drop_driver = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_driver', n.drop_driver, d_driver, public.leo_kata_prev(n.day, n.child, 'drop_driver'), false),
         drop_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_time', n.drop_time, d_time, public.leo_kata_prev(n.day, n.child, 'drop_time'), coalesce(btrim(n.drop_time), '') <> '' and btrim(n.drop_time) is not distinct from btrim(n.end_time)),
         drop_place = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false),
-        auto_fill = case when n.staff_saved_at is null and n.day >= (timezone('Asia/Tokyo', now()))::date then jsonb_build_object(
+        auto_fill = case when n.day >= public.leo_sync_start() and n.staff_saved_at is null and n.day >= (timezone('Asia/Tokyo', now()))::date then jsonb_build_object(
           'start_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false),
           'end_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
           'pick_driver', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
@@ -250,7 +250,7 @@ begin
       update leo_nikki set auto_fill = jsonb_build_object(
         'start_time', start_time, 'end_time', end_time, 'pick_driver', pick_driver, 'pick_time', pick_time,
         'pick_place', pick_place, 'drop_driver', drop_driver, 'drop_time', drop_time, 'drop_place', drop_place)
-      where day = p_day and row_no = base and day >= (timezone('Asia/Tokyo', now()))::date;
+      where day = p_day and row_no = base and day >= greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start());
       n := n + 1;
     end if;
     p_driver := null; p_time := null; p_place := null;
@@ -407,7 +407,7 @@ begin
     elsif k = 'drop_place' then update leo_nikki set drop_place = v where day = p_day and row_no = p_row;
     end if;
   end loop;
-  update leo_nikki set staff_saved_at = coalesce(staff_saved_at, now()) where day = p_day and row_no = p_row;
+  update leo_nikki set staff_saved_at = coalesce(staff_saved_at, now()) where day = p_day and row_no = p_row and p_day >= public.leo_sync_start();
   if touched_activity then
     select nk.child into child from leo_nikki nk where nk.day = p_day and nk.row_no = p_row;
     insert into leo_activity (day, child, text, source, made_by)

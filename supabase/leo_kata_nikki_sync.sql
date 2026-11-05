@@ -1,21 +1,33 @@
--- 型表やカレンダーを直したあと、今日以降の予定（source=kata）と、職員がまだ保存していない日誌の送迎・開始を追従させる。
+-- 型表やカレンダーを直したあと、2026-12-01 以降かつ今日以降の予定（source=kata）と、
+-- 職員がまだ保存していない日誌の送迎・開始を追従させる。
+-- それより前の予定は消さず、児童ごとの時刻も揃えない。日誌は空欄を埋める従来の動きだけ残し、送り時刻が終了と同じときの入れ直しはしない。
+-- 開始日は public.leo_sync_start()。作り直す範囲の下限は greatest(今日, 開始日)。
 -- Supabase SQL Editor でこのファイルだけ Run する。何度実行してもよい。
--- 権限（RLS・grant）は変えない。過去の日は予定を消さない。source が kata 以外（カレンダーで直した便・削除の印・休み）は消さない。
+-- 権限（RLS・grant）は変えない。source が kata 以外（カレンダーで直した便・削除の印・休み）は消さない。
 -- 依存：leo_sched_plan_core / leo_norm / leo_kid_json / leo_record_allowed / leo_nikki_from_events（supabase/leo_record_flow.sql を一度は実行してあること）。
 -- このファイルは leo_nikki_from_events も置き換える（record_flow と同じ中身）。
+
+-- 追従を始める日。2026-11 以前は対象にしない。
+create or replace function public.leo_sync_start() returns date
+language sql immutable as $$
+  select date '2026-12-01'
+$$;
 
 alter table public.leo_nikki add column if not exists staff_saved_at timestamptz;
 alter table public.leo_nikki add column if not exists auto_fill jsonb;
 comment on column public.leo_nikki.staff_saved_at is '職員が日誌の保存を押した時刻。入っている行の送迎・開始は自動で上書きしない。';
 comment on column public.leo_nikki.auto_fill is '最後に自動で入れた送迎・開始。まだこの値の欄だけ、予定の変更で入れ直す。';
 
--- 職員が保存した行、過去の日は、空の欄だけ埋める。今日以降で未保存の欄は、前回の自動値・型表由来の値・送り時刻=終了のときだけ入れ直す。
+-- 開始日より前と、過去の日と、職員が保存した行は、空の欄だけ埋める。
+-- 開始日以降の今日以降で未保存の欄は、前回の自動値・型表由来の値・送り時刻=終了のときだけ入れ直す。
 create or replace function public.leo_auto_field(
   p_saved timestamptz, p_day date, p_auto jsonb, p_key text,
   p_cur text, p_new text, p_prev text, p_stale boolean
 ) returns text
 language sql stable as $$
   select case
+    when p_day < public.leo_sync_start() then
+      case when coalesce(btrim(p_cur), '') = '' then p_new else p_cur end
     when p_saved is not null then p_cur
     when p_day < (timezone('Asia/Tokyo', now()))::date then
       case when coalesce(btrim(p_cur), '') = '' then p_new else p_cur end
@@ -63,6 +75,7 @@ declare
   times jsonb := coalesce(NEW.kid_times, '{}'::jsonb);
   places jsonb := coalesce(NEW.kid_places, '{}'::jsonb);
 begin
+  if NEW.day is null or NEW.day < public.leo_sync_start() then return NEW; end if;
   if NEW.kind not in ('迎え', '送り') then return NEW; end if;
   if NEW.source = 'portal' and (coalesce(NEW.title, '') = 'カレンダーで削除' or coalesce(NEW.note, '') = 'カレンダーで削除') then
     return NEW;
@@ -113,6 +126,7 @@ create or replace function public.leo_align_event_kids(p_day date) returns void
 language plpgsql security definer set search_path = public as $$
 declare r record; kid text; newt text;
 begin
+  if p_day is null or p_day < greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start()) then return; end if;
   for r in
     select id, kind, child, kids, start_time, end_time, place
     from leo_events
@@ -156,7 +170,7 @@ declare
   kids_left text[];
   kid text;
 begin
-  if p_day is null or p_day < (timezone('Asia/Tokyo', now()))::date then return; end if;
+  if p_day is null or p_day < greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start()) then return; end if;
   if plan is null then plan := public.leo_sched_plan_core(date_trunc('month', p_day)::date); end if;
   create temp table if not exists _kata_prev (
     day date, key text,
@@ -249,7 +263,7 @@ end $$;
 create or replace function public.leo_kata_resync(p_from date default null) returns int
 language plpgsql security definer set search_path = public as $$
 declare
-  d0 date := coalesce(p_from, (timezone('Asia/Tokyo', now()))::date);
+  d0 date := greatest(coalesce(p_from, (timezone('Asia/Tokyo', now()))::date), (timezone('Asia/Tokyo', now()))::date, public.leo_sync_start());
   d1 date;
   m date;
   plan jsonb;
@@ -257,7 +271,6 @@ declare
   n int := 0;
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
-  if d0 < (timezone('Asia/Tokyo', now()))::date then d0 := (timezone('Asia/Tokyo', now()))::date; end if;
   d1 := least(greatest(
       coalesce((select max(day) from leo_events where source = 'kata' and day >= d0), d0),
       (date_trunc('month', d0)::date + interval '2 month' - interval '1 day')::date
@@ -282,7 +295,7 @@ create or replace function public.leo_master_kata_touch() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if exists (select 1 from new_rows where kind = 'kata') then
-    perform public.leo_kata_resync((timezone('Asia/Tokyo', now()))::date);
+    perform public.leo_kata_resync(greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start()));
   end if;
   return null;
 end $$;
@@ -306,7 +319,7 @@ declare
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
   if p_day is null then raise exception '日付'; end if;
-  if p_day >= (timezone('Asia/Tokyo', now()))::date then
+  if p_day >= greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start()) then
     perform public.leo_align_event_kids(p_day);
     perform public.leo_kata_rewrite_day(p_day);
   end if;
@@ -446,7 +459,7 @@ begin
         drop_driver = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_driver', n.drop_driver, d_driver, public.leo_kata_prev(n.day, n.child, 'drop_driver'), false),
         drop_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_time', n.drop_time, d_time, public.leo_kata_prev(n.day, n.child, 'drop_time'), coalesce(btrim(n.drop_time), '') <> '' and btrim(n.drop_time) is not distinct from btrim(n.end_time)),
         drop_place = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false),
-        auto_fill = case when n.staff_saved_at is null and n.day >= (timezone('Asia/Tokyo', now()))::date then jsonb_build_object(
+        auto_fill = case when n.day >= public.leo_sync_start() and n.staff_saved_at is null and n.day >= (timezone('Asia/Tokyo', now()))::date then jsonb_build_object(
           'start_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false),
           'end_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
           'pick_driver', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
@@ -474,7 +487,7 @@ begin
       update leo_nikki set auto_fill = jsonb_build_object(
         'start_time', start_time, 'end_time', end_time, 'pick_driver', pick_driver, 'pick_time', pick_time,
         'pick_place', pick_place, 'drop_driver', drop_driver, 'drop_time', drop_time, 'drop_place', drop_place)
-      where day = p_day and row_no = base and day >= (timezone('Asia/Tokyo', now()))::date;
+      where day = p_day and row_no = base and day >= greatest((timezone('Asia/Tokyo', now()))::date, public.leo_sync_start());
       n := n + 1;
     end if;
     p_driver := null; p_time := null; p_place := null;
@@ -510,7 +523,7 @@ begin
     elsif k = 'drop_place' then update leo_nikki set drop_place = v where day = p_day and row_no = p_row;
     end if;
   end loop;
-  update leo_nikki set staff_saved_at = coalesce(staff_saved_at, now()) where day = p_day and row_no = p_row;
+  update leo_nikki set staff_saved_at = coalesce(staff_saved_at, now()) where day = p_day and row_no = p_row and p_day >= public.leo_sync_start();
   if touched_activity then
     select nk.child into child from leo_nikki nk where nk.day = p_day and nk.row_no = p_row;
     insert into leo_activity (day, child, text, source, made_by)
