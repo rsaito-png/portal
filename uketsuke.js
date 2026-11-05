@@ -18,7 +18,7 @@ async function renderUketsuke() {
     const groups = {}; rows.forEach(r => (groups[r.office || '事業所未設定'] = groups[r.office || '事業所未設定'] || []).push(r));
     const tabs = ['未完了', 'すべて'].map(f => `<button class="${f === UK_FILTER ? 'on' : ''}" onclick="UK_FILTER='${f}';renderUketsuke()">${f}</button>`).join('');
     $('view').innerHTML = back + `<h3>受付</h3>${typeof DEMO !== 'undefined' && DEMO ? '<p class="note">見本データです（架空）</p>' : ''}
-      <p class="note">ポータルから送られた依頼・報告です。不具合や画面の修正依頼もここから。${ROLE === '事務' ? '事務なので全事業所を表示しています。' : '自分の事業所の分だけ表示しています。'}対応したら状態を変えてください。どの画面からでも、右下の「分からないことを送る」で、いまのページのまま同じ受付に送れます。</p>
+      <p class="note">ポータルから送られた依頼・報告です。不具合や画面の修正依頼もここから。${ROLE === '事務' ? '事務なので全事業所を表示しています。' : '自分の事業所の分だけ表示しています。'}対応したら状態を変えてください。${ukAskOn() ? 'どの画面からでも、右下の「分からないことを送る」で、いまのページのまま同じ受付に送れます。' : ''}</p>
       <div class="card"><h4>✏️ ここから送る</h4>
       <select id="uk_c">${UK_CATS.map(c => `<option>${c}</option>`).join('')}</select>
       <textarea id="uk_b" rows="3" maxlength="4000" style="width:100%;font-size:16px" placeholder="依頼・報告を書いてください"></textarea>
@@ -231,8 +231,20 @@ const UK_ASK_CSS = `#uk_fab,#uk_help_btn{background:var(--main,#2e6b4f);color:#f
 #uk_ask_m a{color:#1d5c38}
 @media print{#uk_fab,#uk_ask,#uk_help_btn{display:none!important}}`;
 
+function ukAskOn() {
+  const Cfg = ukCfg();
+  return !!(Cfg && Cfg.askButton);
+}
+function ukHideAskUi() {
+  ['uk_fab', 'uk_help_btn', 'uk_help_note'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
+  });
+  if (document.body) document.body.style.paddingBottom = '';
+}
 function ukInstallAsk() {
   if (typeof document === 'undefined') return;
+  if (!ukAskOn()) { ukHideAskUi(); return; }
   if (!document.getElementById('uk_ask_css')) {
     const st = document.createElement('style');
     st.id = 'uk_ask_css';

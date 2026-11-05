@@ -172,7 +172,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261104nojippi"></script>
+<script src="config.js?v=20261105askoff"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -206,7 +206,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="leo_jippi.js?v=20261103mealfee"></script>
 <script src="leo_jogan.js?v=20261030jogan"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
-<script src="uketsuke.js?v=20261030px"></script>
+<script src="uketsuke.js?v=20261105askoff"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261102wage"></script>
 <script src="chamu.js?v=20261103pc"></script>
@@ -231,7 +231,7 @@ const DEMO = new URLSearchParams(location.search).get('demo') === '1';
 const $ = id => document.getElementById(id);
 document.title = C.title;
 $('ttl').textContent = C.title;
-$('help').textContent = C.helpText;
+$('help').textContent = C.askButton ? C.helpText : '';
 document.documentElement.style.setProperty('--main', C.themeColor);
 
 // Supabase Auth（メール＋パスワード）でログイン
