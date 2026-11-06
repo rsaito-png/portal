@@ -7,7 +7,7 @@ begin
     return new;
   end if;
   select coalesce(nullif(full_name,''), nikki_name, '') into n from staff_profiles where user_id = new.assignee;
-  perform notify_enqueue('all', '指示', '📌 ' || coalesce(nullif(n,''), 'ご担当') || 'さんに新しい指示があります。ポータルの「注進」で確認してください。', 'https://rsaito-png.github.io/portal/#report', 'レオ');
+  perform notify_enqueue('all', '指示', '📌 ' || coalesce(nullif(n,''), 'ご担当') || 'さんに新しい指示があります。ポータルの「私への依頼」で確認してください。', 'https://rsaito-png.github.io/portal/#report', 'レオ');
   return new;
 end $$;
 drop trigger if exists notify_todo on staff_todo;

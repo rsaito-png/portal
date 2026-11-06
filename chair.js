@@ -104,7 +104,7 @@ async function chairMsgSend() {
     await sb('chair_message', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ body: t }) }); $('ch_msg').value = ''; m.textContent = '表示しました'; chairCur(); } catch (e) { m.textContent = e.message; }
 }
 async function chairMsgOff() { try { await sb('chair_message?active=eq.true', { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ active: false }) }); chairCur(); } catch (e) { alert(e.message); } }
-// 注進（未報告の人・職員ごとのToDo）。詳細は #report/admin
+// 報告（未報告の人・職員ごとのToDo）。詳細は #report/admin
 async function chairReport() {
   const el = $('ch_rep'); if (!el) return;
   try {
@@ -112,7 +112,7 @@ async function chairReport() {
     const [ros, reps, todos] = await Promise.all([srRpc('staff_roster'), sb(`staff_report?day=gte.${since}&order=day.desc`), sb('staff_todo?status=neq.done&order=due.asc.nullslast,updated_at')]);
     const nm = Object.fromEntries(ros.map(r => [r.user_id, r.name])), targets = ros.filter(r => r.daily_report), have = new Set(reps.filter(r => r.day === day).map(r => r.staff));
     const miss = targets.filter(r => !have.has(r.user_id)), by = {}; todos.forEach(x => (by[x.assignee] = by[x.assignee] || []).push(x));
-    el.innerHTML = `<p style="font-size:18px">📭 今日まだ注進がない人（${miss.length}／${targets.length}）：<b>${miss.map(r => esc(r.name)).join('、') || 'なし'}</b></p>
+    el.innerHTML = `<p style="font-size:18px">📭 今日まだ報告がない人（${miss.length}／${targets.length}）：<b>${miss.map(r => esc(r.name)).join('、') || 'なし'}</b></p>
       <div class="card"><h4>➕ 指示を出す</h4><p><select id="ta_who" style="font-size:16px">${ros.map(r => `<option value="${r.user_id}">${esc(r.name)}</option>`).join('')}</select>
       <input id="ta_t" maxlength="300" placeholder="指示の内容" style="width:100%;font-size:16px"> 期限 <input id="ta_d" type="date" style="width:auto"> <button onclick="srAdd()">出す</button> <span id="ta_m" class="note"></span></p></div>
       ${Object.keys(by).length ? Object.entries(by).map(([id, xs]) => `<p><b>${esc(nm[id] || '？')}</b>（ToDo ${xs.length}）<br>${xs.map(x => `<small>・${esc(x.title)}（${srST[x.status]}${x.note ? '：' + esc(x.note) : ''}）${x.due ? '　期限 ' + esc(x.due) : ''}${x.due && x.due < day ? ' ⚠️期限切れ' : ''}</small> <a href="javascript:void 0" style="font-size:12px" onclick="srDel(${x.id})">消す</a>`).join('<br>')}</p>`).join('') : '<p class="note">未完了のToDoはありません。</p>'}
