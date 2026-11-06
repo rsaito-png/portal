@@ -61,12 +61,13 @@
 
   let JG_MONTH = '';
   let JG_ROWS = [];
+  let JG_MASTERS = []; // 全件（無効含む）。画面のマスタ編集用
   const JG_DEMO_AMT = {};
   let JG_DEMO_SEEDED = false;
   const JG_DEMO_CHILDREN = [
-    { child: '児童A', side: 'レオが管理', partner_name: '見本学園', partner_email: 'demo-a@example.com' },
-    { child: '児童B', side: '他所が管理', partner_name: '見本キッズ', partner_email: 'demo-b@example.com' },
-    { child: '児童C', side: 'レオが管理', partner_name: '見本ウィズ', partner_email: '' },
+    { child: '児童A', side: 'レオが管理', partner_name: '見本学園', partner_email: 'demo-a@example.com', active: true, sort_no: 1 },
+    { child: '児童B', side: '他所が管理', partner_name: '見本キッズ', partner_email: 'demo-b@example.com', active: true, sort_no: 2 },
+    { child: '児童C', side: 'レオが管理', partner_name: '見本ウィズ', partner_email: '', active: true, sort_no: 3 },
   ];
   function joganEnsureMonth() {
     if (JG_MONTH) return JG_MONTH;
@@ -134,7 +135,116 @@
     const dt = new Date(y, m - 1 + delta, 1);
     joganMonth(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`);
   }
+  function joganMasterForm(m) {
+    const sideOpts = JOGAN_SIDES.map(s => `<option value="${esc(s)}"${m && m.side === s ? ' selected' : ''}>${esc(s)}</option>`).join('');
+    const title = m ? `「${esc(m.child)}」を直す` : '対象児童を追加';
+    const childField = m
+      ? `<input type="hidden" id="jg_m_key" value="${esc(m.child)}"><p><b>${esc(m.child)}</b></p>`
+      : `<label>児童名（日誌と同じ表記）<br><input id="jg_m_child" maxlength="100" required placeholder="例 山田太郎"></label>`;
+    return `<div class="card" id="jg_m_form" style="margin:10px 0;border-left:4px solid #36c">
+      <h4 style="margin:0 0 8px">${title}</h4>
+      ${childField}
+      <label>区分<br><select id="jg_m_side">${sideOpts}</select></label>
+      <label>相手事業所名<br><input id="jg_m_partner" maxlength="200" value="${esc(m ? m.partner_name : '')}" required></label>
+      <label>相手メール（空でも可・下書きは不可）<br><input id="jg_m_email" type="email" maxlength="200" value="${esc(m && m.partner_email ? m.partner_email : '')}" placeholder="例 office@example.com"></label>
+      <label>並び順<br><input id="jg_m_sort" type="number" value="${m && m.sort_no != null ? m.sort_no : ((JG_MASTERS.length ? Math.max(...JG_MASTERS.map(x => x.sort_no || 0)) : 0) + 1)}" style="width:6em"></label>
+      <p style="margin:8px 0"><button type="button" onclick="joganMasterSave()">${m ? 'マスタを保存' : '追加する'}</button>
+        <button type="button" class="back" onclick="joganMasterCancel()">やめる</button>
+        <span id="jg_m_msg" class="note"></span></p>
+    </div>`;
+  }
+  function joganMasterPanel() {
+    const rows = JG_MASTERS.map(m => {
+      const mail = m.partner_email ? esc(m.partner_email) : '<span style="color:#c00">未設定</span>';
+      const st = m.active ? '有効' : '<span style="color:#888">無効</span>';
+      return `<tr style="${m.active ? '' : 'opacity:.65'}">
+        <td><b>${esc(m.child)}</b></td><td>${esc(m.side)}</td><td>${esc(m.partner_name)}<br><small>${mail}</small></td><td>${st}</td>
+        <td style="white-space:nowrap">
+          <button type="button" class="back" onclick="joganMasterEdit('${esc(m.child)}')">直す</button>
+          <button type="button" class="back" onclick="joganMasterToggle('${esc(m.child)}',${m.active ? 'false' : 'true'})">${m.active ? '無効にする' : '有効に戻す'}</button>
+          <button type="button" class="back" onclick="joganMasterDelete('${esc(m.child)}')">削除</button>
+        </td></tr>`;
+    }).join('');
+    return `<details style="margin-top:18px" id="jg_master"><summary style="cursor:pointer;font-weight:bold">対象児童マスタ（追加・直す・無効・削除）</summary>
+      <p class="note">相手事業所名・メール・区分（レオが管理／他所が管理）を手で直せます。無効にすると今月の金額入力から外れます（金額の履歴は残ります）。削除は金額も消えます。</p>
+      <p><button type="button" onclick="joganMasterEdit(null)">＋ 対象児童を追加</button></p>
+      <div id="jg_m_edit"></div>
+      ${JG_MASTERS.length ? `<div class="sheet-scroll"><table class="tbl"><tr><th>児童</th><th>区分</th><th>相手</th><th>状態</th><th></th></tr>${rows}</table></div>` : '<p class="note">まだ対象がありません。上から追加してください。</p>'}
+    </details>`;
+  }
+  function joganMasterEdit(child) {
+    const box = document.getElementById('jg_m_edit'); if (!box) return;
+    const m = child == null ? null : JG_MASTERS.find(x => x.child === child) || null;
+    box.innerHTML = joganMasterForm(m);
+    const det = document.getElementById('jg_master'); if (det) det.open = true;
+    box.scrollIntoView({ block: 'nearest' });
+  }
+  function joganMasterCancel() {
+    const box = document.getElementById('jg_m_edit'); if (box) box.innerHTML = '';
+  }
+  async function joganMasterSave() {
+    const msg = document.getElementById('jg_m_msg'); if (!msg) return;
+    const key = (document.getElementById('jg_m_key') || {}).value;
+    const child = key || ((document.getElementById('jg_m_child') || {}).value || '').trim();
+    const side = ((document.getElementById('jg_m_side') || {}).value || '').trim();
+    const partner_name = ((document.getElementById('jg_m_partner') || {}).value || '').trim();
+    const emailRaw = ((document.getElementById('jg_m_email') || {}).value || '').trim();
+    const partner_email = emailRaw || null;
+    const sort_no = Number((document.getElementById('jg_m_sort') || {}).value);
+    if (!child || child.length > 100) { msg.style.color = '#c00'; msg.textContent = '児童名を入れてください（100文字まで）。'; return; }
+    if (!JOGAN_SIDES.includes(side)) { msg.style.color = '#c00'; msg.textContent = '区分を選んでください。'; return; }
+    if (!partner_name || partner_name.length > 200) { msg.style.color = '#c00'; msg.textContent = '相手事業所名を入れてください。'; return; }
+    if (partner_email && !joganEmailOk(partner_email)) { msg.style.color = '#c00'; msg.textContent = 'メールの形が正しくありません（空なら未設定のまま残します）。'; return; }
+    if (!Number.isFinite(sort_no)) { msg.style.color = '#c00'; msg.textContent = '並び順は数字で入れてください。'; return; }
+    if (typeof DEMO !== 'undefined' && DEMO) {
+      const i = JG_DEMO_CHILDREN.findIndex(x => x.child === child);
+      const row = { child, side, partner_name, partner_email: partner_email || '', active: true, sort_no };
+      if (i >= 0) JG_DEMO_CHILDREN[i] = Object.assign({}, JG_DEMO_CHILDREN[i], row);
+      else JG_DEMO_CHILDREN.push(row);
+      msg.style.color = ''; msg.textContent = '見本モードなので保存しません。';
+      renderLeoView('jogan'); return;
+    }
+    try {
+      const body = { child, side, partner_name, partner_email, sort_no, active: true };
+      if (key) {
+        await sb(`leo_jogan_master?child=eq.${encodeURIComponent(key)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ side, partner_name, partner_email, sort_no }) });
+      } else {
+        await sb('leo_jogan_master?on_conflict=child', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([body]) });
+      }
+      await renderLeoView('jogan');
+      const det = document.getElementById('jg_master'); if (det) det.open = true;
+    } catch (e) { msg.style.color = '#c00'; msg.textContent = e.message; }
+  }
+  async function joganMasterToggle(child, active) {
+    if (typeof DEMO !== 'undefined' && DEMO) {
+      const r = JG_DEMO_CHILDREN.find(x => x.child === child); if (r) r.active = !!active;
+      renderLeoView('jogan'); return;
+    }
+    const verb = active ? '有効に戻す' : '無効にする';
+    if (!confirm(`「${child}」を${verb}しますか？\n${active ? '金額入力の一覧に戻ります。' : '金額入力の一覧から外れます（金額の履歴は残ります）。'}`)) return;
+    try {
+      await sb(`leo_jogan_master?child=eq.${encodeURIComponent(child)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ active: !!active }) });
+      await renderLeoView('jogan');
+      const det = document.getElementById('jg_master'); if (det) det.open = true;
+    } catch (e) { alert(e.message); }
+  }
+  async function joganMasterDelete(child) {
+    if (!confirm(`「${child}」をマスタから削除します。\nこの児童の上限額の金額履歴も消えます。よろしいですか？`)) return;
+    if (typeof DEMO !== 'undefined' && DEMO) {
+      const i = JG_DEMO_CHILDREN.findIndex(x => x.child === child);
+      if (i >= 0) JG_DEMO_CHILDREN.splice(i, 1);
+      renderLeoView('jogan'); return;
+    }
+    try {
+      await sb(`leo_jogan_amount?child=eq.${encodeURIComponent(child)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      await sb(`leo_jogan_master?child=eq.${encodeURIComponent(child)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      await renderLeoView('jogan');
+      const det = document.getElementById('jg_master'); if (det) det.open = true;
+    } catch (e) { alert('削除できませんでした：' + e.message); }
+  }
   g.joganOnInput = joganOnInput; g.joganSave = joganSave; g.joganMonth = joganMonth; g.joganShift = joganShift;
+  g.joganMasterEdit = joganMasterEdit; g.joganMasterCancel = joganMasterCancel; g.joganMasterSave = joganMasterSave;
+  g.joganMasterToggle = joganMasterToggle; g.joganMasterDelete = joganMasterDelete;
 
   LEO_VIEWS.jogan = async function () {
     if (!canManage()) return '<p>この画面は児発管・管理者・事務の方だけが使えます。</p>';
@@ -146,17 +256,19 @@
         JG_DEMO_AMT[JG_MONTH + '\t児童C'] = { total_yen: 8000, burden_yen: null };
         JG_DEMO_SEEDED = true;
       }
-      JG_ROWS = JG_DEMO_CHILDREN.map(c => Object.assign({ total_yen: null, burden_yen: null }, c, JG_DEMO_AMT[JG_MONTH + '\t' + c.child] || {}));
+      JG_MASTERS = JG_DEMO_CHILDREN.map(c => Object.assign({ active: true, sort_no: 0 }, c));
+      JG_ROWS = JG_MASTERS.filter(c => c.active !== false).map(c => Object.assign({ total_yen: null, burden_yen: null }, c, JG_DEMO_AMT[JG_MONTH + '\t' + c.child] || {}));
     } else {
       try {
         const [masters, amounts] = await Promise.all([
-          sb('leo_jogan_master?active=eq.true&order=sort_no,child'),
+          sb('leo_jogan_master?order=sort_no,child'),
           sb(`leo_jogan_amount?ym=eq.${JG_MONTH}&select=child,total_yen,burden_yen`)]);
+        JG_MASTERS = masters || [];
         const byChild = {}; (amounts || []).forEach(a => { byChild[a.child] = a; });
-        JG_ROWS = (masters || []).map(m => ({ child: m.child, side: m.side, partner_name: m.partner_name, partner_email: m.partner_email || '', total_yen: byChild[m.child] ? byChild[m.child].total_yen : null, burden_yen: byChild[m.child] ? byChild[m.child].burden_yen : null }));
+        JG_ROWS = JG_MASTERS.filter(m => m.active).map(m => ({ child: m.child, side: m.side, partner_name: m.partner_name, partner_email: m.partner_email || '', total_yen: byChild[m.child] ? byChild[m.child].total_yen : null, burden_yen: byChild[m.child] ? byChild[m.child].burden_yen : null }));
       } catch (e) {
         missing = `<p style="color:#c00">金額の保存場所がまだありません。管理者が <code>supabase/leo_jogan.sql</code> を Supabase の SQL Editor で実行してください。</p><p class="note">${esc(e.message)}</p>`;
-        JG_ROWS = [];
+        JG_ROWS = []; JG_MASTERS = [];
       }
     }
     const [y, m] = JG_MONTH.split('-').map(Number);
@@ -167,13 +279,14 @@
       return cards || '<p class="note">この区分の対象はいません。</p>';
     };
     return `<h3>上限額管理</h3>${demoNote()}
-      <p class="note">上限額管理がある児童だけです（無償化・レオのみ・不要は出しません）。区分が違っても、メールの文面は同じです。その月の利用金額（総費用額）を相手事業所へ下書きします。ポータルからは送りません。開いた下書きを、soumu@（宮本）のメールで確認してから送ってください。署名は「${JOGAN_SIGN}」です。</p>
+      <p class="note">上限額管理がある児童だけです（無償化・レオのみ・不要は出しません）。区分が違っても、メールの文面は同じです。その月の利用金額（総費用額）を相手事業所へ下書きします。ポータルからは送りません。開いた下書きを、soumu@（宮本）のメールで確認してから送ってください。署名は「${JOGAN_SIGN}」です。対象児童・相手先は下の「対象児童マスタ」で手で直せます。</p>
       <p class="ptabs"><button type="button" onclick="joganShift(-1)">← 前の月</button> <b>${y}年${m}月分</b> <button type="button" onclick="joganShift(1)">次の月 →</button></p>
       <p><input type="month" value="${JG_MONTH}" onchange="joganMonth(this.value)" style="width:auto"></p>
-      ${missing || (JG_ROWS.length ? `<p>対象 ${JG_ROWS.length}人・下書きできる ${ready}人${noMail ? `・送信不可（メール未設定） ${noMail}人` : ''}</p>` : '<p>有効な対象児童がありません。</p>')}
+      ${missing || (JG_ROWS.length ? `<p>対象 ${JG_ROWS.length}人・下書きできる ${ready}人${noMail ? `・送信不可（メール未設定） ${noMail}人` : ''}</p>` : '<p>有効な対象児童がありません。下のマスタから追加してください。</p>')}
       <p><button type="button" onclick="joganSave()">この月の金額を保存</button></p>
       <p id="jg_msg" class="note"></p>
       <h4>レオが管理</h4><p class="note">レオが上限額管理事業所です。相手へ利用金額を送ります。</p>${block('レオが管理')}
-      <h4>他所が管理</h4><p class="note">相手の事業所が上限額管理事業所です。送る文面は上と同じです。</p>${block('他所が管理')}`;
+      <h4>他所が管理</h4><p class="note">相手の事業所が上限額管理事業所です。送る文面は上と同じです。</p>${block('他所が管理')}
+      ${missing ? '' : joganMasterPanel()}`;
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -7,8 +7,7 @@
 -- 1. このファイルを最後まで実行する（表・RLS・対象児童の初期行）
 -- 2. 職員ポータルを開き、事務（soumu）または児発管・管理者で #leo/jogan を開く
 -- 3. 対象児童が出て、総費用額を保存できれば適用できている
--- 退所などで外すときは active を false にする（画面の一覧から消える。金額の履歴は残る）
---   update public.leo_jogan_master set active = false where child = '児童名';
+-- 退所などで外すときは画面の「対象児童マスタ」で無効にする（または active を false）。金額の履歴は残る。
 -- 再実行しても、すでに入っている相手メールが空の行は、後から入れたメールを消さない。
 
 create table if not exists public.leo_jogan_master (

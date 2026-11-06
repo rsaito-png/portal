@@ -578,7 +578,7 @@ const LEO_VIEWS = {
   },
   async keikaku() {
     const [rows, LEFT] = await Promise.all([sheetRows('keikaku'), loadLeftIndex()]);
-    const tday = today(), t = new Date(tday + 'T00:00:00+09:00');
+    const tday = today(), t = new Date(tday + 'T00:00:00+09:00'), mg = canManage();
     const due = r => { // 期限＝次期開始月の1日。送付目安日が「至急」なら期限切れ扱い
       const m = String(r['次期開始月']).match(/(\d{4})年(\d{1,2})月/); return m ? new Date(+m[1], +m[2] - 1, 1) : null; };
     const level = r => { const d = due(r), done = r['本案署名'] === '済';
@@ -586,12 +586,15 @@ const LEO_VIEWS = {
       if (r['フォーム送付目安日'] === '至急' || (d && d < t)) return ['over', '期限切れ'];
       if (d && (d - t) / 864e5 <= 30) return ['soon', '30日以内'];
       return ['', '']; };
+    const editLink = name => mg
+      ? `<p style="margin:8px 0 0"><a href="#leo/plan?edit=${encodeURIComponent(name)}">管理表の行を直す（個別支援計画）</a></p>`
+      : '';
     const card = ({ r, l }) => `<div class="card rec kk ${leftDone(LEFT, r['児童名'], tday) ? '' : l[0]}"><b>${esc(r['児童名'])}</b>${leftMark(LEFT, r['児童名'], tday)} ${l[1] && !leftDone(LEFT, r['児童名'], tday) ? `<span class="badge">${l[1]}</span>` : ''}
         <br>${esc(r['現在の期'])}・${esc(r['現在の計画期間'])}<br>次期開始：<b>${esc(r['次期開始月'])}</b>　フォーム送付目安：${esc(r['フォーム送付目安日'])}
-        <br><small>フォーム回答 ${esc(r['フォーム回答日']) || 'なし'}／計画書 ${esc(r['計画書作成'])}／原案署名 ${esc(r['原案署名'])}／本案署名 ${esc(r['本案署名'])}</small></div>`;
+        <br><small>フォーム回答 ${esc(r['フォーム回答日']) || 'なし'}／計画書 ${esc(r['計画書作成'])}／原案署名 ${esc(r['原案署名'])}／本案署名 ${esc(r['本案署名'])}</small>${editLink(r['児童名'])}</div>`;
     const list = rows.map(r => ({ r, l: level(r), d: due(r) })).sort((a, b) => (a.d || 0) - (b.d || 0));
     const live = list.filter(x => !leftDone(LEFT, x.r['児童名'], tday)), gone = list.filter(x => leftDone(LEFT, x.r['児童名'], tday));
-    return `<h3>個別支援計画 管理表（見るだけ）</h3>${demoNote()}<p class="note">赤＝期限切れ、黄＝30日以内。期限は「次期開始月」の1日として計算しています。退所日を過ぎた児童は下に分けています（行は残しています）。</p>` +
+    return `<h3>個別支援計画 管理表</h3>${demoNote()}<p class="note">赤＝期限切れ、黄＝30日以内。期限は「次期開始月」の1日として計算しています。退所日を過ぎた児童は下に分けています（行は残しています）。${mg ? '各カードの「管理表の行を直す」から、<a href="#leo/plan">個別支援計画（管理）</a>の同じ欄を開けます。' : ''}</p>` +
       live.map(card).join('') + (gone.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:bold">退所した児童（${gone.length}人・記録は残しています）</summary>${gone.map(card).join('')}</details>` : '');
   },
   async haichi() {
@@ -963,6 +966,18 @@ function leoUserinfoFromHash() {
   UI.adding = false;
   if (q.get('tab') === 'jukyusha') UI.tab = 'jukyusha';
   try { history.replaceState(null, '', location.pathname + location.search + '#leo/userinfo'); } catch (e) {}
+}
+
+
+function leoPlanEditFromHash() {
+  const raw = String(location.hash || '').slice(1);
+  const i = raw.indexOf('?');
+  if (i < 0) return '';
+  const q = new URLSearchParams(raw.slice(i + 1));
+  const edit = (q.get('edit') || '').trim();
+  if (!edit) return '';
+  try { history.replaceState(null, '', location.pathname + location.search + '#leo/plan'); } catch (e) {}
+  return edit;
 }
 
 // ===== 児発管ホーム：今日やること（一画面に、やることだけ） =====
@@ -1431,8 +1446,19 @@ async function renderLeoView(name) {
   $('view').innerHTML = '<p>読み込み中…</p>';
   await loadDuty();
   try {
+    const planEdit = name === 'plan' ? leoPlanEditFromHash() : '';
     $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button>` + await LEO_VIEWS[name]();
     if (name === 'master' || name === 'kata') fitMasterSheet();
+    if (planEdit && typeof trackEdit === 'function' && canManage()) {
+      const det = document.querySelector('#plan_editor') && document.querySelector('details summary');
+      // 管理表の行を直す欄を開いてから編集フォームを出す
+      document.querySelectorAll('details').forEach(d => { if (/管理表の行を直す/.test((d.querySelector('summary') || {}).textContent || '')) d.open = true; });
+      await trackEdit(planEdit);
+      if (!document.getElementById('plan_editor') || !document.getElementById('plan_editor').innerHTML.trim()) {
+        const pe = document.getElementById('plan_editor');
+        if (pe) pe.innerHTML = `<div class="card"><p class="note">「${esc(planEdit)}」の管理表の行がありません。ポータルの管理表（leo_plan_track）に行がある児童だけ直せます。</p></div>`;
+      }
+    }
   }
   catch (e) { $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button><p>${esc(e.message)}</p>`; }
 }
@@ -1571,7 +1597,7 @@ async function uiDropSpaceAliases(w, name) {
       await sb(`${t}?${c}=eq.${encodeURIComponent(raw)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   }
 }
-// 受給者証の原本確認の記録（いつ・誰が原本を見たか）。表は supabase/leo_jukyusha_check.sql。追加と読むだけ（画面から直す・消すはできない）
+// 受給者証の原本確認の記録（いつ・誰が原本を見たか）。表は supabase/leo_jukyusha_check.sql。児発管・事務・管理者は追加・直す・消すができる
 const DEMO_JCHECKS = [{ id: 2, child: 'テスト 太郎', checked_on: '2026-10-20', checked_by: '職員X', note: '更新後の受給者証を保護者が持参', created_at: '2026-10-20T06:10:00Z' }, { id: 1, child: 'テスト 太郎', checked_on: '2025-04-12', checked_by: '職員Y', note: null, created_at: '2025-04-12T05:00:00Z' }];
 async function jcLoad(raws) {   // 児童の確認の履歴（新しい順）。表がまだない（SQL未実行）ときは null
   if (DEMO) return DEMO_JCHECKS.filter(r => raws.includes(r.child));
@@ -1583,9 +1609,10 @@ function jcHtml(rows, mg, me) {
   if (rows === null) return mg ? `<div class="uic" id="jc_box"><h4>受給者証の原本の確認</h4><p class="note" style="padding:0 10px">原本を確認した記録の欄は、管理者が supabase/leo_jukyusha_check.sql を実行すると出ます。</p></div>` : '';
   const last = rows[0];
   return `<div class="uic" id="jc_box"><h4>受給者証の原本の確認（いつ・だれが原本を見たか）</h4>
-    <style>.jc-t{width:calc(100% - 20px);margin:0 10px 8px;border-collapse:collapse}.jc-t th,.jc-t td{border-top:1px solid #e5e5ee;padding:5px 6px;text-align:left;font-size:14px;vertical-align:top}.jc-t th{font-size:12px;color:#5a5a70;font-weight:normal}.jc-add{border-top:1px dashed #ccd;margin:0 10px;padding:6px 0 10px}.jc-add .uig{padding:4px 0}</style>
-    <p style="margin:6px 10px">${last ? `最後に原本を確認したのは <b>${esc(jcDay(last.checked_on))}</b>（${esc(last.checked_by)}）です。` : '<b style="color:#c60">原本を確認した記録は、まだありません。</b>'}</p><p style="margin:0 10px 6px"><small style="color:#667">受給者証の写真は保管しません。確認した日と職員だけを記録します（追加だけできます。直す・消すはできません）。</small></p>
-    ${rows.length ? `<table class="jc-t"><tr><th>確認した日</th><th>確認した職員</th><th>メモ</th><th>記録した日時</th></tr>${rows.map(r => `<tr><td><b>${esc(jcDay(r.checked_on))}</b></td><td>${esc(r.checked_by)}</td><td style="white-space:pre-wrap">${esc(r.note || '')}</td><td style="color:#667;font-size:12px">${esc(new Date(r.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}</td></tr>`).join('')}</table>` : ''}
+    <style>.jc-t{width:calc(100% - 20px);margin:0 10px 8px;border-collapse:collapse}.jc-t th,.jc-t td{border-top:1px solid #e5e5ee;padding:5px 6px;text-align:left;font-size:14px;vertical-align:top}.jc-t th{font-size:12px;color:#5a5a70;font-weight:normal}.jc-add{border-top:1px dashed #ccd;margin:0 10px;padding:6px 0 10px}.jc-add .uig{padding:4px 0}.jc-edit{background:#f7f9ff;border:1px solid #cde;border-radius:8px;margin:6px 10px;padding:8px}</style>
+    <p style="margin:6px 10px">${last ? `最後に原本を確認したのは <b>${esc(jcDay(last.checked_on))}</b>（${esc(last.checked_by)}）です。` : '<b style="color:#c60">原本を確認した記録は、まだありません。</b>'}</p><p style="margin:0 10px 6px"><small style="color:#667">受給者証の写真は保管しません。確認した日と職員だけを記録します。児発管・事務・管理者は直す・消すもできます。</small></p>
+    ${rows.length ? `<table class="jc-t"><tr><th>確認した日</th><th>確認した職員</th><th>メモ</th><th>記録した日時</th>${mg ? '<th></th>' : ''}</tr>${rows.map(r => `<tr id="jc_row_${r.id}"><td><b>${esc(jcDay(r.checked_on))}</b></td><td>${esc(r.checked_by)}</td><td style="white-space:pre-wrap">${esc(r.note || '')}</td><td style="color:#667;font-size:12px">${esc(new Date(r.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}</td>${mg ? `<td style="white-space:nowrap"><button type="button" class="back" onclick="jcEdit(${r.id})">直す</button> <button type="button" class="back" onclick="jcDel(${r.id})">消す</button></td>` : ''}</tr>`).join('')}</table>` : ''}
+    <div id="jc_edit_box"></div>
     ${mg ? `<div class="jc-add"><div class="uig">
       <label><span>原本確認日</span><input type="date" id="jc_on" value="${today()}" max="${today()}"></label>
       <label><span>確認した職員</span><input id="jc_by" value="${esc(me || '')}" maxlength="60" placeholder="職員の名前"></label>
@@ -1593,17 +1620,56 @@ function jcHtml(rows, mg, me) {
       <button type="button" onclick="jcAdd()">原本を確認した</button> <span id="jc_msg" class="note"></span></div>` : ''}</div>`;
 }
 window.jcAdd = async () => {
-  const w = $('uiw'), name = w && uiCanon(w.dataset.name), m = $('jc_msg'), on = ($('jc_on').value || '').trim(), by = $('jc_by').value.trim(), note = $('jc_note').value.trim();
+  const w = $('uiw'), name = w && uiCanon(w.dataset.name), m = $('jc_msg'), on = ($('jc_on').value || '').trim(), by = ($('jc_by').value || '').trim(), note = ($('jc_note').value || '').trim();
   if (!name) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) { m.textContent = '原本確認日を入れてください。'; return; }
   if (on > today()) { m.textContent = '原本確認日は、今日までの日付にしてください。'; return; }
   if (!by) { m.textContent = '確認した職員の名前を入れてください。'; return; }
-  if (!confirm(`「${name}」の受給者証の原本を、${jcDay(on)} に ${by} が確認した、と記録します。\n${note ? 'メモ：' + note + '\n' : ''}\n追加した記録は、画面から直したり消したりできません。よろしいですか？`)) return;
+  if (!confirm(`「${name}」の受給者証の原本を、${jcDay(on)} に ${by} が確認した、と記録します。\n${note ? 'メモ：' + note + '\n' : ''}\nよろしいですか？`)) return;
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try {
     await sb('leo_jukyusha_checks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify([{ child: name, checked_on: on, checked_by: by, note: note || null }]) });
     await renderLeoView('userinfo'); const mm = $('jc_msg'); if (mm) mm.textContent = '記録しました。';
   } catch (e) { m.textContent = '記録できませんでした：' + e.message; }
+};
+window.jcEdit = async (id) => {
+  const box = $('jc_edit_box'); if (!box) return;
+  let row = null;
+  if (DEMO) row = DEMO_JCHECKS.find(r => r.id === id);
+  else {
+    try { row = (await sb(`leo_jukyusha_checks?id=eq.${id}&select=id,child,checked_on,checked_by,note`))[0]; } catch (e) { box.innerHTML = `<p class="note" style="color:#c00">${esc(e.message)}</p>`; return; }
+  }
+  if (!row) { box.innerHTML = '<p class="note">記録が見つかりません。</p>'; return; }
+  box.innerHTML = `<div class="jc-edit"><h4 style="margin:0 0 6px">原本確認を直す</h4>
+    <div class="uig">
+      <label><span>原本確認日</span><input type="date" id="jc_e_on" value="${esc(String(row.checked_on).slice(0, 10))}" max="${today()}"></label>
+      <label><span>確認した職員</span><input id="jc_e_by" value="${esc(row.checked_by || '')}" maxlength="60"></label>
+      <label class="wide"><span>メモ</span><input id="jc_e_note" value="${esc(row.note || '')}" maxlength="500"></label>
+    </div>
+    <button type="button" onclick="jcSave(${id})">保存</button>
+    <button type="button" class="back" onclick="$('jc_edit_box').innerHTML=''">やめる</button>
+    <span id="jc_e_msg" class="note"></span></div>`;
+  box.scrollIntoView({ block: 'nearest' });
+};
+window.jcSave = async (id) => {
+  const m = $('jc_e_msg'), on = ($('jc_e_on').value || '').trim(), by = ($('jc_e_by').value || '').trim(), note = ($('jc_e_note').value || '').trim();
+  if (!m) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) { m.textContent = '原本確認日を入れてください。'; return; }
+  if (on > today()) { m.textContent = '原本確認日は、今日までの日付にしてください。'; return; }
+  if (!by) { m.textContent = '確認した職員の名前を入れてください。'; return; }
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try {
+    await sb(`leo_jukyusha_checks?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ checked_on: on, checked_by: by, note: note || null }) });
+    await renderLeoView('userinfo');
+  } catch (e) { m.textContent = '保存できませんでした：' + e.message; }
+};
+window.jcDel = async (id) => {
+  if (!confirm('この原本確認の記録を消します。よろしいですか？')) return;
+  if (DEMO) { alert('見本モードなので消しません。'); return; }
+  try {
+    await sb(`leo_jukyusha_checks?id=eq.${id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    await renderLeoView('userinfo');
+  } catch (e) { alert('消せませんでした：' + e.message); }
 };
 LEO_VIEWS.userinfo = async function () {
   leoUserinfoFromHash();
@@ -1839,7 +1905,7 @@ async function makeCsv() {
 }
 
 // ===== 個別支援計画：レオの実際の流れ（作成マニュアル 2026年10月版・レオ個別支援計画ボットの手順）に合わせた「いまどこ？」画面 =====
-// 正は Google の「レオ 個別支援計画 管理表」。この画面は見るだけ（書き換えない）。保護者への送付は児発管がLINE 1対1で行う。
+// 管理表の一覧。行の手直しは #leo/plan?edit=児童名 → 管理表の行を直す。保護者への送付は児発管がLINE 1対1で行う。
 const PLAN_LINKS = {
   管理表: 'gl:g15',
   アンケート: 'gl:g16',

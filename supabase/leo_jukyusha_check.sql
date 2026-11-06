@@ -3,8 +3,7 @@
 -- 受給者証の写真は保管しない（連先生の決定）。ここに残すのは「確認した日・確認した職員・メモ」だけ。
 -- 前提：leo_billing.sql（can_manage / can_bill）と leo_userinfo.sql（my_office）が実行ずみであること。
 -- 既存の表・データには触らない（新しい表だけ）。何度実行しても同じ。
--- 追加だけできる記録：画面からは「追加」と「読む」だけ。直す・消すは画面からはできない
---   （まちがえたときは、新しく「訂正：…」のメモつきで1件足す。どうしても消すときは管理者が SQL で）。
+-- 画面からは読む・追加・直す・消す（直す／消すは can_manage。追加のあとに leo_jukyusha_check_edit.sql も実行）。
 create table if not exists public.leo_jukyusha_checks (
   id bigint generated always as identity primary key,
   child text not null check (char_length(child) between 1 and 100),   -- leo_children / leo_child_info と同じ児童名の表記
