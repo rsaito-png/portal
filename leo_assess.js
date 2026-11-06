@@ -58,17 +58,27 @@ window.afPrior = async () => {
   cb.checked = has;
   if (nt) nt.textContent = has ? '（アセスメントがあるので、チェックを入れました。はずすと、空の入力ページになります）' : '（まだアセスメントがないので、空の入力ページです）';
 };
+let AF_LINK_SEQ = 0;
 window.afLink = async () => {
-  const child = ($('af_child').value || '').trim(), B = copyBtnEl();
+  const child = ($('af_child').value || '').trim(), B = copyBtnEl(), seq = ++AF_LINK_SEQ;
   if (!child) { copyNote(B, '<p class="note">児童名を入れてください。まだ登録がなくても、名前だけでリンクを作れます。</p>', ''); return; }
   if (child.length > 100) { copyNote(B, '<p class="note">児童名は100字までです。</p>', child); return; }
   const pre = !!($('af_prefill') && $('af_prefill').checked);
   if (DEMO) { copyNote(B, `<p class="note">見本：${AF_BASE()}assess.html?demo=1${pre ? '&prefill=1' : ''}</p>`, child); return; }
+  if (B) B.disabled = true;
   try {
     const tok = await sb('rpc/leo_af_make_link', { method: 'POST', body: JSON.stringify({ p_child: child, p_prefill: pre }) });
-    const url = `${AF_BASE()}assess.html?t=${tok}`, ok = await copyUrl(url);
-    copyResult(B, url, ok, child, `${esc(child)} さんの専用リンクです。${pre ? 'いまのアセスメントが入った状態で開きます（開いた人に内容が見えます）。' : ''}ほかの家庭には送らないでください。30日で期限が切れます。`);
-  } catch (e) { copyError(B, e.message, child); }
+    const url = `${AF_BASE()}assess.html?t=${tok}`;
+    if (seq !== AF_LINK_SEQ) return;
+    if (($('af_child').value || '').trim() !== child) {
+      copyNote(B, '<p class="note">児童名が変わったので、このコピーは取り消しました。もう一度押してください。</p>', child);
+      return;
+    }
+    const ok = await copyUrl(url);
+    if (seq !== AF_LINK_SEQ) return;
+    copyResult(B, url, ok, child, `${esc(child)} さんの専用リンクです（トークン末尾 …${esc(String(tok).slice(-6))}）。${pre ? 'いまのアセスメントが入った状態で開きます（開いた人に内容が見えます）。' : ''}ほかの家庭には送らないでください。30日で期限が切れます。`);
+  } catch (e) { if (seq === AF_LINK_SEQ) copyError(B, e.message, child); }
+  finally { if (B && seq === AF_LINK_SEQ) B.disabled = false; }
 };
 async function afCurrent(child) {
   if (DEMO) return child === AF_DEMO.subs[0].child ? AF_DEMO.cur : {};

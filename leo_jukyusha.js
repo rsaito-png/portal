@@ -3,7 +3,8 @@
 //  ② 届いた入力の一覧 → 開く → 入力された値といまの値を見くらべ → 職員が直す → 「確認して反映」
 // 写真・読み取り（OCR）・画像の保管はない。何も自動では書き込まない：反映の前は leo_children / leo_child_info に触らない（leo_jf_apply だけが書く）。反映前の値は記録に残る。
 // 項目の定義・日付の読みかえは jukyusha_lib.js（保護者のページと共通）。
-const JF = { sel: null, msg: '', err: '' };
+const JF = { sel: null, edit: null, msg: '', err: '' };
+let JF_LINK_SEQ = 0;
 const JF_BASE = () => location.origin + location.pathname.replace(/[^/]*$/, '');
 const jfSt = { pending: ['確認待ち', '#e8833a'], applied: ['反映済み', '#2e6b4f'], rejected: ['反映せず', '#888'], superseded: ['新しい入力に置き換え', '#888'] };
 const jfFmt = s => new Date(s).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -25,32 +26,45 @@ const JF_CSS = `.jf button:not(.nk-fold){width:auto;padding:8px 14px;margin:4px 
 LEO_VIEWS.jukyusha = async function () {
   if (!canManage()) return '<p>この画面は事務・管理者・児発管だけです。</p>';
   if (JF.sel !== null) return jfReview();
+  if (JF.edit !== null) return jfEditMaster();
   JF.err = '';
   const [names, subs] = await Promise.all([jfNames(), DEMO ? JF_DEMO.subs : sb('leo_jf_subs?select=id,child,status,created_at,note&order=id.desc&limit=60').catch(e => { JF.err = e.message; return []; })]);
   const pend = subs.filter(s => s.status === 'pending').length;
   const introOpen = leoFoldOpen('leo_jf_intro_open');
   const linkOpen = leoFoldOpen('leo_jf_link_note_open');
   const subsOpen = leoFoldOpen('leo_jf_subs_open');
+  const editOpen = leoFoldOpen('leo_jf_edit_open');
   const pendLabel = pend ? `<span style="color:#e8833a">確認待ち ${pend}件</span>` : '確認待ちはありません';
   return `<div class="jf"><h3 class="nk-fold-h">${leoFoldBtn('leo_jf_intro_open', 'jf_intro', '受給者証の入力（保護者から）')}</h3>${demoNote()}<style>${JF_CSS}</style>
-    <p class="note" id="jf_intro"${introOpen ? '' : ' hidden'}>保護者が、広げた受給者証を見ながら入力した内容を、いまの利用者情報と見くらべて確認し、利用者情報（受給者証番号・負担上限月額など）に入れる画面です。<b>職員が確認して「確認して反映」を押すまで、利用者情報は変わりません。</b>写真は受け取りません。入力した内容は、事務・管理者・児発管だけが見られます。</p>
+    <p class="note" id="jf_intro"${introOpen ? '' : ' hidden'}>保護者が、広げた受給者証を見ながら入力した内容を、いまの利用者情報と見くらべて確認し、利用者情報（受給者証番号・負担上限月額など）に入れる画面です。<b>職員が確認して「確認して反映」を押すまで、利用者情報は変わりません。</b>写真は受け取りません。入力した内容は、事務・管理者・児発管だけが見られます。職員が手元の受給者証を見て直すときは、下の「3. 職員が直接直す」を使います。</p>
     <div class="jf-card"><h4 class="nk-fold-h">${leoFoldBtn('leo_jf_link_note_open', 'jf_link_note', '1. 保護者にリンクを送る')}</h4>
       <div id="jf_link_note"${linkOpen ? '' : ' hidden'}>
         <p class="note">児童を選んでリンクをコピーし、公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。リンクは30日有効です。児童が一覧にいないときは、先に<a href="#leo/userinfo">利用者情報</a>で追加してください。</p>
         <p class="note" style="margin:4px 0 0">チェックを入れたリンクは、<b>開いた人に、お子さんの前回の内容（お名前・受給者証番号・保護者名・相談支援事業所名など）がそのまま見えます</b>。リンクは、その家庭の保護者の1対1のLINEにだけ送ってください。ほかの児童の情報や、住所・電話・備考は出ません。</p>
       </div>
-      <select id="jf_child" onchange="jfPrior()"><option value="">児童を選ぶ</option>${names.map(n => `<option>${esc(n)}</option>`).join('')}</select>
+      <select id="jf_child" onchange="jfPrior()"><option value="">児童を選ぶ</option>${names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
       <div style="margin:2px 0 4px"><label><input type="checkbox" id="jf_prefill"> 前回の内容を入れておく</label> <small id="jf_prefill_note">（2回め以降のとき。児童を選ぶと、前の入力や利用者情報があれば自動でチェックが入ります）</small></div>
       <button onclick="jfLink()">リンクをコピー</button></div>
     <div class="jf-card"><h4 class="nk-fold-h">${leoFoldBtn('leo_jf_subs_open', 'jf_subs', `2. 届いた入力（${pendLabel}）`)}</h4>
       <div id="jf_subs"${subsOpen ? '' : ' hidden'}>
       ${JF.err ? `<p class="note" style="color:#c00">一覧を読み込めませんでした。管理者が supabase/leo_jukyusha_form.sql を実行したか確認してください。</p>` : ''}
       ${subs.length ? `<table class="jf-tbl"><tr><th>児童</th><th>届いた日時</th><th>状態</th><th></th></tr>${subs.map(s => { const [l, c] = jfSt[s.status] || ['', '#888'];
-        return `<tr><td>${esc(s.child)}</td><td>${jfFmt(s.created_at)}</td><td><b style="color:${c}">${l}</b></td><td><button onclick="jfOpen(${+s.id})">${s.status === 'pending' ? '確認する' : '見る'}</button></td></tr>`; }).join('')}</table>` : '<p class="note">まだ届いていません。</p>'}
+        return `<tr><td>${esc(s.child)}</td><td>${jfFmt(s.created_at)}</td><td><b style="color:${c}">${l}</b></td><td><button onclick="jfOpen(${+s.id})">${s.status === 'pending' ? '確認する' : '見る'}</button>${s.status === 'pending' ? ` <button class="back" onclick="jfDeletePending(${+s.id})">削除</button>` : ''}</td></tr>`; }).join('')}</table>` : '<p class="note">まだ届いていません。</p>'}
+      </div></div>
+    <div class="jf-card"><h4 class="nk-fold-h">${leoFoldBtn('leo_jf_edit_open', 'jf_edit', '3. 職員が直接直す（利用者情報の受給者証）')}</h4>
+      <div id="jf_edit"${editOpen ? '' : ' hidden'}>
+        <p class="note">保護者の入力を待たず、職員が受給者証を見ながら利用者情報を直します。保存すると請求に使われます。</p>
+        <select id="jf_edit_child"><option value="">児童を選ぶ</option>${names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
+        <button onclick="jfEditOpen()">開く</button>
       </div></div></div>`;
 };
-window.jfOpen = id => { JF.sel = id; JF.msg = ''; renderLeoView('jukyusha'); window.scrollTo(0, 0); };
-window.jfBack = () => { JF.sel = null; renderLeoView('jukyusha'); };
+window.jfOpen = id => { JF.sel = id; JF.edit = null; JF.msg = ''; renderLeoView('jukyusha'); window.scrollTo(0, 0); };
+window.jfBack = () => { JF.sel = null; JF.edit = null; renderLeoView('jukyusha'); };
+window.jfEditOpen = () => {
+  const child = ($('jf_edit_child') && $('jf_edit_child').value) || '';
+  if (!child) { alert('児童を選んでください。'); return; }
+  JF.edit = child; JF.sel = null; JF.msg = ''; renderLeoView('jukyusha'); window.scrollTo(0, 0);
+};
 window.jfPrior = async () => {   // 前の入力（反映ずみ）か、受給者証番号の入った利用者情報があれば「前回の内容を入れておく」を自動でON
   const child = $('jf_child').value, cb = $('jf_prefill'), nt = $('jf_prefill_note'); if (!cb) return;
   if (!child) { cb.checked = false; return; }
@@ -60,12 +74,22 @@ window.jfPrior = async () => {   // 前の入力（反映ずみ）か、受給�
   cb.checked = has; if (nt) nt.textContent = has ? '（前の入力・利用者情報があるので、チェックを入れました。はずすと、空の入力ページになります）' : '（前の入力・利用者情報がないので、空の入力ページです）';
 };
 window.jfLink = async () => {
-  const child = $('jf_child').value, B = copyBtnEl();
+  const child = $('jf_child').value, B = copyBtnEl(), seq = ++JF_LINK_SEQ, pre = !!($('jf_prefill') && $('jf_prefill').checked);
   if (!child) { copyNote(B, '<p class="note">児童を選んでください。</p>', ''); return; }
   if (DEMO) { copyNote(B, `<p class="note">見本：${JF_BASE()}jukyusha.html?demo=1</p>`, child); return; }
-  try { const tok = await jfRpc('leo_jf_make_link', { p_child: child, p_prefill: !!($('jf_prefill') && $('jf_prefill').checked) }), url = `${JF_BASE()}jukyusha.html?t=${tok}`, ok = await copyUrl(url);
-    copyResult(B, url, ok, child, `${esc(child)} さんの専用リンクです。${$('jf_prefill') && $('jf_prefill').checked ? '前回の内容が入った状態で開きます（開いた人に内容が見えます）。' : ''}ほかの家庭には送らないでください。30日で期限が切れます。`); }
-  catch (e) { copyError(B, e.message, child); }
+  if (B) B.disabled = true;
+  try {
+    const tok = await jfRpc('leo_jf_make_link', { p_child: child, p_prefill: pre }), url = `${JF_BASE()}jukyusha.html?t=${tok}`;
+    if (seq !== JF_LINK_SEQ) return;   // あとのコピー操作が勝つ（表示とクリップボードが食い違わないように）
+    if ($('jf_child') && $('jf_child').value !== child) {
+      copyNote(B, '<p class="note">児童の選択が変わったので、このコピーは取り消しました。もう一度「リンクをコピー」を押してください。</p>', child);
+      return;
+    }
+    const ok = await copyUrl(url);
+    if (seq !== JF_LINK_SEQ) return;
+    copyResult(B, url, ok, child, `${esc(child)} さんの専用リンクです（トークン末尾 …${esc(String(tok).slice(-6))}）。${pre ? '前回の内容が入った状態で開きます（開いた人に内容が見えます）。' : ''}ほかの家庭には送らないでください。30日で期限が切れます。`);
+  } catch (e) { if (seq === JF_LINK_SEQ) copyError(B, e.message, child); }
+  finally { if (B && seq === JF_LINK_SEQ) B.disabled = false; }
 };
 // ----- 確認画面 -----
 async function jfCurrent(child) {   // いまの利用者情報（比べるため）
@@ -118,7 +142,10 @@ async function jfReview() {
       <div style="margin:2px 0 6px"><label><input type="checkbox" id="jf_orig" onchange="$('jf_orig_w').hidden=!this.checked"> 受給者証の原本も確認した</label>
         <div id="jf_orig_w" hidden style="margin:4px 0 0 22px">確認した職員：<input type="text" id="jf_orig_by" value="${esc(me)}" maxlength="60" style="width:11em;font-size:15px;padding:4px"> <small>（今日の日付で、利用者情報の「受給者証の原本の確認」に記録します）</small></div></div>
       <button onclick="jfApply(${mism})" style="background:#2e6b4f;color:#fff;font-size:16px;padding:10px 18px">確認して反映</button>
-      <button onclick="jfReject()">反映しない</button> <span class="note">「確認して反映」を押すまで、利用者情報は変わりません。反映前の値は記録に残ります。</span></div>`}
+      <button onclick="jfSavePending()">入力の直しを保存</button>
+      <button onclick="jfReject()">反映しない</button>
+      <button class="back" onclick="jfDeletePending(${+s.id})">この入力を削除</button>
+      <span class="note">「確認して反映」を押すまで、利用者情報は変わりません。「入力の直しを保存」は確認待ちの内容だけ直します。</span></div>`}
     <p id="jf_msg" class="note">${esc(JF.msg)}</p></div>`;
 }
 function jfCollect() {   // チェックが入っている項目だけ（数字は全角→半角・空白とハイフンを除く）
@@ -165,4 +192,90 @@ window.jfReject = async () => {
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
   try { await jfRpc('leo_jf_reject', { p_id: JF.s.id, p_note: note }); JF.msg = '「反映しない」にしました。利用者情報は変わっていません。'; await renderLeoView('jukyusha'); }
   catch (e) { m.textContent = e.message; }
+};
+
+function jfPendingValsFromForm() {   // 確認画面の欄 → leo_jf_subs.vals（保護者フォームのキー）
+  const v = { ...(JF.s && JF.s.vals || {}) };
+  document.querySelectorAll('[data-jf]').forEach(e => {
+    const col = e.dataset.jf; if (col === 'note_add') return;
+    const key = col === 'contract_end' ? 'period_to' : col;
+    if (col === 'mushouka') {
+      if (e.value === 'true') v.mushouka = 'yes'; else if (e.value === 'false') v.mushouka = 'no';
+      else if (v.mushouka !== 'unknown') delete v.mushouka;
+      return;
+    }
+    let x = (col === 'soudan_office' || col === 'soudan_person' || col === 'guardian_name') ? e.value.trim() : e.value.normalize('NFKC').trim();
+    if (col === 'jukyusha_no' || col === 'city_no') x = x.replace(/[\s-]/g, '');
+    if (col === 'guardian_name') x = JukyushaForm.nameClean(x);
+    if (x === '') delete v[key]; else v[key] = String(x);
+  });
+  return v;
+}
+window.jfSavePending = async () => {
+  const m = $('jf_msg'); if (!JF.s || JF.s.status !== 'pending') { m.textContent = '確認待ち以外は保存できません。'; return; }
+  const v = jfPendingValsFromForm();
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  try {
+    await jfRpc('leo_jf_edit_pending', { p_id: JF.s.id, p_vals: v, p_note: JF.s.note || null });
+    JF.msg = '確認待ちの入力を保存しました（利用者情報にはまだ反映していません）。';
+    await renderLeoView('jukyusha');
+  } catch (e) { m.textContent = e.message; }
+};
+window.jfDeletePending = async id => {
+  const sid = id != null ? +id : (JF.s && JF.s.id);
+  if (!sid) return;
+  if (!confirm('この確認待ちの入力を削除します。利用者情報は変わりません。バックアップに残します。よろしいですか？')) return;
+  if (DEMO) { JF.msg = '見本モードなので削除しません。'; await renderLeoView('jukyusha'); return; }
+  try {
+    await jfRpc('leo_jf_delete_pending', { p_id: sid, p_reason: '職員が確認待ちを削除' });
+    JF.sel = null; JF.msg = '確認待ちの入力を削除しました。';
+    await renderLeoView('jukyusha');
+  } catch (e) { alert(e.message); }
+};
+async function jfEditMaster() {
+  const child = JF.edit;
+  const cur = await jfCurrent(child), k = (cur.kid || {}), i = (cur.info || {});
+  const fields = [
+    ['jukyusha_no', '受給者証番号（10桁）', 'text'], ['city_no', '市町村番号（6桁）', 'text'],
+    ['kind', 'サービス種別', 'kind'], ['cap_monthly', '負担上限月額', 'cap'],
+    ['contract_days', '契約支給量（日）', 'text'], ['contract_start', '契約開始日', 'date'],
+    ['contract_end', '受給者証の有効期限（終了日）', 'date'], ['mushouka', '無償化', 'chk'],
+    ['kana', '児童フリガナ', 'text'], ['guardian_kana', '保護者フリガナ', 'text'],
+    ['first_date', '初回利用日', 'date'],
+    ['guardian_name', '保護者名', 'info'], ['soudan_office', '相談支援事業所名', 'info'], ['soudan_person', '担当の相談支援専門員', 'info']
+  ];
+  const cell = ([f, lab, t]) => {
+    const src = t === 'info' ? i : k, v = src[f];
+    if (t === 'kind') return `<label><span>${lab}</span><select data-je="${f}" data-src="kid"><option value=""></option>${['児発','放デイ'].map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+    if (t === 'cap') return `<label><span>${lab}</span><select data-je="${f}" data-src="kid">${[0,4600,37200].map(o => `<option value="${o}" ${+v === o ? 'selected' : ''}>${(+o).toLocaleString()}円</option>`).join('')}</select></label>`;
+    if (t === 'chk') return `<label><span>${lab}</span><input type="checkbox" data-je="${f}" data-src="kid" ${v ? 'checked' : ''}></label>`;
+    if (t === 'info') return `<label><span>${lab}</span><input type="text" data-je="${f}" data-src="info" value="${esc(v ?? '')}"></label>`;
+    return `<label><span>${lab}</span><input ${t === 'date' ? 'type="date"' : 'type="text"'} data-je="${f}" data-src="kid" value="${esc(v ?? '')}"></label>`;
+  };
+  return `<div class="jf"><style>${JF_CSS}.jf .uig{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}@media(max-width:700px){.jf .uig{grid-template-columns:1fr}}.jf .uig label{display:block}.jf .uig span{display:block;font-size:13px;color:#555;margin-bottom:2px}</style>
+    <button onclick="jfBack()">← 一覧へ</button><h3>${esc(child)} さんの受給者証（職員が直接直す）${demoNote()}</h3>
+    <p class="note">利用者情報の受給者証・相談支援を、この画面から直します。保存すると請求に使われます。保護者の確認待ち入力があるときは、先にそちらを確認・削除してください。</p>
+    <div class="jf-card"><div class="uig" id="jf_edit_box">${fields.map(cell).join('')}</div>
+      <p style="margin-top:12px"><button onclick="jfSaveMaster()" style="background:#2e6b4f;color:#fff">保存</button> <span id="jf_edit_msg" class="note"></span></p></div></div>`;
+}
+window.jfSaveMaster = async () => {
+  const m = $('jf_edit_msg'), child = JF.edit; if (!child) return;
+  const kid = {}, info = {};
+  document.querySelectorAll('[data-je]').forEach(e => {
+    const f = e.dataset.je, src = e.dataset.src;
+    const val = e.type === 'checkbox' ? e.checked : e.value.trim();
+    if (src === 'info') info[f] = val; else kid[f] = val;
+  });
+  const childWrite = leoChildWrite(kid, child);
+  if (childWrite.error) { m.textContent = childWrite.error; return; }
+  Object.keys(info).forEach(f => { if (info[f] === '') info[f] = null; });
+  info.name = child;
+  if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
+  const up = (t, k, r) => sb(`${t}?on_conflict=${k}`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([r]) });
+  try {
+    if (!childWrite.skip) await up('leo_children', 'name', childWrite.row);
+    await up('leo_child_info', 'name', info);
+    m.textContent = '保存しました。';
+    JF.msg = `${child} の受給者証を保存しました。`;
+  } catch (e) { m.textContent = e.message; }
 };
