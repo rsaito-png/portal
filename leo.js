@@ -240,6 +240,7 @@ function leoMergeNikki(rows, events) {
   }
   // 型表（kata）の迎え・送り場所は、ポータルで上書きしていない行に載せる。
   // 日誌に旧スプシの場所が残っていても、型表＝マスターを正にする。時刻・担当は触らない。
+  // （DB側は leo_nikki_from_events / leo_nikki_places_from_master でも同じ正を入れる）
   for (const e of events || []) {
     if (!e || e.source !== 'kata' || leoCalHidden(e)) continue;
     if (e.kind !== '迎え' && e.kind !== '送り') continue;

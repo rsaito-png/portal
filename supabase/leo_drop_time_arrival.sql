@@ -19,6 +19,7 @@ declare
   p_driver text; p_time text; p_place text;
   d_driver text; d_time text; d_place text; d_src text; kata_drop text;
   kid_drop text; d_end text; d_start text; dow text;
+  m_pick text; m_drop text; m_parent text;
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
   if p_day is null then raise exception '日付'; end if;
@@ -147,6 +148,29 @@ begin
       d_time := coalesce(kid_drop, d_end, d_start);
     end if;
 
+    -- 場所は型表（leo_master）を正とする。便の場所より優先。母の送り／母の迎えの日は施設側の場所を入れない。
+    m_pick := null; m_drop := null; m_parent := null;
+    select nullif(btrim(k->>'迎え場所'), ''),
+           nullif(btrim(coalesce(k->>'送り場所（空欄なら自宅）', k->>'送り場所')), ''),
+           nullif(btrim(k->>'保護者送迎'), '')
+      into m_pick, m_drop, m_parent
+      from (
+        select data as k from leo_master where kind = 'kata'
+        union all
+        select data from leo_sheet where kind = 'kata'
+          and not exists (select 1 from leo_master where kind = 'kata')
+      ) s
+     where public.leo_norm(k->>'児童名') = public.leo_norm(r.child)
+       and left(btrim(k->>'曜日'), 1) = dow
+     order by (btrim(k->>'曜日') = dow) desc, (k->>'児童名' = public.leo_name_canon(k->>'児童名')) desc, k->>'児童名'
+     limit 1;
+    if not (r.parent_drop or coalesce(m_parent, '') in ('母の送り', '○', '保護者送迎')) and m_pick is not null then
+      p_place := m_pick;
+    end if;
+    if not (r.parent_pick or coalesce(m_parent, '') = '母の迎え') and m_drop is not null then
+      d_place := m_drop;
+    end if;
+
     select c.kind into svc from leo_children c where public.leo_norm(c.name) = public.leo_norm(r.child) limit 1;
 
     if exists (select 1 from leo_nikki n where n.day = p_day and public.leo_norm(n.child) = public.leo_norm(r.child)) then
@@ -158,19 +182,40 @@ begin
         end_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
         pick_driver = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
         pick_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_time', n.pick_time, p_time, public.leo_kata_prev(n.day, n.child, 'pick_time'), false),
-        pick_place = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false),
+        -- 場所は職員保存・過去日でも型表を入れる（活動など他欄は従来どおり）
+        pick_place = case
+          when r.parent_drop or coalesce(m_parent, '') in ('母の送り', '○', '保護者送迎') then
+            public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false)
+          when p_place is not null then p_place
+          else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false)
+        end,
         drop_driver = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_driver', n.drop_driver, d_driver, public.leo_kata_prev(n.day, n.child, 'drop_driver'), false),
         drop_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_time', n.drop_time, d_time, public.leo_kata_prev(n.day, n.child, 'drop_time'), coalesce(btrim(n.drop_time), '') <> '' and btrim(n.drop_time) is not distinct from btrim(n.end_time)),
-        drop_place = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false),
+        drop_place = case
+          when r.parent_pick or coalesce(m_parent, '') = '母の迎え' then
+            public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false)
+          when d_place is not null then d_place
+          else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false)
+        end,
         auto_fill = case when n.day >= public.leo_sync_start() and n.staff_saved_at is null and n.day >= (timezone('Asia/Tokyo', now()))::date then jsonb_build_object(
           'start_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false),
           'end_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
           'pick_driver', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
           'pick_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_time', n.pick_time, p_time, public.leo_kata_prev(n.day, n.child, 'pick_time'), false),
-          'pick_place', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false),
+          'pick_place', case
+            when r.parent_drop or coalesce(m_parent, '') in ('母の送り', '○', '保護者送迎') then
+              public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false)
+            when p_place is not null then p_place
+            else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_place', n.pick_place, p_place, public.leo_kata_prev(n.day, n.child, 'pick_place'), false)
+          end,
           'drop_driver', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_driver', n.drop_driver, d_driver, public.leo_kata_prev(n.day, n.child, 'drop_driver'), false),
           'drop_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_time', n.drop_time, d_time, public.leo_kata_prev(n.day, n.child, 'drop_time'), coalesce(btrim(n.drop_time), '') <> '' and btrim(n.drop_time) is not distinct from btrim(n.end_time)),
-          'drop_place', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false)
+          'drop_place', case
+            when r.parent_pick or coalesce(m_parent, '') = '母の迎え' then
+              public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false)
+            when d_place is not null then d_place
+            else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false)
+          end
         ) else n.auto_fill end,
         seed = case when n.day >= date '2026-11-01' then coalesce(n.seed, 'events') else n.seed end
       where n.day = p_day and public.leo_norm(n.child) = public.leo_norm(r.child);
@@ -196,6 +241,7 @@ begin
     p_driver := null; p_time := null; p_place := null;
     d_driver := null; d_time := null; d_place := null; d_src := null; kata_drop := null;
     kid_drop := null; d_end := null; d_start := null;
+    m_pick := null; m_drop := null; m_parent := null;
     svc := null;
   end loop;
   return n;

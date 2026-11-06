@@ -68,6 +68,10 @@ assert.ok(between(leo, 'async jisseki()', 'LEO_VIEWS.kakunin').includes('rpc/leo
 assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoView').includes('rpc/leo_nikki_apply'));
 assert.ok(between(leo, 'async function saveNikki()', 'async function renderLeoView').includes('nikkiEditValue'));
 assert.ok(sql.includes('kata_drop'), '空の送り時刻は型表で埋める');
+assert.ok(sql.includes("k->>'迎え場所'"), '日誌の迎え場所は型表を正にする');
+assert.ok(sql.includes('leo_nikki_places_from_master') || read('supabase/leo_nikki_places_master.sql').includes('leo_nikki_places_from_master'), '場所一括直し');
+assert.ok(sql.includes('perform public.leo_nikki_places_from_master'), 'Google同期のあと場所を型表に戻す');
+
 assert.ok(sql.includes("k->>'送り終了'"), '型表の送り終了を読む');
 assert.ok(sql.includes("d_src is distinct from 'kata'"), 'カレンダーで直した時刻を型表で上書きしない');
 assert.ok(sql.includes('d_end is distinct from nullif(btrim(r.end_time)'), '便の着を利用終了の写しより先に使う');
