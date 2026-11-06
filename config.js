@@ -18,6 +18,7 @@ window.PORTAL_CONFIG = {
       ['✍️', '書類の確認と署名', '#sign', '労働条件通知書・誓約書を読んで署名'],
       ['🗂️', '書類管理（契約書・誓約書）', '#clerk/docs', '職員別の署名状況・紙の締結済み登録・印刷'],
       ['👥', '職員マスタ', '#staff', '所属・兼務・職責・日誌名など（会長・事務・管理者）'],
+      ['⏰', '打刻設定', '#dakoku-settings', '事業所・半径・座標・職員割当（会長・事務・管理者）'],
       ['🩺', '実施者養成研修（運営）', '#sct', '運用マニュアル'],
       ['💴', '処遇改善加算（試作）', '#shogu', '国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作'] ] },
     { name: '補助金・助成金', tiles: [
@@ -66,7 +67,7 @@ window.PORTAL_CONFIG = {
       ['📅', '来月の利用予定（保護者に聞く）', '#leo/yotei', 'リンクをまとめてコピー・回答状況・予定を作る'],
       ['📝', '個別支援計画 管理表', '#leo/keikaku', '期限が近い順。行の手直しは個別支援計画へ'],
       ['🔍', 'アセスメント', '#leo/assess', '保護者の初回入力リンク・確認。直接入力は利用者情報'],
-      ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ）'],
+      ['👥', '職員配置表', '#leo/haichi', '日ごとの配置（見るだけ。手直しは #leo/master）'],
       ['🗓️', '勤務実績及び利用者の実績表', '#leo/kinmu', '三重県の様式。月ごとの配置と利用者数（茶夢と共通の配置）'],
       ['🖊️', '保護者の実績確認', '#leo/kakunin', '児童ごとのリンク作成・確認済みの一覧', '', null, '児発管'],
       ['💬', 'LINE報告を書く', '#leo/line', '保護者への報告文→LINE・日誌の活動記録に', 'main'],
@@ -91,7 +92,7 @@ window.PORTAL_CONFIG = {
       pt: { '業務日誌': 'Diário de trabalho', '職員配置表': 'Escala de funcionários', '勤務実績及び利用者の実績表': 'Registro de trabalho e de usuários', 'サービス提供実績記録票': 'Registro de serviços prestados', '利用者': 'Usuários', '献立報告': 'Relatório do cardápio', 'ヒヤリハット週報': 'Relatório semanal de quase-acidentes', '国保連CSV': 'CSV de cobrança (Kokuhoren)', '個別支援計画': 'Plano de apoio individual', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
       tiles: [
       ['📓', '業務日誌', '#chamu/journal', '職員が入力するのはここだけ（実績記録票に自動で転記）', 'main'],
-      ['👥', '職員配置表', '#chamu/haichi', '曜日ごとの常勤・非常勤（見るだけ）', 'main'],
+      ['👥', '職員配置表', '#chamu/haichi', '曜日ごとの常勤・非常勤（事務・茶夢管理者は追加・直す・削除可）', 'main'],
       ['🗓️', '勤務実績及び利用者の実績表', '#chamu/kinmu', '三重県の様式。配置はレオと共通、利用者数は生活介護'],
       ['✅', 'サービス提供実績記録票', '#chamu/records', '日誌から自動転記。署名をもらうとCSV対象', 'main'],
       ['👤', '利用者', '#chamu/users', '登録・受給者証・障害支援区分・送迎・食事'],

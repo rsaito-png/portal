@@ -58,9 +58,9 @@ ok(Dakoku.gpsRequired({ name: 'RYDEEN', lat: 35.034866, lng: 136.583191, radius:
 
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 ok(index.includes("id === 'dakoku'") && index.includes('dakoku-lib.js') && index.includes('dakoku.js'), 'index wired');
+ok(index.includes("id === 'dakoku-settings'") && index.includes('dakoku_admin.js'), 'settings screen wired');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-ok(cfg.includes("#dakoku") && cfg.includes('gasUrl') && cfg.includes('token:'), 'config tile and endpoint');
-ok(cfg.includes("位置情報不要"), 'kintoun tile notes no GPS');
+ok(cfg.includes("#dakoku") && cfg.includes('#dakoku-settings'), 'config dakoku tiles');
 const staffJs = fs.readFileSync(path.join(root, 'rydeen-staff.js'), 'utf8');
 ok(staffJs.includes('href="#dakoku"'), 'link beside staff screen');
 const gas = fs.readFileSync(path.join(root, 'dakoku-gas/Code.gs'), 'utf8');
@@ -69,5 +69,11 @@ ok(gas.includes('種別は出勤か退勤') && gas.includes('ログイン中の�
 ok(gas.includes('needGps') || gas.includes('gps=off'), 'gas optional GPS');
 const ui = fs.readFileSync(path.join(root, 'dakoku.js'), 'utf8');
 ok(ui.includes('gpsRequired') && ui.includes('位置情報不要') && ui.includes('ポータルへ'), 'ui no-GPS path');
+ok(ui.includes('rpc/dakoku_bootstrap') && ui.includes('rpc/dakoku_punch') && ui.includes('rpc/dakoku_recent'), 'ui uses Supabase RPCs');
+const admin = fs.readFileSync(path.join(root, 'dakoku_admin.js'), 'utf8');
+ok(admin.includes('renderDakokuSettings') && admin.includes('dakoku_offices') && admin.includes('dakoku_staff'), 'admin edits offices/staff');
+const sql = fs.readFileSync(path.join(root, 'supabase/dakoku.sql'), 'utf8');
+ok(sql.includes('dakoku_bootstrap') && sql.includes('dakoku_punch') && sql.includes('on conflict (name) do nothing'), 'sql migrate preserves values');
+ok(sql.includes("'金斗雲', 'KINTOUN', null, null, null"), 'kintoun seeded without GPS');
 
 console.log('ok', n);

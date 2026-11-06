@@ -53,8 +53,36 @@ function dkWrong(action, j) {
 }
 // GAS は OPTIONS に答えない。POST は text/plain（単純リクエスト）。302 で中身が落ちたら GET に落とす。
 async function dkRpc(payload) {
+  const action = payload.action || 'bootstrap';
+  // Supabase が正。ログイン済みなら RPC を使う。
+  if (!DK.sess.demo && typeof sb === 'function') {
+    try {
+      if (action === 'bootstrap') {
+        const j = await sb('rpc/dakoku_bootstrap', { method: 'POST', body: '{}' });
+        if (j && j.ok && Array.isArray(j.offices) && j.offices.length) return j;
+      } else if (action === 'recent') {
+        const j = await sb('rpc/dakoku_recent', { method: 'POST', body: JSON.stringify({ p_staff_id: payload.staffId }) });
+        if (j && j.ok) return j;
+        if (j && j.error) throw new Error(j.error);
+      } else if (action === 'punch') {
+        const j = await sb('rpc/dakoku_punch', { method: 'POST', body: JSON.stringify({
+          p_office: payload.office, p_staff_id: payload.staffId, p_kind: payload.kind,
+          p_lat: payload.lat ?? null, p_lng: payload.lng ?? null, p_accuracy: payload.accuracy ?? null,
+          p_lunch: !!payload.lunch, p_memo: payload.memo || null
+        }) });
+        if (j && j.ok) return j;
+        if (j && j.error) throw new Error(j.error);
+        throw new Error('打刻を記録できませんでした');
+      }
+    } catch (e) {
+      // 表が未作成などのときだけ GAS へ。punch の失敗は GAS に流さない（二重記録防止）
+      if (action === 'punch') throw e;
+      if (!/読み込めません|404|PGRST|ログイン/.test(String(e.message || e))) throw e;
+    }
+  }
+  // フォールバック：旧 GAS（設定がまだ Supabase に無いとき）
   const c = dkCfg();
-  if (!c.gasUrl || !c.token) throw new Error('打刻の接続先が未設定です。GASをデプロイし、config.js の dakoku.gasUrl と dakoku.token を入れてください。');
+  if (!c.gasUrl || !c.token) throw new Error('打刻の接続先が未設定です。Supabase の dakoku 表、または GAS を確認してください。');
   const full = Object.assign({}, payload, { token: c.token });
   let text = '';
   try {
@@ -70,13 +98,10 @@ async function dkRpc(payload) {
     text = await r.text();
     j = dkJson(text);
   }
-  if (!j) {
-    if (/accounts\.google\.com|ServiceLogin|ログイン/.test(text)) throw new Error('GASの公開範囲が「全員」になっているか確認してください。');
-    throw new Error('打刻サーバーの応答を読めませんでした。');
-  }
-  if (!j.ok) throw new Error(j.error || '失敗しました');
+  if (!j || j.ok === false) throw new Error((j && j.error) || '打刻サーバーに接続できませんでした');
   return j;
 }
+
 function dkGeo() {
   return new Promise((resolve, reject) => {
     if (!window.isSecureContext) { reject(new Error('位置情報は https（または localhost）で開いたときだけ使えます。')); return; }
@@ -258,7 +283,7 @@ async function renderDakoku() {
   try {
     DK.data = DK.sess.demo ? Dakoku.sample() : await dkRpc({ action: 'bootstrap' });
   } catch (e) {
-    $('view').innerHTML = back + `<div class="dk"><h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><div class="ng">${dkEsc(e.message || e)}</div><p class="meta">手順は dakoku-gas/README.md です。</p></div>`;
+    $('view').innerHTML = back + `<div class="dk"><h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><div class="ng">${dkEsc(e.message || e)}</div><p class="meta">設定は総務の「打刻設定」から直せます。</p></div>`;
     return;
   }
   const offices = dkAssigned(Dakoku.visibleOffices(DK.data.offices));

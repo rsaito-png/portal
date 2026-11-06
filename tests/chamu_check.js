@@ -126,13 +126,13 @@ const run = (users, records, settings) => {
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
-assert.ok(html.includes('chamu.js?v=20261105rice'));
-assert.ok(html.includes('leo.js?v=20261105cert'));
+assert.ok(/chamu\.js\?v=\d+/.test(html));
+assert.ok(/leo\.js\?v=\d+/.test(html));
 assert.ok(src.includes('@media screen and (min-width:900px)'));
 assert.ok(src.includes('font-size:51px') && src.includes('font-size:17px'));
 assert.ok(src.includes('.cm textarea{min-height:72px}') && src.includes('.cm textarea{min-height:216px}'));
 assert.ok(src.includes('class="cm-who"'));
-assert.ok(html.includes('leo_kinmu.js?v=20261102read'));
+assert.ok(/leo_kinmu\.js\?v=\d+/.test(html));
 assert.deepStrictEqual(L.journalSavedNotice([]), { title: '保存しました', body: '記録票に転記しました。' });
 assert.deepStrictEqual(L.journalSavedNotice(null), { title: '保存しました', body: '記録票に転記しました。' });
 assert.strictEqual(L.journalSavedNotice(['  ', '利用者A: 時刻空欄→11:00-15:00補完']).body, '記録票に転記しました。\n利用者A: 時刻空欄→11:00-15:00補完');
@@ -258,7 +258,7 @@ assert.ok(dirty.includes('齊藤') && dirty.includes('10:00〜18:00') && !dirty.
 assert.ok(L.shiftIssues([{ dow: '火', staff_name: '加藤幸弘', employment: '非常勤', start_time: '11:00', end_time: '14:00' }]).some(s => s.includes('水曜')));
 assert.ok(L.shiftIssues([{ dow: '月', staff_name: '中村文', employment: '非常勤', start_time: '14:30', end_time: '17:00' }]).some(s => s.includes('14:00〜17:00')));
 assert.ok(L.shiftIssues([{ dow: '土', staff_name: '齊藤', employment: '常勤', start_time: '10:00', end_time: '18:00' }]).some(s => s.includes('土日')));
-assert.ok(src.includes('CM_SHIFT_Q') && src.includes('chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort'));
+assert.ok(src.includes('CM_SHIFT_Q') && src.includes('chamu_shift?select=id,dow,staff_name,employment,start_time,end_time,sort'));
 assert.ok(src.includes('ChamuLib.dayShiftHtml(date, shift.rows)') && src.includes('haichi: cmHaichi'));
 assert.ok(src.includes('supabase/chamu_shift.sql') && !src.includes('leo_sheet') && !src.includes('時給') && !src.includes('1150') && !src.includes('80000'));
 

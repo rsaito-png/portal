@@ -6,7 +6,7 @@
 // 記入者が自分の名前と違う公式名になる人だけ、staff_profiles.chamu_record_name を使う。画面の記入者は本人のまま、保存する staff_name だけ公式名。実績の利用者署名と国保連CSVには載せない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
 const CM_NAV = [['journal', '業務日誌'], ['kondate', '献立報告'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
-const CM_SHIFT_Q = 'chamu_shift?select=dow,staff_name,employment,start_time,end_time,sort&order=sort.asc,staff_name.asc';
+const CM_SHIFT_Q = 'chamu_shift?select=id,dow,staff_name,employment,start_time,end_time,sort&order=dow.asc,sort.asc,staff_name.asc';
 
 /* cm-pure */
 var ChamuLib = (() => {
@@ -728,15 +728,94 @@ async function cmJournal() {
   CM.st.users = users;
   CM.st.defaults = ChamuLib.settingsOf(settings);
 }
+function cmHaichiCanEdit() {
+  if (typeof DEMO !== 'undefined' && DEMO) return false;
+  if (typeof IS_CHAIR !== 'undefined' && IS_CHAIR) return true;
+  if (typeof ROLE !== 'undefined' && ROLE === '事務') return true;
+  if (typeof DUTY !== 'undefined' && DUTY === '管理者') return true;
+  return false;
+}
 async function cmHaichi() {
   let body;
+  let rows = [];
   try {
-    const rows = await cmRest(CM_SHIFT_Q) || [];
+    rows = await cmRest(CM_SHIFT_Q) || [];
     body = ChamuLib.weekShiftHtml(rows);
   } catch (e) {
     body = '<div class="card"><p>配置表を読めませんでした。</p><p class="note">supabase/chamu_shift.sql を適用してください。</p></div>';
   }
-  cmFrame('haichi', `<h3>職員配置表</h3><p class="note">曜日を見ると、その日に誰がいるかが分かります。日誌の日付にも、同じ曜日の配置を出します。月ごとの三重県様式は <a href="#chamu/kinmu">勤務実績及び利用者の実績表</a> です。</p>${body}`);
+  let edit = '';
+  if (cmHaichiCanEdit() && rows.length !== undefined) {
+    const DOW = ['月', '火', '水', '木', '金'];
+    const list = (rows || []).map(r => {
+      const id = r.id;
+      const st = String(r.start_time || '').slice(0, 5);
+      const en = String(r.end_time || '').slice(0, 5);
+      const empOpts = ['常勤', '非常勤'].map(e => `<option${r.employment === e ? ' selected' : ''}>${e}</option>`).join('');
+      const dowOpts = DOW.map(d => `<option${r.dow === d ? ' selected' : ''}>${d}</option>`).join('');
+      return `<tr>
+        <td><select id="cs_dow_${id}">${dowOpts}</select></td>
+        <td><input id="cs_name_${id}" value="${cmEsc(r.staff_name)}" style="width:7rem"></td>
+        <td><select id="cs_emp_${id}">${empOpts}</select></td>
+        <td><input id="cs_st_${id}" type="time" value="${cmEsc(st)}"></td>
+        <td><input id="cs_en_${id}" type="time" value="${cmEsc(en)}"></td>
+        <td><input id="cs_sort_${id}" type="number" value="${r.sort ?? 0}" style="width:3.5rem"></td>
+        <td><button type="button" class="inl sec" onclick="cmHaichiSave('${id}')">保存</button>
+          <button type="button" class="inl back" onclick="cmHaichiDel('${id}')">削除</button></td>
+      </tr>`;
+    }).join('');
+    edit = `<div class="card noprint"><h4>配置を直す（事務・茶夢管理者・会長）</h4>
+      <p class="note">既存の行の値はそのまま。土日は置けません。終了は開始より後。</p>
+      ${rows.length ? `<table class="tbl"><tr><th>曜日</th><th>氏名</th><th>区分</th><th>開始</th><th>終了</th><th>順</th><th></th></tr>${list}</table>` : '<p>行がありません</p>'}
+      <p>追加：曜日 <select id="cs_new_dow">${DOW.map(d => `<option>${d}</option>`).join('')}</select>
+        氏名 <input id="cs_new_name" style="width:7rem">
+        区分 <select id="cs_new_emp"><option>常勤</option><option>非常勤</option></select>
+        <input id="cs_new_st" type="time" value="10:00">〜<input id="cs_new_en" type="time" value="18:00">
+        順 <input id="cs_new_sort" type="number" value="50" style="width:3.5rem">
+        <button type="button" class="inl" onclick="cmHaichiAdd()">追加</button></p>
+      <p id="cs_msg" class="note"></p></div>`;
+  }
+  cmFrame('haichi', `<h3>職員配置表</h3><p class="note">曜日を見ると、その日に誰がいるかが分かります。日誌の日付にも、同じ曜日の配置を出します。月ごとの三重県様式は <a href="#chamu/kinmu">勤務実績及び利用者の実績表</a> です。</p>${body}${edit}`);
+}
+async function cmHaichiSave(id) {
+  const msg = document.getElementById('cs_msg');
+  try {
+    const body = {
+      dow: document.getElementById('cs_dow_' + id).value,
+      staff_name: (document.getElementById('cs_name_' + id).value || '').trim(),
+      employment: document.getElementById('cs_emp_' + id).value,
+      start_time: document.getElementById('cs_st_' + id).value,
+      end_time: document.getElementById('cs_en_' + id).value,
+      sort: Number(document.getElementById('cs_sort_' + id).value) || 0
+    };
+    if (!body.staff_name) throw new Error('氏名は必須です');
+    await cmRest('chamu_shift?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+    if (msg) msg.textContent = '保存しました';
+    await renderChamu('haichi');
+  } catch (e) { if (msg) msg.textContent = e.message; else alert(e.message); }
+}
+async function cmHaichiDel(id) {
+  if (!confirm('この配置行を削除しますか？')) return;
+  try {
+    await cmRest('chamu_shift?id=eq.' + encodeURIComponent(id), { method: 'DELETE' });
+    await renderChamu('haichi');
+  } catch (e) { alert(e.message); }
+}
+async function cmHaichiAdd() {
+  const msg = document.getElementById('cs_msg');
+  try {
+    const body = {
+      dow: document.getElementById('cs_new_dow').value,
+      staff_name: (document.getElementById('cs_new_name').value || '').trim(),
+      employment: document.getElementById('cs_new_emp').value,
+      start_time: document.getElementById('cs_new_st').value,
+      end_time: document.getElementById('cs_new_en').value,
+      sort: Number(document.getElementById('cs_new_sort').value) || 0
+    };
+    if (!body.staff_name) throw new Error('氏名は必須です');
+    await cmRest('chamu_shift', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+    await renderChamu('haichi');
+  } catch (e) { if (msg) msg.textContent = e.message; else alert(e.message); }
 }
 function cmNoteField(id, label, value) {
   const safe = String(id).replace(/[^A-Za-z0-9_-]/g, '');

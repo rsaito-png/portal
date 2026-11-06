@@ -603,7 +603,7 @@ const LEO_VIEWS = {
     const days = [...new Set(rows.map(r => r['日付']))];
     const pick = DEMO ? days : days.filter(d => d >= t).slice(0, 7);
     const show = pick.length ? pick : days.slice(-3);
-    return `<h3>職員配置表（見るだけ）</h3>${demoNote()}<p class="note">日誌から作られた配置です（${pick.length ? '今日以降' : '直近'}）。職員名は届け出上の名前です。</p>` + show.map(d => {
+    return `<h3>職員配置表（見るだけ）</h3>${demoNote()}<p class="note">日誌から作られた配置です（${pick.length ? '今日以降' : '直近'}）。職員名は届け出上の名前です。<b>配置の手直しは <a href="#leo/master">配置表・型表・管理表・送迎の配慮の入力（#leo/master）</a> で行います。</b></p>` + show.map(d => {
       const rs = rows.filter(r => r['日付'] === d);
       return `<h4>${esc(d)}（${esc(rs[0]['曜日'])}） 児童${esc(rs[0]['利用児童数'])}人</h4><table><tr><th>職員</th><th>時間</th><th>役割</th></tr>${rs.map(r =>
         `<tr><td>${esc(filingDriverName(r['職員名']))}<br><small>${esc(r['常勤/非常勤'])}</small></td><td>${esc(r['配置開始'])}〜${esc(r['配置終了'])}</td><td><small>${esc(r['役割(日誌)'])}</small></td></tr>`).join('')}</table>`;

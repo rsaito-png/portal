@@ -35,7 +35,16 @@ async function klUserView(id) {
   const [[u], sup, docs] = await Promise.all([sb(`kin_user?id=eq.${id}&select=*`), sb(`kin_supply?user_id=eq.${id}&select=*&order=weekday,start_time`), sb(`kin_doc?user_id=eq.${id}&select=*&order=doc_type,version`)]);
   if (!u) return '<p>見つかりません</p>';
   const f = (k, l, t = 'text', ex = '') => `<label>${l}<br>${klIn('ku_' + k, u[k], t, ex)}</label>`;
-  const sr = sup.map(s => `<tr><td>${esc(s.service)}</td><td>${s.monthly_amount ?? ''}${esc(s.amount_unit || '')}</td><td>${s.weekday == null ? '' : KL_WD[s.weekday]}</td><td>${esc((s.start_time || '').slice(0, 5))}〜${esc((s.end_time || '').slice(0, 5))}</td><td>${s.supply_minutes ?? ''}</td><td>${esc(s.content || '')}</td><td>${esc(s.building || '')}</td><td>${esc(s.plan_from || '')}〜${esc(s.plan_to || '')}</td><td><button class="back" onclick="klDel('kin_supply',${s.id})">削除</button></td></tr>`).join('');
+  const sr = sup.map(s => `<tr>
+    <td><select id="ks_svc_${s.id}">${KL_SVC.map(x => `<option${x === s.service ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
+    <td><input id="ks_amt_${s.id}" type="number" step="0.5" style="width:70px" value="${s.monthly_amount ?? ''}"><select id="ks_unit_${s.id}"><option${(s.amount_unit || '時間') === '時間' ? ' selected' : ''}>時間</option><option${s.amount_unit === '回' ? ' selected' : ''}>回</option></select></td>
+    <td><select id="ks_wd_${s.id}"><option value="">-</option>${KL_WD.map((w, i) => `<option value="${i}"${s.weekday === i ? ' selected' : ''}>${w}</option>`).join('')}</select></td>
+    <td><input id="ks_st_${s.id}" type="time" value="${esc((s.start_time || '').slice(0, 5))}">〜<input id="ks_en_${s.id}" type="time" value="${esc((s.end_time || '').slice(0, 5))}"></td>
+    <td><input id="ks_min_${s.id}" type="number" min="1" style="width:70px" value="${s.supply_minutes ?? ''}"></td>
+    <td><input id="ks_ct_${s.id}" value="${esc(s.content || '')}" style="width:8rem"></td>
+    <td><input id="ks_bd_${s.id}" value="${esc(s.building || '')}" style="width:5rem"></td>
+    <td><input id="ks_pf_${s.id}" type="date" value="${esc(s.plan_from || '')}">〜<input id="ks_pt_${s.id}" type="date" value="${esc(s.plan_to || '')}"></td>
+    <td><button class="inl sec" onclick="klSaveSup(${s.id})">保存</button> <button class="back" onclick="klDel('kin_supply',${s.id})">削除</button></td></tr>`).join('');
   const dr = docs.map(d => `<tr><td>${esc(d.doc_type)}</td><td>v${d.version}</td><td>${esc(d.created_on || '')}</td><td>${esc(d.signed_on || '')}</td><td>${d.locked ? '🔒' : ''}</td><td><button class="back" onclick="klLock(${d.id},${!d.locked})">${d.locked ? '解除' : 'ロック'}</button> <button class="back" onclick="klDocEdit(${d.id},'${esc(d.created_on || '')}','${esc(d.signed_on || '')}',${d.locked})">日付</button></td></tr>`).join('');
   return `<h3>${esc(u.name)}</h3>${klWarn(u).map(x => `<p style="color:#b00">⚠ ${esc(x)}</p>`).join('')}
   <div class="card"><h4>基本・受給者証</h4>
@@ -61,6 +70,23 @@ async function klAddSup(uid) {
   const n = k => klV(k) == null ? null : +klV(k);
   const b = { user_id: uid, service: $('ks_service').value, monthly_amount: n('ks_amt'), amount_unit: $('ks_unit').value, weekday: n('ks_wd'), start_time: klV('ks_st'), end_time: klV('ks_en'), supply_minutes: n('ks_min'), content: klV('ks_ct'), building: klV('ks_bd'), plan_from: klV('ks_pf'), plan_to: klV('ks_pt') };
   try { await sb('kin_supply', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderKinLedger(); } catch (e) { alert(e.message); }
+}
+async function klSaveSup(id) {
+  const n = k => { const el = $(k); if (!el || el.value === '') return null; const v = +el.value; return Number.isFinite(v) ? v : null; };
+  const b = {
+    service: $('ks_svc_' + id).value,
+    monthly_amount: n('ks_amt_' + id),
+    amount_unit: $('ks_unit_' + id).value,
+    weekday: n('ks_wd_' + id),
+    start_time: $('ks_st_' + id).value || null,
+    end_time: $('ks_en_' + id).value || null,
+    supply_minutes: n('ks_min_' + id),
+    content: ($('ks_ct_' + id).value || '').trim() || null,
+    building: ($('ks_bd_' + id).value || '').trim() || null,
+    plan_from: $('ks_pf_' + id).value || null,
+    plan_to: $('ks_pt_' + id).value || null
+  };
+  try { await sb('kin_supply?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderKinLedger(); } catch (e) { alert(e.message); }
 }
 async function klAddDoc(uid) {
   try { await sb('kin_doc', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: uid, doc_type: $('kd_t').value, version: +$('kd_v').value || 1, created_on: klV('kd_c'), signed_on: klV('kd_s') }) }); renderKinLedger(); } catch (e) { alert(e.message); }
@@ -92,6 +118,47 @@ async function klSaveOffice(id) {
 }
 async function klCode() {
   const cs = await sb('kin_service_code?select=*&order=service,id');
-  return `<p class="note">国保連のコード表と照合して登録します（令和8年6月施行版・居宅介護。身体介護の時間区分：30分未満／30分以上1時間未満／1時間以上1時間30分未満／以降30分刻み（20分以上30分未満の区分は居宅介護にはありません）。時間区分は記録の開始〜終了の実時間で決めます。</p>` +
-    (cs.length ? `<table class="tbl"><tr><th>種別</th><th>時間区分</th><th>時間帯区分</th><th>コード</th><th>単位</th><th>備考</th></tr>${cs.map(c => `<tr><td>${esc(c.service)}</td><td>${esc(c.duration_class || '')}</td><td>${esc(c.time_band || '')}</td><td>${esc(c.code || '')}</td><td>${c.units ?? ''}</td><td>${esc(c.memo || '')}</td></tr>`).join('')}</table>` : '<p>未登録</p>');
+  const svc = ['身体介護','家事援助','通院等介助'];
+  const rows = (cs || []).map(c => `<tr>
+    <td><select id="kc_svc_${c.id}">${svc.map(s => `<option${s === c.service ? ' selected' : ''}>${s}</option>`).join('')}</select></td>
+    <td><input id="kc_dur_${c.id}" value="${esc(c.duration_class || '')}" style="width:9rem"></td>
+    <td><input id="kc_band_${c.id}" value="${esc(c.time_band || '')}" style="width:6rem"></td>
+    <td><input id="kc_code_${c.id}" value="${esc(c.code || '')}" style="width:6rem"></td>
+    <td><input id="kc_units_${c.id}" type="number" value="${c.units ?? ''}" style="width:5rem"></td>
+    <td><input id="kc_memo_${c.id}" value="${esc(c.memo || '')}" style="width:8rem"></td>
+    <td><button class="inl sec" onclick="klSaveCode(${c.id})">保存</button> <button class="back" onclick="klDelCode(${c.id})">削除</button></td>
+  </tr>`).join('');
+  return `<p class="note">国保連のコード表と照合して登録します（令和8年6月施行版・居宅介護。身体介護の時間区分：30分未満／30分以上1時間未満／1時間以上1時間30分未満／以降30分刻み（20分以上30分未満の区分は居宅介護にはありません）。時間区分は記録の開始〜終了の実時間で決めます。編集は事務（管理側）のみ。</p>` +
+    ((cs && cs.length) ? `<table class="tbl"><tr><th>種別</th><th>時間区分</th><th>時間帯区分</th><th>コード</th><th>単位</th><th>備考</th><th></th></tr>${rows}</table>` : '<p>未登録</p>') +
+    `<p>追加：<select id="kc_new_svc">${svc.map(s => `<option>${s}</option>`).join('')}</select>
+      時間区分 <input id="kc_new_dur" style="width:9rem"> 時間帯 <input id="kc_new_band" style="width:6rem">
+      コード <input id="kc_new_code" style="width:6rem"> 単位 <input id="kc_new_units" type="number" style="width:5rem">
+      備考 <input id="kc_new_memo" style="width:8rem"> <button onclick="klAddCode()">追加</button></p>`;
+}
+async function klSaveCode(id) {
+  const b = {
+    service: $('kc_svc_' + id).value,
+    duration_class: ($('kc_dur_' + id).value || '').trim() || null,
+    time_band: ($('kc_band_' + id).value || '').trim() || null,
+    code: ($('kc_code_' + id).value || '').trim() || null,
+    units: $('kc_units_' + id).value === '' ? null : +$('kc_units_' + id).value,
+    memo: ($('kc_memo_' + id).value || '').trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  try { await sb('kin_service_code?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderKinLedger(); } catch (e) { alert(e.message); }
+}
+async function klAddCode() {
+  const b = {
+    service: $('kc_new_svc').value,
+    duration_class: ($('kc_new_dur').value || '').trim() || null,
+    time_band: ($('kc_new_band').value || '').trim() || null,
+    code: ($('kc_new_code').value || '').trim() || null,
+    units: $('kc_new_units').value === '' ? null : +$('kc_new_units').value,
+    memo: ($('kc_new_memo').value || '').trim() || null
+  };
+  try { await sb('kin_service_code', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(b) }); renderKinLedger(); } catch (e) { alert(e.message); }
+}
+async function klDelCode(id) {
+  if (!confirm('このサービスコードを削除しますか？')) return;
+  try { await sb('kin_service_code?id=eq.' + id, { method: 'DELETE' }); renderKinLedger(); } catch (e) { alert(e.message); }
 }

@@ -172,16 +172,16 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261106staff"></script>
+<script src="config.js?v=20261106manual"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261105ren"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261106hand"></script>
+<script src="leo.js?v=20261106manual"></script>
 <script src="kin.js?v=202610221421"></script>
-<script src="kin_ledger.js?v=202610162320"></script>
+<script src="kin_ledger.js?v=20261106manual"></script>
 <script src="kin_visit.js?v=20261104all"></script>
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
@@ -209,15 +209,16 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="uketsuke.js?v=20261105askoff"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261102wage"></script>
-<script src="chamu.js?v=20261105rice"></script>
+<script src="chamu.js?v=20261106manual"></script>
 <script src="ryozan.js?v=20261104ryozan"></script>
 <script src="leo_kinmu_lib.js?v=20261102f1400"></script>
 <script src="leo_kinmu.js?v=20261102read"></script>
 <script src="dakoku-lib.js?v=20261030dakoku"></script>
-<script src="dakoku.js?v=20261104home"></script>
+<script src="dakoku.js?v=20261106dakoku"></script>
+<script src="dakoku_admin.js?v=20261106dakoku"></script>
 <script src="soudan.js?v=202611042130"></script>
 <script src="staff.js?v=20261106staff"></script>
-<script src="taxcal.js?v=202611052230"></script>
+<script src="taxcal.js?v=20261106manual"></script>
 <script src="banto.js?v=202610211550"></script>
 <script src="sns.js?v=202610271650"></script>
 <script src="leaderboard.js?v=20261026hold"></script>
@@ -365,6 +366,7 @@ async function render() {
   if (id === 'nicchu' && sub === 'sign' && typeof renderNicchuSign === 'function') return renderNicchuSign();
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
   if (id === 'dakoku' && typeof renderDakoku === 'function') return renderDakoku();
+  if (id === 'dakoku-settings' && typeof renderDakokuSettings === 'function') return renderDakokuSettings();
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
   if (id === 'ryozan' && sub === 'meal' && typeof renderRyozanMeal === 'function') return renderRyozanMeal();
   if (id === 'chamu' && sub && typeof renderChamu === 'function') return renderChamu(sub);
@@ -419,20 +421,56 @@ async function render() {
   loadDailySky(); if (typeof homeTodo === 'function') homeTodo();
 }
 // 毎日占い（全体の空の動き）。portal_daily_sky の今日（JST）分。取れなければ枠ごと隠す。
+function skyCanEdit() {
+  if (DEMO) return false;
+  return (typeof ROLE !== 'undefined' && ROLE === '事務')
+    || (typeof DUTY !== 'undefined' && DUTY === '管理者')
+    || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR);
+}
 async function loadDailySky() {
   const el = $('daily_sky'); if (!el) return;
+  const day = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
   let r = null;
   try {
-    if (DEMO) r = { body: '月は昼に乙女座へ。話は進むが、現場は動かない日。急がず、一つだけ片づける。', tip: '散らかっても慌てず、目の前の一つを拾え。' };
+    if (DEMO) r = { day, body: '月は昼に乙女座へ。話は進むが、現場は動かない日。急がず、一つだけ片づける。', tip: '散らかっても慌てず、目の前の一つを拾え。' };
     else if (typeof sb === 'function') {
-      const day = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
-      r = ((await sb(`portal_daily_sky?day=eq.${day}&select=body,tip`)) || [])[0];
+      r = ((await sb(`portal_daily_sky?day=eq.${day}&select=day,body,tip`)) || [])[0];
     }
   } catch (e) { r = null; }
-  if (!r || !r.body || $('daily_sky') !== el) { el.hidden = true; return; }
-  const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  el.innerHTML = `<div class="ds-h">毎日占い</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
+  if ((!r || !r.body) && !skyCanEdit()) { el.hidden = true; return; }
+  if ($('daily_sky') !== el) return;
+  const esc = x => String(x || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const editBtn = skyCanEdit() ? `<button type="button" class="inl back" style="margin-left:8px;font-size:12px" onclick="skyEditOpen('${esc(day)}')">直す</button>` : '';
+  if (!r || !r.body) {
+    el.innerHTML = `<div class="ds-h">毎日占い ${editBtn}</div><div class="ds-b note">今日分はまだありません（管理者は「直す」から書けます）。</div>`;
+  } else {
+    el.innerHTML = `<div class="ds-h">毎日占い ${editBtn}</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
+  }
   el.hidden = false;
+}
+async function skyEditOpen(day) {
+  if (!skyCanEdit()) return;
+  let cur = { body: '', tip: '' };
+  try {
+    const rows = await sb(`portal_daily_sky?day=eq.${day}&select=body,tip`) || [];
+    if (rows[0]) cur = rows[0];
+  } catch (e) {}
+  const body = prompt('本文（2〜3文）', cur.body || '');
+  if (body === null) return;
+  const tip = prompt('今日のひとこと', cur.tip || '');
+  if (tip === null) return;
+  const b = (body || '').trim(), tp = (tip || '').trim();
+  if (!b || !tp) return alert('本文とひとことは必須です');
+  try {
+    // upsert: try patch, if none insert
+    const existing = await sb(`portal_daily_sky?day=eq.${day}&select=day`) || [];
+    if (existing.length) {
+      await sb(`portal_daily_sky?day=eq.${day}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ body: b, tip: tp, updated_at: new Date().toISOString() }) });
+    } else {
+      await sb('portal_daily_sky', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ day, body: b, tip: tp }) });
+    }
+    await loadDailySky();
+  } catch (e) { alert(e.message); }
 }
 async function sctIsAdmin() {
   if (DEMO) return ROLE === '事務' || ROLE === 'sct_admin';
@@ -488,12 +526,16 @@ async function renderSoumu() {
     if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', t);
     else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + t + '</div>');
   }
-  // 職員マスタ：事務はタイル一覧に出る。管理者・会長は事務でなくても人事労務に出す
-  if (!clerk && !sec.querySelector('a[href="#staff"]') && (DUTY === '管理者' || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR))) {
-    const t = tileHtml(['👥', '職員マスタ', '#staff', '所属・兼務・職責・日誌名など'], '#555');
-    const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
-    if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', t);
-    else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + t + '</div>');
+  // 職員マスタ・打刻設定：事務はタイル一覧に出る。管理者・会長は事務でなくても人事労務に出す
+  if (!clerk && (DUTY === '管理者' || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR))) {
+    const extras = [];
+    if (!sec.querySelector('a[href="#staff"]')) extras.push(tileHtml(['👥', '職員マスタ', '#staff', '所属・兼務・職責・日誌名など'], '#555'));
+    if (!sec.querySelector('a[href="#dakoku-settings"]')) extras.push(tileHtml(['⏰', '打刻設定', '#dakoku-settings', '事業所・半径・座標・職員割当'], '#555'));
+    if (extras.length) {
+      const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
+      if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', extras.join(''));
+      else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + extras.join('') + '</div>');
+    }
   }
   if (typeof esignBadge === 'function') esignBadge();
 }
