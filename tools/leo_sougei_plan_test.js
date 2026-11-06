@@ -101,6 +101,25 @@ assert.ok(emptyPlan.includes('本計画PDFはまだ登録されていません')
 const blankPlan = leoKidPlanHtml('児童 D', { body: ' \n\t', source_url: 'https://example.com/plan.pdf' });
 assert.ok(blankPlan.includes('本計画PDFはまだ登録されていません'));
 assert.ok(!blankPlan.includes('example.com'));
+const pendingPlan = leoKidPlanHtml('山本 蒼悟', { term: '4期', period: '令和8年11月1日 〜 令和9年4月30日', body: '【長期目標】\n宿題に自分から取り組む。', pending: true });
+assert.ok(pendingPlan.includes('📋 計画（同意待ち）（4期　令和8年11月1日 〜 令和9年4月30日）を読む'));
+assert.ok(pendingPlan.includes('宿題に自分から取り組む。'));
+assert.ok(!pendingPlan.includes('本計画（'));
+const leoMergeKidPlans = grab('leoMergeKidPlans');
+const leoKidPlanFromLeoPlan = grab('leoKidPlanFromLeoPlan');
+const merged = leoMergeKidPlans(
+  [{ name: '山本 蒼悟', term: '旧', period: '古い', body: '' }],
+  [{ child: '山本 蒼悟', term_no: 4, start_on: '2026-11-01', end_on: '2027-04-30', honan: '#T 個別支援計画書（第4期）\n#R 【利用者名】山本　蒼悟\n【長期目標】\n本案の本文です。', honan_consent_at: '2026-11-04T00:00:00Z' }],
+  '2026-11-06'
+);
+assert.strictEqual(merged.length, 1);
+assert.strictEqual(merged[0].term, '4期');
+assert.strictEqual(merged[0].pending, false);
+assert.ok(merged[0].body.includes('本案の本文です。'));
+assert.ok(!merged[0].body.includes('#T '));
+const waitMerged = leoMergeKidPlans([], [{ child: '西山 琴', term_no: 3, start_on: '2026-07-01', end_on: '2026-12-31', honan: '同意前の本案', honan_consent_at: null }], '2026-11-06');
+assert.strictEqual(waitMerged[0].pending, true);
+assert.ok(leoKidPlanHtml('西山 琴', waitMerged[0]).includes('計画（同意待ち）'));
 assert.strictEqual(leoKidWarnHtml([]), '');
 assert.strictEqual(leoKidWarnHtml(null), '');
 const leoKindOf = grab('leoKindOf');

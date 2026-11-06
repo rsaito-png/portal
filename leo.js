@@ -335,9 +335,63 @@ function leoFindChildPlan(plans, name) {
   const hits = list.filter(x => sameChildName(x.name, name));
   return hits.length === 1 ? hits[0] : null;
 }
-// 今日の利用児童の「本計画」は本文の展開だけ。Googleドキュメント等はここから開かない。
+// leo_plans の本案本文を、今日の利用児童カード用の平文に直す（#T/#R は落とす）。
+function leoReiwaFromIso(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  return `令和${+m[1] - 2018}年${+m[2]}月${+m[3]}日`;
+}
+function leoPlanMarkupPlain(t) {
+  return String(t || '').split('\n').map(l => (l.startsWith('#T ') || l.startsWith('#R ')) ? l.slice(3) : l).join('\n');
+}
+function leoKidPlanFromLeoPlan(p) {
+  if (!p || !String(p.honan || '').trim()) return null;
+  return {
+    name: p.child,
+    term: p.term_no != null ? `${p.term_no}期` : '',
+    period: [leoReiwaFromIso(p.start_on), leoReiwaFromIso(p.end_on)].filter(Boolean).join(' 〜 '),
+    body: leoPlanMarkupPlain(p.honan),
+    pending: !p.honan_consent_at,
+    start_on: p.start_on || '',
+    end_on: p.end_on || ''
+  };
+}
+// 今日を含む期を優先。無ければ開始日が新しい本案。
+function leoCurrentKidPlans(leoPlans, day) {
+  const by = new Map();
+  const d = day || '';
+  const nn = s => String(s || '').replace(/\s/g, '');
+  (leoPlans || []).forEach(p => {
+    const converted = leoKidPlanFromLeoPlan(p);
+    if (!converted) return;
+    const key = nn(p.child);
+    const prev = by.get(key);
+    const covers = !!(d && p.start_on && p.end_on && p.start_on <= d && d <= p.end_on);
+    const prevCovers = !!(prev && prev.start_on && prev.end_on && prev.start_on <= d && d <= prev.end_on);
+    if (!prev || (covers && !prevCovers) || (covers === prevCovers && String(p.start_on || '') > String(prev.start_on || ''))) by.set(key, converted);
+  });
+  return [...by.values()];
+}
+// 個別支援計画（管理）の本案を正とする。leo_child_plan は本案が無いときの控え。
+function leoMergeKidPlans(childPlans, leoPlans, day) {
+  const fromLeo = leoCurrentKidPlans(leoPlans, day);
+  const nn = s => String(s || '').replace(/\s/g, '');
+  const out = [];
+  fromLeo.forEach(p => {
+    const match = (childPlans || []).find(x => nn(x.name) === nn(p.name) || (typeof sameChildName === 'function' && sameChildName(x.name, p.name)));
+    out.push({ ...p, name: (match && match.name) || p.name });
+  });
+  (childPlans || []).forEach(p => {
+    if (out.some(x => nn(x.name) === nn(p.name) || (typeof sameChildName === 'function' && sameChildName(x.name, p.name)))) return;
+    out.push({ name: p.name, term: p.term || '', period: p.period || '', body: p.body || '', pending: !!p.pending, source_url: p.source_url || '' });
+  });
+  return out;
+}
+// 今日の利用児童の計画は本文の展開だけ。Googleドキュメント等はここから開かない。
+// 本案同意前でも本文があれば「計画（同意待ち）」として読める（同意済み扱いにはしない）。
 function leoKidPlanHtml(name, plan) {
-  const label = `📋 本計画${plan && (plan.term || plan.period) ? `（${esc(plan.term || '')}　${esc(plan.period || '')}）` : ''}`;
+  const kind = plan && plan.pending ? '計画（同意待ち）' : '本計画';
+  const label = `📋 ${kind}${plan && (plan.term || plan.period) ? `（${esc(plan.term || '')}　${esc(plan.period || '')}）` : ''}`;
   if (plan && String(plan.body || '').trim()) {
     return `<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:bold;color:#36c">${label}を読む</summary><div style="white-space:pre-wrap;line-height:1.7;background:#f7f9fc;border:1px solid #dde;border-radius:6px;padding:10px;margin-top:6px">${planText(plan.body)}</div></details>`;
   }
@@ -470,11 +524,12 @@ const LEO_VIEWS = {
   async kids() {
     const [a, b] = range();
     const evPromise = DEMO ? Promise.resolve(demoCalEdits()) : sb(`leo_events?day=gte.${a}&day=lte.${b}&kind=in.(利用,迎え,送り,休み)&order=day,start_time`).catch(() => []);
-    const [rows0, cc, ci, cp, LEFT, ev0, kinds] = await Promise.all([loadNikki(), DEMO ? [] : sb('leo_child_care').catch(() => []), DEMO ? [] : sb('leo_child_info?select=name,note').catch(() => []), DEMO ? [] : sb('leo_child_plan').catch(() => []), loadLeftIndex(), evPromise, leoChildKinds()]);
+    const [rows0, cc, ci, cp0, LEFT, ev0, kinds, lp] = await Promise.all([loadNikki(), DEMO ? [] : sb('leo_child_care').catch(() => []), DEMO ? [] : sb('leo_child_info?select=name,note').catch(() => []), DEMO ? [] : sb('leo_child_plan').catch(() => []), loadLeftIndex(), evPromise, leoChildKinds(), DEMO ? [] : sb('leo_plans?select=child,term_no,start_on,end_on,honan,honan_consent_at&order=start_on.desc').catch(() => [])]);
     const rows = filterByLeftDay(rows0, LEFT);
     const evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(ev0 || [], LEFT) : (ev0 || []);
     const N = s => String(s || '').replace(/\s/g, '');
     const days = byDay(rows);
+    const cp = leoMergeKidPlans(cp0 || [], lp || [], today());
     const planOf = c => leoFindChildPlan(cp, c);
     const roster = [...ci.map(x => x.name), ...cp.map(x => x.name), ...cc.map(x => x.child)].filter(Boolean);
     const disp = c => leoFullChildName(c, roster);
