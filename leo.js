@@ -238,6 +238,21 @@ function leoMergeNikki(rows, events) {
       }
     }
   }
+  // 型表（kata）の迎え・送り場所は、ポータルで上書きしていない行に載せる。
+  // 日誌に旧スプシの場所が残っていても、型表＝マスターを正にする。時刻・担当は触らない。
+  for (const e of events || []) {
+    if (!e || e.source !== 'kata' || leoCalHidden(e)) continue;
+    if (e.kind !== '迎え' && e.kind !== '送り') continue;
+    const kids = (e.kids && e.kids.length) ? e.kids : (e.child ? [e.child] : []);
+    for (const name of kids) {
+      const row = ensure(e.day, name, false);
+      if (!row) continue;
+      const pl = leoKidVal(e.kid_places, name) || e.place || '';
+      if (!pl) continue;
+      if (e.kind === '迎え' && row._calPick !== true && row._calPick !== 'del') row.pick_place = pl;
+      if (e.kind === '送り' && row._calDrop !== true && row._calDrop !== 'del') row.drop_place = pl;
+    }
+  }
   for (const e of events || []) {
     if (!e || e.source !== 'portal' || e.kind !== '休み' || !e.child) continue;
     const label = leoAbsLabel(e);
@@ -2268,6 +2283,10 @@ async function saveMaster() {
   const m = $('ms_msg'); if (DEMO) { m.textContent = `見本モードなので保存しません（${rows.length}行）。`; return; }
   try { await sb(`leo_master?kind=eq.${MASTER_KIND}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     if (rows.length) await sb('leo_master', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows.map((d, i) => ({ kind: MASTER_KIND, row_no: i + 1, data: d }))) });
+    if (MASTER_KIND === 'kata') {
+      try { await sb('rpc/leo_kata_resync', { method: 'POST', body: JSON.stringify({}) }); }
+      catch (e) { /* トリガーでも追従する。失敗しても型表自体は保存済み */ }
+    }
     m.textContent = `${rows.length}行を保存しました。`; } catch (e) { m.textContent = e.message; }
 }
 async function saveCare() {

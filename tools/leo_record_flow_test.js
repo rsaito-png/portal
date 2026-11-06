@@ -88,7 +88,7 @@ function fnBody(s) {
 }
 assert.strictEqual(fnBody(arrival), fnBody(sql), '実行用SQLと record_flow の関数は同じ');
 assert.strictEqual(fnBody(sync), fnBody(sql), '追従SQLと record_flow の関数は同じ');
-assert.ok(sync.includes("select date '2026-12-01'"), '追従の開始日');
+assert.ok(sync.includes("select date '2026-11-01'"), '追従の開始日');
 assert.ok(sync.includes('function public.leo_sync_start()'), '開始日は一つの関数');
 assert.ok(/when p_day < public\.leo_sync_start\(\) then/.test(sync), '開始日より前は空欄だけ');
 {

@@ -1,4 +1,4 @@
--- 型表やカレンダーを直したあと、2026-12-01 以降かつ今日以降の予定（source=kata）と、
+-- 型表やカレンダーを直したあと、2026-11-01 以降かつ今日以降の予定（source=kata）と、
 -- 職員がまだ保存していない日誌の送迎・開始を追従させる。
 -- それより前の予定は消さず、児童ごとの時刻も揃えない。日誌は空欄を埋める従来の動きだけ残し、送り時刻が終了と同じときの入れ直しはしない。
 -- 開始日は public.leo_sync_start()。作り直す範囲の下限は greatest(今日, 開始日)。
@@ -7,10 +7,10 @@
 -- 依存：leo_sched_plan_core / leo_norm / leo_kid_json / leo_record_allowed / leo_nikki_from_events（supabase/leo_record_flow.sql を一度は実行してあること）。
 -- このファイルは leo_nikki_from_events も置き換える（record_flow と同じ中身）。
 
--- 追従を始める日。2026-11 以前は対象にしない。
+-- 追従を始める日。2026-11-01 から（旧スプシ写しが日誌に残るのを止めるため。2026-11-06 に前倒し）。
 create or replace function public.leo_sync_start() returns date
 language sql immutable as $$
-  select date '2026-12-01'
+  select date '2026-11-01'
 $$;
 
 alter table public.leo_nikki add column if not exists staff_saved_at timestamptz;
@@ -19,7 +19,7 @@ comment on column public.leo_nikki.staff_saved_at is '職員が日誌の保存�
 comment on column public.leo_nikki.auto_fill is '最後に自動で入れた送迎・開始。まだこの値の欄だけ、予定の変更で入れ直す。';
 
 -- 開始日より前と、過去の日と、職員が保存した行は、空の欄だけ埋める。
--- 開始日以降の今日以降で未保存の欄は、前回の自動値・型表由来の値・送り時刻=終了のときだけ入れ直す。
+-- 開始日以降の今日以降で未保存の欄は、前回の自動値・型表由来の値・送り時刻=終了・自動印なしのとき入れ直す。
 create or replace function public.leo_auto_field(
   p_saved timestamptz, p_day date, p_auto jsonb, p_key text,
   p_cur text, p_new text, p_prev text, p_stale boolean
@@ -37,6 +37,7 @@ language sql stable as $$
     when coalesce(btrim(p_cur), '') = '' or p_stale
       or (p_prev is not null and btrim(p_cur) is not distinct from btrim(p_prev))
       or (p_auto is not null and (coalesce(btrim(p_cur), '') = '' or btrim(p_cur) is not distinct from nullif(p_auto->>p_key, '')))
+      or p_auto is null
       then p_new
     else p_cur
   end
