@@ -54,10 +54,9 @@ function ncValidate(f) {
     if (NC_TRANSPORT.indexOf(u.transport) < 0) err.push(n + '送迎を選んでください');
     if (NC_MEAL.indexOf(u.meal_served) < 0) err.push(n + '食事提供を選んでください');
     const activity = String(u.activity || '').trim(), state = String(u.state || '').trim();
-    if (!activity) err.push(n + '活動内容を入れてください');
-    else if (activity.length > 2000) err.push(n + '活動内容は2000文字以内にしてください');
-    if (!state) err.push(n + 'ご様子を入れてください');
-    else if (state.length > 2000) err.push(n + 'ご様子は2000文字以内にしてください');
+    if (!activity && !state) err.push(n + '活動内容かご様子のどちらかを入れてください');
+    if (activity.length > 2000) err.push(n + '活動内容は2000文字以内にしてください');
+    if (state.length > 2000) err.push(n + 'ご様子は2000文字以内にしてください');
   });
   return err;
 }
@@ -379,12 +378,12 @@ async function ncSaveClick() {
   NC.busy = true;
   try {
     const res = await ncSaveDay(ncReadForm());
-    if (!res.ok) { msg.textContent = res.errs.join('\n'); return; }
+    if (!res.ok) { msg.textContent = res.errs.join('\n'); alert('保存できませんでした\n' + res.errs.join('\n')); return; }
     try { localStorage.setItem('nicchu.staff', ncClip(document.getElementById('nc_staff').value, 60)); } catch (e) { /* 端末に残せなくても保存は済んでいる */ }
     NC.flash = '保存しました';
     if (location.hash.split('?')[0] === '#nicchu/log' && !ncHashDate()) renderNicchu();
     else location.hash = 'nicchu/log';
-  } catch (e) { msg.textContent = e.message; }
+  } catch (e) { msg.textContent = e.message; alert('保存できませんでした\n' + e.message); }
   finally { NC.busy = false; }
 }
 async function ncDeleteClick() {
