@@ -68,7 +68,7 @@ async function dkRpc(payload) {
         const j = await sb('rpc/dakoku_punch', { method: 'POST', body: JSON.stringify({
           p_office: payload.office, p_staff_id: payload.staffId, p_kind: payload.kind,
           p_lat: payload.lat ?? null, p_lng: payload.lng ?? null, p_accuracy: payload.accuracy ?? null,
-          p_lunch: !!payload.lunch, p_memo: payload.memo || null
+          p_lunch: payload.lunch === true || payload.lunch === 'はい', p_memo: payload.memo || null
         }) });
         if (j && j.ok) return j;
         if (j && j.error) throw new Error(j.error);

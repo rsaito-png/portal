@@ -348,7 +348,7 @@ function ncOpenDate() {
 }
 function ncPerson(u, rec) {
   const id = u.id;
-  const present = rec ? !!rec.present : true;
+  const present = rec ? !!rec.present : false;
   const start = rec && rec.start_time ? String(rec.start_time).slice(0, 5) : '07:00';
   const end = rec && rec.end_time ? String(rec.end_time).slice(0, 5) : '13:00';
   const transport = rec && rec.transport || '往復';
