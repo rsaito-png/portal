@@ -54,8 +54,8 @@ function ncValidate(f) {
     if (NC_TRANSPORT.indexOf(u.transport) < 0) err.push(n + '送迎を選んでください');
     if (NC_MEAL.indexOf(u.meal_served) < 0) err.push(n + '食事提供を選んでください');
     const activity = String(u.activity || '').trim(), state = String(u.state || '').trim();
-    if (!activity && !state) err.push(n + '活動内容かご様子のどちらかを入れてください');
-    if (activity.length > 2000) err.push(n + '活動内容は2000文字以内にしてください');
+    if (!activity && !state) err.push(n + '記録を入れてください');
+    if (activity.length > 2000) err.push(n + '記録は2000文字以内にしてください');
     if (state.length > 2000) err.push(n + 'ご様子は2000文字以内にしてください');
   });
   return err;
@@ -67,7 +67,7 @@ function ncRecordBody(u) {
   }
   return {
     user_id: u.user_id, present: true, start_time: u.start_time, end_time: u.end_time, transport: u.transport, meal_served: u.meal_served,
-    activity: ncClip(u.activity, 2000), state: ncClip(u.state, 2000), ...blank
+    activity: ncClip(u.activity, 2000), state: ncClip(u.state, 2000) || null, ...blank
   };
 }
 const NC_KUBUN = ['区分１', '区分２', '区分３'];
@@ -215,7 +215,7 @@ async function ncRest(path, opt, retried) {
     let msg = '読み込めませんでした（' + r.status + '）';
     try { const j = await r.json(); if (j.message) msg = j.message; if (j.code) msg += ' ' + j.code; } catch (e) { /* 本文なし */ }
     if (r.status === 401 || r.status === 403 || /row-level security/i.test(msg)) msg = 'この操作は日中一時支援の担当職員だけができます。';
-    else if (/nicchu_record_|check constraint|23514/i.test(msg)) msg = '入力が不足しています。来所・退所・送迎・食事・活動・ご様子を確認してください。';
+    else if (/nicchu_record_|check constraint|23514/i.test(msg)) msg = '入力が不足しています。来所・退所・送迎・食事・記録を確認してください。';
     throw new Error(msg);
   }
   if (r.status === 204) return null;
@@ -358,8 +358,7 @@ function ncPerson(u, rec) {
       <div class="nc-grid"><label>来所 ${ncPt('Entrada')}<input id="st_${id}" type="time" value="${esc(start)}"></label><label>退所 ${ncPt('Saída')}<input id="en_${id}" type="time" value="${esc(end)}"></label></div>
       <div>送迎 ${ncPt('Transporte')}${ncChips('tr_' + id, NC_TRANSPORT, transport)}</div>
       <div>食事提供 ${ncPt('Refeição')}${ncChips('ml_' + id, NC_MEAL, meal)}</div>
-      <label>活動内容 ${ncPt('Atividades')}<textarea id="ac_${id}" rows="3">${esc(rec && rec.activity || '')}</textarea></label>
-      <label>ご様子 ${ncPt('Estado')}<textarea id="stt_${id}" rows="3">${esc(rec && rec.state || '')}</textarea></label>
+      <label>記録（活動・様子） ${ncPt('Registro')}<textarea id="ac_${id}" rows="4">${esc([rec && rec.activity, rec && rec.state].filter(Boolean).join('\n'))}</textarea></label>
     </div></div>`;
 }
 function ncReadForm() {
@@ -368,7 +367,7 @@ function ncReadForm() {
     users: NC.shown.map(u => ({
       user_id: u.id, name: u.name, present: document.getElementById('p_' + u.id).checked,
       start_time: document.getElementById('st_' + u.id).value, end_time: document.getElementById('en_' + u.id).value,
-      transport: ncVal('tr_' + u.id), meal_served: ncVal('ml_' + u.id), activity: document.getElementById('ac_' + u.id).value, state: document.getElementById('stt_' + u.id).value
+      transport: ncVal('tr_' + u.id), meal_served: ncVal('ml_' + u.id), activity: document.getElementById('ac_' + u.id).value, state: ''
     }))
   };
 }
