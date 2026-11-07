@@ -30,8 +30,8 @@ async function htLoad() {
     g('ht_records?order=taken_at.desc&limit=5000'), g('ht_settings'), g('ht_access')]);
   const me = (JSON.parse(localStorage.getItem('sess') || '{}').email || '').toLowerCase();
   const mine = acc.filter(a => a.email === me);
-  const isAll = mine.some(a => !a.office_id);
-  const myOffs = isAll ? off.map(o => o.id) : mine.map(a => a.office_id);
+  const isAll = mine.some(a => !a.office_id && a.can_edit), allRead = mine.some(a => !a.office_id);
+  const myOffs = allRead ? off.map(o => o.id) : mine.map(a => a.office_id);
   const editOffs = isAll ? off.map(o => o.id) : mine.filter(a => a.can_edit).map(a => a.office_id);
   HT.D = { off: off.filter(o => myOffs.includes(o.id)), allOff: off, staff, tr, mat, qs, ev, evl, com, plan, cl, rec, set: Object.fromEntries(set.map(s => [s.key, s.value])), acc, me, isAll, myOffs, editOffs };
   if (HT.office !== 'all' && !myOffs.includes(HT.office)) HT.office = 'all';
@@ -80,13 +80,13 @@ async function renderHt() {
   if (DEMO) { $('view').innerHTML = back + '<h3>法定研修</h3><p>見本モードでは表示しません（個人情報を扱うため、ログインした方だけが見られます）。</p>'; return; }
   $('view').innerHTML = back + '<p>読み込み中…</p>';
   try { HT.fy = htFy(); await htLoad(); } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; return; }
-  if (!HT.D.myOffs.length) { $('view').innerHTML = back + '<h3>法定研修</h3><p>このアカウントには、法定研修を見る権限がありません。研修統括責任者に権限の追加を頼んでください。</p>'; return; }
+  if (!HT.D.myOffs.length && !HT.D.isAll) { $('view').innerHTML = back + '<h3>法定研修</h3><p>このアカウントには、法定研修を見る権限がありません。研修統括責任者に権限の追加を頼んでください。</p>'; return; }
   htDraw();
 }
 function htDraw() {
   const D = HT.D, back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
   const test = (D.set['テストモード'] || '').toUpperCase() === 'TRUE';
-  const sw = D.off.length > 1 ? `<select onchange="HT.office=this.value;htDraw()" style="width:auto;display:inline-block">${[['all', '全事業所（統括ビュー）'], ...D.off.map(o => [o.id, o.name])].map(([a, b]) => `<option value="${a}"${a === HT.office ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : `<b>${esc(D.off[0].name)}</b>`;
+  const sw = D.off.length > 1 ? `<select onchange="HT.office=this.value;htDraw()" style="width:auto;display:inline-block">${[['all', '全事業所（統括ビュー）'], ...D.off.map(o => [o.id, o.name])].map(([a, b]) => `<option value="${a}"${a === HT.office ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : `<b>${esc(D.off[0]?.name || '事業所未登録')}</b>`;
   const body = { home: htHome, staff: htStaff, train: htTrain, comm: htComm, cal: htCal, set: htSet }[HT.tab]();
   $('view').innerHTML = back + `<div class="htw"><h3 style="margin:8px 0">🎓 法定研修・従業者管理　<small>${htRe(HT.fy)}</small></h3>
     <div class="htbar">${test ? '🧪 テストモード：このページからメール・チャットは送りません。' : ''}${D.isAll ? '統括責任者として全事業所を見ています。' : '見られる事業所：' + esc(D.off.map(o => o.name).join('、')) + (D.editOffs.length ? '' : '（見るだけ）')}</div>
@@ -168,7 +168,7 @@ function htTrain() {
     return `<tr><td><b>${esc(e.id)} ${esc(e.name)}</b><br><small>${esc(e.kind)}</small></td><td>${e.months.map(x => `<span class="chip ${x === m ? 'now' : ''}">${x}月</span>`).join('')}</td><td>${logs.length}/${e.times_per_year}回${logs.length ? '<br><small>' + logs.map(l => htFmtD(l.done_on) + ' ' + esc(htOffName(l.office_id))).join('<br>') + '</small>' : ''}</td><td>${D.editOffs.length ? `<button class="htb" onclick="htEvForm('${e.id}')">実施を記録</button>` : ''}</td></tr>`; }).join('');
   return `<div class="htw"><table class="htt"><tr><th>研修</th><th>受講</th><th>証跡</th><th>教材</th><th></th></tr>${rows}</table></div>
   <p class="note">「実施記録PDF」「受講証明書」は印刷画面が開きます（「PDFに保存」を選べます）。事業所を選んでいるときはその事業所分、「全事業所」のときは事業所ごとに1枚ずつ出ます。手入力の記録は「証跡なし」と区別して表示されます。</p>
-  <h4>訓練・点検・計画見直し</h4><div class="htw"><table class="htt"><tr><th>項目</th><th>予定月</th><th>実施</th><th></th></tr>${ev}</table></div>`;
+  <h4>訓練・点検・計画見直し</h4><div class="htw"><table class="htt"><tr><th>項目</th><th>予定月</th><th>実施</th><th></th></tr>${ev}</table></div>${htLogList('rec')}${htLogList('evl')}`;
 }
 function htRecForm(tid) {
   const D = HT.D, t = D.tr.find(x => x.id === tid);
@@ -235,7 +235,7 @@ function htComm() {
   const logs = D.cl.filter(l => l.office_ids.some(x => sc.some(o => o.id === x))).map(l => { const c = D.com.find(x => x.id === l.committee_id) || {};
     return `<tr><td>${htFmtDT(l.held_at)}</td><td>${esc(c.name || '')}</td><td>${esc(l.office_ids.map(htOffName).join('、'))}</td><td>${esc(l.decisions || '')}</td><td><button class="htb g" onclick="htMinutes('${l.id}')">議事録PDF</button></td></tr>`; }).join('');
   return `<div class="htw"><table class="htt"><tr><th>委員会</th><th>前回開催</th><th>次回期限</th><th>今年度の予定</th><th></th></tr>${rows}</table></div>
-  <h4>開催記録（議事録）</h4><div class="htw"><table class="htt"><tr><th>日時</th><th>委員会</th><th>対象事業所</th><th>決定事項</th><th></th></tr>${logs || '<tr><td colspan=5>まだ開催記録がありません</td></tr>'}</table></div>
+  <h4>開催記録（議事録）</h4><div class="htw"><table class="htt"><tr><th>日時</th><th>委員会</th><th>対象事業所</th><th>決定事項</th><th></th></tr>${logs || '<tr><td colspan=5>まだ開催記録がありません</td></tr>'}</table></div>${htLogList('cl')}
   <p class="note">議事録は事業所ごとに分かれて保存されます。一体開催の場合は参加した事業所すべてにチェックを入れてください（事業所ごとの議事録PDFが出ます）。</p>`;
 }
 function htCommForm(cid) {
@@ -265,9 +265,9 @@ function htSet() {
   const sets = Object.entries(D.set).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${D.isAll ? `<input value="${esc(v)}" onchange="htSetSave('${esc(k).replace(/'/g, "\\'")}',this.value)" style="padding:4px;margin:0">` : esc(v)}</td></tr>`).join('');
   const offs = D.off.map(o => `<tr><td>${esc(o.name)}</td><td>${esc(o.types.join('・') || '未設定')}</td><td>${esc(o.start_date || '')}</td><td>${esc(o.note || '')}</td></tr>`).join('');
   return `<h4>設定${D.isAll ? '' : '（見るだけ）'}</h4><div class="htw"><table class="htt">${sets}</table></div>
-  <h4>事業所</h4><div class="htw"><table class="htt"><tr><th>事業所</th><th>サービス種別</th><th>開所</th><th>備考</th></tr>${offs}</table></div>
+  <h4>事業所</h4><div class="htw"><table class="htt"><tr><th>事業所</th><th>サービス種別</th><th>開所</th><th>備考</th></tr>${offs}</table></div>${D.isAll ? htMasterLists() : ''}
   <h4>アクセス権限</h4><div class="htw"><table class="htt"><tr><th>メール</th><th>範囲</th><th>入力</th><th>メモ</th></tr>${(D.isAll ? D.acc : D.acc.filter(a => a.email === D.me)).map(a => `<tr><td>${esc(a.email)}</td><td>${a.office_id ? esc(htOffName(a.office_id)) + 'のみ' : '全事業所（統括）'}</td><td>${a.can_edit ? '○' : '見るだけ'}</td><td>${esc(a.note || '')}</td></tr>`).join('')}</table></div>
-  <p class="note">権限は事業所ごとに分かれています。統括責任者は全事業所を見て直せます。事業所の担当者は、その事業所の記録だけ見られ・入力できます（統括確認は統括責任者のみ）。権限の追加・変更は研修統括責任者に依頼してください。</p>`;
+  <p class="note">権限は事業所ごとに分かれています。統括責任者は全事業所を見て直せます。事業所の担当者は、その事業所の記録だけ見られ・入力できます（統括確認は統括責任者のみ）。統括責任者は設定画面で権限を追加・変更できます。削除には確認が出ます。</p>`;
 }
 async function htSetSave(k, v) { try { await sb('ht_settings?key=eq.' + encodeURIComponent(k), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ value: v }) }); HT.D.set[k] = v; } catch (e) { alert(e.message); } }
 // ---------- PDF（印刷画面。「PDFに保存」を選ぶ）
@@ -307,4 +307,114 @@ function htMinutes(lid) {
   const D = HT.D, l = D.cl.find(x => x.id === lid), c = D.com.find(x => x.id === l.committee_id) || {}, corp = D.set['法人名'] || '', ids = htScope().map(o => o.id);
   const pages = l.office_ids.filter(x => ids.includes(x)).map(oid => `<div class="pg"><h1>${esc(c.name || '委員会')} 議事録</h1>${htKV([['法人名', esc(corp)], ['事業所', esc(htOffName(oid)) + (l.office_ids.length > 1 ? '（一体開催：' + esc(l.office_ids.map(htOffName).join('、')) + '）' : '')], ['開催日時', htFmtDT(l.held_at)], ['場所/方法', esc(l.place || '')], ['出席者', esc(l.attendees || '')], ['欠席者', esc(l.absent || '')], ['議題', esc(l.agenda || '')], ['検討内容', esc(l.discussion || '')], ['決定事項', esc(l.decisions || '')], ['次回予定', esc(l.next_plan || '')], ['周知', esc((l.notice_method || '') + ' ' + (l.notice_on || ''))]])}</div>`);
   htPrint('議事録', pages);
+}
+
+// 手で管理する画面。列は実DBのスキーマと対応。証跡・作成者は編集対象にしない。
+const HT_EDIT = {
+  off: ['事業所', 'ht_offices_t', 'id', 'id:管理番号:required name:事業所名:required code:コード types:サービス種別:types start_date:開所日:date sort:並び順:int note:備考:textarea'],
+  tr: ['研修マスタ', 'ht_trainings', 'id', 'id:管理番号:required name:研修名:required category:分類 target_types:対象サービス:types frequency:頻度 months:予定月:months times_per_year:年間回数:positive newhire:新入職員向け:bool pass_score:合格点:percent active:使用する:bool basis:法定根拠:textarea owner:担当 prep:準備:textarea url1:資料URL1 kind1:資料種類1 url2:資料URL2 kind2:資料種類2 url_checked:URL確認日:date note:備考:textarea'],
+  ev: ['訓練項目', 'ht_events', 'id', 'id:管理番号:required name:項目名:required kind:種類 target_types:対象サービス:types months:予定月:months times_per_year:年間回数:positive active:使用する:bool basis:法定根拠:textarea prep:準備:textarea owner:担当 note:備考:textarea'],
+  com: ['委員会', 'ht_committees', 'id', 'id:管理番号:required name:委員会名:required target_types:対象サービス:types interval_months:開催間隔（月）:positive basis:法定根拠:textarea owner:担当 last_held:前回開催日:date next_due:次回期限:date url:資料URL grp:一体開催グループ prep:準備:textarea note:備考:textarea'],
+  plan: ['委員会の開催予定', 'ht_committee_plan', 'id', 'fy:年度（西暦）:year month:予定月:month committee_ids:委員会:committees joint:一体開催:bool planned_on:予定日:date place:場所 note:備考:textarea'],
+  mat: ['教材', 'ht_materials', 'id', 'id:管理番号:required training_id:研修:trainings kind:種類 title:題名:required url:資料URL:required minutes:時間（分）:int descr:説明:textarea sort:並び順:int active:使用する:bool note:備考:textarea'],
+  qs: ['確認テストの問題', 'ht_questions', 'training_id,no', 'training_id:研修:trainings no:問題番号:positive question:問題文:required opt_a:選択肢A:required opt_b:選択肢B:required opt_c:選択肢C opt_d:選択肢D answer:正解:answer points:点数:positive'],
+  acc: ['アクセス権限', 'ht_access', 'email,office_id', 'email:メールアドレス:email office_id:対象事業所:accessOffice can_edit:入力・編集を許可:bool note:メモ:textarea'],
+  rec: ['受講記録', 'ht_records', 'id', 'training_id:研修:trainings staff_id:職員:staff taken_at:受講日時:datetime fy:年度（西暦）:year offices:計上事業所:offices round:受講回数:int score:得点:int max_score:満点:int rate:得点率:percent passed:結果:passed impression:所感・気づき:textarea plan:現場実践計画:textarea'],
+  evl: ['訓練・点検の実施記録', 'ht_event_logs', 'id', 'event_id:訓練項目:events office_id:事業所:office done_on:実施日:dateRequired headcount:参加者数:int members:参加者・担当:textarea result:内容・結果:required issues:課題・改善点:textarea url:資料URL note:備考:textarea'],
+  cl: ['委員会開催記録', 'ht_committee_logs', 'id', 'committee_id:委員会:committee held_at:開催日時:datetime office_ids:対象事業所:offices place:場所・方法 attendees:出席者:textarea absent:欠席者:textarea agenda:議題:textarea discussion:検討内容:textarea decisions:決定事項:required next_plan:次回予定 notice_method:周知方法 notice_on:周知日:date note:備考:textarea']
+};
+const htAdminKeys = ['off', 'tr', 'ev', 'com', 'plan', 'mat', 'qs', 'acc'];
+const htEditable = (key, row, deleting = false) => {
+  if (HT.D.isAll) return true;
+  if (htAdminKeys.includes(key) || !row) return false;
+  if (key === 'rec' && (deleting || row.confirmed_at)) return false;
+  const ids = key === 'rec' ? row.offices : key === 'cl' ? row.office_ids : [row.office_id];
+  return ids.length > 0 && ids.every(id => HT.D.editOffs.includes(id));
+};
+function htEditButtons(key, i) {
+  const row = HT.D[key][i];
+  return `${htEditable(key, row) ? `<button class="htb g" onclick="htEditForm('${key}',${i})">編集</button>` : ''}${htEditable(key, row, true) ? `<button class="htb g" onclick="htDeleteRow('${key}',${i})">削除</button>` : ''}`;
+}
+function htLogList(key) {
+  const ids = htScope().map(o => o.id), cfg = HT_EDIT[key];
+  const rows = HT.D[key].map((r, i) => ({ r, i })).filter(({r}) => (key === 'rec' ? r.offices : key === 'cl' ? r.office_ids : [r.office_id]).some(id => ids.includes(id)));
+  return `<h4>${cfg[0]}の編集</h4><div class="htw"><table class="htt"><tr><th>日付</th><th>内容</th><th>操作</th></tr>${rows.map(({r,i}) => `<tr><td>${htFmtDT(r.taken_at || r.held_at || r.done_on)}</td><td>${esc(key === 'rec' ? r.staff_name + '／' + r.training_name : key === 'evl' ? (HT.D.ev.find(e => e.id === r.event_id) || {}).name || r.event_id : (HT.D.com.find(c => c.id === r.committee_id) || {}).name || r.committee_id)}<br>${esc(r.result || r.decisions || r.impression || '')}</td><td>${htEditButtons(key,i)}</td></tr>`).join('') || '<tr><td colspan="3">記録なし</td></tr>'}</table></div>`;
+}
+function htMasterLists() {
+  return '<p class="note">ここで追加・編集・削除できます。管理番号は追加時だけ設定します。参照されている項目は削除できません。研修・訓練は「使用する」を「いいえ」にして残せます。</p>' + htAdminKeys.map(key => {
+    const cfg = HT_EDIT[key];
+    return `<h4>${cfg[0]}を管理</h4><button class="htb" onclick="htEditForm('${key}')">＋追加</button><table class="htt"><tr><th>項目</th><th>操作</th></tr>${HT.D[key].map((r,i) => `<tr><td>${esc(r.name || r.title || r.question || r.email || (r.fy + '年度 ' + r.month + '月'))}${key === 'acc' ? '<br>' + esc(r.office_id ? htOffName(r.office_id) : '全事業所') + (r.can_edit ? '（編集可）' : '（見るだけ）') : ''}${r.months ? '<br>' + esc(r.months.join('・')) + '月' : ''}${r.active === false ? '（使用しない）' : ''}</td><td>${htEditButtons(key,i)}</td></tr>`).join('')}</table>`;
+  }).join('');
+}
+function htRowFilter(key, row) {
+  return HT_EDIT[key][2].split(',').map(k => k + (row[k] == null ? '=is.null' : '=eq.' + encodeURIComponent(row[k]))).join('&');
+}
+async function htWrite(key, row, old) {
+  const result = await sb(HT_EDIT[key][1] + (old ? '?' + htRowFilter(key, old) : ''), { method: old ? 'PATCH' : 'POST', headers: {Prefer:'return=representation'}, body: JSON.stringify(row) });
+  if (!Array.isArray(result) || result.length !== 1) throw new Error('保存できませんでした。権限を確認して再読み込みしてください。');
+}
+function htAccessCheck(old, row) {
+  if (!old || old.office_id || !old.can_edit) return;
+  const loses = !row || row.email !== old.email || row.office_id !== null || !row.can_edit;
+  if (loses && old.email === HT.D.me) throw new Error('自分の全事業所の管理者権限は外せません');
+  if (loses && HT.D.acc.filter(a => !a.office_id && a.can_edit).length <= 1) throw new Error('最後の全事業所管理者は外せません');
+}
+async function htDeleteRow(key, i) {
+  const row = HT.D[key][i];
+  if (!htEditable(key,row,true)) return alert('削除権限がありません');
+  try {
+    if (key === 'acc') htAccessCheck(row,null);
+    if (!confirm(`${HT_EDIT[key][0]}「${row.name || row.title || row.email || row.id}」を削除しますか？元に戻せません。`)) return;
+    const result = await sb(HT_EDIT[key][1] + '?' + htRowFilter(key,row), {method:'DELETE',headers:{Prefer:'return=representation'}});
+    if (!Array.isArray(result) || result.length !== 1) throw new Error('削除できませんでした。権限を確認してください。');
+    await htRefresh();
+  } catch(e) { alert('削除できません：' + e.message); }
+}
+function htEditForm(key, i) {
+  const cfg = HT_EDIT[key], old = i == null ? null : HT.D[key][i], r = old || {};
+  if (!htEditable(key, old)) return alert('編集権限がありません');
+  const specs = cfg[3].split(' ').map(s => s.split(':'));
+  const pick = (arr) => arr.map(x => [x.id, x.name]);
+  const fields = specs.filter(([k]) => !old || !cfg[2].split(',').includes(k) || key === 'acc').map(([k,label,type]) => {
+    let val = r[k], opts, kind = type || 'text';
+    if (type === 'bool') { kind = 'select'; opts = [['true','はい'],['false','いいえ']]; val = String(val ?? ['active'].includes(k)); }
+    if (type === 'months') { kind='checks'; opts=[4,5,6,7,8,9,10,11,12,1,2,3].map(m=>[String(m),m+'月']); val=(val || []).map(String); }
+    if (type === 'types') { kind='text'; label += '（読点またはカンマで区切る。全対象は「全事業」）'; val=(val || []).join('、'); }
+    if (['offices','committees'].includes(type)) {kind='checks';opts=pick(type === 'offices' ? HT.D.allOff.filter(o=>HT.D.editOffs.includes(o.id)) : HT.D.com);val=val || [];}
+    const list = {trainings:HT.D.tr,events:HT.D.ev,committee:HT.D.com,staff:HT.D.staff,office:HT.D.allOff.filter(o=>HT.D.editOffs.includes(o.id)),accessOffice:HT.D.allOff}[type];
+    if (list) {kind='select';opts=pick(list);if(type==='accessOffice') opts.unshift(['','全事業所']);val=val ?? (opts[0] || [''])[0];}
+    if(type==='passed') {kind='select';opts=['合格','不合格','参加'].map(v=>[v,v]);val=val || '参加';}
+    if(type==='answer') {kind='select';opts=['A','B','C','D'].map(v=>[v,v]);val=val || 'A';}
+    if(type==='month') {kind='select';opts=Array.from({length:12},(_,n)=>[String(n+1),(n+1)+'月']);val=String(val || 4);}
+    if(['int','positive','percent','year'].includes(type)) {kind='number';val=val ?? (type==='year'?HT.fy:type==='positive'?1:type==='percent'?75:'');}
+    if(type==='datetime') {kind='datetime-local';val=new Date(new Date(val || Date.now()).getTime()+9*36e5).toISOString().slice(0,16);}
+    if(type==='dateRequired') kind='date';
+    if(type==='required') kind='text';
+    return {k,label,type:kind,opts,val,req:['required','email','datetime','dateRequired','year','positive'].includes(type)};
+  });
+  htModal(cfg[0] + (old ? 'を編集' : 'を追加'),fields,async o => {
+    const row={};
+    for(const [k,,type] of specs) {
+      if(!(k in o)) continue;
+      let v=o[k];
+      if(type==='bool') v=v==='true';
+      else if(type==='months') v=v.map(Number);
+      else if(type==='types') v=[...new Set(v.split(/[、,\n]/).map(x=>x.trim()).filter(Boolean))];
+      else if(['int','positive','percent','year','month'].includes(type)) { v=v===''?null:Number(v);if(v!==null && (!Number.isInteger(v) || (type==='positive' && v<1) || (type==='percent' && (v<0||v>100)) || (type==='year' && (v<2000||v>2200)) || (type==='int' && v<0))) throw new Error('数値の範囲を確認してください'); }
+      else if(type==='datetime') v=v+':00+09:00';
+      else if(type==='email') {v=v.toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) throw new Error('メールアドレスを確認してください');}
+      else if(!Array.isArray(v)) v=v || null;
+      row[k]=v;
+    }
+    for(const k of ['offices','office_ids','committee_ids','target_types','types']) if(k in row && !row[k].length) throw new Error('対象を1つ以上選んでください');
+    if(key==='plan' && row.planned_on) {const d=new Date(row.planned_on+'T12:00:00+09:00');if(htFy(d)!==row.fy || Number(row.planned_on.slice(5,7))!==row.month) throw new Error('予定日と年度・予定月を合わせてください');}
+    if(key==='acc') htAccessCheck(old,row);
+    if(key==='rec') {
+      const t=HT.D.tr.find(t=>t.id===row.training_id),s=HT.D.staff.find(s=>s.id===row.staff_id);
+      row.training_name=t.name;row.staff_name=s.name;row.email=s.email;
+      if(row.fy!==htFy(new Date(row.taken_at))) throw new Error('受講日と年度を合わせてください');
+      // DB側で編集後の証跡と確認日時を更新する。
+    }
+    await htWrite(key,row,old);
+  });
 }

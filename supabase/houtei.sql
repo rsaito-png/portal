@@ -133,8 +133,91 @@ drop policy if exists ht_el_w on public.ht_event_logs; create policy ht_el_w on 
 alter table public.ht_committee_logs enable row level security;
 drop policy if exists ht_cl_r on public.ht_committee_logs; create policy ht_cl_r on public.ht_committee_logs for select to authenticated using (public.ht_all() or office_ids && public.ht_offices());
 drop policy if exists ht_cl_w on public.ht_committee_logs; create policy ht_cl_w on public.ht_committee_logs for all to authenticated using (public.ht_all() or (office_ids <@ public.ht_edit_offices())) with check (public.ht_all() or (array_length(office_ids,1)>0 and office_ids <@ public.ht_edit_offices()));
--- アクセス表：自分の行は読める。変えられるのは統括だけ（画面からは触らない・SQLで設定）
+-- アクセス表：自分の行は読める。変えられるのは統括だけ（設定画面から管理）
 drop policy if exists ht_access_r on public.ht_access; create policy ht_access_r on public.ht_access for select to authenticated using (email = public.ht_email() or public.ht_all());
 drop policy if exists ht_access_w on public.ht_access; create policy ht_access_w on public.ht_access for all to authenticated using (public.ht_all()) with check (public.ht_all());
 -- anon には何も出さない
 do $$ declare t text; begin for t in select tablename from pg_tables where schemaname='public' and tablename like 'ht\_%' loop execute format('revoke all on public.%I from anon', t); end loop; end $$;
+
+-- 2026-11-08 手動編集。閲覧のみの全事業所権限は管理者ではない。
+create or replace function public.ht_all() returns boolean language sql stable security definer set search_path=public as
+$$ select exists(select 1 from ht_access where email=public.ht_email() and office_id is null and can_edit) $$;
+create or replace function public.ht_offices() returns text[] language sql stable security definer set search_path=public as
+$$ select case when exists(select 1 from ht_access where email=public.ht_email() and office_id is null)
+ then (select coalesce(array_agg(id),'{}') from ht_offices_t)
+ else (select coalesce(array_agg(office_id),'{}') from ht_access where email=public.ht_email() and office_id is not null) end $$;
+-- 書き込みは直列化して、同時操作で最後の管理者が消えることも防ぐ。
+create schema if not exists private;
+create table if not exists private.ht_access_mutex (id boolean primary key default true check(id), version bigint not null default 0);
+insert into private.ht_access_mutex(id) values(true) on conflict do nothing;
+revoke all on private.ht_access_mutex from public, anon, authenticated;
+create or replace function private.ht_access_lock() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ update private.ht_access_mutex set version=version+1 where id;
+ return null;
+end $$;
+create or replace function private.ht_access_guard() returns trigger language plpgsql security definer set search_path='' as $$
+declare losing boolean;
+begin
+ if tg_op <> 'DELETE' then
+  new.email := lower(trim(new.email));
+  if new.email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' then raise exception 'メールアドレスを確認してください'; end if;
+  if new.office_id is not null and not exists(select 1 from public.ht_offices_t where id=new.office_id) then raise exception '対象事業所がありません'; end if;
+ end if;
+ if tg_op <> 'INSERT' and old.office_id is null and old.can_edit then
+  losing := tg_op='DELETE';
+  if tg_op='UPDATE' then losing := new.office_id is not null or not new.can_edit or new.email<>old.email; end if;
+  if losing then
+   if old.email=public.ht_email() then raise exception '自分の全事業所の管理者権限は外せません'; end if;
+   if not exists(select 1 from public.ht_access where office_id is null and can_edit and email<>old.email) then raise exception '最後の全事業所管理者は外せません'; end if;
+  end if;
+ end if;
+ if tg_op='DELETE' then return old; end if;
+ return new;
+end $$;
+revoke all on function private.ht_access_lock(), private.ht_access_guard() from public, anon, authenticated;
+drop trigger if exists ht_access_lock on public.ht_access;
+create trigger ht_access_lock before insert or update or delete on public.ht_access for each statement execute function private.ht_access_lock();
+drop trigger if exists ht_access_guard on public.ht_access;
+create trigger ht_access_guard before insert or update or delete on public.ht_access for each row execute function private.ht_access_guard();
+-- 修正した受講内容に、元の本人確認・統括確認をそのまま付けない。
+create or replace function private.ht_record_edit_guard() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if (to_jsonb(new)-array['confirmed_at','confirmed_by']) is distinct from (to_jsonb(old)-array['confirmed_at','confirmed_by']) then
+  new.confirmed_at := null; new.confirmed_by := null;
+  new.source := '手入力'; new.evidence := '手入力（編集済み・証跡なし）'; new.submit_email := '';
+ end if;
+ return new;
+end $$;
+revoke all on function private.ht_record_edit_guard() from public, anon, authenticated;
+drop trigger if exists ht_record_edit_guard on public.ht_records;
+create trigger ht_record_edit_guard before update on public.ht_records for each row execute function private.ht_record_edit_guard();
+-- 空配列で書き込み範囲をすり抜けない。
+drop policy if exists ht_records_u on public.ht_records;
+create policy ht_records_u on public.ht_records for update to authenticated
+ using (public.ht_all() or (array_length(offices,1)>0 and offices <@ public.ht_edit_offices()))
+ with check (public.ht_all() or (array_length(offices,1)>0 and offices <@ public.ht_edit_offices()));
+drop policy if exists ht_cl_w on public.ht_committee_logs;
+create policy ht_cl_w on public.ht_committee_logs for all to authenticated
+ using (public.ht_all() or (array_length(office_ids,1)>0 and office_ids <@ public.ht_edit_offices()))
+ with check (public.ht_all() or (array_length(office_ids,1)>0 and office_ids <@ public.ht_edit_offices()));
+-- 配列参照はFKでは守られないため、参照中のマスタ削除を止める。
+create or replace function private.ht_master_delete_guard() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if tg_table_name='ht_offices_t' then
+  if exists(select 1 from public.ht_access where office_id=old.id)
+   or exists(select 1 from public.ht_staff where old.id=any(sub_offices))
+   or exists(select 1 from public.ht_records where old.id=any(offices))
+   or exists(select 1 from public.ht_committee_logs where old.id=any(office_ids)) then
+   raise exception 'この事業所は権限や記録に使われているため削除できません';
+  end if;
+ elsif tg_table_name='ht_committees' then
+  if exists(select 1 from public.ht_committee_plan where old.id=any(committee_ids)) then raise exception '開催予定に使われている委員会は削除できません'; end if;
+ end if;
+ return old;
+end $$;
+revoke all on function private.ht_master_delete_guard() from public, anon, authenticated;
+drop trigger if exists ht_master_delete_guard on public.ht_offices_t;
+create trigger ht_master_delete_guard before delete on public.ht_offices_t for each row execute function private.ht_master_delete_guard();
+drop trigger if exists ht_master_delete_guard on public.ht_committees;
+create trigger ht_master_delete_guard before delete on public.ht_committees for each row execute function private.ht_master_delete_guard();
