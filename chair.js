@@ -14,11 +14,12 @@ async function chairCheck() {
 async function chairTile() {
   if (!(await chairCheck())) return;
   const v = document.getElementById('view'); if (!v || document.getElementById('chair_tile')) return;
-  const html = `<a id="chair_tile" class="tile big" href="#chair" style="display:block;border-top:4px solid #b8860b;margin-bottom:12px"><span>👑</span>会長ページ<small>思いつきを入れる・今日やる3つ</small></a>`;
+  const html = `<a id="chair_tile" class="tile big" href="#chair/inquiries" style="display:block;border-top:4px solid #b8860b;margin-bottom:12px"><span>👑</span>会長ページ<small>思いつきを入れる・今日やる3つ</small></a>`;
   const msg = document.getElementById('chair_msg');
   if (msg) msg.insertAdjacentHTML('afterend', html); else v.insertAdjacentHTML('afterbegin', html);
   const ct = document.getElementById('chair_tile'); // 会長は総務を経ずに税カレンダーへ
   if (ct && !document.getElementById('taxcal_tile')) ct.insertAdjacentHTML('afterend', `<a id="taxcal_tile" class="tile" href="#taxcal" style="display:block;border-top:4px solid #2e6b4f;margin-bottom:12px"><span>🧾</span>税カレンダー<small>源泉・住民税（毎月10日）と年次の期限</small></a>`);
+  if (typeof contactBadge === 'function') contactBadge();
 }
 // 会長からの一言（職員向け表示）
 async function chairMsgHtml() {
@@ -49,6 +50,7 @@ async function renderChair() {
       ${i.status === 'done' ? ` <button class="back" style="width:auto;padding:8px 18px;font-size:16px" onclick="chairUndo(${i.id})">戻す</button>` : btn ? ` <button style="width:auto;padding:8px 18px;font-size:16px" onclick="chairDone(${i.id})">完了</button>` : ''}</div></div>`;
     const cnt = bks.map(b => [b, open.filter(i => i.bucket === b).length]);
     $('view').innerHTML = back + `<h3 class="nx" style="font-size:22px">👑 会長ページ</h3>
+      <div id="contact_inbox">読み込み中…</div>
       <div class="card"><input id="ch_in" maxlength="1000" placeholder="思いついたことを一行で" style="font-size:20px;padding:14px"
         onkeydown="if(event.key==='Enter')chairSend()"><button style="font-size:22px;padding:14px;margin-top:8px" onclick="chairSend()">送る</button><div id="ch_m" style="font-size:20px;color:#2e6b4f;min-height:1.4em;margin-top:6px"></div></div>
       <h3 class="nx" id="bn_chair_h">🧑‍💼 番頭さんからの取り次ぎ</h3><div id="bn_chair">読み込み中…</div>
@@ -63,6 +65,7 @@ async function renderChair() {
         <button style="margin-top:6px" onclick="chairMsgSend()">表示する</button> <button class="back" onclick="chairMsgOff()">一言を消す</button> <span id="ch_mm" class="note"></span></div>
 `;
     chairList(); chairCur(); if (typeof bnChair === 'function') bnChair();
+    if (typeof contactInboxMount === 'function') contactInboxMount();
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }
 // 手で書き足すToDo。各担当セクションの一番下から入れる。そのセクションの担当で固定（ai_at を入れて朝のAI整理の振り分けで上書きされない）
