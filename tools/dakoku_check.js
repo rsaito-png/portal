@@ -83,6 +83,7 @@ const ui = fs.readFileSync(path.join(root, 'dakoku.js'), 'utf8');
 ok(ui.includes('gpsRequired') && ui.includes('位置情報不要') && ui.includes('ポータルへ'), 'ui no-GPS path');
 ok(ui.includes('名簿に未登録') && ui.includes('staffByEmail') && ui.includes('dkOffices'), 'ui email lock');
 ok(ui.includes('rpc/dakoku_bootstrap') && ui.includes('rpc/dakoku_punch') && ui.includes('rpc/dakoku_recent') && ui.includes('rpc/dakoku_month'), 'ui uses Supabase RPCs');
+ok(ui.includes('dkIngestFromGas_') && ui.includes('dakoku_ingest_gas'), 'ui dual-writes GAS punches');
 ok(ui.includes('月別一覧') && ui.includes('Registro mensal') && ui.includes('dkLoadMonth'), 'ui month list');
 const admin = fs.readFileSync(path.join(root, 'dakoku_admin.js'), 'utf8');
 ok(admin.includes('renderDakokuSettings') && admin.includes('dakoku_offices') && admin.includes('dakoku_staff'), 'admin edits offices/staff');

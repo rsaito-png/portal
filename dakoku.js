@@ -122,7 +122,36 @@ async function dkRpc(payload) {
     j = dkJson(text);
   }
   if (!j || j.ok === false) throw new Error((j && j.error) || '打刻サーバーに接続できませんでした');
+  // 旧GAS経由でも Supabase に残す（キャッシュ古い端末対策）
+  if (payload.action === 'punch' && j && j.ok && j.at) {
+    try { await dkIngestFromGas_(payload, j); } catch (e) { /* Sheet側は成功済み */ }
+  }
   return j;
+}
+async function dkIngestFromGas_(payload, j) {
+  const url = (window.SB_URL || (window.PORTAL_CONFIG && window.PORTAL_CONFIG.supabaseUrl) || 'https://zvrardoyxocmqhvyddnf.supabase.co').replace(/\/$/, '');
+  const key = window.SB_ANON || (window.PORTAL_CONFIG && (window.PORTAL_CONFIG.supabaseKey || window.PORTAL_CONFIG.supabaseAnon || window.PORTAL_CONFIG.anonKey)) || '';
+  if (!key) return;
+  const body = {
+    p_token: dkCfg().token,
+    p_at_jst: j.at,
+    p_office: payload.office,
+    p_staff_id: payload.staffId,
+    p_staff_name: (DK.data && DK.data.staff && (DK.data.staff.find(s => s.id === payload.staffId) || {}).name) || '',
+    p_kind: payload.kind,
+    p_lat: payload.lat == null || payload.lat === '' ? null : Number(payload.lat),
+    p_lng: payload.lng == null || payload.lng === '' ? null : Number(payload.lng),
+    p_distance: j.distance == null ? null : Number(j.distance),
+    p_accuracy: payload.accuracy == null || payload.accuracy === '' ? null : Number(payload.accuracy),
+    p_lunch: payload.lunch === true || payload.lunch === 'はい',
+    p_email: payload.email || DK.sess.email || '',
+    p_memo: (payload.memo || '') + '（GAS経由）'
+  };
+  await fetch(url + '/rest/v1/rpc/dakoku_ingest_gas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: 'Bearer ' + key },
+    body: JSON.stringify(body)
+  });
 }
 
 function dkGeo() {
