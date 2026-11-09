@@ -82,11 +82,33 @@ ok(gas.includes('needGps') || gas.includes('gps=off'), 'gas optional GPS');
 const ui = fs.readFileSync(path.join(root, 'dakoku.js'), 'utf8');
 ok(ui.includes('gpsRequired') && ui.includes('位置情報不要') && ui.includes('ポータルへ'), 'ui no-GPS path');
 ok(ui.includes('名簿に未登録') && ui.includes('staffByEmail') && ui.includes('dkOffices'), 'ui email lock');
-ok(ui.includes('rpc/dakoku_bootstrap') && ui.includes('rpc/dakoku_punch') && ui.includes('rpc/dakoku_recent'), 'ui uses Supabase RPCs');
+ok(ui.includes('rpc/dakoku_bootstrap') && ui.includes('rpc/dakoku_punch') && ui.includes('rpc/dakoku_recent') && ui.includes('rpc/dakoku_month'), 'ui uses Supabase RPCs');
+ok(ui.includes('月別一覧') && ui.includes('Registro mensal') && ui.includes('dkLoadMonth'), 'ui month list');
 const admin = fs.readFileSync(path.join(root, 'dakoku_admin.js'), 'utf8');
 ok(admin.includes('renderDakokuSettings') && admin.includes('dakoku_offices') && admin.includes('dakoku_staff'), 'admin edits offices/staff');
 const sql = fs.readFileSync(path.join(root, 'supabase/dakoku.sql'), 'utf8');
 ok(sql.includes('dakoku_bootstrap') && sql.includes('dakoku_punch') && sql.includes('on conflict (name) do nothing'), 'sql migrate preserves values');
+ok(sql.includes('dakoku_month') && sql.includes('自分の打刻だけ見られます'), 'sql month rpc + recent lock');
 ok(sql.includes("'金斗雲', 'KINTOUN', null, null, null"), 'kintoun seeded without GPS');
+
+ok(Dakoku.currentMonthJst(new Date('2026-11-09T06:00:00Z')) === '2026-11', 'currentMonthJst');
+eq(Dakoku.shiftMonth('2026-11', -1), '2026-10', 'shift prev');
+eq(Dakoku.shiftMonth('2026-12', 1), '2027-01', 'shift next year');
+ok(Dakoku.isProxyMemo('管理者記録（打刻漏れ）／齊藤さん指示で代理入力') && !Dakoku.isProxyMemo('昼食=いいえ'), 'proxy memo');
+const packed = Dakoku.pairMonth([
+  { at: '2026-11-07 10:55:40', kind: '出勤' },
+  { at: '2026-11-07 13:12:35', kind: '退勤' },
+  { at: '2026-11-07 14:58:47', kind: '出勤' },
+  { at: '2026-11-07 20:43:48', kind: '退勤' },
+  { at: '2026-11-09 15:00:00', kind: '出勤', memo: '管理者記録（打刻漏れ）／齊藤さん指示で代理入力' },
+]);
+eq(packed.pairs.length, 3, 'pair count');
+eq(packed.pairs[0], { day: '2026-11-07', inAt: '10:55', outAt: '13:12', minutes: 137, proxy: false, missing: null }, 'pair1');
+eq(packed.pairs[1].minutes, 345, 'pair2 mins');
+ok(packed.pairs[2].proxy && packed.pairs[2].missing === '退勤なし', 'proxy open');
+eq(packed.totalMinutes, 137 + 345, 'month total');
+eq(Dakoku.formatHours(137), '2時間17分', 'formatHours');
+const missIn = Dakoku.pairMonth([{ at: '2026-11-01 18:00:00', kind: '退勤' }]);
+eq(missIn.pairs[0].missing, '出勤なし', 'missing in');
 
 console.log('ok', n);

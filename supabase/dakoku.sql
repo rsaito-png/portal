@@ -133,10 +133,20 @@ $$;
 create or replace function public.dakoku_recent(p_staff_id text)
 returns jsonb
 language plpgsql stable security definer set search_path = public as $$
-declare rows jsonb;
+declare
+  rows jsonb;
+  s public.dakoku_staff;
+  email text := lower(coalesce(auth.jwt()->>'email',''));
 begin
   if auth.uid() is null then raise exception 'ログインが必要です'; end if;
   if coalesce(btrim(p_staff_id),'') = '' then return jsonb_build_object('ok', false, 'error', '職員が指定されていません'); end if;
+  select * into s from public.dakoku_staff where id = btrim(p_staff_id);
+  if not found then return jsonb_build_object('ok', false, 'error', '職員が見つかりません'); end if;
+  if not public.dakoku_admin_can() then
+    if email = '' or coalesce(nullif(btrim(s.email),''), '') = '' or email <> lower(btrim(s.email)) then
+      return jsonb_build_object('ok', false, 'error', '自分の打刻だけ見られます');
+    end if;
+  end if;
   select coalesce(jsonb_agg(x.obj order by x.punched_at desc), '[]'::jsonb) into rows
   from (
     select punched_at, jsonb_build_object(
@@ -144,7 +154,7 @@ begin
       'lunch', case when lunch then 'はい' else 'いいえ' end
     ) as obj
     from public.dakoku_punches
-    where staff_id = p_staff_id
+    where staff_id = s.id
     order by punched_at desc
     limit 8
   ) x;
@@ -209,11 +219,63 @@ begin
 end;
 $$;
 
+create or replace function public.dakoku_month(p_staff_id text, p_month text)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  s public.dakoku_staff;
+  email text := lower(coalesce(auth.jwt()->>'email',''));
+  rows jsonb;
+  mon text;
+  mon_start text;
+  mon_end text;
+begin
+  if auth.uid() is null then raise exception 'ログインが必要です'; end if;
+  if coalesce(btrim(p_staff_id),'') = '' then
+    return jsonb_build_object('ok', false, 'error', '職員が指定されていません');
+  end if;
+  mon := btrim(coalesce(p_month,''));
+  if mon !~ '^\d{4}-\d{2}$' then
+    return jsonb_build_object('ok', false, 'error', '月はYYYY-MMで指定してください');
+  end if;
+  select * into s from public.dakoku_staff where id = btrim(p_staff_id);
+  if not found then
+    return jsonb_build_object('ok', false, 'error', '職員が見つかりません');
+  end if;
+  if not public.dakoku_admin_can() then
+    if email = '' or coalesce(nullif(btrim(s.email),''), '') = '' or email <> lower(btrim(s.email)) then
+      return jsonb_build_object('ok', false, 'error', '自分の打刻だけ見られます');
+    end if;
+  end if;
+  mon_start := mon || '-01 00:00:00';
+  mon_end := to_char(((mon || '-01')::date + interval '1 month'), 'YYYY-MM-DD') || ' 00:00:00';
+  select coalesce(jsonb_agg(x.obj order by x.punched_at_jst, x.id), '[]'::jsonb) into rows
+  from (
+    select id, punched_at_jst, jsonb_build_object(
+      'id', id,
+      'at', punched_at_jst,
+      'kind', kind,
+      'office', office,
+      'lunch', case when lunch then 'はい' else 'いいえ' end,
+      'memo', coalesce(memo,''),
+      'proxy', coalesce(memo,'') like '管理者記録%'
+    ) as obj
+    from public.dakoku_punches
+    where staff_id = s.id
+      and punched_at_jst >= mon_start
+      and punched_at_jst < mon_end
+  ) x;
+  return jsonb_build_object('ok', true, 'month', mon, 'staffId', s.id, 'rows', rows);
+end;
+$$;
+
 revoke all on function public.dakoku_bootstrap() from public, anon;
 revoke all on function public.dakoku_recent(text) from public, anon;
+revoke all on function public.dakoku_month(text, text) from public, anon;
 revoke all on function public.dakoku_punch(text,text,text,double precision,double precision,double precision,boolean,text) from public, anon;
 grant execute on function public.dakoku_bootstrap() to authenticated;
 grant execute on function public.dakoku_recent(text) to authenticated;
+grant execute on function public.dakoku_month(text, text) to authenticated;
 grant execute on function public.dakoku_punch(text,text,text,double precision,double precision,double precision,boolean,text) to authenticated;
 
 notify pgrst, 'reload schema';

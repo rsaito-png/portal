@@ -113,6 +113,72 @@
   }
   const kindOk = k => KINDS.indexOf(k) >= 0;
 
+  // 管理者代理入力のメモ（先頭一致）
+  function isProxyMemo(memo) {
+    return String(memo || '').indexOf('管理者記録') === 0;
+  }
+  // punched_at_jst（YYYY-MM-DD HH:MM:SS）から日・分を取る
+  function parseJst(at) {
+    const m = String(at || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return null;
+    return { day: m[1], hm: m[2] + ':' + m[3], minutes: (+m[2]) * 60 + (+m[3]) };
+  }
+  // 月の打刻を日ごとに出勤→退勤で組む。複数シフト可。未対応は missing。
+  function pairMonth(rows) {
+    const byDay = {};
+    (rows || []).forEach(r => {
+      const p = parseJst(r.at);
+      if (!p) return;
+      const item = { at: String(r.at || ''), kind: r.kind, memo: r.memo || '', proxy: r.proxy === true || isProxyMemo(r.memo), day: p.day, hm: p.hm, minutes: p.minutes };
+      (byDay[p.day] = byDay[p.day] || []).push(item);
+    });
+    const pairs = [];
+    let totalMinutes = 0;
+    Object.keys(byDay).sort().forEach(day => {
+      const list = byDay[day].slice().sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+      let open = null;
+      list.forEach(ev => {
+        if (ev.kind === '出勤') {
+          if (open) pairs.push({ day: day, inAt: open.hm, outAt: null, minutes: null, proxy: !!open.proxy, missing: '退勤なし' });
+          open = ev;
+        } else if (ev.kind === '退勤') {
+          if (open) {
+            const mins = ev.minutes - open.minutes;
+            const ok = Number.isFinite(mins) && mins >= 0;
+            if (ok) totalMinutes += mins;
+            pairs.push({ day: day, inAt: open.hm, outAt: ev.hm, minutes: ok ? mins : null, proxy: !!(open.proxy || ev.proxy), missing: null });
+            open = null;
+          } else {
+            pairs.push({ day: day, inAt: null, outAt: ev.hm, minutes: null, proxy: !!ev.proxy, missing: '出勤なし' });
+          }
+        }
+      });
+      if (open) pairs.push({ day: day, inAt: open.hm, outAt: null, minutes: null, proxy: !!open.proxy, missing: '退勤なし' });
+    });
+    return { pairs: pairs, totalMinutes: totalMinutes };
+  }
+  function formatHours(mins) {
+    if (mins == null || !Number.isFinite(mins)) return '—';
+    const h = Math.floor(mins / 60);
+    const m = Math.abs(Math.round(mins % 60));
+    return h + '時間' + String(m).padStart(2, '0') + '分';
+  }
+  function shiftMonth(ym, delta) {
+    const parts = String(ym || '').split('-');
+    const y = +parts[0], m = +parts[1];
+    if (!y || !m) return ym;
+    const d = new Date(Date.UTC(y, m - 1 + (delta || 0), 1));
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+  }
+  function currentMonthJst(now) {
+    const d = now || new Date();
+    try {
+      return d.toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
+    } catch (e) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    }
+  }
+
   // 見本モード用。実在の職員名は入れない。座標だけ RYDEEN の事業所（設定シートと同じ）。
   const SAMPLE = {
     offices: [
@@ -131,7 +197,7 @@
   const sample = () => JSON.parse(JSON.stringify(SAMPLE));
 
   const api = {
-    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, staffByEmail, officesForEmail, resolveStaff, gpsRequired, judge, kindOk, sample,
+    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, staffByEmail, officesForEmail, resolveStaff, gpsRequired, judge, kindOk, isProxyMemo, parseJst, pairMonth, formatHours, shiftMonth, currentMonthJst, sample,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Dakoku = api;
