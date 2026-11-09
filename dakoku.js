@@ -1,5 +1,5 @@
 // 出退勤打刻（#dakoku）。スマホ向け。出勤・退勤だけ。
-// シートへの書き込みは GAS ウェブアプリ経由（config.js の dakoku.gasUrl / dakoku.token）。秘密鍵は置かない。
+// 記録先は Supabase（dakoku_* RPC）のみ。Google シート／GAS は使わない。
 // ログインは法人ポータルの sess。本番は dakoku_staff.email と一致する本人だけ自動選択（他人は選べない）。
 const DK = { data: null, office: '', staffId: '', pos: null, posError: '', locating: false, msg: '', bad: false, busy: false, lunch: false, recent: [], month: '', monthRows: [], monthErr: '', monthBusy: false, sess: { email: '', demo: false } };
 let DK_LOC_SEQ = 0;
@@ -33,10 +33,6 @@ function dkSession() {
     return { email: (s && s.email) || '', demo: false };
   } catch (e) { return { email: '', demo: false }; }
 }
-function dkCfg() {
-  const c = (window.PORTAL_CONFIG && window.PORTAL_CONFIG.dakoku) || {};
-  return { gasUrl: String(c.gasUrl || '').trim(), token: String(c.token || '').trim() };
-}
 // 見本：所属＋兼務で絞る。本番：ログインメール一致の所属事業所だけ。
 function dkAssigned(all) {
   const mine = typeof MY_OFFICE === 'string' ? MY_OFFICE : '';
@@ -60,98 +56,39 @@ function dkRemember(office, email, id) {
 function dkRecall(office, email) {
   try { return sessionStorage.getItem('dakoku:' + office + ':' + email) || ''; } catch (e) { return ''; }
 }
-function dkJson(text) {
-  const t = String(text || '').replace(/^\)\]\}',?\n/, '').trim();
-  try { return JSON.parse(t); } catch (e) { return null; }
-}
-function dkWrong(action, j) {
-  if (!j) return true;
-  if (action === 'punch') return !j.at && !j.error;
-  if (action === 'recent' || action === 'month') return !j.rows && !j.error;
-  return !j.offices && !j.error;
-}
-// GAS は OPTIONS に答えない。POST は text/plain（単純リクエスト）。302 で中身が落ちたら GET に落とす。
+// Supabase RPC のみ。失敗したらエラー（Google へは落とさない）。
 async function dkRpc(payload) {
   const action = payload.action || 'bootstrap';
-  // Supabase が正。ログイン済みなら RPC を使う。
-  if (!DK.sess.demo && typeof sb === 'function') {
-    try {
-      if (action === 'bootstrap') {
-        const j = await sb('rpc/dakoku_bootstrap', { method: 'POST', body: '{}' });
-        if (j && j.ok && Array.isArray(j.offices) && j.offices.length) return j;
-      } else if (action === 'recent') {
-        const j = await sb('rpc/dakoku_recent', { method: 'POST', body: JSON.stringify({ p_staff_id: payload.staffId }) });
-        if (j && j.ok) return j;
-        if (j && j.error) throw new Error(j.error);
-      } else if (action === 'month') {
-        const j = await sb('rpc/dakoku_month', { method: 'POST', body: JSON.stringify({ p_staff_id: payload.staffId, p_month: payload.month }) });
-        if (j && j.ok) return j;
-        if (j && j.error) throw new Error(j.error);
-      } else if (action === 'punch') {
-        const j = await sb('rpc/dakoku_punch', { method: 'POST', body: JSON.stringify({
-          p_office: payload.office, p_staff_id: payload.staffId, p_kind: payload.kind,
-          p_lat: payload.lat ?? null, p_lng: payload.lng ?? null, p_accuracy: payload.accuracy ?? null,
-          p_lunch: payload.lunch === true || payload.lunch === 'はい', p_memo: payload.memo || null
-        }) });
-        if (j && j.ok) return j;
-        if (j && j.error) throw new Error(j.error);
-        throw new Error('打刻を記録できませんでした');
-      }
-    } catch (e) {
-      // 表が未作成などのときだけ GAS へ。punch の失敗は GAS に流さない（二重記録防止）
-      if (action === 'punch') throw e;
-      if (!/読み込めません|404|PGRST|ログイン/.test(String(e.message || e))) throw e;
-    }
+  if (typeof sb !== 'function') throw new Error('打刻の接続先が未設定です。ログインし直してください。');
+  if (action === 'bootstrap') {
+    const j = await sb('rpc/dakoku_bootstrap', { method: 'POST', body: '{}' });
+    if (j && j.ok && Array.isArray(j.offices)) return j;
+    if (j && j.error) throw new Error(j.error);
+    throw new Error('打刻の初期データを読めませんでした');
   }
-  // フォールバック：旧 GAS（設定がまだ Supabase に無いとき）
-  const c = dkCfg();
-  if (!c.gasUrl || !c.token) throw new Error('打刻の接続先が未設定です。Supabase の dakoku 表、または GAS を確認してください。');
-  const full = Object.assign({}, payload, { token: c.token });
-  let text = '';
-  try {
-    const r = await fetch(c.gasUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(full) });
-    text = await r.text();
-  } catch (e) { text = ''; }
-  let j = dkJson(text);
-  if (dkWrong(payload.action, j)) {
-    const q = new URLSearchParams();
-    Object.keys(full).forEach(k => { if (full[k] !== undefined && full[k] !== null) q.set(k, String(full[k])); });
-    const join = c.gasUrl.indexOf('?') >= 0 ? '&' : '?';
-    const r = await fetch(c.gasUrl + join + q.toString(), { method: 'GET' });
-    text = await r.text();
-    j = dkJson(text);
+  if (action === 'recent') {
+    const j = await sb('rpc/dakoku_recent', { method: 'POST', body: JSON.stringify({ p_staff_id: payload.staffId }) });
+    if (j && j.ok) return j;
+    if (j && j.error) throw new Error(j.error);
+    throw new Error('最近の打刻を読めませんでした');
   }
-  if (!j || j.ok === false) throw new Error((j && j.error) || '打刻サーバーに接続できませんでした');
-  // 旧GAS経由でも Supabase に残す（キャッシュ古い端末対策）
-  if (payload.action === 'punch' && j && j.ok && j.at) {
-    try { await dkIngestFromGas_(payload, j); } catch (e) { /* Sheet側は成功済み */ }
+  if (action === 'month') {
+    const j = await sb('rpc/dakoku_month', { method: 'POST', body: JSON.stringify({ p_staff_id: payload.staffId, p_month: payload.month }) });
+    if (j && j.ok) return j;
+    if (j && j.error) throw new Error(j.error);
+    throw new Error('月の打刻を読めませんでした');
   }
-  return j;
-}
-async function dkIngestFromGas_(payload, j) {
-  const url = (window.SB_URL || (window.PORTAL_CONFIG && window.PORTAL_CONFIG.supabaseUrl) || 'https://zvrardoyxocmqhvyddnf.supabase.co').replace(/\/$/, '');
-  const key = window.SB_ANON || (window.PORTAL_CONFIG && (window.PORTAL_CONFIG.supabaseKey || window.PORTAL_CONFIG.supabaseAnon || window.PORTAL_CONFIG.anonKey)) || '';
-  if (!key) return;
-  const body = {
-    p_token: dkCfg().token,
-    p_at_jst: j.at,
-    p_office: payload.office,
-    p_staff_id: payload.staffId,
-    p_staff_name: (DK.data && DK.data.staff && (DK.data.staff.find(s => s.id === payload.staffId) || {}).name) || '',
-    p_kind: payload.kind,
-    p_lat: payload.lat == null || payload.lat === '' ? null : Number(payload.lat),
-    p_lng: payload.lng == null || payload.lng === '' ? null : Number(payload.lng),
-    p_distance: j.distance == null ? null : Number(j.distance),
-    p_accuracy: payload.accuracy == null || payload.accuracy === '' ? null : Number(payload.accuracy),
-    p_lunch: payload.lunch === true || payload.lunch === 'はい',
-    p_email: payload.email || DK.sess.email || '',
-    p_memo: (payload.memo || '') + '（GAS経由）'
-  };
-  await fetch(url + '/rest/v1/rpc/dakoku_ingest_gas', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: 'Bearer ' + key },
-    body: JSON.stringify(body)
-  });
+  if (action === 'punch') {
+    const j = await sb('rpc/dakoku_punch', { method: 'POST', body: JSON.stringify({
+      p_office: payload.office, p_staff_id: payload.staffId, p_kind: payload.kind,
+      p_lat: payload.lat ?? null, p_lng: payload.lng ?? null, p_accuracy: payload.accuracy ?? null,
+      p_lunch: payload.lunch === true || payload.lunch === 'はい', p_memo: payload.memo || null
+    }) });
+    if (j && j.ok) return j;
+    if (j && j.error) throw new Error(j.error);
+    throw new Error('打刻を記録できませんでした');
+  }
+  throw new Error('不明な操作です');
 }
 
 function dkGeo() {

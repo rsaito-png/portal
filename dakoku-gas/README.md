@@ -1,21 +1,12 @@
-# 出退勤打刻の GAS
+# 出退勤打刻の GAS（廃止スタブ）
 
-ポータル（`#dakoku`）からスプレッドシートへ書くためのウェブアプリです。ページに秘密鍵は置きません。
+ポータルの打刻は **Supabase のみ**。この `Code.gs` は旧キャッシュ端末がまだ `/exec` に POST してくるとき用で、**シートにも Supabase にも書かない**。
 
-シート: [出退勤記録（レオ・金斗雲・RYDEEN）](https://docs.google.com/spreadsheets/d/1KEyzLGVwIWR2ziWNyghhGzSf6B2ZfHE-UIj8U0szxzs/edit)
-タブ: 設定 / 職員 / 打刻ログ / 管理者修正（修正タブはまだ使いません）
+返す JSON は `{ ok: false, error: "新しい画面に…" }`。旧画面はこの `error` を赤枠で表示する。
 
 ## デプロイ
 
-1. スプレッドシートを、ポータルと同じ Google アカウントで開く。
-2. 拡張機能 → Apps Script。`Code.gs` の中身を、このフォルダの `Code.gs` で置き換える。
-3. プロジェクトの設定 → スクリプト プロパティに `DAKOKU_TOKEN` を追加する。値は `config.js` の `dakoku.token` と同じ文字列。
-4. デプロイ → 新しいデプロイ → 種類「ウェブアプリ」。
-   - 実行ユーザー: 自分
-   - アクセスできるユーザー: 全員
-5. 出た `/exec` の URL を `config.js` の `dakoku.gasUrl` に入れる。
-6. コードを直したあとは、同じデプロイの「デプロイを管理」から新しいバージョンにする（URL は変えない）。
-
-トークンは GitHub Pages のページに出ます。秘密ではありません。本人確認は、ログイン中のメールと職員シートの「ログイン用メール」です。メールが空のあいだは、画面で名前を選ぶ暫定動作になります。
-
-`dakokuEditorCheck` はエディタで距離計算だけ確認します。シートには書きません。
+1. [出退勤記録シート](https://docs.google.com/spreadsheets/d/1KEyzLGVwIWR2ziWNyghhGzSf6B2ZfHE-UIj8U0szxzs/edit) → 拡張機能 → Apps Script
+2. `Code.gs` をこのファイルの内容で置き換え
+3. デプロイ → デプロイを管理 → 既存ウェブアプリの「新バージョン」
+4. URL は変えない（`…/AKfycbwOFXip…/exec`）

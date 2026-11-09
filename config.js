@@ -166,7 +166,6 @@ window.PORTAL_CONFIG = {
     // 事業所ごとの既定（就業場所・仕事内容）。例を書いておく
     officeDefaults: { 'レオ': { place: 'レオ', job: '' }, '茶夢': { place: '茶夢', job: '' }, '金斗雲': { place: '金斗雲', job: '' }, '日中一時支援': { place: '星心会レスパイトスタジオ', job: '' }, 'レスパイト': { place: '星心会レスパイトスタジオ', job: '' }, '日中一時': { place: '星心会レスパイトスタジオ', job: '' }, '梁山泊': { place: '梁山泊', job: '' } },
   },
-  // 出退勤打刻（#dakoku）。秘密鍵は置かない。gasUrl は GAS ウェブアプリの /exec。
-  // token はスクリプトプロパティ DAKOKU_TOKEN と同じ文字列。ページに出るので秘密ではない。空なら打刻ボタンの先には繋がらない。
-  dakoku: { gasUrl: 'https://script.google.com/macros/s/AKfycbwOFXipVY98Q9x7123hjlFhAOV2wLQ209ursj6q8iX_hb61f4qHL6Idszn2ABEz8y6U/exec', token: '3517d63074ab498269ad81494ad8ea2e' },
+  // 出退勤打刻（#dakoku）。記録は Supabase の dakoku_* のみ（Google は使わない）。
+  dakoku: {},
 };

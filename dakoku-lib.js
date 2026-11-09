@@ -1,5 +1,5 @@
 // 出退勤打刻の判定（画面 dakoku.js と node tools/dakoku_check.js が共用）。
-// 距離の式は dakoku-gas/Code.gs の dkMeters_ と同じ（地球半径 6371000m）。
+// 距離の式は地球半径 6371000m（旧 GAS と同じ式だが、打刻経路では Google を使わない）。
 // 個人の氏名・メールはこのファイルに書かない。見本は架空の名前だけ。
 // 本番はログインメール一致のみ。他人の名前選択は禁止（見本だけ allowPick）。
 (function (root) {
@@ -21,7 +21,7 @@
     if (o && Object.prototype.hasOwnProperty.call(o, header)) return o[header];
     return undefined;
   }
-  // 2点間の距離（メートル）。同じ式を GAS にも置いてある。
+  // 2点間の距離（メートル）。
   function meters(lat1, lng1, lat2, lng2) {
     const rad = d => d * Math.PI / 180;
     const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);

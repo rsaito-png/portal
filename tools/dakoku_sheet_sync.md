@@ -1,11 +1,5 @@
-# 打刻ログ Sheet → Supabase 取り込み
+# 打刻は Supabase のみ
 
-正は Supabase `dakoku_punches`。旧キャッシュのポータルは GAS（Sheet）にだけ書くことがある。
+Google シート／GAS は打刻経路に使わない（2026-11-09）。正は `dakoku_punches`。
 
-手順（ボット）:
-1. Sheets `1KEyzLGVwIWR2ziWNyghhGzSf6B2ZfHE-UIj8U0szxzs` タブ `打刻ログ` を読む
-2. `dakoku_punches` と staff_id+kind+時刻±60秒で突合
-3. 無い行だけ `dakoku_ingest_gas` または INSERT（メモ末尾に（シートから移行））
-4. `punched_at_jst` は必ず `YYYY-MM-DD HH24:MI:SS`（時は2桁）
-
-GAS `Code.gs` は打刻後に `dakoku_ingest_gas` へも送る。デプロイは clasp（scriptId `1eMe76h8tY6cv3JAEvLf_F8wrvBNj55qaoPz_gRqm6PZsAzWGxqcSgWOY`）またはエディタから「デプロイ」→既存ウェブアプリの新バージョン。
+旧キャッシュ端末向けに `dakoku-gas/Code.gs` は記録せずエラーを返すスタブ。親が Apps Script に貼って再デプロイする。
