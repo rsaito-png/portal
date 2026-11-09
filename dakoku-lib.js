@@ -1,6 +1,7 @@
 // 出退勤打刻の判定（画面 dakoku.js と node tools/dakoku_check.js が共用）。
 // 距離の式は dakoku-gas/Code.gs の dkMeters_ と同じ（地球半径 6371000m）。
 // 個人の氏名・メールはこのファイルに書かない。見本は架空の名前だけ。
+// 本番はログインメール一致のみ。他人の名前選択は禁止（見本だけ allowPick）。
 (function (root) {
   const R = 6371000;
   const KINDS = ['出勤', '退勤'];
@@ -56,10 +57,39 @@
   function staffFor(staff, officeName) {
     return (staff || []).map(staffView).filter(s => s.enabled && s.office === officeName && s.id && s.name);
   }
-  // メールが職員シートと1件だけ一致すれば本人。空欄・不一致のときは名前選択（暫定）。
+  // ログインメールと一致する有効職員（全事業所）。メール空は対象外。
+  function staffByEmail(staff, email) {
+    const e = String(email || '').trim().toLowerCase();
+    if (!e) return [];
+    return (staff || []).map(staffView).filter(s => s.enabled && s.id && s.name && s.email && s.email.toLowerCase() === e);
+  }
+  // メール一致職員の所属事業所だけ（有効な事業所に限定）。
+  function officesForEmail(offices, staff, email) {
+    const mine = staffByEmail(staff, email);
+    const names = [];
+    mine.forEach(s => { if (s.office && names.indexOf(s.office) < 0) names.push(s.office); });
+    const visible = visibleOffices(offices).filter(o => names.indexOf(o.name) >= 0);
+    return { staff: mine, offices: visible, names: names };
+  }
+  // メール一致が正。allowPick は見本モード用の暫定選択だけ。
+  // mode: email / ambiguous / unregistered / noemail / pick
   function resolveStaff(opt) {
-    const list = staffFor(opt.staff, opt.office);
     const email = String(opt.email || '').trim().toLowerCase();
+    const officeName = String(opt.office || '').trim();
+    const allowPick = !!opt.allowPick;
+    if (!allowPick) {
+      if (!email) return { staff: null, mode: 'noemail', list: [] };
+      const mine = staffByEmail(opt.staff, email);
+      if (!mine.length) return { staff: null, mode: 'unregistered', list: [] };
+      const atOffice = officeName ? mine.filter(s => s.office === officeName) : mine;
+      if (atOffice.length === 1) return { staff: atOffice[0], mode: 'email', list: atOffice };
+      if (atOffice.length > 1) {
+        const chosen = atOffice.find(s => s.id === String(opt.chosenId || ''));
+        return { staff: chosen || null, mode: 'ambiguous', list: atOffice };
+      }
+      return { staff: null, mode: 'email', list: [] };
+    }
+    const list = staffFor(opt.staff, officeName);
     const hits = email ? list.filter(s => s.email.toLowerCase() === email) : [];
     const pool = hits.length > 1 ? hits : list;
     if (hits.length === 1) return { staff: hits[0], mode: 'email', list: pool };
@@ -101,7 +131,7 @@
   const sample = () => JSON.parse(JSON.stringify(SAMPLE));
 
   const api = {
-    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, resolveStaff, gpsRequired, judge, kindOk, sample,
+    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, staffByEmail, officesForEmail, resolveStaff, gpsRequired, judge, kindOk, sample,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Dakoku = api;

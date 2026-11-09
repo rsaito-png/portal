@@ -181,7 +181,13 @@ begin
   if not found then
     return jsonb_build_object('ok', false, 'error', '職員が見つかりません');
   end if;
-  if coalesce(nullif(btrim(s.email),''), '') <> '' and email <> lower(s.email) then
+  if email = '' then
+    return jsonb_build_object('ok', false, 'error', 'ログインが必要です');
+  end if;
+  if coalesce(nullif(btrim(s.email),''), '') = '' then
+    return jsonb_build_object('ok', false, 'error', '職員のログイン用メールが未登録です。管理者へ連絡してください');
+  end if;
+  if email <> lower(btrim(s.email)) then
     return jsonb_build_object('ok', false, 'error', 'ログイン中のメールと職員が一致しません');
   end if;
   need_gps := o.lat is not null and o.lng is not null and o.radius is not null and o.radius > 0;

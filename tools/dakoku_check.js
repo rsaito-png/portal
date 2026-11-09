@@ -36,18 +36,30 @@ const staff = sample.staff;
 const emailHit = Dakoku.resolveStaff({ email: 'Demo-Staff@example.com', staff: staff, office: 'RYDEEN', chosenId: 'R001' });
 eq(emailHit.mode, 'email', 'email mode');
 eq(emailHit.staff.id, 'R002', 'email wins');
-const pick = Dakoku.resolveStaff({ email: 'nobody@example.com', staff: staff, office: 'RYDEEN', chosenId: 'R001' });
-eq(pick.mode, 'pick', 'pick mode');
-eq(pick.staff.id, 'R001', 'chosen');
-eq(pick.list.map(s => s.id), ['R001', 'R002'], 'inactive and other office dropped');
+const unreg = Dakoku.resolveStaff({ email: 'nobody@example.com', staff: staff, office: 'RYDEEN', chosenId: 'R001' });
+eq(unreg.mode, 'unregistered', 'unregistered blocks others');
+ok(!unreg.staff && unreg.list.length === 0, 'no stranger pick');
+const pick = Dakoku.resolveStaff({ email: 'nobody@example.com', staff: staff, office: 'RYDEEN', chosenId: 'R001', allowPick: true });
+eq(pick.mode, 'pick', 'demo pick mode');
+eq(pick.staff.id, 'R001', 'demo chosen');
 const none = Dakoku.resolveStaff({ email: '', staff: staff, office: 'RYDEEN', chosenId: '' });
-ok(!none.staff && none.list.length === 2, 'need a choice');
+eq(none.mode, 'noemail', 'no login email');
+ok(!none.staff, 'no staff without email');
 const amb = Dakoku.resolveStaff({
   email: 'a@example.com', office: 'RYDEEN', chosenId: 'B',
   staff: [{ id: 'A', name: '甲', office: 'RYDEEN', email: 'a@example.com', enabled: true }, { id: 'B', name: '乙', office: 'RYDEEN', email: 'a@example.com', enabled: true }],
 });
 eq(amb.mode, 'ambiguous', 'ambiguous');
 eq(amb.staff.id, 'B', 'pick among dupes');
+const multi = Dakoku.officesForEmail(sample.offices, [
+  { id: 'L002', name: '見本A', office: '金斗雲', email: 'dual@example.com', enabled: true },
+  { id: 'R002', name: '見本B', office: 'RYDEEN', email: 'dual@example.com', enabled: true },
+  { id: 'R001', name: '他', office: 'RYDEEN', email: 'other@example.com', enabled: true },
+], 'dual@example.com');
+eq(multi.offices.map(o => o.name).sort(), ['RYDEEN', '金斗雲'], 'email offices only');
+const self = Dakoku.resolveStaff({ email: 'dual@example.com', staff: multi.staff.concat([{ id: 'X', name: '他人', office: 'RYDEEN', email: 'x@example.com', enabled: true }]), office: 'RYDEEN', chosenId: '' });
+eq(self.mode, 'email', 'self at office');
+eq(self.staff.id, 'R002', 'self id');
 
 ok(Dakoku.kindOk('出勤') && Dakoku.kindOk('退勤') && !Dakoku.kindOk('休憩') && !Dakoku.kindOk(''), 'kinds');
 
@@ -69,6 +81,7 @@ ok(gas.includes('種別は出勤か退勤') && gas.includes('ログイン中の�
 ok(gas.includes('needGps') || gas.includes('gps=off'), 'gas optional GPS');
 const ui = fs.readFileSync(path.join(root, 'dakoku.js'), 'utf8');
 ok(ui.includes('gpsRequired') && ui.includes('位置情報不要') && ui.includes('ポータルへ'), 'ui no-GPS path');
+ok(ui.includes('名簿に未登録') && ui.includes('staffByEmail') && ui.includes('dkOffices'), 'ui email lock');
 ok(ui.includes('rpc/dakoku_bootstrap') && ui.includes('rpc/dakoku_punch') && ui.includes('rpc/dakoku_recent'), 'ui uses Supabase RPCs');
 const admin = fs.readFileSync(path.join(root, 'dakoku_admin.js'), 'utf8');
 ok(admin.includes('renderDakokuSettings') && admin.includes('dakoku_offices') && admin.includes('dakoku_staff'), 'admin edits offices/staff');

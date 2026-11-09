@@ -156,7 +156,9 @@ function dkPunch_(b) {
   });
   if (!staff) return { ok: false, error: '職員が見つかりません' };
   var email = String(b.email || '').trim().toLowerCase();
-  if (staff.email && email !== staff.email.toLowerCase()) return { ok: false, error: 'ログイン中のメールと職員が一致しません' };
+  if (!email) return { ok: false, error: 'ログインが必要です' };
+  if (!staff.email) return { ok: false, error: '職員のログイン用メールが未登録です。管理者へ連絡してください' };
+  if (email !== staff.email.toLowerCase()) return { ok: false, error: 'ログイン中のメールと職員が一致しません' };
   var lat = dkNum_(b.lat), lng = dkNum_(b.lng);
   var distance = null;
   if (needGps) {
