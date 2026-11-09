@@ -123,7 +123,7 @@ function dkBootstrap_() {
   var names = {};
   offices.forEach(function (o) { names[o.name] = true; });
   var staff = dkStaff_().filter(function (s) { return s.enabled && names[s.office]; });
-  return { ok: true, offices: offices, staff: staff };
+  return { ok: true, offices: offices, staff: staff, portalMin: '20261109pad', preferSupabase: true };
 }
 
 function dkRecent_(staffId) {
@@ -186,7 +186,13 @@ function dkPunch_(b) {
       '昼食提供': (b.lunch === true || b.lunch === 'はい' || b.lunch === 'true') ? 'はい' : 'いいえ',
     });
   } finally { lock.releaseLock(); }
-  return { ok: true, at: at, distance: distance, office: office.name, staffId: staff.id, kind: kind };
+  dkSupabaseIngest_({
+    at: at, office: office.name, staffId: staff.id, staffName: staff.name, kind: kind,
+    lat: lat, lng: lng, distance: distance, accuracy: acc,
+    lunch: (b.lunch === true || b.lunch === 'はい' || b.lunch === 'true'),
+    email: email, memo: memo
+  });
+  return { ok: true, at: at, distance: distance, office: office.name, staffId: staff.id, kind: kind, supabase: true };
 }
 
 function dkAppend_(name, obj) {
@@ -197,6 +203,45 @@ function dkAppend_(name, obj) {
   var head = sh.getRange(1, 1, 1, last).getValues()[0].map(function (h) { return String(h).trim(); });
   var row = head.map(function (h) { return h && obj[h] != null ? obj[h] : ''; });
   sh.appendRow(row);
+}
+
+
+/** Supabase にも同じ打刻を残す（旧キャッシュのポータル対策）。失敗してもシート記録は成功のまま返す。 */
+function dkSupabaseIngest_(row) {
+  try {
+    var url = PropertiesService.getScriptProperties().getProperty('DAKOKU_SUPABASE_URL')
+      || 'https://zvrardoyxocmqhvyddnf.supabase.co';
+    var key = PropertiesService.getScriptProperties().getProperty('DAKOKU_SUPABASE_ANON')
+      || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2cmFyZG95eG9jbXFodnlkZG5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NDEyOTQsImV4cCI6MjEwNzUxNzI5NH0.ZhjiJ26Ie6HFaUekYoNhxQUMCmwkJliP36C22Cy13RQ';
+    var token = PropertiesService.getScriptProperties().getProperty('DAKOKU_TOKEN') || '';
+    var payload = {
+      p_token: token,
+      p_at_jst: row.at,
+      p_office: row.office,
+      p_staff_id: row.staffId,
+      p_staff_name: row.staffName,
+      p_kind: row.kind,
+      p_lat: row.lat,
+      p_lng: row.lng,
+      p_distance: row.distance,
+      p_accuracy: row.accuracy,
+      p_lunch: row.lunch === true || row.lunch === 'はい',
+      p_email: row.email || '',
+      p_memo: row.memo || ''
+    };
+    var res = UrlFetchApp.fetch(url + '/rest/v1/rpc/dakoku_ingest_gas', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { apikey: key, Authorization: 'Bearer ' + key },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() >= 300) {
+      console.warn('dakoku supabase ingest http ' + res.getResponseCode() + ' ' + res.getContentText());
+    }
+  } catch (err) {
+    console.warn('dakoku supabase ingest ' + err);
+  }
 }
 
 /** エディタから実行して、距離が 0 になることだけ確認する（シートには書かない）。 */

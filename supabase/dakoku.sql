@@ -278,4 +278,64 @@ grant execute on function public.dakoku_recent(text) to authenticated;
 grant execute on function public.dakoku_month(text, text) to authenticated;
 grant execute on function public.dakoku_punch(text,text,text,double precision,double precision,double precision,boolean,text) to authenticated;
 
+
+-- 旧クライアント（GASウェブアプリ）からの取り込み。token は config.js の dakoku.token と同じ。
+create or replace function public.dakoku_ingest_gas(
+  p_token text,
+  p_at_jst text,
+  p_office text,
+  p_staff_id text,
+  p_staff_name text,
+  p_kind text,
+  p_lat double precision default null,
+  p_lng double precision default null,
+  p_distance double precision default null,
+  p_accuracy double precision default null,
+  p_lunch boolean default false,
+  p_email text default null,
+  p_memo text default null
+)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  expected text := '3517d63074ab498269ad81494ad8ea2e';
+  at_jst text;
+  at_ts timestamptz;
+  sid text := btrim(coalesce(p_staff_id,''));
+begin
+  if coalesce(p_token,'') is distinct from expected then
+    return jsonb_build_object('ok', false, 'error', 'トークンが違います');
+  end if;
+  if p_kind is distinct from '出勤' and p_kind is distinct from '退勤' then
+    return jsonb_build_object('ok', false, 'error', '種別は出勤か退勤です');
+  end if;
+  if sid = '' or coalesce(btrim(p_office),'') = '' then
+    return jsonb_build_object('ok', false, 'error', '事業所か職員がありません');
+  end if;
+  at_jst := to_char(btrim(p_at_jst)::timestamp, 'YYYY-MM-DD HH24:MI:SS');
+  at_ts := (at_jst || '+09')::timestamptz;
+  -- 60秒以内の同一打刻は二重にしない
+  if exists (
+    select 1 from public.dakoku_punches
+    where staff_id = sid and kind = p_kind
+      and abs(extract(epoch from (punched_at_jst::timestamp - at_jst::timestamp))) <= 60
+  ) then
+    return jsonb_build_object('ok', true, 'deduped', true, 'at', at_jst);
+  end if;
+  insert into public.dakoku_punches (
+    punched_at, punched_at_jst, office, staff_id, staff_name, kind,
+    lat, lng, distance, accuracy, lunch, email, memo, created_by
+  ) values (
+    at_ts, at_jst, btrim(p_office), sid, coalesce(nullif(btrim(p_staff_name),''), sid), p_kind,
+    p_lat, p_lng, p_distance, p_accuracy, coalesce(p_lunch,false),
+    nullif(lower(btrim(coalesce(p_email,''))),''), left(coalesce(p_memo,''), 200), null
+  );
+  return jsonb_build_object('ok', true, 'at', at_jst, 'staffId', sid, 'kind', p_kind);
+end;
+$$;
+
+revoke all on function public.dakoku_ingest_gas(text,text,text,text,text,text,double precision,double precision,double precision,double precision,boolean,text,text) from public;
+grant execute on function public.dakoku_ingest_gas(text,text,text,text,text,text,double precision,double precision,double precision,double precision,boolean,text,text) to anon, authenticated;
+
 notify pgrst, 'reload schema';
+

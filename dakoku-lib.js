@@ -119,9 +119,9 @@
   }
   // punched_at_jst（YYYY-MM-DD HH:MM:SS）から日・分を取る
   function parseJst(at) {
-    const m = String(at || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+    const m = String(at || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
     if (!m) return null;
-    return { day: m[1], hm: m[2] + ':' + m[3], minutes: (+m[2]) * 60 + (+m[3]) };
+    return { day: m[1], hm: String(m[2]).padStart(2,'0') + ':' + m[3], minutes: (+m[2]) * 60 + (+m[3]) };
   }
   // 月の打刻を日ごとに出勤→退勤で組む。複数シフト可。未対応は missing。
   function pairMonth(rows) {

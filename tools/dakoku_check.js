@@ -89,6 +89,7 @@ ok(admin.includes('renderDakokuSettings') && admin.includes('dakoku_offices') &&
 const sql = fs.readFileSync(path.join(root, 'supabase/dakoku.sql'), 'utf8');
 ok(sql.includes('dakoku_bootstrap') && sql.includes('dakoku_punch') && sql.includes('on conflict (name) do nothing'), 'sql migrate preserves values');
 ok(sql.includes('dakoku_month') && sql.includes('自分の打刻だけ見られます'), 'sql month rpc + recent lock');
+ok(sql.includes('dakoku_ingest_gas'), 'sql gas ingest');
 ok(sql.includes("'金斗雲', 'KINTOUN', null, null, null"), 'kintoun seeded without GPS');
 
 ok(Dakoku.currentMonthJst(new Date('2026-11-09T06:00:00Z')) === '2026-11', 'currentMonthJst');
@@ -108,6 +109,7 @@ eq(packed.pairs[1].minutes, 345, 'pair2 mins');
 ok(packed.pairs[2].proxy && packed.pairs[2].missing === '退勤なし', 'proxy open');
 eq(packed.totalMinutes, 137 + 345, 'month total');
 eq(Dakoku.formatHours(137), '2時間17分', 'formatHours');
+ok(Dakoku.parseJst('2026-11-09 9:14:14') && Dakoku.parseJst('2026-11-09 9:14:14').hm === '09:14', 'parseJst pads hour');
 const missIn = Dakoku.pairMonth([{ at: '2026-11-01 18:00:00', kind: '退勤' }]);
 eq(missIn.pairs[0].missing, '出勤なし', 'missing in');
 
