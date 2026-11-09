@@ -37,7 +37,13 @@ const DEMO_DATA = {
 // 日誌で「直せる」項目。直すと1分ほどで Google の日誌に反映（box の apply_edits.py）
 // activity＝日誌の活動記録（LINEから入る児童の様子）。食事提供と総合日誌はポータルの別表（leo_meal_record / leo_day_log）。シートの食事・おやつ列と国保連には写さない
 const NIKKI_FIELDS = [['activity','活動記録（児童の様子）'],['pick_place','迎え場所'],['pick_time','迎え時刻'],['pick_driver','迎え運転手'],['start_time','開始'],['end_time','終了'],
-  ['drop_time','送り時刻'],['drop_driver','送り運転手'],['drop_place','送り場所']];
+  ['drop_place','送り場所'],['drop_time','送り時刻'],['drop_driver','送り運転手']];
+// 今日の日誌の入力カードだけ、送迎と開始・終了を行にまとめる（中身と保存は1欄ずつ）
+const NIKKI_RIDE_ROWS = [
+  ['pick_place', 'pick_time', 'pick_driver'],
+  ['start_time', 'end_time'],
+  ['drop_place', 'drop_time', 'drop_driver'],
+];
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
 const planText = b => esc(String(b || '').split('\n').filter(l => !/^【(利用者名|作成者)】/.test(l)).join('\n')).replace(/^(【[^】\n]*】|\d\.[^\n]*)/gm, '<b>$1</b>');
@@ -648,14 +654,18 @@ const LEO_VIEWS = {
         const a = A[String(r.child || '').replace(/\s/g, '')];
         const actVal = (a && a.text) || r.activity || '';
         const mealRec = meals[leoMealNorm(r.child)];
-        const card = `<div class="card rec"><b>${esc(r.child)}</b>（${esc(leoCardService(r.child, kinds, r.service))}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
-        ${NIKKI_FIELDS.map(([f, l]) => {
-          const raw = f === 'activity' ? actVal : (r[f] ?? '');
+        const labelOf = Object.fromEntries(NIKKI_FIELDS);
+        const fieldHtml = (f, raw) => {
           const shown = nikkiShownValue(f, raw);
+          const attrs = `data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
-            ? `<label>${l}<textarea rows="6" data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}">${esc(shown)}</textarea></label>`
-            : `<label>${l}<input data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}" value="${esc(shown)}"></label>`;
-        }).join('')}
+            ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
+            : `<label>${labelOf[f]}<input ${attrs} value="${esc(shown)}"></label>`;
+        };
+        const rideRows = NIKKI_RIDE_ROWS.map(fs => `<div class="nk-row">${fs.map(f => fieldHtml(f, r[f] ?? '')).join('')}</div>`).join('');
+        const card = `<div class="card rec"><b>${esc(r.child)}</b>（${esc(leoCardService(r.child, kinds, r.service))}）${a ? `<small>　活動記録：${esc(a.source)}</small>` : ''}
+        ${fieldHtml('activity', actVal)}
+        ${rideRows}
         ${leoMealBox(r.child, mealRec, r, false, false, true)}</div>`;
         return { child: r.child, kind: '利用', filled: leoNikkiFilledUse(r, actVal, mealRec), html: card };
       }),
@@ -1337,8 +1347,19 @@ function leoAbsCardHtml(child, flag, withSave) {
 }
 function leoAbsAddHtml(prefix, day, names) {
   const opts = (names || []).map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-  return `<div class="card" id="${prefix}_abs_add"><b>欠席（加算対応）を追加</b>
-    <p class="note">来所の予定だった子が休むとき、ここに足します。日誌と実績に欠席として載ります。キャンセルはカレンダーで付けます（日誌と実績には出ません）。</p>
+  const title = '<b>欠席（加算対応）を追加</b>';
+  const explain = '来所の予定だった子が休むとき、ここに足します。日誌と実績に欠席として載ります。キャンセルはカレンダーで付けます（日誌と実績には出ません）。';
+  const noteId = prefix + '_abs_note';
+  // 今日の日誌だけ説明を畳む。児童・連絡日・追加するは開いたまま
+  const head = prefix === 'nk'
+    ? `<div>${leoFoldBtn('leo_kesseki_note_open', noteId, title)}</div>`
+    : title;
+  const noteOpen = prefix === 'nk' && leoFoldOpen('leo_kesseki_note_open');
+  const note = prefix === 'nk'
+    ? `<p class="note" id="${noteId}"${noteOpen ? '' : ' hidden'}>${explain}</p>`
+    : `<p class="note">${explain}</p>`;
+  return `<div class="card" id="${prefix}_abs_add">${head}
+    ${note}
     ${opts ? `<label>児童<select id="${prefix}_abs_child">${opts}</select></label>
       <label>連絡日<input type="date" id="${prefix}_abs_contact" value="${esc(day)}"></label>
       <button type="button" onclick="leoAddKesseki('${prefix}','${day}')">追加する</button>` : '<p>追加できる児童はいません。</p>'}
