@@ -36,6 +36,7 @@ const DEMO_DATA = {
 };
 // 日誌で「直せる」項目。直すと1分ほどで Google の日誌に反映（box の apply_edits.py）
 // activity＝日誌の活動記録（LINEから入る児童の様子）。食事提供と総合日誌はポータルの別表（leo_meal_record / leo_day_log）。シートの食事・おやつ列と国保連には写さない
+const DRIVER_PICK = { pick_driver: 1, drop_driver: 1 };
 const NIKKI_FIELDS = [['activity','活動記録（児童の様子）'],['pick_place','迎え場所'],['pick_time','迎え時刻'],['pick_driver','迎え運転手'],['start_time','開始'],['end_time','終了'],
   ['drop_place','送り場所'],['drop_time','送り時刻'],['drop_driver','送り運転手']];
 // 今日の日誌の入力カードだけ、送迎と開始・終了を行にまとめる（中身と保存は1欄ずつ）
@@ -612,7 +613,7 @@ const LEO_VIEWS = {
     return `<h3>職員配置表（見るだけ）</h3>${demoNote()}<p class="note">日誌から作られた配置です（${pick.length ? '今日以降' : '直近'}）。職員名は届け出上の名前です。<b>配置の手直しは <a href="#leo/master">配置表・型表・管理表・送迎の配慮の入力（#leo/master）</a> で行います。</b></p>` + show.map(d => {
       const rs = rows.filter(r => r['日付'] === d);
       return `<h4>${esc(d)}（${esc(rs[0]['曜日'])}） 児童${esc(rs[0]['利用児童数'])}人</h4><table><tr><th>職員</th><th>時間</th><th>役割</th></tr>${rs.map(r =>
-        `<tr><td>${esc(filingDriverName(r['職員名']))}<br><small>${esc(r['常勤/非常勤'])}</small></td><td>${esc(r['配置開始'])}〜${esc(r['配置終了'])}</td><td><small>${esc(r['役割(日誌)'])}</small></td></tr>`).join('')}</table>`;
+        `<tr><td>${esc(filingDriverName(r['職員名'], r['日付']))}<br><small>${esc(r['常勤/非常勤'])}</small></td><td>${esc(r['配置開始'])}〜${esc(r['配置終了'])}</td><td><small>${esc(r['役割(日誌)'])}</small></td></tr>`).join('')}</table>`;
     }).join('');
   },
   async edits() {
@@ -633,10 +634,10 @@ const LEO_VIEWS = {
   },
   async nikki() {
     PERIOD = 'today';
-    if (!DEMO) await leoRecordDay(today());
-    const day = today();
+    const day = nkDay();
+    if (!DEMO) await leoRecordDay(day);
     const [rowsAll, kinds, flags, left] = await Promise.all([
-      loadNikki(),
+      (DEMO || day === today()) ? loadNikki() : sb(`leo_nikki?day=eq.${day}&order=row_no`),
       leoChildKinds(),
       DEMO ? Promise.resolve(leoDemoAbsFlags(day)) : sb(`leo_day_flags?day=eq.${day}&select=day,child,absent_support,absent_note`).catch(() => []),
       loadLeftIndex()]);
@@ -645,6 +646,9 @@ const LEO_VIEWS = {
     const abs = rows.filter(r => r.kind === '欠席');
     let act = [];
     const bundle = await leoLoadDayBundle(day);
+    // 運転手欄のプルダウン：届け出名（宮本→齊藤連）に揃え、保護者も選べる。横田　祥はそのまま。
+    const drvRaw = await leoDriverNames().catch(() => []);
+    const drvNames = [...drvRaw.filter(n => filingDriverName(n) === n), ...drvRaw.map(n => filingDriverName(n)), '保護者'];
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${day}`); } catch (e) { }
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
     const meals = leoMealByChild(bundle.meals);
@@ -660,6 +664,7 @@ const LEO_VIEWS = {
           const attrs = `data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
             ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
+            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${driverOptionsHtml(drvNames, shown)}</select></label>`
             : `<label>${labelOf[f]}<input ${attrs} value="${esc(shown)}"></label>`;
         };
         const rideRows = NIKKI_RIDE_ROWS.map(fs => `<div class="nk-row">${fs.map(f => fieldHtml(f, r[f] ?? '')).join('')}</div>`).join('');
@@ -675,7 +680,7 @@ const LEO_VIEWS = {
       }),
     ];
     const noteOpen = leoFoldOpen('leo_nikki_note_open');
-    return `<h3 class="nk-fold-h">${leoFoldBtn('leo_nikki_note_open', 'nk_note', '今日の日誌（見る・直す）')}</h3>${demoNote()}<p class="note" id="nk_note"${noteOpen ? '' : ' hidden'}>ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+    return `<h3 class="nk-fold-h">${leoFoldBtn('leo_nikki_note_open', 'nk_note', (day === today() ? '今日' : fmtDay(day)) + 'の日誌（見る・直す）')}</h3>${nkDayNav(day)}${demoNote()}<p class="note" id="nk_note"${noteOpen ? '' : ' hidden'}>ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
       leoDayLogHtml(day, bundle.log, 'nk', bundle.missing) +
       leoNikkiKidBar(kids) +
       kids.map((k, i) => leoNikkiChildWrap(i, k.kind, k.child, k.html)).join('') +
@@ -787,7 +792,7 @@ let IS_CHAIR = false;
 let EXTRA_OFFICES = [];
 const canManage = () => ROLE === '事務' || ['管理者', '児発管'].includes(DUTY);
 let MY_FULL_NAME = '';
-const canLeoHomeTodo = () => canManage() || ['安藤尚子', '加藤幸弘'].includes(MY_FULL_NAME);
+const canLeoHomeTodo = () => canManage() || IS_CHAIR || ['安藤尚子', '加藤幸弘'].includes(MY_FULL_NAME);
 function extraOfficeList(v) {
   const raw = Array.isArray(v) ? v : (typeof v === 'string' ? v.replace(/^\{|\}$/g, '').split(',') : []);
   return raw.map(s => String(s || '').trim().replace(/^"|"$/g, '')).filter(Boolean);
@@ -991,8 +996,10 @@ function leoPlanEditFromHash() {
 }
 
 // ===== 児発管ホーム：今日やること（一画面に、やることだけ） =====
-// 中村 友香がする、の「今日やること」も、加藤・安藤の同じ名前も、この画面（#leo/home）を開く。
+// 中村友香担当の「今日やること」も、加藤・安藤の同じ名前も、この画面（#leo/home）を開く。
 LEO_VIEWS.home = async function () {
+  // 今日やること（児発管）は管理する人だけ（会長・事務・管理者・児発管・安藤・加藤）。現場職員がURLで開いても中身は出さない
+  if (!DEMO && !canLeoHomeTodo()) return '<h3>今日やること（児発管）</h3><p class="note">この画面は児発管・管理者・事務の人が使います。</p><p><a href="#leo">レオのホームへもどる</a></p>';
   const todo = [];
   // 1. 個別支援計画：個別支援計画（管理）と同じ進み具合。退所済み、次の計画が退所日よりあと、本案まで終わった子、急ぎでない子は出さない
   try {
@@ -1426,6 +1433,15 @@ async function leoAddKesseki(prefix, day) {
     else await renderLeoView('nikki');
   } catch (e) { say(e.message); }
 }
+// 日誌（今日の画面）で開いている日。空なら今日。過去の日の活動記録も、ここで直接打って後から直せる。
+let NK_DAY = null;
+const nkDay = () => NK_DAY || today();
+function nkGo(d) { NK_DAY = (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < today()) ? d : null; renderLeoView('nikki'); }
+function nkDayNav(day) {
+  if (DEMO) return '';
+  const t = today();
+  return `<p class="ptabs"><button onclick="nkGo(addDays('${day}',-1))">← 前の日</button> <input type="date" value="${day}" max="${t}" onchange="nkGo(this.value)" style="font-size:16px"> <button onclick="nkGo(addDays('${day}',1))"${day >= t ? ' disabled' : ''}>次の日 →</button> <button onclick="nkGo(null)">今日</button></p>${day === t ? '' : `<p class="note"><b>${esc(fmtDay(day))}の日誌を開いています。</b>活動記録などを直接入力して保存すると、日誌とサービス提供実績に反映されます。</p>`}`;
+}
 async function saveNikki() {
   const view = document.getElementById('view');
   const absRows = leoReadAbs(view);
@@ -1433,7 +1449,7 @@ async function saveNikki() {
   if (absErr) { $('saved').textContent = absErr; return; }
   const by = {};
   let n = 0;
-  for (const i of document.querySelectorAll('#view .rec input, #view .rec textarea')) {
+  for (const i of document.querySelectorAll('#view .rec input, #view .rec textarea, #view .rec select.nk-driver')) {
     if (i.dataset.kind === 'meal' || i.dataset.kind === 'day' || i.dataset.kind === 'abs') continue;
     const edit = nikkiEditValue(i.dataset.f, i.dataset.old, i.value);
     if (!edit) continue;
@@ -1450,13 +1466,13 @@ async function saveNikki() {
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${n}件の修正）。`; return; }
   try {
     for (const [row, fields] of rows) {
-      await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: today(), p_row: Number(row), p_fields: fields }) });
+      await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: nkDay(), p_row: Number(row), p_fields: fields }) });
     }
     if (mealForms.length) {
-      const err = await leoUpsertMeals(today(), mealForms);
+      const err = await leoUpsertMeals(nkDay(), mealForms);
       if (err.length) { $('saved').textContent = err[0]; return; }
     }
-    if (absRows.length) await leoSaveAbsFlags(today(), absRows);
+    if (absRows.length) await leoSaveAbsFlags(nkDay(), absRows);
     const msg = rows.length ? `${rows.length}人分を日誌に保存し、実績へ転記しました。食事の記録も保存しました。` : (mealForms.length ? '食事の記録を保存しました。' : '');
     $('saved').textContent = msg + (absRows.length ? '欠席時対応を保存しました。' : '');
   } catch (e) { $('saved').textContent = e.message; }
@@ -2312,6 +2328,7 @@ function orderKataCols(cols) {
   return out.concat(left);
 }
 // 型表の見出しだけ。保存する列名（data-c）は変えない。
+const KATA_DRIVER_COLS = { '迎え担当': 1, '送り担当': 1 };
 function kataColLabel(c) {
   if (c === '迎え開始') return '迎え時間';
   if (c === '送り終了') return '送り時間';
@@ -2349,10 +2366,13 @@ async function renderMasterEditor(view) {
   const rows = own.length ? own.map(r => r.data) : g;
   let cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
   if (MASTER_KIND === 'kata') cols = orderKataCols(cols);
+  // 型表の迎え担当・送り担当はプルダウン（在籍のレオ職員＋保護者）。祥先生は「横田　祥」に統一（2026-11-10）
+  const kataDrv = MASTER_KIND === 'kata' && typeof driverOptionsHtml === 'function'
+    ? [...await leoDriverNames().catch(() => []), '保護者'] : null;
   const title = MASTER_KIND === 'kata' ? '送迎 型表' : `${labels[MASTER_KIND]}の入力`;
   return `<h3>${title}</h3>${demoNote()}${tabs}
     <p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
-    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)"></td>`).join('')}</tr>`).join('')}</table></div>
+    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td>${kataDrv && KATA_DRIVER_COLS[c] ? `<select class="kata-drv" data-c="${esc(c)}" style="min-width:9em">${driverOptionsHtml(kataDrv, r[c] ?? '')}</select>` : `<input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)">`}</td>`).join('')}</tr>`).join('')}</table></div>
     <button onclick="renderLeoView('${view}').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
 }
 // 型表などの入力欄。短い列は中身（曜日は1文字、時刻は HH:MM）に合わせ、見出しは折り返す。保存する中身は変えない。
@@ -2417,12 +2437,12 @@ function fitMasterInput(el) {
 function addMasterRow() {
   const t = document.querySelector('tr.mrow:last-child');
   const row = t.cloneNode(true);
-  row.querySelectorAll('input').forEach(i => { i.value = ''; });
+  row.querySelectorAll('input, select.kata-drv').forEach(i => { i.value = ''; });
   t.parentNode.appendChild(row);
   fitMasterSheet();
 }
 async function saveMaster() {
-  const rows = [...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length);
+  const rows = [...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input, select.kata-drv')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length);
   const m = $('ms_msg'); if (DEMO) { m.textContent = `見本モードなので保存しません（${rows.length}行）。`; return; }
   try { await sb(`leo_master?kind=eq.${MASTER_KIND}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     if (rows.length) await sb('leo_master', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows.map((d, i) => ({ kind: MASTER_KIND, row_no: i + 1, data: d }))) });
@@ -2569,7 +2589,7 @@ LEO_VIEWS.diary = async function () {
       const d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
       const mealRec = meals[leoMealNorm(k)];
       return `<details class="card" open style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／食事 ${esc((mealRec && mealRec.meal) || '未記入')}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
-        <div style="padding:0 14px 14px"><p class="note">迎え：${esc(filingDriverName(r.pick_driver) || '-')}　送り：${esc(filingDriverName(r.drop_driver) || '-')}</p>
+        <div style="padding:0 14px 14px"><p class="note">迎え：${esc(filingDriverName(r.pick_driver, DIA_DAY) || '-')}　送り：${esc(filingDriverName(r.drop_driver, DIA_DAY) || '-')}</p>
         ${actText ? `<p style="white-space:pre-wrap"><b>日誌の活動記録${actSrc ? '（' + esc(actSrc) + '）' : ''}</b><br>${esc(actText)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
         <div id="${id}_meal">${leoMealBox(k, meals[leoMealNorm(k)], r, false)}</div>
         <b>下書き（です・ます調）</b>${d ? `<small>　${esc(d.author || '')}</small>` : ''}

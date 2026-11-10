@@ -75,21 +75,26 @@ const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
 ok(cfg.includes("#dakoku") && cfg.includes('#dakoku-settings'), 'config dakoku tiles');
 const staffJs = fs.readFileSync(path.join(root, 'rydeen-staff.js'), 'utf8');
 ok(staffJs.includes('href="#dakoku"'), 'link beside staff screen');
-const gas = fs.readFileSync(path.join(root, 'dakoku-gas/Code.gs'), 'utf8');
-['function doGet', 'function doPost', 'DAKOKU_TOKEN', '打刻ログ', '設定', '職員', '6371000', '1KEyzLGVwIWR2ziWNyghhGzSf6B2ZfHE-UIj8U0szxzs', 'text/plain', '管理者修正'].forEach(s => ok(gas.includes(s), 'gas ' + s));
-ok(gas.includes('種別は出勤か退勤') && gas.includes('ログイン中のメールと職員が一致しません'), 'gas checks');
-ok(gas.includes('needGps') || gas.includes('gps=off'), 'gas optional GPS');
 const ui = fs.readFileSync(path.join(root, 'dakoku.js'), 'utf8');
 ok(ui.includes('gpsRequired') && ui.includes('位置情報不要') && ui.includes('ポータルへ'), 'ui no-GPS path');
 ok(ui.includes('名簿に未登録') && ui.includes('staffByEmail') && ui.includes('dkOffices'), 'ui email lock');
 ok(ui.includes('rpc/dakoku_bootstrap') && ui.includes('rpc/dakoku_punch') && ui.includes('rpc/dakoku_recent') && ui.includes('rpc/dakoku_month'), 'ui uses Supabase RPCs');
+ok(!ui.includes('script.google.com') && !ui.includes('gasUrl') && !ui.includes('dkIngestFromGas_') && !ui.includes('dakoku_ingest_gas'), 'ui has no GAS/Google punch path');
 ok(ui.includes('月別一覧') && ui.includes('Registro mensal') && ui.includes('dkLoadMonth'), 'ui month list');
+ok(!cfg.includes('script.google.com') || !/dakoku:\s*\{[^}]*gasUrl/.test(cfg.replace(/\n/g,' ')), 'config dakoku has no gasUrl');
+ok(!/dakoku:\s*\{[^}]*gasUrl/.test(cfg.replace(/\s+/g,' ')), 'config dakoku block has no gasUrl');
+ok(!cfg.includes("gasUrl: 'https://script.google.com"), 'config no script.google gasUrl');
+const gas = fs.readFileSync(path.join(root, 'dakoku-gas/Code.gs'), 'utf8');
+ok(gas.includes('function doGet') && gas.includes('function doPost') && gas.includes('新しい画面に切り替わりました'), 'gas stub refuses punches');
+ok(!gas.includes('dkAppend_') && !gas.includes('SpreadsheetApp') && !gas.includes('dakoku_ingest'), 'gas stub writes nothing');
 const admin = fs.readFileSync(path.join(root, 'dakoku_admin.js'), 'utf8');
 ok(admin.includes('renderDakokuSettings') && admin.includes('dakoku_offices') && admin.includes('dakoku_staff'), 'admin edits offices/staff');
 const sql = fs.readFileSync(path.join(root, 'supabase/dakoku.sql'), 'utf8');
 ok(sql.includes('dakoku_bootstrap') && sql.includes('dakoku_punch') && sql.includes('on conflict (name) do nothing'), 'sql migrate preserves values');
 ok(sql.includes('dakoku_month') && sql.includes('自分の打刻だけ見られます'), 'sql month rpc + recent lock');
+ok(!sql.includes('dakoku_ingest_gas'), 'sql has no gas ingest');
 ok(sql.includes("'金斗雲', 'KINTOUN', null, null, null"), 'kintoun seeded without GPS');
+ok(index.includes('portalBuild') && index.includes('20261110req') && index.includes('dakoku.js?v=20261110req') && index.includes('dakoku-lib.js?v=20261110req') && index.includes('Cache-Control'), 'index cache-bust');
 
 ok(Dakoku.currentMonthJst(new Date('2026-11-09T06:00:00Z')) === '2026-11', 'currentMonthJst');
 eq(Dakoku.shiftMonth('2026-11', -1), '2026-10', 'shift prev');
@@ -103,12 +108,51 @@ const packed = Dakoku.pairMonth([
   { at: '2026-11-09 15:00:00', kind: '出勤', memo: '管理者記録（打刻漏れ）／齊藤さん指示で代理入力' },
 ]);
 eq(packed.pairs.length, 3, 'pair count');
-eq(packed.pairs[0], { day: '2026-11-07', inAt: '10:55', outAt: '13:12', minutes: 137, proxy: false, missing: null }, 'pair1');
+eq(packed.pairs[0], { day: '2026-11-07', inAt: '10:55', outAt: '13:12', minutes: 137, proxy: false, req: false, inReq: false, outReq: false, missing: null }, 'pair1');
 eq(packed.pairs[1].minutes, 345, 'pair2 mins');
 ok(packed.pairs[2].proxy && packed.pairs[2].missing === '退勤なし', 'proxy open');
 eq(packed.totalMinutes, 137 + 345, 'month total');
 eq(Dakoku.formatHours(137), '2時間17分', 'formatHours');
+ok(Dakoku.parseJst('2026-11-09 9:14:14') && Dakoku.parseJst('2026-11-09 9:14:14').hm === '09:14', 'parseJst pads hour');
 const missIn = Dakoku.pairMonth([{ at: '2026-11-01 18:00:00', kind: '退勤' }]);
 eq(missIn.pairs[0].missing, '出勤なし', 'missing in');
+
+// 打刻忘れ申告
+ok(Dakoku.isRequestMemo('本人申告（打刻漏れ）／齊藤連承認：押し忘れ') && !Dakoku.isRequestMemo('管理者記録（打刻漏れ）') && !Dakoku.isProxyMemo('本人申告（打刻漏れ）'), 'request memo');
+const reqPack = Dakoku.pairMonth([
+  { at: '2026-11-05 09:00:00', kind: '出勤' },
+  { at: '2026-11-05 18:00:00', kind: '退勤', memo: '本人申告（打刻漏れ）／齊藤連承認：押し忘れ', request: true },
+]);
+ok(reqPack.pairs[0].req && reqPack.pairs[0].outReq && !reqPack.pairs[0].inReq && !reqPack.pairs[0].proxy, 'request pair flagged on out');
+eq(reqPack.totalMinutes, 540, 'request counted in total');
+const NOW = new Date('2026-11-10T06:00:00Z'); // JST 15:00
+eq(Dakoku.todayJst(NOW), '2026-11-10', 'todayJst');
+eq(Dakoku.addDays('2026-11-10', -31), '2026-10-10', 'addDays');
+const rq = f => Dakoku.checkRequest(Object.assign({ date: '2026-11-09', kind: '退勤', time: '18:00', reason: '押し忘れ' }, f), NOW);
+ok(rq({}).ok && rq({}).time === '18:00', 'request ok');
+ok(rq({ time: '9:05' }).ok && rq({ time: '9:05' }).time === '09:05', 'request pads time');
+ok(!rq({ date: '2026-11-11' }).ok, 'request future date');
+ok(!rq({ date: '2026-10-09' }).ok && rq({ date: '2026-10-10' }).ok, 'request 31-day window');
+ok(!rq({ date: '2026-11-10', time: '15:30' }).ok && rq({ date: '2026-11-10', time: '14:59' }).ok, 'request today future time');
+ok(!rq({ reason: '  ' }).ok, 'request reason required');
+ok(!rq({ kind: '休憩' }).ok && !rq({ time: '25:00' }).ok && !rq({ date: '' }).ok, 'request bad input');
+ok(Dakoku.canRequestDay('2026-11-01', NOW) && !Dakoku.canRequestDay('2026-11-11', NOW) && !Dakoku.canRequestDay('2026-09-30', NOW), 'canRequestDay');
+ok(Dakoku.reqStatusLabel('pending').indexOf('承認待ち') === 0 && Dakoku.reqStatusLabel('rejected').indexOf('却下') === 0, 'status labels');
+ok(ui.includes('rpc/dakoku_request_submit') && ui.includes('rpc/dakoku_request_list') && ui.includes('rpc/dakoku_request_decide'), 'ui request RPCs');
+ok(ui.includes('打刻忘れを申告') && ui.includes('Informar registro esquecido') && ui.includes('req-fill') && ui.includes('申告 / Declarado'), 'ui request form + prefill + label');
+ok(ui.includes('dkReqAdminHtml') && ui.includes('承認') && ui.includes('却下'), 'ui admin approve/reject');
+ok(!ui.includes('押し忘れを直す画面は、まだありません'), 'old no-fix note removed');
+const rsql = fs.readFileSync(path.join(root, 'supabase/dakoku_requests.sql'), 'utf8');
+ok(rsql.includes('create table if not exists public.dakoku_requests') && rsql.includes('alter table public.dakoku_requests enable row level security'), 'requests table + RLS');
+ok(rsql.includes('revoke all on public.dakoku_requests from public, anon, authenticated') && !/create policy[^;]*dakoku_requests/.test(rsql), 'requests no direct access');
+['dakoku_request_submit', 'dakoku_request_list', 'dakoku_request_decide'].forEach(fn => {
+  const m = rsql.match(new RegExp('create or replace function public\\.' + fn + '\\([\\s\\S]*?\\$\\$;'));
+  ok(m && /security definer set search_path = public/.test(m[0]), fn + ' security definer + search_path');
+  ok(new RegExp('revoke all on function public\\.' + fn + '\\([^)]*\\) from public, anon').test(rsql) && new RegExp('grant execute on function public\\.' + fn + '\\([^)]*\\) to authenticated').test(rsql), fn + ' grants');
+});
+ok(rsql.includes('dakoku_admin_can()') && rsql.includes("'本人申告（打刻漏れ）／' || decider || '承認：'") && rsql.includes("'YYYY-MM-DD HH24:MI:SS'") && rsql.includes("at time zone 'Asia/Tokyo'"), 'decide inserts JST punch with memo');
+ok(rsql.includes("'request', coalesce(memo,'') like '本人申告%'") && sql.includes("'request', coalesce(memo,'') like '本人申告%'"), 'month returns request flag (both sql files)');
+ok(!rsql.includes('script.google.com') && !rsql.includes('gasUrl') && !lib_has_google(), 'no Google in request path');
+function lib_has_google() { const lib = fs.readFileSync(path.join(root, 'dakoku-lib.js'), 'utf8'); return lib.includes('script.google.com') || lib.includes('gasUrl'); }
 
 console.log('ok', n);

@@ -190,7 +190,7 @@ begin
   note := nullif(btrim(coalesce(p_answer->>'note', '')), ''); if char_length(coalesce(note, '')) > 500 then raise exception '備考は500字までです'; end if;
   closed := leo_sched_closed(r.month);
   for d in select * from jsonb_array_elements(a_days) loop
-    kd := d->>'kind'; if kd not in ('休み','母の送り','母の迎え','追加利用','時刻変更','送り場所変更') then raise exception '種類が正しくありません'; end if;
+    kd := d->>'kind'; if kd not in ('休み','母の送り','母の迎え','追加利用','時刻変更','送り場所変更','連絡') then raise exception '種類が正しくありません'; end if;
     begin dy := (d->>'day')::date; exception when others then raise exception '日付が正しくありません'; end;
     if dy < r.month or dy >= (r.month + interval '1 month')::date then raise exception '対象月以外の日付です'; end if;
     if dy = any(closed) then raise exception '% は事業所のお休みです', to_char(dy, 'MM/DD'); end if;
@@ -222,6 +222,24 @@ begin
 end $$;
 
 -- BEGIN leo_sched_plan_core
+-- 保護者の備考の本文から、その月の日付（11/16・11/12,25・11月30日・17日）を拾う。拾えなければ空の配列。
+create or replace function public.leo_memo_days(p_month date, p_memo text) returns date[]
+language sql immutable set search_path = public as $$
+  with t as (select translate(coalesce(p_memo, ''), '０１２３４５６７８９／，', '0123456789/,') s),
+  md as (
+    select m[1]::int mo, m[2] || coalesce(m[3], '') rest
+    from t, regexp_matches(t.s, '(\d{1,2})\s*[/月]\s*(\d{1,2})((?:\s*日?\s*[,、・と]\s*\d{1,2}(?![\d:時/]))*)', 'g') m
+  ),
+  d as (
+    select mo, (regexp_matches(rest, '\d{1,2}', 'g'))[1]::int dd from md
+    union all
+    select extract(month from p_month)::int, m[1]::int from t, regexp_matches(t.s, '(?<![\d/月])(\d{1,2})日', 'g') m
+  )
+  select coalesce(array_agg(distinct make_date(extract(year from p_month)::int, mo, dd) order by make_date(extract(year from p_month)::int, mo, dd)), '{}')
+  from d
+  where mo = extract(month from p_month)::int and dd between 1 and extract(day from (p_month + interval '1 month - 1 day'))::int
+$$;
+revoke all on function public.leo_memo_days(date, text) from public, anon, authenticated;
 -- 予定の中身。型表は読むだけ。通常の曜日の場所・時刻は型表のみ。利用する曜日は回答を優先する。未回答の子は型表から予定を作らない。名前が複数の児童に当たる回答だけ、これまでどおり型表の「毎週」を使う。例外は exception だけ。確認用の呼び出しは書き込まない。
 create or replace function public.leo_sched_plan_core(p_month date) returns jsonb language plpgsql security definer set search_path = public as $$
 declare ev jsonb := '[]'; warn jsonb := '[]'; closed date[]; last_day date := (p_month + interval '1 month - 1 day')::date;
@@ -294,7 +312,7 @@ begin
     if public.leo_left_on(v.child) is not null and v.day > public.leo_left_on(v.child) then continue; end if;
     if v.kind = '休み' then
       delete from _lsv where child = v.child and day = v.day;
-      ev := ev || jsonb_build_array(jsonb_build_object('day', v.day, 'kind', '休み', 'child', v.child, 'title', v.child || '　休み'));
+      ev := ev || jsonb_build_array(jsonb_build_object('day', v.day, 'kind', '休み', 'child', v.child, 'title', v.child || '　休み', 'note', case when nullif(btrim(v.memo), '') is not null then '⚠ 保護者の備考：' || btrim(v.memo) end));
     elsif v.kind in ('追加利用') then
       if not exists (select 1 from _lsv where child = v.child and day = v.day) and v.day <> all(closed) then
         insert into _lsv select v.day, v.child, d.dow, k->>'利用開始', k->>'利用終了', nullif(k->>'迎え開始', ''), nullif(btrim(coalesce(nullif(btrim(k->>'送り終了'), ''), nullif(btrim(k->>'送り時間'), ''))), ''),
@@ -322,18 +340,25 @@ begin
     where public.leo_left_on(x->>'child') is null or nullif(x->>'day', '') is null or (x->>'day')::date <= public.leo_left_on(x->>'child');
   update _lsv set parent_drop = true, ps = null, pst = null where par = '母の送り' and not parent_drop;
   update _lsv set parent_pick = true, pe = null, dst = null where par = '母の迎え' and not parent_pick;
+  -- 2026-11-10：保護者の備考は、その日の予定にだけ付ける。日ごとの備考（exception.day あり）はその日、
+  -- まとめ欄の備考（要確認・day なし）は本文の日付（leo_memo_days）の日だけ。日付のない備考は予定に貼らず、確認の一覧にだけ出す。
   for v in
-    select distinct r.kata as child, e.memo
+    select distinct r.kata as child, e.day, e.memo, case when e.day is null then public.leo_memo_days(p_month, e.memo) end as days
     from leo_schedule_exception e
     join _nres r on r.kind = 'link' and r.answer = e.child
-    where e.month = p_month and e.kind = '要確認'
+    where e.month = p_month and (e.kind = '要確認' or nullif(btrim(e.memo), '') is not null)
       and (public.leo_left_on(r.kata) is null or public.leo_left_on(r.kata) >= p_month)
   loop
-    warn := warn || jsonb_build_array(jsonb_build_object('child', v.child, 'msg', '保護者の備考：' || coalesce(v.memo, '')));
+    warn := warn || jsonb_build_array(jsonb_build_object('child', v.child, 'msg', '保護者の備考（' ||
+      case when v.day is not null then to_char(v.day, 'MM/DD')
+           when cardinality(v.days) > 0 then (select string_agg(to_char(x, 'MM/DD'), '・' order by x) from unnest(v.days) x) || 'の予定に付けました'
+           else '日付なし・予定には付けていません' end || '）：' || coalesce(v.memo, '')));
   end loop;
   select ev || coalesce(jsonb_agg(jsonb_build_object('day', day, 'kind', '利用', 'child', child, 'start_time', ks, 'end_time', ke, 'parent_drop', parent_drop, 'parent_pick', parent_pick,
       'title', child || case when parent_drop then '（母の送り）' when parent_pick then '（母の迎え）' else '' end,
-      'note', (select '⚠ 保護者の備考：' || string_agg(coalesce(e.memo, ''), ' / ') from leo_schedule_exception e join _nres r on r.kind = 'link' and r.answer = e.child and r.kata = _lsv.child where e.month = p_month and e.kind = '要確認')) order by day, ks), '[]') into ev from _lsv;
+      'note', (select '⚠ 保護者の備考：' || string_agg(distinct btrim(e.memo), ' / ') from leo_schedule_exception e join _nres r on r.kind = 'link' and r.answer = e.child and r.kata = _lsv.child
+        where e.month = p_month and nullif(btrim(e.memo), '') is not null
+          and ((e.day is not null and e.day = _lsv.day) or (e.day is null and e.kind = '要確認' and _lsv.day = any(public.leo_memo_days(p_month, e.memo)))))) order by day, ks), '[]') into ev from _lsv;
   for g in select day, pst staff, array_agg(child order by ps, pord nulls last) kids, min(ps) st, max(ks) en,
         jsonb_object_agg(child, pplace) kp, jsonb_object_agg(child, ps) kt
       from (select *, sum(case when pm is null or ps >= pm then 1 else 0 end) over (partition by day, pst order by ps, pord) grp

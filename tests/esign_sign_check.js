@@ -136,6 +136,64 @@ assert.ok(view.innerHTML.includes('印刷／PDFにする'));
 assert.ok(view.innerHTML.includes('紙で締結済みを登録'));
 assert.ok(!view.innerHTML.includes('氏名を入力'));
 assert.ok(!view.innerHTML.includes('id="esPrev"'));
+assert.ok(!view.innerHTML.includes('登録された書類はありません'));
+
+const preview = sandbox.esRenderPreview(
+  '労働条件通知書兼雇用契約書\n契約締結日：{{sign_date}}\n氏名：{{name}}\n雇用期間：{{period}}\n賃金：{{wage}}',
+  '金子 光恵',
+  { sign_date: '令和8年11月1日', period: '期間の定めあり（令和8年11月1日から令和9年3月31日）', wage: '基本給 1,300円（時給）' }
+);
+assert.ok(preview.includes('金子 光恵') && preview.includes('令和8年11月1日') && preview.includes('令和9年3月31日') && preview.includes('1,300円'));
+assert.ok(!preview.includes('{{'));
+
+sandbox.DEMO = false;
+const calls = [];
+sandbox.sb = async (q) => {
+  calls.push(String(q));
+  if (String(q).startsWith('staff_docs')) return [{
+    id: 3, doc_type: 'labor_contract', method: 'electronic', status: 'draft', rendered_text: null, template_id: 1,
+    terms: { sign_date: '令和8年11月1日', period: '期間の定めあり（令和8年11月1日から令和9年3月31日）', wage: '基本給 1,300円（時給）' }
+  }, {
+    id: 2, doc_type: 'confidentiality', method: 'electronic', status: 'signed', rendered_text: '秘密情報の保持に関する誓約書（見本）'
+  }, {
+    id: 9, doc_type: 'labor_contract', method: 'electronic', status: 'void', rendered_text: '取消した文面'
+  }];
+  if (String(q).startsWith('doc_signatures')) return [{
+    doc_id: 2, typed_name: '見本 花子', text_sha256: 'ab'.repeat(32), template_version: 1, signed_at: '2026-10-02T03:00:00Z', signature_png: png
+  }];
+  if (String(q).startsWith('doc_templates')) return [{
+    id: 1, body: '労働条件通知書兼雇用契約書\n\n契約締結日：{{sign_date}}\n氏名：{{name}}\n雇用期間：{{period}}\n賃金：{{wage}}\n'
+  }];
+  return [];
+};
+sandbox.esRpc = async () => { throw new Error('esRpc should not be called'); };
+await sandbox.esAdminDetail({ user_id: 'u9', full_name: '金子 光恵', office: '金斗雲' }, '<button class="back">戻る</button>');
+assert.ok(view.innerHTML.includes('📝 下書き（未発行）'));
+assert.ok(view.innerHTML.includes('金子 光恵'));
+assert.ok(view.innerHTML.includes('令和8年11月1日'));
+assert.ok(view.innerHTML.includes('令和9年3月31日'));
+assert.ok(view.innerHTML.includes('1,300円'));
+assert.ok(view.innerHTML.includes('秘密情報の保持に関する誓約書（見本）'));
+assert.ok(view.innerHTML.includes('class="essig"'));
+assert.ok(!view.innerHTML.includes('登録された書類はありません'));
+assert.ok(!view.innerHTML.includes('取消した文面'));
+assert.ok(!view.innerHTML.includes('id="esPrev"'));
+assert.ok(!view.innerHTML.includes('同意して署名する'));
+assert.ok(!view.innerHTML.includes('doc_issue'));
+assert.ok(!view.innerHTML.includes('notify_enqueue'));
+assert.ok(view.innerHTML.includes('書類 3 件'));
+assert.ok(calls.some(q => q.startsWith('doc_templates')));
+assert.ok(calls.every(q => !q.includes('doc_issue') && !q.includes('notify_enqueue')));
+
+sandbox.sb = async (q) => {
+  if (String(q).startsWith('staff_docs')) return [{ id: 3, doc_type: 'labor_contract', method: 'electronic', status: 'draft', rendered_text: null, terms: { wage: '基本給 1,300円（時給）' } }];
+  if (String(q).startsWith('doc_signatures')) return [];
+  throw new Error('unexpected ' + q);
+};
+await sandbox.esAdminDetail({ user_id: 'u9', full_name: '金子 光恵', office: '金斗雲' }, '<button class="back">戻る</button>');
+assert.ok(view.innerHTML.includes('📝 下書き（未発行）'));
+assert.ok(view.innerHTML.includes('基本給 1,300円（時給）'));
+assert.ok(!view.innerHTML.includes('登録された書類はありません'));
 
 console.log('esign_sign_check ok');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -118,7 +118,12 @@ html.th-yamen body.portal #home::after {
 }
 @media (prefers-reduced-motion: reduce) { html.th-yamen body.portal .tile { transition: none; } }
 @media print { html.th-yamen body.portal { background: #fff; color: #000; } }
-/* 毎日占い：金縁の短い札 */
+/* 今日のお仕事占い：金縁の短い札 */
 html.th-yamen body.portal .daily-sky { background: linear-gradient(#2a1a10, #1c110a); color: #f3e3b5; border: 2px solid #c9a24a; box-shadow: inset 0 0 0 1px #6b4a1a; border-radius: 4px; }
 html.th-yamen body.portal .daily-sky .ds-h { color: #e2c46d; letter-spacing: .2em; opacity: 1; }
 html.th-yamen body.portal .daily-sky .ds-t { color: #ffd77a; }
+
+/* 日中一時などの選択チップ：未選択は白、選択中は朱で一目で分かるように */
+html.th-yamen body.portal button.nc-chip { background: #fffaf0; color: #2a1a10; border: 2px solid #8a6a3a; box-shadow: none; }
+html.th-yamen body.portal button.nc-chip.on { background: linear-gradient(180deg, var(--ym-red-2), var(--ym-red)); color: var(--ym-ivory); border: 2px solid var(--ym-gold); box-shadow: 0 0 0 3px var(--ym-gold) inset; font-weight: 700; }
+html.th-yamen body.portal button.nc-chip.on::before { content: "✔ "; }

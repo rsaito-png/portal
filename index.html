@@ -1,5 +1,8 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#121a2f">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="theme-color" content="#f6efe1">
 <title>星心会 職員ポータル</title>
 <style>
 .daily-sky{margin:4px 0 14px;padding:10px 14px;border:1px solid #c9b27a;border-radius:8px;background:#fffaf0;line-height:1.6;font-size:.95em}.daily-sky .ds-h{font-weight:bold;font-size:.85em;opacity:.75;margin-bottom:2px}.daily-sky .ds-t{margin-top:4px;font-weight:bold}
@@ -118,11 +121,12 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="theme-retro.css?v=20261103pc">
-<script>/* テーマ切替：未指定=官吏(yamen)、?theme=retro で従来。localStorage に覚える */
-(function(){try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')localStorage.setItem('portalTheme',q);var t=q||localStorage.getItem('portalTheme')||'yamen';if(t==='yamen')document.documentElement.classList.add('th-yamen');}catch(e){document.documentElement.classList.add('th-yamen');}})();</script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="theme-yamen.css?v=20261104sky">
+<link id="th_retro" rel="stylesheet" href="theme-retro.css?v=20261103pc">
+<script>/* テーマ切替：既定=惑星の空(planet・2026-11-10 会長承認)。?theme=yamen（官吏）/ ?theme=retro（ドット絵）はそのページを開いたときだけ。覚えない */
+(function(){var t='planet';try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')t=q;localStorage.removeItem('portalTheme');}catch(e){}
+document.documentElement.classList.add('th-'+t);var l=document.getElementById('th_retro');if(l&&t!=='retro')l.disabled=true;})();</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@700&family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<link rel="stylesheet" href="theme-yamen.css?v=20261109chip">
 <style>
 /* 今日の日誌：児童名のボタン。入力欄は隠すだけで残す（保存は全員分） */
 .nk-kids{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
@@ -156,8 +160,9 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
-<link rel="stylesheet" href="shell.css?v=20261104all">
-<style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}</style>
+<link rel="stylesheet" href="shell.css?v=20261110chip2">
+<link rel="stylesheet" href="theme-planet.css?v=20261110org">
+<style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}#home_todo[hidden],#ht_jump[hidden]{display:none!important}</style>
 </head><body class="portal ui-app">
 <header class="ui-topbar"><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
@@ -177,14 +182,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261106manual"></script>
+<script src="config.js?v=20261110org"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
-<script src="leo_driver.js?v=20261105ren"></script>
+<script src="leo_driver.js?v=20261110yokota"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261109nikki"></script>
+<script src="leo.js?v=20261111nkday"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261106manual"></script>
 <script src="kin_visit.js?v=20261104all"></script>
@@ -198,32 +203,33 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="kin_contract.js?v=202610221354"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
-<script src="report.js?v=20261104home"></script>
-<script src="ht.js?v=20261108manual1"></script>
+<script src="report.js?v=20261110org"></script>
+<script src="ht.js?v=20261110link"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
 <script src="sct.js?v=20261030px"></script>
-<script src="chair.js?v=20261108inq"></script>
+<script src="chair.js?v=20261110org"></script>
 <script src="contact_inbox.js?v=20261108inq"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=20261026calov"></script>
-<script src="leo_cal.js?v=20261026calov"></script>
-<script src="leo_home_cal.js?v=20261109fit"></script>
+<script src="leo_cal.js?v=20261110drv"></script>
+<script src="leo_home_cal.js?v=20261110fit"></script>
 <script src="leo_jippi.js?v=20261103mealfee"></script>
 <script src="leo_jogan.js?v=20261106hand"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
-<script src="uketsuke.js?v=20261105askoff"></script>
+<script src="uketsuke.js?v=20261110me2"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261102wage"></script>
 <script src="chamu.js?v=20261106manual"></script>
 <script src="ryozan.js?v=20261104ryozan"></script>
 <script src="leo_kinmu_lib.js?v=20261102f1400"></script>
 <script src="leo_kinmu.js?v=20261102read"></script>
-<script src="dakoku-lib.js?v=20261109month"></script>
-<script src="dakoku.js?v=20261109month"></script>
+<script src="dakoku-lib.js?v=20261110req"></script>
+<script src="dakoku.js?v=20261110req"></script>
 <script src="dakoku_admin.js?v=20261106dakoku"></script>
 <script src="soudan.js?v=202611042130"></script>
 <script src="staff.js?v=20261106staff"></script>
+<script src="me.js?v=20261110soumu"></script>
 <script src="taxcal.js?v=20261106manual"></script>
 <script src="banto.js?v=202610211550"></script>
 <script src="sns.js?v=202610271650"></script>
@@ -234,6 +240,21 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="shogu_logic.js?v=20261030flow"></script>
 <script src="shogu.js?v=20261030proto"></script>
 <script>
+
+// 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
+(function () {
+  var BUILD = '20261110req';
+  try {
+    var prev = localStorage.getItem('portalBuild');
+    if (prev && prev !== BUILD) {
+      localStorage.setItem('portalBuild', BUILD);
+      location.reload();
+      return;
+    }
+    localStorage.setItem('portalBuild', BUILD);
+  } catch (e) {}
+  window.PORTAL_BUILD = BUILD;
+})();
 const C = window.PORTAL_CONFIG;
 // 見本モード（?demo=1）: ログイン不要・見本データのみ
 const DEMO = new URLSearchParams(location.search).get('demo') === '1';
@@ -268,7 +289,29 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 
 
 // 事業所画面の本体。o.groups があれば「次にやること＋大ボタン（最大6〜8）」、無ければ従来のタイル一覧
-const visTiles = o => o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()) || (t[1] === '今日やること（児発管）' && typeof canLeoHomeTodo === 'function' && canLeoHomeTodo()));
+// 準備中・受付（トップに統一）はメニューから隠すだけ。画面のルートは残す
+const hideFromHome = t => !t[2] || t[1] === '受付' || t[1] === '不具合・修正の依頼' || t[3] === '未整備' || String(t[3] || '').startsWith('準備中');
+const visTiles = o => o.tiles.filter(t => !hideFromHome(t) && (!t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()) || (t[1] === '今日やること（児発管）' && typeof canLeoHomeTodo === 'function' && canLeoHomeTodo())));
+// 担当欄の見出し（「〜がする」は「〜担当」）。中村友香担当＝本人＋児発管・管理者・会長・事務。事務担当＝事務・管理者・会長
+function whoVisible(title) {
+  const n = String(title || '').replace(/[\s　]/g, '');
+  const me = String(typeof MY_FULL_NAME !== 'undefined' ? MY_FULL_NAME : '').replace(/[\s　]/g, '');
+  const chair = typeof IS_CHAIR !== 'undefined' && IS_CHAIR;
+  const mgr = typeof canManage === 'function' && canManage();
+  if (n === '中村友香担当' || n === '中村友香がする') return chair || mgr || me === '中村友香';
+  if (n === '事務担当' || n === '宮本担当' || n === '宮本がする') return chair || DUTY === '管理者' || ROLE === '事務';
+  const m = String(title || '').match(/^(.+?)(がする|担当)$/);
+  if (m) return chair || mgr || me === m[1].replace(/[\s　]/g, '');
+  return true;
+}
+const OFFICE_PAUSED = { rydeen: '閉鎖予定', suishodama: '休止' };
+const officePaused = o => (o && OFFICE_PAUSED[o.id]) || '';
+const officeTile = (x, tag) => {
+  const mark = tag || officePaused(x);
+  const name = x.homeName || x.name;
+  const st = mark ? ` <span class="st">${mark}</span>` : '';
+  return `<a class="tile office${mark ? ' dim' : ''}" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${name}${st}<small>${x.kind}</small></span></a>`;
+};
 const shortName = (o, n) => (o.short || {})[n] || n;
 // 茶夢・金斗雲はメニューに日本語＋ポルトガル語を併記（o.pt）
 const ptL = (o, n, label) => o && o.pt && o.pt[n] ? `${label === undefined ? n : label}<em class="pt" style="display:block;font-size:.72em;font-style:normal;opacity:.75">${o.pt[n]}</em>` : (label === undefined ? n : label);
@@ -279,7 +322,7 @@ function groupList(o) {
   const rest = vis.filter(t => !used.has(t[1]));
   // 未分類は「その他」だけに足す（金斗雲）。最後のグループには足さない。
   const catchAll = n => n === 'その他';
-  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(catchAll(g[1]) ? rest : []) })).filter(g => g.tiles.length);
+  return o.groups.map((g, i) => ({ k: i, icon: g[0], label: g[1], sub: g[3] || '', tiles: g[2].flatMap(n => vis.filter(t => t[1] === n)).concat(catchAll(g[1]) ? rest : []) })).filter(g => g.tiles.length);
 }
 const tl = (t, name, cls, color) => { const link = t[2] ? `href="${t[2]}"${/^https?:/.test(t[2]) ? ' target="_blank" rel="noopener"' : ''}` : 'style="opacity:.5"';
   return `<a class="tile ${cls}" ${link} style="border-top:4px solid ${color}"><span>${t[0]}</span>${name}<small>${t[3]}</small></a>`; };
@@ -287,28 +330,36 @@ function leoHomeBody(o) {
   const vis = visTiles(o), col = o.color;
   const mine = ((o.mine || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
   const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
-  const gbtn = x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`;
-  const g = groupList(o).map(gbtn).join('');
+  const gbtn = x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}${x.sub ? `<small>${x.sub}</small>` : ''}</a>`;
+  // 現場（送迎）はホームに直置き。事務・計画のフォルダは事務・管理者・児発管・会長だけ（現場職員のホームには出さない。#leo/g1 は残す）
+  const g = groupList(o).filter(x => x.label !== '現場' && (x.label !== '事務・計画' || (typeof canManage === 'function' && canManage()) || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR))).map(gbtn).join('');
   const tileBig = t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`;
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
   const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(tileBig).join('')}</div>` : '';
   const who = (o.who || []).map(([title, names]) => {
+    if (typeof whoVisible === 'function' && !whoVisible(title)) return '';
     const tiles = (names || []).flatMap(n => vis.filter(t => t[1] === n));
     return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid">${tiles.map(tileBig).join('')}</div>` : '';
   }).join('');
   const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
   const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}`;
-  const duty = dutyName === '児発管の仕事' ? (dutyInner ? `<div class="grid">${dutyInner}</div>` : '') : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`;
-  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。LINEの下書き（#leo/linedraft）は直リンクのみ。
-  // 不具合・修正の依頼は毎日やる・現場・事務・計画には重ねない。who の下、管理系ルーティンの前に単独で出す。
-  const fix = vis.filter(t => t[1] === '不具合・修正の依頼').map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('');
-  const fixRow = fix ? `<div class="grid">${fix}</div>` : '';
-  return `<div id="my_todo"></div><div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
+  const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`);
+  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。
+  // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
+  const sougeiNames = ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'];
+  const sougei = sougeiNames.flatMap(n => vis.filter(t => t[1] === n));
+  const sougeiRow = sougei.length ? `<h3 class="nx">送迎</h3><div class="grid">${sougei.map(tileBig).join('')}</div>` : '';
+  // 今日やること（児発管）はここ1か所だけ（担当者名の欄には重ねない）
+  const todoT = o.todoTop ? vis.filter(t => t[1] === o.todoTop) : [];
+  const todoRow = todoT.length ? `<div class="grid">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
+  return `${todoRow}<div id="my_todo"></div><div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
-    ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}</div>
+    ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
+    ${big('#leo/nikki', '📔', '日誌', '', '')}</div>
+    ${sougeiRow}
     ${duty}
-    ${who}${fixRow}${rt}`;
+    ${who}${rt}`;
 }
 async function leoHomeStatus() {
   try { if (DEMO || typeof sb !== 'function') return;
@@ -371,11 +422,16 @@ async function render() {
   if (id === 'nicchu' && sub === 'jisseki' && typeof renderNicchuJisseki === 'function') return renderNicchuJisseki();
   if (id === 'nicchu' && sub === 'sign' && typeof renderNicchuSign === 'function') return renderNicchuSign();
   if (id === 'kintoun' && sub === 'consent') { KIN.name = null; return renderKin(); }
+  if (id === 'me' && sub === 'list' && sub2 && typeof renderMeDetail === 'function') return renderMeDetail(sub2);
+  if (id === 'me' && sub === 'list' && typeof renderMeList === 'function') return renderMeList();
+  if (id === 'me' && typeof renderMe === 'function') return renderMe();
   if (id === 'dakoku' && typeof renderDakoku === 'function') return renderDakoku();
   if (id === 'dakoku-settings' && typeof renderDakokuSettings === 'function') return renderDakokuSettings();
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
   if (id === 'ryozan' && sub === 'meal' && typeof renderRyozanMeal === 'function') return renderRyozanMeal();
   if (id === 'chamu' && sub && typeof renderChamu === 'function') return renderChamu(sub);
+  if (id === 'report' && sub === 'admin' && typeof renderReportAdmin === 'function') return renderReportAdmin();
+  if (id === 'report' && typeof renderReport === 'function') return renderReport();
   if (id === 'ht') return renderHt();
   if (id === 'sct' && typeof renderSct === 'function') return renderSct();
   if (id === 'chair') return renderChair();
@@ -404,29 +460,43 @@ async function render() {
     return;
   }
   // 評定所タイルは HYOJOSHO_HOLD（leaderboard.js）が true のあいだ出さない。戻すときはそのフラグを false に。
-  const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
-  const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
+  const topConsult = [['📌', '私への依頼', '#report', '届いた依頼を見て、「済」にする'], ['🧑‍💼', '番頭さん', '#banto', '相談・報告はここへ。要るものは会長へ取り次ぎ'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談'], ['📨', '受付', '#uketsuke', '不具合や修正の依頼、報告を送る']];
+  const topLearn = [['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとこと']];
   const officesHome = (typeof visibleOffices === 'function' ? visibleOffices() : C.offices);
-  $('view').innerHTML = `<div id="daily_sky" class="daily-sky" hidden></div>
-    <section id="home_todo" class="ui-card home-todo"><h2 class="ht-h">私のやること</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
-    <p class="ht-jump"><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
-    <h3 id="home_offices">出退勤</h3>
-    <div class="grid">${tileHtml(['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤。事業所の近くだけ', 'main'])}</div>
-    <h3>障害福祉事業</h3>
-    <div class="grid">${officesHome.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
-    <div id="kankoyo_sec"><h3>官公需</h3><div id="sct_slot"></div></div>
-    <h3>共通</h3>
-    <div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
-    <div id="soumu_slot">${soumuTile()}</div>
-    <h3 id="misc_h">未整理</h3>
-    <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
+  const canSeePaused = ROLE === '事務' || DUTY === '管理者' || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR);
+  const activeOff = officesHome.filter(x => !officePaused(x));
+  // 休止・閉鎖予定：事務・管理者・会長は全部。現場職員のトップには出さない（所属・兼務にあるときだけ出す。見本の現場は所属なしなので出さない）
+  const pausedOff = (typeof DEMO !== 'undefined' && DEMO && !canSeePaused && !MY_OFFICE) ? []
+    : (canSeePaused ? C.offices : officesHome).filter(x => officePaused(x));
+  // 並び：あなたへのお知らせ → 出退勤打刻＋今日のお仕事占い → 稼働中の事業所 → 休止・閉鎖予定 → 相談・報告 → 研修・発信 → 総務 → 会長
+  $('view').innerHTML = `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">あなたへのお知らせ</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
+    <p id="ht_jump" class="ht-jump" hidden><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
+    <div class="pl-hero"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span><small>スマホで出勤・退勤。事業所の近くだけ</small></a>
+    <div id="daily_sky" class="daily-sky" hidden></div></div>
+    <h3 id="home_offices">障害福祉事業</h3>
+    <div class="grid pl-offices">${activeOff.map(x => officeTile(x)).join('')}</div>
+    ${pausedOff.length ? `<h3>休止・閉鎖予定 <small>普段は使わない</small></h3><div class="grid pl-paused">${pausedOff.map(x => officeTile(x)).join('')}</div>` : ''}
+    <h3>相談・報告</h3>
+    <div class="grid pl-links">${topConsult.map(t => tileHtml(t)).join('')}</div>
+    <h3>研修・発信</h3>
+    <div class="grid pl-links">${topLearn.map(t => tileHtml(t)).join('')}</div>
+    <div id="soumu_slot" class="pl-links-wrap"><h3 class="nx">総務</h3>${soumuTile()}</div>
+    <div id="chair_slot" class="pl-links-wrap"></div>`;
+  plClock();
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof lbBadge === 'function') lbBadge();
   if (typeof soudanBadge === 'function') soudanBadge();
-  chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); sctAdminTile();
+  if (typeof todoBadge === 'function') todoBadge();
+  chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile();
   loadDailySky(); if (typeof homeTodo === 'function') homeTodo();
 }
-// 毎日占い（全体の空の動き）。portal_daily_sky の今日（JST）分。取れなければ枠ごと隠す。
+// トップの打刻カードの時計（日本時間・表示だけ）
+function plClock() {
+  const f = () => { const el = document.getElementById('pl_clock'); if (!el) { clearInterval(window.__plClk); window.__plClk = 0; return; }
+    const d = new Date(Date.now() + 9 * 3600000); el.textContent = `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
+  f(); if (!window.__plClk) window.__plClk = setInterval(f, 20000);
+}
+// 今日のお仕事占い（全体の空の動きを、その日の仕事に結びつけて）。portal_daily_sky の今日（JST）分。取れなければ枠ごと隠す。
 function skyCanEdit() {
   if (DEMO) return false;
   return (typeof ROLE !== 'undefined' && ROLE === '事務')
@@ -438,7 +508,7 @@ async function loadDailySky() {
   const day = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
   let r = null;
   try {
-    if (DEMO) r = { day, body: '月は昼に乙女座へ。話は進むが、現場は動かない日。急がず、一つだけ片づける。', tip: '散らかっても慌てず、目の前の一つを拾え。' };
+    if (DEMO) r = { day, body: '月は夕方に射手座へ。新月前後は動きを急がず、記録と申し送りを先に整える日。', tip: '送迎の前に、報連相を一つ済ませよう。' };
     else if (typeof sb === 'function') {
       r = ((await sb(`portal_daily_sky?day=eq.${day}&select=day,body,tip`)) || [])[0];
     }
@@ -448,9 +518,9 @@ async function loadDailySky() {
   const esc = x => String(x || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const editBtn = skyCanEdit() ? `<button type="button" class="inl back" style="margin-left:8px;font-size:12px" onclick="skyEditOpen('${esc(day)}')">直す</button>` : '';
   if (!r || !r.body) {
-    el.innerHTML = `<div class="ds-h">毎日占い ${editBtn}</div><div class="ds-b note">今日分はまだありません（管理者は「直す」から書けます）。</div>`;
+    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b note">今日分はまだありません（管理者は「直す」から書けます）。</div>`;
   } else {
-    el.innerHTML = `<div class="ds-h">毎日占い ${editBtn}</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
+    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
   }
   el.hidden = false;
 }
@@ -461,7 +531,7 @@ async function skyEditOpen(day) {
     const rows = await sb(`portal_daily_sky?day=eq.${day}&select=body,tip`) || [];
     if (rows[0]) cur = rows[0];
   } catch (e) {}
-  const body = prompt('本文（2〜3文）', cur.body || '');
+  const body = prompt('本文（2〜3文。その日の仕事について）', cur.body || '');
   if (body === null) return;
   const tip = prompt('今日のひとこと', cur.tip || '');
   if (tip === null) return;
@@ -503,7 +573,7 @@ async function accAdmin() {
     return r.ok && (await r.json()) === true; } catch (e) { return false; }
 }
 // 総合トップの「総務」。全員が開ける（自分の書類の署名）。中の人事労務・補助金・経理は事務、会計（簡易）は法人管理者
-const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>書類の署名は全員。人事労務・補助金・経理は事務</small></a></div>`;
+const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>書類の署名・給与口座の届出は全員。人事労務・経理は事務</small></a></div>`;
 async function accTile() {
   if (ROLE === C.clerk.role || document.getElementById('soumu_tile')) return;
   if (!(await accAdmin())) return;
@@ -514,18 +584,23 @@ async function renderSoumu() {
   const back = `<button class="back" onclick="location.hash=''">← トップへ</button>`;
   const clerk = ROLE === C.clerk.role;
   const groups = (C.clerk.groups || []).map(g => {
-    const tiles = (g.tiles || []).filter(t => clerk || t[2] === '#sign');
+    const tiles = (g.tiles || []).filter(t => (clerk || t[2] === '#sign') && t[2] && t[3] !== '未整備' && !String(t[3] || '').startsWith('準備中'));
     if (!tiles.length) return '';
     return `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${tiles.map(t => tileHtml(t, '#555')).join('')}</div>`;
   }).join('');
   $('view').innerHTML = back + `<h3>🗂️ 総務</h3><div id="sumu_sec">${groups}</div>`;
   const sec = document.getElementById('sumu_sec');
+  // 給与口座・マイナンバー（本人の届出 #me）は全職員。トップから総務へ移した（2026-11-10 会長）。書類の署名の隣に出す
+  if (!sec.querySelector('a[href="#me"]')) {
+    const t = tileHtml(['📝', '給与口座・マイナンバー', '#me', '振込口座と本人の個人番号の届出'], '#555'), sg = sec.querySelector('a[href="#sign"]');
+    if (sg) sg.insertAdjacentHTML('afterend', t); else sec.insertAdjacentHTML('afterbegin', '<div class="grid">' + t + '</div>');
+  }
   if (await accAdmin()) {
     const t = '<a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a>';
     const kh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '経理'), kg = kh && kh.nextElementSibling;
     const tt = sec.querySelector('a[href="#taxcal"]') ? '' : tileHtml(['🧾', '税カレンダー', '#taxcal', '源泉・住民税（毎月10日）と年次の期限'], '#555');
     if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', tt + t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + tt + t + '</div>');
-  } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
+  } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.insertAdjacentHTML('beforeend', '<p>そのほかの総務は事務の方だけが見られます。</p>');
   if (!clerk && !sec.querySelector('a[href="#shogu"]') && (DUTY === '管理者' || (typeof shoguUiCan === 'function' && await shoguUiCan()))) {
     const t = tileHtml(['💴', '処遇改善加算（試作）', '#shogu', '国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作'], '#555');
     const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
@@ -542,6 +617,13 @@ async function renderSoumu() {
       if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', extras.join(''));
       else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + extras.join('') + '</div>');
     }
+  }
+  // 給与口座・マイナンバーの一覧：事務は config のタイル。会長は事務でなくても人事労務に出す（管理者には出さない）
+  if (!clerk && (typeof IS_CHAIR !== 'undefined' && IS_CHAIR) && !sec.querySelector('a[href="#me/list"]')) {
+    const t = tileHtml(['📋', '登録状況の一覧', '#me/list', '給与口座と個人番号の登録状況（閲覧のみ）'], '#555');
+    const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
+    if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', t);
+    else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + t + '</div>');
   }
   if (typeof esignBadge === 'function') esignBadge();
 }

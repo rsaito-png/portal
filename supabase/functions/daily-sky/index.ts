@@ -1,4 +1,4 @@
-// 毎日占い（全体の空の動き）を1日1回作って portal_daily_sky に入れる。
+// 今日のお仕事占い（全体の空の動きを、その日の仕事に結びつけて）を1日1回作って portal_daily_sky に入れる。
 // cron（JST 5:10）から x-daily-sky-secret 付きで POST される。verify_jwt=false、秘密ヘッダで守る。
 // シークレット: DAILY_SKY_SECRET, XAI_API_KEY（既存）, AI_MODEL（任意）。{"force":true} で作り直し。
 const SIGNS = ["牡羊座", "牡牛座", "双子座", "蟹座", "獅子座", "乙女座", "天秤座", "蠍座", "射手座", "山羊座", "水瓶座", "魚座"];
@@ -40,25 +40,24 @@ export function factLine(f: ReturnType<typeof skyFacts>) {
 }
 export function fallback(f: ReturnType<typeof skyFacts>) {
   const m = f.ingress ? `月は${when(f.ingress.hour)}に${f.ingress.to}へ。` : `月は${f.moon}で落ち着く。`;
-  return { body: `${m}太陽は${f.sun}。急がず、手元の一つを片づける日。`, tip: "目の前の一つを丁寧に。" };
+  return { body: `${m}太陽は${f.sun}。${f.phase}。記録と申し送りを先に整え、送迎も一つずつ確かめる日。連絡は短く事実だけに。`, tip: "報連相は、短く一つ済ませよう。" };
 }
 export function parse(t: string) {
-  const b = t.match(/BODY\s*[:：]\s*(.+?)(?:\n|$)/s), p = t.match(/TIP\s*[:：]\s*(.+?)(?:\n|$)/);
-  if (!b || !p) return null;
-  const body = b[1].replace(/\s*TIP\s*[:：].*$/s, "").trim(), tip = p[1].trim();
-  if (!body || !tip || body.length > 120 || tip.length > 50) return null;
+  const m = t.match(/BODY\s*[:：]\s*([\s\S]+?)\s*TIP\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (!m) return null;
+  const body = m[1].trim(), tip = m[2].trim();
+  if (!body || !tip || body.length > 400 || tip.length > 80) return null;
   return { body, tip };
 }
 function redact(s: string, key: string) {
   let o = s.replace(/xai-[A-Za-z0-9._-]+/g, "***").replace(/Bearer\s+\S+/gi, "Bearer ***");
   return key ? o.split(key).join("***") : o;
 }
-const SYSTEM = `あなたは職場ポータルの「毎日占い」係。個人の出生図ではなく、今日の空全体の動き（太陽・月の星座、月の移動、月相）だけを短く述べる。
-規則: BODYは2〜3文、合計80字以内。TIPは1文、30字以内。命令形・言い切りで静かなトーン。専門用語の解説や長文は禁止。個人占い・星座別運勢は禁止。
-例:
-BODY: 月は昼に乙女座へ。話は進むが、現場は動かない日。急がず、一つだけ片づける。
-TIP: 散らかっても慌てず、目の前の一つを拾え。
-出力はこの2行だけ:
+const SYSTEM = `あなたは障害福祉の職員ポータル「今日のお仕事占い」係。読む人は児発・放デイ、居宅介護、生活介護の現場職員と事務。
+個人の出生図や星座別運勢は禁止。今日の空全体の動き（太陽・月の星座、月の移動、月相、必要なら水星などその日に目立つ動き）を、その日の仕事の手がかりとして述べる。
+本文はチームワーク、利用者対応、記録、送迎、報連相、集中とペースなど、その日の仕事に結びつける。健康・病気・医療の予言、怖い言い方、事故や災いの暗示は禁止。
+BODYは2〜3行、TIPは「今日のひとこと」1行。字数の上限は設けない。空の動きは時刻や星座を略さず具体的に。落ち着いた言い切り。専門用語の解説はしない。薄い一文で済ませない。
+出力は次の2項目だけ（BODYは改行してよい）:
 BODY: ...
 TIP: ...`;
 
@@ -88,7 +87,7 @@ export async function handle(req: Request): Promise<Response> {
       const r = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
         body: JSON.stringify({ model: Deno.env.get("AI_MODEL") || MODEL_DEFAULT, temperature: 0.8, max_tokens: 200,
-          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: `${day}（東京）の空: ${factLine(f)}` }] }),
+          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: `${day}（東京）の空: ${factLine(f)} 今日の仕事（記録・送迎・利用者対応・報連相・チームワーク・集中とペース）に結びつけて。` }] }),
       });
       if (r.ok) { const p = parse(String((await r.json())?.choices?.[0]?.message?.content ?? "")); if (p) { out = p; src = "xai"; } }
       else console.error("daily-sky xAI", r.status, redact(await r.text(), key).slice(0, 300));

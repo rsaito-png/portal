@@ -1,0 +1,73 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const root = path.join(__dirname, '..');
+const src = fs.readFileSync(path.join(root, 'me.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const cfg = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
+const sql = fs.readFileSync(path.join(root, 'supabase/staff_me.sql'), 'utf8');
+const drop = fs.readFileSync(path.join(root, 'supabase/staff_me_drop_ye.sql'), 'utf8');
+
+assert.ok(html.includes('me.js?v='));
+assert.ok(html.includes("id === 'me'"));
+assert.ok(html.includes('給与口座・マイナンバー'));
+assert.ok(html.includes('#me'));
+assert.ok(cfg.includes('#me/list'));
+assert.ok(cfg.includes('給与口座・マイナンバー'));
+assert.ok(src.includes('年末調整の申告はフリーウェイから案内します'));
+assert.ok(!src.includes('staff_ye_declarations'));
+assert.ok(!src.includes('staff_dependent_my_numbers'));
+assert.ok(!src.includes('staff-ye-docs'));
+assert.ok(!src.includes('扶養控除'));
+assert.ok(!src.includes('基礎控除'));
+assert.ok(!src.includes('保険料控除'));
+assert.ok(!src.includes('住宅借入'));
+assert.ok(!src.includes('前職'));
+assert.ok(!/console\.(log|debug|info|warn|error)\(/.test(src));
+assert.ok(!src.includes('staff_todo'));
+assert.ok(!src.includes('notify_enqueue'));
+assert.ok(!src.includes('doc_issue'));
+assert.ok(sql.includes("my_role() = '事務'"));
+assert.ok(sql.includes('is_chair()'));
+assert.ok(sql.includes('staff_bank_accounts'));
+assert.ok(sql.includes('staff_my_numbers'));
+assert.ok(!sql.includes('create table') || !/create table if not exists public\.staff_ye_declarations/.test(sql));
+assert.ok(!/create table if not exists public\.staff_dependent_my_numbers/.test(sql));
+assert.ok(!sql.includes("staff-ye-docs"));
+assert.ok(sql.includes("staff_my_number_valid"));
+assert.ok(sql.includes("revoke delete on public.staff_bank_accounts"));
+assert.ok(sql.includes("revoke delete on public.staff_my_numbers"));
+assert.ok(sql.includes('purpose_ack'));
+assert.ok(drop.includes('drop table if exists public.staff_ye_declarations'));
+assert.ok(drop.includes('drop table if exists public.staff_dependent_my_numbers'));
+assert.ok(drop.includes('DELETE /storage/v1/bucket/staff-ye-docs'));
+assert.ok(drop.includes('refuse drop'));
+const policies = sql.split('create policy');
+for (const p of policies.slice(1)) {
+  assert.ok(!p.split(';')[0].includes('staff_admin_can'), 'policy must not use staff_admin_can');
+  assert.ok(!p.split(';')[0].includes("my_duty()"), 'policy must not use my_duty');
+}
+
+const sandbox = {};
+sandbox.window = sandbox;
+sandbox.globalThis = sandbox;
+vm.createContext(sandbox);
+vm.runInContext(src, sandbox);
+assert.strictEqual(sandbox.meNumberValid('123456789016'), true);
+assert.strictEqual(sandbox.meNumberValid('123456789010'), false);
+assert.strictEqual(sandbox.meNumberValid('123'), false);
+assert.strictEqual(sandbox.meMaskNumber('1234567'), '•••4567');
+assert.strictEqual(sandbox.meMaskNumber('123456789016'), '••••••••9016');
+assert.ok(sandbox.meToKana('さいとう れん').includes('サイトウ'));
+assert.strictEqual(typeof sandbox.renderMe, 'function');
+assert.strictEqual(typeof sandbox.renderMeList, 'function');
+assert.strictEqual(typeof sandbox.renderMeDetail, 'function');
+assert.strictEqual(typeof sandbox.meAddRow, 'undefined');
+assert.strictEqual(typeof sandbox.meChangeYear, 'undefined');
+assert.strictEqual(typeof sandbox.meOpenFile, 'undefined');
+
+const uk = fs.readFileSync(path.join(root, 'uketsuke.js'), 'utf8');
+assert.ok(uk.includes("me: '給与口座・マイナンバー'"));
+
+console.log('me_check ok');

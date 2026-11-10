@@ -1,5 +1,5 @@
--- 打刻設定・打刻ログを Supabase に移す（ポータルが正。GASシートは参照しない）
--- 既存の設定値は GAS bootstrap（2026-11-06 取得）をそのまま投入。何度実行しても同じ。
+-- 打刻設定・打刻ログを Supabase に移す（ポータル（Supabase）が正。Google は使わない）
+-- 既存の設定値は 2026-11-06 時点の名簿を投入。何度実行しても同じ。
 
 create table if not exists public.dakoku_offices (
   name text primary key check (char_length(btrim(name)) between 1 and 40),
@@ -258,7 +258,8 @@ begin
       'office', office,
       'lunch', case when lunch then 'はい' else 'いいえ' end,
       'memo', coalesce(memo,''),
-      'proxy', coalesce(memo,'') like '管理者記録%'
+      'proxy', coalesce(memo,'') like '管理者記録%',
+      'request', coalesce(memo,'') like '本人申告%'
     ) as obj
     from public.dakoku_punches
     where staff_id = s.id
@@ -277,5 +278,6 @@ grant execute on function public.dakoku_bootstrap() to authenticated;
 grant execute on function public.dakoku_recent(text) to authenticated;
 grant execute on function public.dakoku_month(text, text) to authenticated;
 grant execute on function public.dakoku_punch(text,text,text,double precision,double precision,double precision,boolean,text) to authenticated;
+
 
 notify pgrst, 'reload schema';
