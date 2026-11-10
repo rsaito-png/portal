@@ -41,7 +41,7 @@ assert.ok(sql.includes("revoke delete on public.staff_my_numbers"));
 assert.ok(sql.includes('purpose_ack'));
 assert.ok(drop.includes('drop table if exists public.staff_ye_declarations'));
 assert.ok(drop.includes('drop table if exists public.staff_dependent_my_numbers'));
-assert.ok(drop.includes("delete from storage.buckets where id = 'staff-ye-docs'"));
+assert.ok(drop.includes('DELETE /storage/v1/bucket/staff-ye-docs'));
 assert.ok(drop.includes('refuse drop'));
 const policies = sql.split('create policy');
 for (const p of policies.slice(1)) {

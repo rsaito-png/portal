@@ -1,5 +1,7 @@
--- 年末調整関連の表と Storage を削除する（件数 0 のときだけ）。
+-- 年末調整関連の表を削除する（件数 0 のときだけ）。
 -- staff_bank_accounts と staff_my_numbers は残す。
+-- Storage バケット staff-ye-docs は storage.protect_delete により SQL からの DELETE が拒否される。
+-- オブジェクト0件を確認したうえで、Storage API（DELETE /storage/v1/bucket/staff-ye-docs）で削除する。
 do $$
 declare
   n_ye int;
@@ -29,5 +31,3 @@ drop policy if exists syedoc_del on storage.objects;
 
 drop table if exists public.staff_ye_declarations;
 drop table if exists public.staff_dependent_my_numbers;
-
-delete from storage.buckets where id = 'staff-ye-docs';
