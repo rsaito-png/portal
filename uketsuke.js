@@ -64,7 +64,7 @@ function ukRouteFrom(pathname, hash, cfg) {
   if (file && file !== 'index.html') return { route: file + (h ? '#' + h : ''), label: file + (h ? ' / ' + h : '') };
   if (!h) return { route: 'index.html', label: 'トップ' };
   const [id, sub] = h.split('/');
-  const fixed = { uketsuke: '受付', sign: '書類の確認と署名', dakoku: '出退勤打刻', me: '入職・年末調整の届出', ht: '法定研修', chair: '評定所', banto: '番頭さん', soudan: '人事労務の相談所', leaderboard: '評定所', mgr: '管理者', staff: '職員マスタ' };
+  const fixed = { uketsuke: '受付', sign: '書類の確認と署名', dakoku: '出退勤打刻', me: '給与口座・マイナンバー', ht: '法定研修', chair: '評定所', banto: '番頭さん', soudan: '人事労務の相談所', leaderboard: '評定所', mgr: '管理者', staff: '職員マスタ' };
   if (id === 'clerk' && sub === 'docs') return { route: 'index.html#' + h, label: '書類管理' };
   const o = (C.offices || []).find(x => x.id === id);
   if (o) {
