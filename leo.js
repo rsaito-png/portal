@@ -36,6 +36,7 @@ const DEMO_DATA = {
 };
 // 日誌で「直せる」項目。直すと1分ほどで Google の日誌に反映（box の apply_edits.py）
 // activity＝日誌の活動記録（LINEから入る児童の様子）。食事提供と総合日誌はポータルの別表（leo_meal_record / leo_day_log）。シートの食事・おやつ列と国保連には写さない
+const DRIVER_PICK = { pick_driver: 1, drop_driver: 1 };
 const NIKKI_FIELDS = [['activity','活動記録（児童の様子）'],['pick_place','迎え場所'],['pick_time','迎え時刻'],['pick_driver','迎え運転手'],['start_time','開始'],['end_time','終了'],
   ['drop_place','送り場所'],['drop_time','送り時刻'],['drop_driver','送り運転手']];
 // 今日の日誌の入力カードだけ、送迎と開始・終了を行にまとめる（中身と保存は1欄ずつ）
@@ -645,6 +646,9 @@ const LEO_VIEWS = {
     const abs = rows.filter(r => r.kind === '欠席');
     let act = [];
     const bundle = await leoLoadDayBundle(day);
+    // 運転手欄のプルダウン：届け出名（祥先生→齊藤 など）に揃え、保護者も選べる。
+    const drvRaw = await leoDriverNames().catch(() => []);
+    const drvNames = [...drvRaw.filter(n => filingDriverName(n) === n), ...drvRaw.map(n => filingDriverName(n)), '保護者'];
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${day}`); } catch (e) { }
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
     const meals = leoMealByChild(bundle.meals);
@@ -660,6 +664,7 @@ const LEO_VIEWS = {
           const attrs = `data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
             ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
+            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${driverOptionsHtml(drvNames, shown)}</select></label>`
             : `<label>${labelOf[f]}<input ${attrs} value="${esc(shown)}"></label>`;
         };
         const rideRows = NIKKI_RIDE_ROWS.map(fs => `<div class="nk-row">${fs.map(f => fieldHtml(f, r[f] ?? '')).join('')}</div>`).join('');
@@ -1435,7 +1440,7 @@ async function saveNikki() {
   if (absErr) { $('saved').textContent = absErr; return; }
   const by = {};
   let n = 0;
-  for (const i of document.querySelectorAll('#view .rec input, #view .rec textarea')) {
+  for (const i of document.querySelectorAll('#view .rec input, #view .rec textarea, #view .rec select.nk-driver')) {
     if (i.dataset.kind === 'meal' || i.dataset.kind === 'day' || i.dataset.kind === 'abs') continue;
     const edit = nikkiEditValue(i.dataset.f, i.dataset.old, i.value);
     if (!edit) continue;

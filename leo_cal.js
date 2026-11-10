@@ -405,11 +405,11 @@ function calForm(e, kids, staffs) {
   const v = k => esc(e[k] ?? ''), opt = (l, cur) => l.map(x => `<option${x === cur ? ' selected' : ''}>${esc(x)}</option>`).join('');
   const memo = leoAbsSplit(e).memo;
   return `<div style="border:2px solid #06c;border-radius:8px;padding:8px;margin:8px 0"><b>${e.id ? '予定を直す' : '予定を追加'}</b>
-  <datalist id="calkids">${kids.map(k => `<option value="${esc(k)}">`).join('')}</datalist><datalist id="calstaff">${staffs.map(k => `<option value="${esc(k)}">`).join('')}</datalist>
+  <datalist id="calkids">${kids.map(k => `<option value="${esc(k)}">`).join('')}</datalist>
   <p>日付 <input type="date" id="cf_day" value="${v('day')}" onchange="calAbsSync()"> 種類 <select id="cf_kind" onchange="calKindChange()">${opt(['利用', '休み', '迎え', '送り', '勤務', '不在', '休所', 'その他'], e.kind)}</select></p>
   <p>児童（利用・休み） <input id="cf_child" list="calkids" value="${v('child')}"></p>
   <p>乗る順（迎え・送り、「→」区切り） <input id="cf_kids" list="calkids" value="${esc((e.kids || []).join(' → '))}" style="width:95%"></p>
-  <p>職員・運転 <input id="cf_staff" list="calstaff" value="${v('staff')}"></p>
+  <p>職員・運転 <select id="cf_staff">${driverOptionsHtml(staffs, e.staff)}</select></p>
   <p>時刻 <input type="time" id="cf_st" value="${v('start_time')}">〜<input type="time" id="cf_en" value="${v('end_time')}"></p>
   <p><label><input type="checkbox" id="cf_pd"${e.parent_drop ? ' checked' : ''}> 保護者が送ってくる（☆なし）</label><br><label><input type="checkbox" id="cf_pp"${e.parent_pick ? ' checked' : ''}> 保護者が迎えに来る（★なし）</label></p>
   <p>場所 <input id="cf_place" value="${v('place')}" style="width:95%"></p><p>メモ <input id="cf_note" value="${esc(memo)}" style="width:95%"></p>
@@ -528,7 +528,7 @@ LEO_VIEWS.cal = async function () {
   if (CAL.edit) {
     const e = CAL.edit === 'new' ? { day: CAL.d, kind: '利用', kids: [] } : evs.find(x => x.id === CAL.edit) || {};
     CAL.row = e.id ? e : null;
-    h += calForm(e, [...new Set([...ch.map(x => x.name), ...evs.map(x => x.child).filter(Boolean)])].sort(), [...new Set(evs.map(x => x.staff).filter(Boolean))].sort());
+    h += calForm(e, [...new Set([...ch.map(x => x.name), ...evs.map(x => x.child).filter(Boolean)])].sort(), [...new Set([...evs.map(x => x.staff).filter(Boolean), ...await leoDriverNames().catch(() => [])])]);
   }
   h += calWrap(`<p class="calv-date">${head}</p><p class="calv-hint">横軸は時刻、色の棒は児童の利用時間です。棒をタップすると、迎え（☆）・送り（★）の担当・時刻・場所と、保護者の備考が出ます。</p>${body}`);
   h += `<p style="margin-top:12px;font-size:13px;line-height:1.5">関連：<a href="#leo/sougei">自分の送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/userinfo">利用者情報</a>' : ''}</p>

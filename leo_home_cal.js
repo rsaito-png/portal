@@ -506,7 +506,7 @@ async function renderSgDay(day) {
       };
       const names = evs.flatMap(e => [e.child, ...(e.kids || [])]).filter(Boolean);
       const staffs = evs.map(e => e.staff).filter(Boolean);
-      form = calForm(row, [...new Set(names)].sort(), [...new Set(staffs)].sort());
+      form = calForm(row, [...new Set(names)].sort(), [...new Set([...staffs, ...(typeof leoDriverNames === 'function' ? await leoDriverNames().catch(() => []) : [])])]);
     }
     $('view').innerHTML = back + form + sgDayHtml(day, evs, care, { me: me || '', mine: SG_MINE, canEdit });
     if (form) { const box = document.querySelector('#cf_day'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'start' }); }
