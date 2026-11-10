@@ -661,7 +661,7 @@ const LEO_VIEWS = {
         const labelOf = Object.fromEntries(NIKKI_FIELDS);
         const fieldHtml = (f, raw) => {
           const shown = nikkiShownValue(f, raw);
-          const attrs = `data-row="${r.row_no}" data-f="${f}" data-old="${esc(raw)}"`;
+          const attrs = `data-row="${r.row_no}" data-child="${esc(r.child)}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
             ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
             : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${driverOptionsHtml(drvNames, shown)}</select></label>`
@@ -1453,7 +1453,7 @@ async function saveNikki() {
     if (i.dataset.kind === 'meal' || i.dataset.kind === 'day' || i.dataset.kind === 'abs') continue;
     const edit = nikkiEditValue(i.dataset.f, i.dataset.old, i.value);
     if (!edit) continue;
-    (by[i.dataset.row] || (by[i.dataset.row] = {}))[i.dataset.f] = edit.new_value;
+    (by[i.dataset.row] || (by[i.dataset.row] = { _child: i.dataset.child || '' }))[i.dataset.f] = edit.new_value;
     i.dataset.old = edit.new_value;
     n += 1;
   }
@@ -1465,8 +1465,9 @@ async function saveNikki() {
   if (!rows.length && !mealForms.length && !absRows.length) { $('saved').textContent = '変更はありません。'; return; }
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${n}件の修正）。`; return; }
   try {
-    for (const [row, fields] of rows) {
-      await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: nkDay(), p_row: Number(row), p_fields: fields }) });
+    for (const [row, fields0] of rows) {
+      const { _child, ...fields } = fields0;
+      await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: nkDay(), p_row: Number(row), p_fields: fields, p_child: _child || null }) });
     }
     if (mealForms.length) {
       const err = await leoUpsertMeals(nkDay(), mealForms);
