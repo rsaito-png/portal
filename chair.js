@@ -19,8 +19,6 @@ async function chairTile() {
   // トップでは毎日の仕事（私のやること・打刻・事業所）の下に置く。枠が無い画面だけ従来どおり先頭
   const slot = document.getElementById('chair_slot');
   if (slot) slot.insertAdjacentHTML('beforeend', '<h3>会長</h3>' + html); else if (msg) msg.insertAdjacentHTML('afterend', html); else v.insertAdjacentHTML('afterbegin', html);
-  const ct = document.getElementById('chair_tile'); // 会長は総務を経ずに税カレンダーへ
-  if (ct && !document.getElementById('taxcal_tile')) ct.insertAdjacentHTML('afterend', `<a id="taxcal_tile" class="tile" href="#taxcal" style="display:block;border-top:4px solid #2e6b4f;margin-bottom:12px"><span>🧾</span>税カレンダー<small>源泉・住民税（毎月10日）と年次の期限</small></a>`);
   if (typeof contactBadge === 'function') contactBadge();
 }
 // 会長からの一言（職員向け表示）
