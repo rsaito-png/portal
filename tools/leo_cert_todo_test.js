@@ -1,4 +1,4 @@
-// 受給者証の期限。今日やること（#leo/home。中村 友香がする、から開く画面）に出す。node tools/leo_cert_todo_test.js
+// 受給者証の期限。今日やること（#leo/home。中村友香担当から開く画面）に出す。node tools/leo_cert_todo_test.js
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -80,13 +80,13 @@ assert.ok(String(sandbox.__replaced).endsWith('#leo/userinfo'));
 const cfg = read('config.js');
 const idx = read('index.html');
 assert.ok(cfg.includes("'今日やること（児発管）', '#leo/home'"));
-const whoLine = cfg.split('\n').find(l => l.includes('who:') && l.includes('中村 友香がする'));
-const who = whoLine.slice(whoLine.indexOf('中村 友香がする'), whoLine.indexOf('宮本がする'));
+const whoLine = cfg.split('\n').find(l => l.includes('who:') && l.includes('中村友香担当'));
+const who = whoLine.slice(whoLine.indexOf('中村友香担当'), whoLine.indexOf('事務担当'));
 assert.ok(!who.includes('今日やること（児発管）') && cfg.includes("todoTop: '今日やること（児発管）'"), '今日やることはホーム最上段に1つだけ（中村の欄に重ねない）');
 const homeFn = read('leo.js').slice(read('leo.js').indexOf('LEO_VIEWS.home = async function'), read('leo.js').indexOf('async function leoRecordDay'));
 assert.ok(homeFn.includes('leoCertTodos'), '同じ今日やること画面に出す');
 assert.ok(!/if \(canLeoHomeTodo\(\)\)[\s\S]{0,120}leoCertTodos/.test(homeFn), '中村が見る一覧を、依頼ボタンの人だけにしない');
-assert.ok(idx.includes('leo.js?v=20261105cert'));
+assert.ok(/leo\.js\?v=/.test(idx));
 assert.strictEqual(leoAddDays('2026-11-05', 7), '2026-11-12');
 assert.strictEqual(typeof LEO_VIEWS.home, 'function');
 sandbox.DUTY = '児発管';

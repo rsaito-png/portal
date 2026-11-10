@@ -18,7 +18,7 @@ async function chairTile() {
   const msg = document.getElementById('chair_msg');
   // トップでは毎日の仕事（私のやること・打刻・事業所）の下に置く。枠が無い画面だけ従来どおり先頭
   const slot = document.getElementById('chair_slot');
-  if (slot) slot.insertAdjacentHTML('beforeend', '<h3>会長</h3>' + html); else if (msg) msg.insertAdjacentHTML('afterend', html); else v.insertAdjacentHTML('afterbegin', html);
+  if (slot) slot.insertAdjacentHTML('beforeend', '<h3 class="nx">会長</h3>' + html); else if (msg) msg.insertAdjacentHTML('afterend', html); else v.insertAdjacentHTML('afterbegin', html);
   if (typeof contactBadge === 'function') contactBadge();
 }
 // 会長からの一言（職員向け表示）

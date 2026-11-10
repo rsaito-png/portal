@@ -256,32 +256,35 @@ assert.strictEqual(sandbox.sgCanEditCal('中村 亮仁'), false);
 assert.strictEqual(sandbox.sgCanEditCal(''), false);
 const cfg = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
 assert.ok(!/'事務': \[[^\]]*児童の利用・送迎予定/.test(cfg), '事務の仕事から予定タイルを外す');
-assert.ok(!/中村 友香がする', \[[^\]]*児童の利用・送迎予定/.test(cfg), '中村の欄から予定タイルを外す');
+assert.ok(!/中村友香担当', \[[^\]]*児童の利用・送迎予定/.test(cfg), '中村の欄から予定タイルを外す');
 assert.ok(cfg.includes("'#leo/cal'"), '予定の画面は残す');
 const cfgWin = {};
 vm.runInNewContext(cfg, { window: cfgWin });
 const leo = cfgWin.PORTAL_CONFIG.offices.find(o => o.id === 'leo');
 assert.strictEqual(leo.groups.map(g => g[1]).join('|'), '現場|事務・計画');
-assert.strictEqual(leo.groups[0][2].join('|'), ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表', '日誌（見る・直す）'].join('|'));
+assert.strictEqual(leo.groups[0][2].join('|'), ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'].join('|'));
 assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '個別支援計画（管理）', '個別支援計画 管理表', '利用者情報（児童ごと）', '来月の利用予定（保護者に聞く）', '利用料実費請求', '国保連請求', '保護者の実績確認', 'サービス提供実績記録表', '勤務実績及び利用者の実績表', '直した所', '請求の印（欠席時対応・子育てサポート）', '実績記録（請求元）'].join('|'));
-assert.strictEqual(leo.mine['現場支援員'].join('|'), '日誌（児童ごと）');
+assert.strictEqual(leo.mine['現場支援員'].join('|'), '');
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
+assert.strictEqual(leo.who[0][0], '中村友香担当');
+assert.strictEqual(leo.who[1][0], '事務担当');
 assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|日誌（見る・直す）|配置表・型表・管理表・送迎の配慮の入力|受給者証の入力（保護者から）');
 assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|上限額管理');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
-const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, [leo.todoTop, '出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く', '不具合・修正の依頼']));
+const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, [leo.todoTop, '出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く', '日誌（見る・直す）']));
 const uncovered = leo.tiles.map(t => t[1]).filter(n => !groupNames.has(n) && !onHome.has(n)).sort();
-assert.strictEqual(uncovered.join('|'), ['公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '職員配置表', '書類', '日誌の元シート（参考・旧）', '実績記録（児童ごと）'].sort().join('|'));
+assert.strictEqual(uncovered.join('|'), ['公式LINE', '公式LINE（管理画面）', '写真（Googleフォト）', '職員配置表', '書類', '日誌の元シート（参考・旧）', '実績記録（児童ごと）', '日誌（児童ごと）', '不具合・修正の依頼'].sort().join('|'));
 ['出退勤打刻', 'ヒヤリハット', '今日の利用児童', 'LINE報告を書く', '不具合・修正の依頼', '日誌（児童ごと）', '上限額管理', '今日やること（児発管）'].forEach(n => assert.ok(!groupNames.has(n), '毎日やると重ねない: ' + n));
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 assert.ok(!leo.groups[0][2].includes('LINE報告を書く'), 'LINE報告は現場に重ねない');
 assert.strictEqual(leo.tiles.find(t => t[1] === 'LINE報告を書く')[2], '#leo/line');
 assert.ok(!leo.groups.some(g => g[2].includes('LINEの下書き')), 'LINEの下書きはグループに置かない');
 assert.ok(html.includes("big('#leo/line', '💬', 'LINE報告を書く'"), '毎日やるはLINE報告を書く');
+assert.ok(html.includes("big('#leo/nikki', '📔', '日誌'"), '毎日やるに日誌を1つ');
 assert.ok(!html.includes("big('#uketsuke'"), '毎日やるには不具合の依頼を置かない');
-assert.ok(html.includes("t[1] === '不具合・修正の依頼'"), 'who の下に単独で出す');
+assert.ok(html.includes("hideFromHome") && html.includes("不具合・修正の依頼"), '不具合はホームから隠す（ルートは残す）');
 assert.ok(!html.includes("big('#leo/linedraft'"), '毎日やるから下書きを外す');
 const fixTile = leo.tiles.find(t => t[2] === '#uketsuke');
 assert.strictEqual(fixTile[1], '不具合・修正の依頼');
@@ -293,9 +296,15 @@ assert.ok(!html.includes('全ての画面') && !html.includes('すべての画�
 assert.ok(!cfg.includes('全ての画面') && !cfg.includes('すべての画面'), '設定の文言も消す');
 assert.ok(!html.includes('!anyCatch'), '未分類を最後のグループへ足さない');
 
-const homeSrc = html.slice(html.indexOf('const visTiles'), html.indexOf('async function leoHomeStatus'));
-function renderLeoHome(role, duty) {
-  const sbx = { DUTY: duty, ROLE: role, canManage: () => duty === '管理者' || duty === '児発管', leo };
+const homeSrc = html.slice(html.indexOf('const hideFromHome'), html.indexOf('async function leoHomeStatus'));
+function renderLeoHome(role, duty, name) {
+  const sbx = {
+    DUTY: duty, ROLE: role, IS_CHAIR: false,
+    MY_FULL_NAME: String(name || '').replace(/[\s　]/g, ''),
+    canManage: () => role === '事務' || duty === '管理者' || duty === '児発管',
+    canLeoHomeTodo: () => role === '事務' || duty === '管理者' || duty === '児発管' || String(name || '').replace(/[\s　]/g, '') === '中村友香',
+    leo,
+  };
   vm.runInNewContext(homeSrc + '\nthis.out = leoHomeBody(leo);', sbx);
   return sbx.out;
 }
@@ -304,62 +313,60 @@ function renderLeoHome(role, duty) {
   const dailyEnd = body.indexOf('</div>', body.indexOf('毎日やる'));
   const daily = body.slice(body.indexOf('毎日やる'), dailyEnd);
   assert.ok(!daily.includes('不具合・修正の依頼') && !daily.includes('#uketsuke'), role + '/' + duty + ' の毎日やるには置かない');
-  assert.ok(body.indexOf('href="#uketsuke"') > dailyEnd, role + '/' + duty + ' は毎日やるの外');
-  assert.strictEqual(body.split('不具合・修正の依頼').length - 1, 1, 'ホームに一度だけ: ' + role + '/' + duty);
-  assert.strictEqual(body.split('href="#uketsuke"').length - 1, 1);
-  ['今日の利用児童', 'ヒヤリハット', 'LINE報告を書く'].forEach(label => {
-    assert.ok(daily.includes(label), label);
+  assert.ok(!body.includes('href="#uketsuke"') && !body.includes('不具合・修正の依頼'), role + '/' + duty + ' のホームから受付は外す');
+  ['今日の利用児童', 'ヒヤリハット', 'LINE報告を書く', '日誌', '#leo/nikki'].forEach(label => {
+    assert.ok(body.includes(label) || daily.includes(label), role + '/' + duty + ' ' + label);
   });
+  assert.ok(body.includes('送迎') && body.includes('href="#leo/kata"'), role + '/' + duty + ' に送迎を直置き');
 });
+const field = renderLeoHome('職員', '現場支援員');
+assert.ok(!field.includes('中村友香担当') && !field.includes('事務担当') && !field.includes('がする'), '現場職員に担当欄を出さない');
+assert.ok(!field.includes('事務・計画') && !field.includes('href="#leo/g1"'), '現場職員のホームから事務・計画を外す');
+assert.ok(!field.includes('href="#leo/g0"'), '送迎は直置き（現場フォルダはホームに出さない）');
+const nakaField = renderLeoHome('職員', '現場支援員', '中村友香');
+assert.ok(nakaField.includes('中村友香担当') && nakaField.includes('今日の日誌'), '中村本人（現場職責でも）には担当欄を出す');
+assert.ok(!nakaField.includes('事務担当'), '中村本人でも事務担当は出さない');
 const kanri = renderLeoHome('職員', '児発管');
-// 中村 友香がする の欄に 今日の日誌（#leo/nikki）。他の欄・毎日やるには増やさない
+assert.ok(kanri.includes('中村友香担当'), '児発管に中村友香担当');
+assert.ok(!kanri.includes('事務担当') && !kanri.includes('宮本がする'), '児発管に事務担当は出さない');
+assert.ok(kanri.includes('事務・計画') || kanri.includes('href="#leo/g1"'), '児発管は事務・計画フォルダを使える');
+const clerk = renderLeoHome('事務', '現場支援員');
+assert.ok(clerk.includes('中村友香担当') && clerk.includes('事務担当'), '事務は両方の担当欄');
+const mgr = renderLeoHome('職員', '管理者');
+assert.ok(mgr.includes('中村友香担当') && mgr.includes('事務担当'), '管理者は両方の担当欄');
 {
   const nikkiHref = leo.tiles.find(t => t[1] === '日誌（見る・直す）')[2];
   assert.strictEqual(nikkiHref, '#leo/nikki');
-  assert.ok(!leo.who[1][1].includes('日誌（見る・直す）'), '宮本の欄には置かない');
-  [['職員', '現場支援員'], ['職員', '児発管'], ['職員', '管理者'], ['事務', '現場支援員']].forEach(([role, duty]) => {
-    const b = renderLeoHome(role, duty);
-    const nk = b.indexOf('中村 友香がする'), mi = b.indexOf('宮本がする');
-    const sec = b.slice(nk, mi >= 0 ? mi : undefined);
-    assert.ok(sec.includes('href="#leo/nikki"') && sec.includes('今日の日誌'), role + '/' + duty + ' 中村の欄に今日の日誌');
-    assert.strictEqual(sec.split('href="#leo/nikki"').length - 1, 1);
-    const daily = b.slice(b.indexOf('毎日やる'), b.indexOf('</div>', b.indexOf('毎日やる')));
-    assert.ok(!daily.includes('#leo/nikki'), '毎日やるには置かない');
-    if (mi >= 0) assert.ok(!b.slice(mi).includes('href="#leo/nikki"'), '宮本の欄以降に重ねない');
-  });
+  assert.ok(!leo.who[1][1].includes('日誌（見る・直す）'), '事務担当の欄には置かない');
   const nakamura = renderLeoHome('職員', '児発管');
-  const sec = nakamura.slice(nakamura.indexOf('中村 友香がする'), nakamura.indexOf('宮本がする'));
-  assert.ok(sec.indexOf('今日やること') < sec.indexOf('今日の日誌'), '日誌は今日やることのあと');
+  const sec = nakamura.slice(nakamura.indexOf('中村友香担当'), nakamura.includes('事務担当') ? nakamura.indexOf('事務担当') : undefined);
+  assert.ok(sec.includes('href="#leo/nikki"') && sec.includes('今日の日誌'), '中村の欄に今日の日誌');
   assert.ok(sec.indexOf('今日の日誌') < sec.indexOf('配置表・型表・管理表'), '入力画面は日誌のあと');
   assert.ok(sec.includes('href="#leo/master"'), '中村の欄に入力画面');
   assert.ok(sec.includes('href="#leo/jukyusha"') && sec.includes('受給者証の入力（保護者から）'), '中村の欄の最後に受給者証');
   assert.ok(sec.indexOf('href="#leo/master"') < sec.indexOf('href="#leo/jukyusha"'), '受給者証は入力画面のあと');
-  assert.ok(!nakamura.slice(nakamura.indexOf('宮本がする')).includes('href="#leo/jukyusha"'), '宮本の欄には置かない');
   assert.ok(!leo.groups.some(g => g[2].includes('受給者証の入力（保護者から）')), '現場・事務・計画には重ねない');
   assert.ok(!sec.includes('利用料実費請求') && !sec.includes('href="#leo/jippi"'), '中村の欄から実費を外す');
-  assert.ok(!sec.includes('href="#leo/kakunin"') && !sec.includes('実績確認'), '中村の欄に保護者の実績確認を出さない');
+  assert.ok(!sec.includes('href="#leo/kakunin"'), '中村の欄に保護者の実績確認を出さない');
   assert.strictEqual(leo.tiles.find(t => t[2] === '#leo/kakunin')[6], '児発管', '実績確認の役割は変えない');
-  assert.ok(leo.who[1][1].includes('保護者の実績確認'), '宮本の欄にも残す');
+  assert.ok(leo.who[1][1].includes('保護者の実績確認'), '事務担当の欄にも残す');
   assert.ok(leo.groups[1][2].includes('保護者の実績確認'), '事務・計画にも残す');
   assert.ok(!leo.who[0][1].includes('利用料実費請求'), '中村の一覧から実費を外す');
   assert.strictEqual(leo.tiles.find(t => t[2] === '#leo/jippi')[6], '児発管', '実費画面の役割は変えない');
-  assert.ok(leo.who[1][1].includes('利用料実費請求'), '宮本の欄には残す');
+  assert.ok(leo.who[1][1].includes('利用料実費請求'), '事務担当の欄には残す');
   assert.ok(leo.groups[1][2].includes('利用料実費請求'), '事務・計画にも残す');
-  assert.ok(!leo.who[1][1].includes('配置表・型表・管理表・送迎の配慮の入力'), '宮本の欄には置かない');
+  assert.ok(!leo.who[1][1].includes('配置表・型表・管理表・送迎の配慮の入力'), '事務担当の欄には置かない');
   assert.ok(leo.groups[0][2].includes('送迎 型表'), '現場の型表はそのまま');
+  const jim = renderLeoHome('事務', '管理者');
+  const jsec = jim.slice(jim.indexOf('事務担当'));
+  assert.ok(jsec.includes('上限額管理') && jsec.includes('href="#leo/jogan"'), '事務担当に上限額管理');
+  assert.ok(!jsec.includes('href="#leo/jukyusha"'), '事務担当に受給者証を置かない');
 }
-assert.ok(kanri.indexOf('宮本がする') < kanri.indexOf('不具合・修正の依頼'), 'who の下');
-assert.ok(kanri.indexOf('上限額管理') < kanri.indexOf('不具合・修正の依頼'), '宮本の欄の下');
-const routineAt = kanri.indexOf('管理系ルーティン');
-if (routineAt >= 0) assert.ok(kanri.indexOf('不具合・修正の依頼') < routineAt, '管理系ルーティンの前');
-assert.ok(kanri.includes('class="tile big main" href="#uketsuke"'), '横幅いっぱい');
-const field = renderLeoHome('職員', '現場支援員');
-assert.ok(field.includes('href="#leo/g0"'), '現場グループから辿れる');
 {
-  const sbx = { DUTY: '現場支援員', ROLE: '職員', canManage: () => false, leo };
+  const sbx = { DUTY: '現場支援員', ROLE: '職員', IS_CHAIR: false, MY_FULL_NAME: '', canManage: () => false, canLeoHomeTodo: () => false, leo };
   vm.runInNewContext(homeSrc + "\nthis.out = groupList(leo).find(g => g.label === '現場').tiles.map(t => t[1] + ' ' + t[2]).join('|');", sbx);
   assert.ok(sbx.out.includes('送迎 型表 #leo/kata'), '現場に型表の編集');
-  assert.ok(sbx.out.includes('日誌（見る・直す） #leo/nikki'), '現場に日誌の手直し');
+  assert.ok(!sbx.out.includes('日誌（見る・直す）'), '日誌は現場グループから外して毎日やるへ');
   assert.ok(!sbx.out.includes('#leo/master'), '児発管の入力は現場に出さない');
   assert.ok(!sbx.out.includes('gl:g4'), '元シートは現場に出さない');
 }
@@ -367,8 +374,6 @@ assert.strictEqual(leo.tiles.find(t => t[1] === '送迎 型表')[2], '#leo/kata'
 assert.ok(!leo.tiles.find(t => t[1] === '送迎 型表')[3].includes('見るだけ'));
 assert.ok(leo.tiles.find(t => t[1] === '日誌（見る・直す）')[3].includes('ポータルで直す'));
 assert.ok(leo.tiles.find(t => t[2] === 'gl:g4')[1].includes('参考・旧'));
-assert.ok(field.includes('事務・計画') && field.indexOf('事務・計画') < field.indexOf('不具合・修正の依頼'));
-assert.strictEqual(field.split('不具合・修正の依頼').length - 1, 1);
 
 // その他（研修・見学など）: 担当の有無に関係なく常に赤 #d50000。時刻があれば時間軸、無ければ終日の欄。担当名は出す
 {

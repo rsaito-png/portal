@@ -161,7 +161,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
 <link rel="stylesheet" href="shell.css?v=20261110chip2">
-<link rel="stylesheet" href="theme-planet.css?v=20261110pl10">
+<link rel="stylesheet" href="theme-planet.css?v=20261110org">
 <style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}#home_todo[hidden],#ht_jump[hidden]{display:none!important}</style>
 </head><body class="portal ui-app">
 <header class="ui-topbar"><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
@@ -182,14 +182,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261110me2"></script>
+<script src="config.js?v=20261110org"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261110yokota"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261110yokota"></script>
+<script src="leo.js?v=20261110org"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261106manual"></script>
 <script src="kin_visit.js?v=20261104all"></script>
@@ -203,12 +203,12 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="kin_contract.js?v=202610221354"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
-<script src="report.js?v=20261110pl1"></script>
+<script src="report.js?v=20261110org"></script>
 <script src="ht.js?v=20261110draft"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
 <script src="sct.js?v=20261030px"></script>
-<script src="chair.js?v=20261110notax"></script>
+<script src="chair.js?v=20261110org"></script>
 <script src="contact_inbox.js?v=20261108inq"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=20261026calov"></script>
@@ -289,7 +289,29 @@ function tileHtml([icon, name, url, note, size, sample], color) {
 
 
 // 事業所画面の本体。o.groups があれば「次にやること＋大ボタン（最大6〜8）」、無ければ従来のタイル一覧
-const visTiles = o => o.tiles.filter(t => !t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()) || (t[1] === '今日やること（児発管）' && typeof canLeoHomeTodo === 'function' && canLeoHomeTodo()));
+// 準備中・受付（トップに統一）はメニューから隠すだけ。画面のルートは残す
+const hideFromHome = t => !t[2] || t[1] === '受付' || t[1] === '不具合・修正の依頼' || t[3] === '未整備' || String(t[3] || '').startsWith('準備中');
+const visTiles = o => o.tiles.filter(t => !hideFromHome(t) && (!t[6] || DUTY === '管理者' || t[6] === ROLE || t[6] === DUTY || (t[6] === '児発管' && canManage()) || (t[1] === '今日やること（児発管）' && typeof canLeoHomeTodo === 'function' && canLeoHomeTodo())));
+// 担当欄の見出し（「〜がする」は「〜担当」）。中村友香担当＝本人＋児発管・管理者・会長・事務。事務担当＝事務・管理者・会長
+function whoVisible(title) {
+  const n = String(title || '').replace(/[\s　]/g, '');
+  const me = String(typeof MY_FULL_NAME !== 'undefined' ? MY_FULL_NAME : '').replace(/[\s　]/g, '');
+  const chair = typeof IS_CHAIR !== 'undefined' && IS_CHAIR;
+  const mgr = typeof canManage === 'function' && canManage();
+  if (n === '中村友香担当' || n === '中村友香がする') return chair || mgr || me === '中村友香';
+  if (n === '事務担当' || n === '宮本担当' || n === '宮本がする') return chair || DUTY === '管理者' || ROLE === '事務';
+  const m = String(title || '').match(/^(.+?)(がする|担当)$/);
+  if (m) return chair || mgr || me === m[1].replace(/[\s　]/g, '');
+  return true;
+}
+const OFFICE_PAUSED = { rydeen: '閉鎖予定', suishodama: '休止' };
+const officePaused = o => (o && OFFICE_PAUSED[o.id]) || '';
+const officeTile = (x, tag) => {
+  const mark = tag || officePaused(x);
+  const name = x.homeName || x.name;
+  const st = mark ? ` <span class="st">${mark}</span>` : '';
+  return `<a class="tile office${mark ? ' dim' : ''}" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${name}${st}<small>${x.kind}</small></span></a>`;
+};
 const shortName = (o, n) => (o.short || {})[n] || n;
 // 茶夢・金斗雲はメニューに日本語＋ポルトガル語を併記（o.pt）
 const ptL = (o, n, label) => o && o.pt && o.pt[n] ? `${label === undefined ? n : label}<em class="pt" style="display:block;font-size:.72em;font-style:normal;opacity:.75">${o.pt[n]}</em>` : (label === undefined ? n : label);
@@ -309,30 +331,35 @@ function leoHomeBody(o) {
   const mine = ((o.mine || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
   const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
   const gbtn = x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}${x.sub ? `<small>${x.sub}</small>` : ''}</a>`;
-  const g = groupList(o).map(gbtn).join('');
+  // 現場（送迎）はホームに直置き。事務・計画のフォルダは事務・管理者・児発管・会長だけ（現場職員のホームには出さない。#leo/g1 は残す）
+  const g = groupList(o).filter(x => x.label !== '現場' && (x.label !== '事務・計画' || (typeof canManage === 'function' && canManage()) || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR))).map(gbtn).join('');
   const tileBig = t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`;
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
   const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(tileBig).join('')}</div>` : '';
   const who = (o.who || []).map(([title, names]) => {
+    if (typeof whoVisible === 'function' && !whoVisible(title)) return '';
     const tiles = (names || []).flatMap(n => vis.filter(t => t[1] === n));
     return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid">${tiles.map(tileBig).join('')}</div>` : '';
   }).join('');
   const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
   const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}`;
-  const duty = dutyName === '児発管の仕事' ? (dutyInner ? `<div class="grid">${dutyInner}</div>` : '') : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`;
-  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。LINEの下書き（#leo/linedraft）は直リンクのみ。
-  // 不具合・修正の依頼は毎日やる・現場・事務・計画には重ねない。who の下、管理系ルーティンの前に単独で出す。
-  const fix = vis.filter(t => t[1] === '不具合・修正の依頼').map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('');
-  const fixRow = fix ? `<div class="grid">${fix}</div>` : '';
+  const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`);
+  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。
+  // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
+  const sougeiNames = ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'];
+  const sougei = sougeiNames.flatMap(n => vis.filter(t => t[1] === n));
+  const sougeiRow = sougei.length ? `<h3 class="nx">送迎</h3><div class="grid">${sougei.map(tileBig).join('')}</div>` : '';
   // 今日やること（児発管）はここ1か所だけ（担当者名の欄には重ねない）
   const todoT = o.todoTop ? vis.filter(t => t[1] === o.todoTop) : [];
   const todoRow = todoT.length ? `<div class="grid">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
   return `${todoRow}<div id="my_todo"></div><div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
-    ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}</div>
+    ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
+    ${big('#leo/nikki', '📔', '日誌', '', '')}</div>
+    ${sougeiRow}
     ${duty}
-    ${who}${fixRow}${rt}`;
+    ${who}${rt}`;
 }
 async function leoHomeStatus() {
   try { if (DEMO || typeof sb !== 'function') return;
@@ -403,6 +430,8 @@ async function render() {
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);
   if (id === 'ryozan' && sub === 'meal' && typeof renderRyozanMeal === 'function') return renderRyozanMeal();
   if (id === 'chamu' && sub && typeof renderChamu === 'function') return renderChamu(sub);
+  if (id === 'report' && sub === 'admin' && typeof renderReportAdmin === 'function') return renderReportAdmin();
+  if (id === 'report' && typeof renderReport === 'function') return renderReport();
   if (id === 'ht') return renderHt();
   if (id === 'sct' && typeof renderSct === 'function') return renderSct();
   if (id === 'chair') return renderChair();
@@ -431,28 +460,34 @@ async function render() {
     return;
   }
   // 評定所タイルは HYOJOSHO_HOLD（leaderboard.js）が true のあいだ出さない。戻すときはそのフラグを false に。
-  const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
-  const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
+  const topConsult = [['📌', '私への依頼', '#report', '届いた依頼を見て、「済」にする'], ['🧑‍💼', '番頭さん', '#banto', '相談・報告はここへ。要るものは会長へ取り次ぎ'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談'], ['📨', '受付', '#uketsuke', '不具合や修正の依頼、報告を送る']];
+  const topLearn = [['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとこと']];
   const officesHome = (typeof visibleOffices === 'function' ? visibleOffices() : C.offices);
-  // 並び（2026-11-10 会長）：あなたへのお知らせ（依頼があるときだけ）→ 出退勤打刻＋毎日占い → 事業所 → 相談・報告 → 会長
+  const canSeePaused = ROLE === '事務' || DUTY === '管理者' || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR);
+  const activeOff = officesHome.filter(x => !officePaused(x));
+  // 休止・閉鎖予定：事務・管理者・会長は全部。現場職員のトップには出さない（所属・兼務にあるときだけ出す。見本の現場は所属なしなので出さない）
+  const pausedOff = (typeof DEMO !== 'undefined' && DEMO && !canSeePaused && !MY_OFFICE) ? []
+    : (canSeePaused ? C.offices : officesHome).filter(x => officePaused(x));
+  // 並び：あなたへのお知らせ → 出退勤打刻＋毎日占い → 稼働中の事業所 → 休止・閉鎖予定 → 相談・報告 → 研修・発信 → 総務 → 会長
   $('view').innerHTML = `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">あなたへのお知らせ</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
     <p id="ht_jump" class="ht-jump" hidden><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
     <div class="pl-hero"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span><small>スマホで出勤・退勤。事業所の近くだけ</small></a>
     <div id="daily_sky" class="daily-sky" hidden></div></div>
     <h3 id="home_offices">障害福祉事業</h3>
-    <div class="grid pl-offices">${officesHome.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
-    <div id="kankoyo_sec"><h3>官公需</h3><div id="sct_slot"></div></div>
-    <h3>相談・報告・研修</h3>
-    <div class="grid pl-links">${topT.map(t => tileHtml(t)).join('')}</div>
-    <div id="soumu_slot" class="pl-links-wrap">${soumuTile()}</div>
-    <div id="chair_slot" class="pl-links-wrap"></div>
-    <h3 id="misc_h">未整理</h3>
-    <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
+    <div class="grid pl-offices">${activeOff.map(x => officeTile(x)).join('')}</div>
+    ${pausedOff.length ? `<h3>休止・閉鎖予定 <small>普段は使わない</small></h3><div class="grid pl-paused">${pausedOff.map(x => officeTile(x)).join('')}</div>` : ''}
+    <h3>相談・報告</h3>
+    <div class="grid pl-links">${topConsult.map(t => tileHtml(t)).join('')}</div>
+    <h3>研修・発信</h3>
+    <div class="grid pl-links">${topLearn.map(t => tileHtml(t)).join('')}</div>
+    <div id="soumu_slot" class="pl-links-wrap"><h3 class="nx">総務</h3>${soumuTile()}</div>
+    <div id="chair_slot" class="pl-links-wrap"></div>`;
   plClock();
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof lbBadge === 'function') lbBadge();
   if (typeof soudanBadge === 'function') soudanBadge();
-  chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); sctAdminTile();
+  if (typeof todoBadge === 'function') todoBadge();
+  chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile();
   loadDailySky(); if (typeof homeTodo === 'function') homeTodo();
 }
 // トップの打刻カードの時計（日本時間・表示だけ）
@@ -538,7 +573,7 @@ async function accAdmin() {
     return r.ok && (await r.json()) === true; } catch (e) { return false; }
 }
 // 総合トップの「総務」。全員が開ける（自分の書類の署名）。中の人事労務・補助金・経理は事務、会計（簡易）は法人管理者
-const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>書類の署名・給与口座の届出は全員。人事労務・補助金・経理は事務</small></a></div>`;
+const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>書類の署名・給与口座の届出は全員。人事労務・経理は事務</small></a></div>`;
 async function accTile() {
   if (ROLE === C.clerk.role || document.getElementById('soumu_tile')) return;
   if (!(await accAdmin())) return;
@@ -549,7 +584,7 @@ async function renderSoumu() {
   const back = `<button class="back" onclick="location.hash=''">← トップへ</button>`;
   const clerk = ROLE === C.clerk.role;
   const groups = (C.clerk.groups || []).map(g => {
-    const tiles = (g.tiles || []).filter(t => clerk || t[2] === '#sign');
+    const tiles = (g.tiles || []).filter(t => (clerk || t[2] === '#sign') && t[2] && t[3] !== '未整備' && !String(t[3] || '').startsWith('準備中'));
     if (!tiles.length) return '';
     return `${g.name ? `<h4>${g.name}</h4>` : ''}<div class="grid">${tiles.map(t => tileHtml(t, '#555')).join('')}</div>`;
   }).join('');
@@ -585,7 +620,7 @@ async function renderSoumu() {
   }
   // 給与口座・マイナンバーの一覧：事務は config のタイル。会長は事務でなくても人事労務に出す（管理者には出さない）
   if (!clerk && (typeof IS_CHAIR !== 'undefined' && IS_CHAIR) && !sec.querySelector('a[href="#me/list"]')) {
-    const t = tileHtml(['📝', '給与口座・マイナンバー（一覧）', '#me/list', '口座と個人番号の登録状況（閲覧のみ）'], '#555');
+    const t = tileHtml(['📋', '登録状況の一覧', '#me/list', '給与口座と個人番号の登録状況（閲覧のみ）'], '#555');
     const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
     if (hg && hg.classList.contains('grid')) hg.insertAdjacentHTML('beforeend', t);
     else sec.insertAdjacentHTML('afterbegin', '<h4>人事労務</h4><div class="grid">' + t + '</div>');

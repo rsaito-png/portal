@@ -7,8 +7,8 @@ const srST = { open: '未着手', doing: '進行中', done: '完了' };
 async function srRpc(fn) { const s = JSON.parse(localStorage.getItem('sess') || '{}'); const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + s.token, 'Content-Type': 'application/json' }, body: '{}' }); if (!r.ok) throw new Error('読み込めませんでした（' + r.status + '）'); return r.json(); }
 function srMe() { const s = JSON.parse(localStorage.getItem('sess') || '{}'); return JSON.parse(atob(s.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; }
 async function renderReport() {
-  const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
-  if (DEMO) return $('view').innerHTML = back + '<h3>報告</h3>' + demoNote() + '<p>見本モードでは表示しません。</p>';
+  const back = `<button class="back" onclick="location.hash=''">← トップへ</button>`;
+  if (DEMO) return $('view').innerHTML = back + '<h3>私への依頼</h3>' + demoNote() + '<p>見本モードでは表示しません。</p>';
   $('view').innerHTML = '<p>読み込み中…</p>';
   try {
     const me = srMe(), day = srToday();
@@ -20,7 +20,7 @@ async function renderReport() {
       <p>または1行でOK：<textarea id="sr_b" rows="3" maxlength="2000" style="width:100%;font-size:16px" placeholder="今日やったこと">${esc(t && !t.no_problem ? t.body || '' : '')}</textarea></p>
       <p>困りごと（あれば）：<textarea id="sr_t" rows="2" maxlength="2000" style="width:100%;font-size:16px">${esc(t?.trouble || '')}</textarea></p>
       <button onclick="srSend(false)" style="font-size:18px;padding:10px 24px">送る</button> <span id="sr_m" class="note"></span></div>
-      <h3>私のToDo（指示）</h3>${todos.length ? todos.map(x => `<div class="card"><b>${esc(x.title)}</b>${x.link && /^#[\w/-]*$/.test(x.link) ? ` <a href="${x.link}">→ 開いて直す</a>` : ''}${x.due ? `<small>　期限 ${esc(x.due)}</small>` : ''}
+      <h3>私への依頼</h3>${todos.length ? todos.map(x => `<div class="card"><b>${esc(x.title)}</b>${x.link && /^#[\w/-]*$/.test(x.link) ? ` <a href="${x.link}">→ 開いて直す</a>` : ''}${x.due ? `<small>　期限 ${esc(x.due)}</small>` : ''}
         <p><select id="st_${x.id}" onchange="srTodo(${x.id})">${Object.entries(srST).map(([k, v]) => `<option value="${k}"${k === x.status ? ' selected' : ''}>${v}</option>`).join('')}</select>
         <input id="sn_${x.id}" maxlength="1000" placeholder="一言（任意）" value="${esc(x.note || '')}" style="width:60%" onchange="srTodo(${x.id})"> <span id="sm_${x.id}" class="note"></span></p></div>`).join('') : '<p>いまの指示はありません。</p>'}
       <h3>最近の報告</h3>${reps.map(r => `<p>${esc(r.day)}　${r.no_problem ? '問題なし' : esc(r.body || '')}${r.trouble ? '　⚠️' + esc(r.trouble) : ''}</p>`).join('') || '<p>まだありません。</p>'}`;
@@ -38,7 +38,7 @@ async function srTodo(id) {
 }
 // 管理者の朝の1画面
 async function renderReportAdmin() {
-  const back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
+  const back = `<button class="back" onclick="location.hash=''">← トップへ</button>`;
   if (DEMO) return $('view').innerHTML = back + '<h3>報告（朝の確認）</h3>' + demoNote() + '<p>見本モードでは表示しません。</p>';
   $('view').innerHTML = '<p>読み込み中…</p>';
   try {

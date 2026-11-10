@@ -201,3 +201,19 @@ html.th-planet body.ui-app .kv-gas .gas-chip.on{background:var(--pl-g)!important
 html.th-planet body.ui-app .kv-gas .gas-go,html.th-planet body.ui-app .kv-save{background:var(--pl-g)!important;color:#fff!important;border:0!important;border-radius:16px!important}
 html.th-planet body.ui-app .kv-gas .gas-badge{background:var(--pl-g)!important}
 html.th-planet body.ui-app .kv-gas .gas-link{color:#1f5d3f!important}
+
+/* 休止・閉鎖予定の事業所：小さめ・控え目 */
+html.th-planet body.ui-app .grid.pl-paused{grid-template-columns:1fr 1fr;gap:10px}
+@media (min-width:900px){html.th-planet body.ui-app .grid.pl-paused{grid-template-columns:repeat(3,1fr);gap:16px}}
+html.th-planet body.ui-app .pl-paused .tile.office{padding:12px 12px;min-height:56px;opacity:.78}
+html.th-planet body.ui-app .pl-paused .office .lg,html.th-planet body.ui-app .pl-paused .office .ph{width:36px;height:36px}
+html.th-planet body.ui-app .tile.office.dim .tx{font-weight:700}
+html.th-planet body.ui-app .tile.office .st{display:inline-block;margin-left:6px;font-family:var(--pl-font);font-size:11px;font-weight:700;background:#efe6d2;color:#6a5a3a;border-radius:999px;padding:1px 8px;vertical-align:middle}
+@media (min-width:900px){
+  html.th-planet body.ui-app .pl-paused .tile.office{padding:16px 18px;min-height:72px}
+  html.th-planet body.ui-app .pl-paused .office .lg,html.th-planet body.ui-app .pl-paused .office .ph{width:52px;height:52px}
+  html.th-planet body.ui-app .tile.office .st{font-size:16px;padding:2px 10px}
+  html.th-planet body.ui-app .pl-paused .tile.office .tx{font-size:26px}
+  html.th-planet body.ui-app .pl-paused .tile.office .tx small{font-size:20px}
+}
+html.th-planet body.ui-app #view > h3 small{font-family:var(--pl-font);font-weight:500;font-size:.55em;color:var(--pl-sub);margin-left:6px}
