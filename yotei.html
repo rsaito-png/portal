@@ -26,7 +26,7 @@ const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search), DEMO =
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const $ = id => document.getElementById(id), M = $('m'), DOW = '日月火水木金土';
-let D, S = { wd: {}, days: {}, note: '' }, SENT = false;
+let D, S = { wd: {}, days: {}, memo: {}, note: '' }, SENT = false;
 const bad = () => M.innerHTML = '<div class="card">リンクが正しくないか、期限が切れています。お手数ですがレオまでご連絡ください。</div>';
 const fmtDL = s => { const x = new Date(s); return x.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
 const hm = s => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : ''; };
@@ -44,7 +44,7 @@ async function load() {
   const list = (dows.length ? dows : ['月', '火', '水', '木', '金']).sort((a, b) => '月火水木金土'.indexOf(a) - '月火水木金土'.indexOf(b));
   for (const w of list) { const r = (D.regular || []).find(x => x.dow === w) || {}, p = pw[w] || {};
     S.wd[w] = { use: p.use !== undefined ? !!p.use : (r.weekly !== false && !!r.dow), school_time: hm(p.school_time || r.school_time), pick_place: r.pick_place || '', drop_place: r.drop_place || '', parent: r.parent || '', irregular: r.weekly === false }; }
-  if (D.prev && D.prev.same_month) { S.note = pa.note || ''; for (const x of pa.days || []) { const e = S.days[x.day] = S.days[x.day] || {}; e[x.kind] = { time: hm(x.time), place: x.place || '' }; } }
+  if (D.prev && D.prev.same_month) { S.note = pa.note || ''; for (const x of pa.days || []) { if (x.memo) S.memo[x.day] = x.memo; if (x.kind === '連絡') continue; const e = S.days[x.day] = S.days[x.day] || {}; e[x.kind] = { time: hm(x.time), place: x.place || '' }; } }
   render();
 }
 const mm = D => +D.month.split('-')[1];
@@ -64,7 +64,7 @@ function render() {
       ${pd ? '' : `<details style="width:100%"><summary class="note">お迎え・送りの場所を変える</summary><div class="sub">お迎え場所 <input class="pl" type="text" maxlength="100" value="${esc(s.pick_place)}" oninput="S.wd['${w}'].pick_place=this.value"> 　送り場所 <input class="pl" type="text" maxlength="100" value="${esc(s.drop_place)}" oninput="S.wd['${w}'].drop_place=this.value"></div></details>`}</div>`; }).join('')}
   <p class="note">上にない曜日に来たい日は、下の「追加利用」から日を選んでください。</p></div>
   <div class="card"><h3>② 日ごとの連絡</h3><p class="note">いつもと違う日だけ、ボタンを押してください。ない日は何も押さなくて大丈夫です。（日曜・事業所のお休みの日は出ていません）</p><div id="days"></div></div>
-  <div class="card"><h3>③ そのほか（任意）</h3><textarea rows="3" maxlength="500" placeholder="職員への連絡があれば" oninput="S.note=this.value">${esc(S.note)}</textarea></div>
+  <div class="card"><h3>③ 日付に関係しない連絡（任意）</h3><p class="note">特定の日のこと（「○日は○時に迎えに行きます」など）は、②のその日の「この日の備考」に書いてください。ここに書いたことは日ごとの予定には付かず、職員が別に確認します。</p><textarea rows="3" maxlength="500" placeholder="日付に関係しない職員への連絡があれば" oninput="S.note=this.value">${esc(S.note)}</textarea></div>
   <div class="card"><button class="go" id="go" onclick="send()">送信する</button><p id="r"></p></div>
   <p class="note">このページはご家庭ごとの専用リンクです。ほかの方には送らないでください。</p>`;
   renderDays();
@@ -77,7 +77,7 @@ function renderDays() {
     const subs = Object.keys(e).filter(k => e[k] && k !== '休み').map(k => k === '母の送り' ? '' :
       k === '送り場所変更' ? `<div class="sub">送り先 <input class="pl" type="text" maxlength="100" placeholder="祖父母宅" value="${esc(e[k].place)}" oninput="S.days['${x.iso}']['${k}'].place=this.value"></div>`
       : `<div class="sub">${k === '母の迎え' ? '施設へ来る時刻' : k === '追加利用' ? '学校（園）お迎え時刻' : '学校（園）お迎え時刻'} <input type="time" value="${esc(e[k].time)}" oninput="S.days['${x.iso}']['${k}'].time=this.value"></div>`).join('');
-    out.push(`<div class="day ${reg ? '' : 'nr'}"><div>${mm(D)}/${x.d}（${x.w}）<span class="note">${reg ? '' : '　いつもは利用しない日'}</span></div><div class="chips">${chips}</div>${subs}</div>`);
+    out.push(`<div class="day ${reg ? '' : 'nr'}"><div>${mm(D)}/${x.d}（${x.w}）<span class="note">${reg ? '' : '　いつもは利用しない日'}</span></div><div class="chips">${chips}</div>${subs}<details ${S.memo[x.iso] ? 'open' : ''}><summary class="note">この日の備考</summary><div class="sub"><input class="pl" style="width:100%" type="text" maxlength="200" placeholder="この日についての連絡" value="${esc(S.memo[x.iso])}" oninput="S.memo['${x.iso}']=this.value"></div></details></div>`);
   }
   $('days').innerHTML = out.join('') || '<p class="note">日がありません</p>';
 }
@@ -85,7 +85,10 @@ function tog(iso, k) { const e = S.days[iso] = S.days[iso] || {}; if (e[k]) dele
 function build() {
   const weekdays = {}, days = [];
   for (const [w, s] of Object.entries(S.wd)) weekdays[w] = { use: s.use, school_time: s.use && s.parent !== '母の送り' ? s.school_time : '', pick_place: s.pick_place, drop_place: s.drop_place };
-  for (const x of monthDays()) { if (D.left_on && x.iso > D.left_on) continue; const e = S.days[x.iso]; if (!e) continue; for (const [k, v] of Object.entries(e)) days.push({ day: x.iso, kind: k, time: v.time || '', place: v.place || '' }); }
+  // 備考はその日の行に付ける（同じ日に複数あるときは最初の1件だけ）。連絡が備考だけの日は kind='連絡'
+  for (const x of monthDays()) { if (D.left_on && x.iso > D.left_on) continue; const e = S.days[x.iso] || {}, memo = String(S.memo[x.iso] || '').trim(); let first = true;
+    for (const [k, v] of Object.entries(e)) { days.push({ day: x.iso, kind: k, time: v.time || '', place: v.place || '', memo: first ? memo : '' }); first = false; }
+    if (first && memo) days.push({ day: x.iso, kind: '連絡', time: '', place: '', memo }); }
   return { weekdays, days, note: S.note.trim() };
 }
 function check(a) {
@@ -98,7 +101,7 @@ function check(a) {
 }
 async function send() {
   const out = $('r'), a = build(), e = check(a); if (e) { out.innerHTML = `<span class="err">${esc(e)}</span>`; return; }
-  const sum = a.days.length ? a.days.map(d => `${mm(D)}/${+d.day.slice(8)} ${d.kind}${d.time ? ' ' + d.time : ''}${d.place ? ' ' + esc(d.place) : ''}`).join('<br>') : 'いつもどおり（個別の連絡なし）';
+  const sum = a.days.length ? a.days.map(d => `${mm(D)}/${+d.day.slice(8)} ${d.kind}${d.time ? ' ' + d.time : ''}${d.place ? ' ' + esc(d.place) : ''}${d.memo ? '（備考：' + esc(d.memo) + '）' : ''}`).join('<br>') : 'いつもどおり（個別の連絡なし）';
   if (DEMO) { out.innerHTML = `<span class="ok">見本なので送信しません。</span><div class="sum">${sum}</div>`; return; }
   $('go').disabled = true; out.textContent = '送信中…';
   try { const r = await rpc('leo_sched_submit', { p_token: T, p_answer: a });

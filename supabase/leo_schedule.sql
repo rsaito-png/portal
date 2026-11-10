@@ -228,7 +228,7 @@ begin
   note := nullif(btrim(coalesce(p_answer->>'note', '')), ''); if char_length(coalesce(note, '')) > 500 then raise exception '備考は500字までです'; end if;
   closed := leo_sched_closed(r.month);
   for d in select * from jsonb_array_elements(a_days) loop
-    kd := d->>'kind'; if kd not in ('休み','母の送り','母の迎え','追加利用','時刻変更','送り場所変更') then raise exception '種類が正しくありません'; end if;
+    kd := d->>'kind'; if kd not in ('休み','母の送り','母の迎え','追加利用','時刻変更','送り場所変更','連絡') then raise exception '種類が正しくありません'; end if;
     begin dy := (d->>'day')::date; exception when others then raise exception '日付が正しくありません'; end;
     if dy < r.month or dy >= (r.month + interval '1 month')::date then raise exception '対象月以外の日付です'; end if;
     if dy = any(closed) then raise exception '% は事業所のお休みです', to_char(dy, 'MM/DD'); end if;
