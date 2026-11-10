@@ -5,7 +5,7 @@ create or replace function public.leo_nikki_apply(p_day date, p_row integer, p_f
 returns void language plpgsql security definer set search_path to 'public' as $function$
 declare
   allowed text[] := array['activity','pick_place','pick_time','pick_driver','start_time','end_time','drop_time','drop_driver','drop_place'];
-  k text; v text; child text; touched_activity boolean := false; row_n integer := p_row; base integer;
+  k text; v text; v_child text; touched_activity boolean := false; row_n integer := p_row; base integer;
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
   if p_day is null or p_row is null or jsonb_typeof(p_fields) <> 'object' then raise exception '形式'; end if;
@@ -42,9 +42,9 @@ begin
   end loop;
   update leo_nikki set staff_saved_at = coalesce(staff_saved_at, now()) where day = p_day and row_no = row_n and p_day >= public.leo_sync_start();
   if touched_activity then
-    select nk.child into child from leo_nikki nk where nk.day = p_day and nk.row_no = row_n;
+    select nk.child into v_child from leo_nikki nk where nk.day = p_day and nk.row_no = row_n;
     insert into leo_activity (day, child, text, source, made_by)
-    select p_day, child, left(coalesce(nk.activity, ''), 6000), '手入力', auth.uid()
+    select p_day, nk.child, left(coalesce(nk.activity, ''), 6000), '手入力', auth.uid()
       from leo_nikki nk where nk.day = p_day and nk.row_no = row_n
     on conflict (day, child) do update
       set text = excluded.text, source = '手入力', made_at = now(), made_by = excluded.made_by;
