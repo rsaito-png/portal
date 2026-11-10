@@ -30,8 +30,12 @@ html body.ui-app .card,html body.ui-app .tile,html body.ui-app .nxc{background:v
 html body.ui-app .office{border-left:6px solid var(--c,var(--line))!important}
 html body.ui-app .tile small,html body.ui-app .nxc small,html body.ui-app .note{color:var(--text-sub)!important}
 html body.ui-app input{border:1px solid var(--line)!important;border-radius:var(--r-sm)!important;background:var(--surface)!important;color:var(--text)!important;min-height:44px}
-html body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.back):not(.btn-ghost){background:var(--primary)!important;color:var(--surface)!important;border:1px solid var(--primary)!important;border-radius:var(--r-sm)!important;min-height:44px;box-shadow:none!important;background-image:none!important}
-html body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.back):not(.btn-ghost):hover{background:var(--primary-active)!important}
+html body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost){background:var(--primary)!important;color:var(--surface)!important;border:1px solid var(--primary)!important;border-radius:var(--r-sm)!important;min-height:44px;box-shadow:none!important;background-image:none!important}
+html body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):hover{background:var(--primary-active)!important}
+/* 選択チップ（日中一時の送迎・食事など）：テーマに関係なく、未選択=薄い地＋枠、選択中=朱で塗り＋白字＋✔ */
+html body.ui-app main button.nc-chip{background:#fffaf0!important;color:#2a1a10!important;border:2px solid #8a6a3a!important;border-radius:var(--r-sm)!important;box-shadow:none!important;background-image:none!important;min-height:44px;font-weight:400}
+html body.ui-app main button.nc-chip.on{background:#b3261e!important;color:#fff!important;border:2px solid #7a1414!important;box-shadow:0 0 0 2px #7a1414!important;font-weight:700}
+html body.ui-app main button.nc-chip.on::before{content:"✔ "}
 html body.ui-app .back,html body.ui-app .btn-ghost{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--line)!important;border-radius:var(--r-sm)!important;min-height:44px;box-shadow:none!important}
 html body.ui-app .badge{background:var(--danger)!important;color:var(--surface)!important;border-radius:var(--r-pill)!important}
 html body.ui-app #msg{color:var(--danger)!important}
