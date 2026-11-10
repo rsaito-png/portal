@@ -18,22 +18,58 @@ function htCss() {
   .htt{width:100%;font-size:24px}.htt th{background:#1a2744;color:#fff6e4;position:sticky;top:0}.htt td,.htt th{padding:6px 5px;vertical-align:top}.htw{overflow-x:auto}
   .htb{width:auto!important;display:inline-block;margin:2px 3px 2px 0!important;padding:6px 10px!important;font-size:24px!important}.htb.g{background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c}
   .chip{display:inline-block;border-radius:0;border:2px solid #1a120c;padding:2px 8px;margin:1px;font-size:23px;background:#e6efe9}.chip.late{background:#fbd9d9;color:#900}.chip.now{background:#fff0b3}.chip.ok{background:#d6ecd9}.chip.ng{background:#fde0cc}
-  .htm{position:fixed;inset:0;background:#000a;z-index:50;overflow:auto}.htm>div{background:#fff4dc;color:#1c140c;max-width:560px;margin:20px auto;padding:16px;border:4px solid #1a120c;border-radius:0;box-shadow:6px 6px 0 #07060a}.htm label{display:block;font-size:24px;color:#4e4336;margin-top:8px}.htm input,.htm select,.htm textarea{margin:2px 0;padding:8px;font-size:26px;width:100%;box-sizing:border-box}.htm input[type=checkbox],.htm input[type=radio]{width:auto}
+  .htm{position:fixed;inset:0;background:#000a;z-index:50;overflow:auto}.htm>div{background:#fff4dc;color:#1c140c;max-width:560px;margin:20px auto;padding:16px;border:4px solid #1a120c;border-radius:0;box-shadow:6px 6px 0 #07060a}.htm p,.htm label{display:block;font-size:24px;color:#4e4336;margin-top:8px}.htm input,.htm select,.htm textarea{margin:2px 0;padding:8px;font-size:26px;width:100%;box-sizing:border-box}.htm input[type=checkbox],.htm input[type=radio]{width:auto}.htm button{font-size:26px}
   .htbar{background:#fff3cd;border:3px solid #1a120c;border-radius:0;padding:8px 10px;font-size:24px;margin:8px 0;color:#1c140c}.htmo{background:#fff4dc;border:3px solid #1a120c;border-radius:0;padding:10px;margin:8px 0;box-shadow:3px 3px 0 #1a120c;color:#1c140c}.htmo.now{border-left:6px solid #e6b800}`;
   document.head.appendChild(s);
 }
+async function htTry(path) {
+  try { return { ok: true, rows: await sb(path) }; } catch (e) { return { ok: false, rows: [] }; }
+}
+function htMergeAnswers(qs, keys) {
+  const map = {};
+  (keys || []).forEach(k => { map[k.training_id + '\t' + k.no] = k.answer; });
+  return (qs || []).map(q => { const a = map[q.training_id + '\t' + q.no]; return a == null ? q : Object.assign({}, q, { answer: a }); });
+}
+async function htLoadQuestions() {
+  const base = 'training_id,no,question,opt_a,opt_b,opt_c,opt_d,points';
+  const keys = await htTry('ht_question_keys?select=training_id,no,answer&order=training_id,no');
+  if (keys.ok) return htMergeAnswers(await sb('ht_questions?select=' + base + '&order=training_id,no'), keys.rows || []);
+  return sb('ht_questions?select=' + base + ',answer&order=training_id,no');
+}
+async function htRpc(name, args) {
+  let s = JSON.parse(localStorage.getItem('sess') || '{}');
+  if (s.exp && s.exp < Date.now() + 30000 && typeof refreshSess === 'function') {
+    if (await refreshSess()) s = JSON.parse(localStorage.getItem('sess') || '{}');
+  }
+  const r = await fetch(C.supabaseUrl + '/rest/v1/rpc/' + name, {
+    method: 'POST',
+    headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + (s.token || ''), 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {})
+  });
+  const tx = await r.text();
+  let body = null; try { body = tx ? JSON.parse(tx) : null; } catch (e) { body = null; }
+  if (!r.ok) throw new Error((body && body.message) || ('提出できませんでした（' + r.status + '）'));
+  return body;
+}
+async function htMyStaff() {
+  try {
+    const rows = await htRpc('ht_my_staff', {});
+    return Array.isArray(rows) ? (rows[0] || null) : null;
+  } catch (e) { return null; }
+}
 async function htLoad() {
   const g = p => sb(p);
-  const [off, staff, tr, mat, qs, ev, evl, com, plan, cl, rec, set, acc] = await Promise.all([
-    g('ht_offices_t?order=sort'), g('ht_staff?order=id'), g('ht_trainings?order=id'), g('ht_materials?order=training_id,sort'), g('ht_questions?order=training_id,no'),
+  const staffCols = 'id,name,kana,email,main_office,sub_offices,employment,job,hired,status,retired,note';
+  const [off, staff, tr, mat, qs, ev, evl, com, plan, cl, rec, set, acc, myStaff] = await Promise.all([
+    g('ht_offices_t?order=sort'), g('ht_staff?select=' + staffCols + '&order=id'), g('ht_trainings?order=id'), g('ht_materials?order=training_id,sort'), htLoadQuestions(),
     g('ht_events?order=id'), g('ht_event_logs?order=done_on.desc'), g('ht_committees?order=id'), g('ht_committee_plan?order=fy,month'), g('ht_committee_logs?order=held_at.desc'),
-    g('ht_records?order=taken_at.desc&limit=5000'), g('ht_settings'), g('ht_access')]);
+    g('ht_records?order=taken_at.desc&limit=5000'), g('ht_settings'), g('ht_access'), htMyStaff()]);
   const me = (JSON.parse(localStorage.getItem('sess') || '{}').email || '').toLowerCase();
   const mine = acc.filter(a => a.email === me);
   const isAll = mine.some(a => !a.office_id && a.can_edit), allRead = mine.some(a => !a.office_id);
   const myOffs = allRead ? off.map(o => o.id) : mine.map(a => a.office_id);
   const editOffs = isAll ? off.map(o => o.id) : mine.filter(a => a.can_edit).map(a => a.office_id);
-  HT.D = { off: off.filter(o => myOffs.includes(o.id)), allOff: off, staff, tr, mat, qs, ev, evl, com, plan, cl, rec, set: Object.fromEntries(set.map(s => [s.key, s.value])), acc, me, isAll, myOffs, editOffs };
+  HT.D = { off: off.filter(o => myOffs.includes(o.id)), allOff: off, staff, tr, mat, qs, ev, evl, com, plan, cl, rec, set: Object.fromEntries(set.map(s => [s.key, s.value])), acc, me, isAll, myOffs, editOffs, myStaff };
   if (HT.office !== 'all' && !myOffs.includes(HT.office)) HT.office = 'all';
   if (myOffs.length === 1) HT.office = myOffs[0];
 }
@@ -41,7 +77,9 @@ const htScope = () => HT.office === 'all' ? HT.D.off : HT.D.off.filter(o => o.id
 const htOffName = id => (HT.D.allOff.find(o => o.id === id) || {}).name || id;
 const htApplies = (it, o) => it.target_types.includes('全事業') || it.target_types.some(t => o.types.includes(t));
 const htAppliesScope = it => htScope().some(o => htApplies(it, o));
-const htStaffOffs = s => [s.main_office, ...s.sub_offices].filter(Boolean);
+const htStaffOffs = s => [s.main_office, ...(s.sub_offices || [])].filter(Boolean);
+const htSelfOffices = (t, s) => !s || s.status !== '在籍' ? [] : htStaffOffs(s).filter(id => HT.D.myOffs.includes(id) && htApplies(t, HT.D.allOff.find(o => o.id === id) || { types: [] }));
+const htViewOnly = () => HT.D && !HT.D.isAll && HT.D.editOffs.length === 0;
 const htStaffScope = () => { const ids = htScope().map(o => o.id); return HT.D.staff.filter(s => s.status === '在籍' && htStaffOffs(s).some(x => ids.includes(x))); };
 const htRecScope = () => { const ids = htScope().map(o => o.id); return HT.D.rec.filter(r => r.fy === HT.fy && r.offices.some(x => ids.includes(x))); };
 // 事業所 o で、職員 s が研修 t を FY 内に何回済ませたか
@@ -155,13 +193,15 @@ function htKarte(id) {
 function htTrain() {
   const D = HT.D, m = htNowM(), canEdit = D.editOffs.length > 0, trs = D.tr.filter(t => t.active && htAppliesScope(t));
   const rows = trs.map(t => { const s = htTrainStat(t), mats = D.mat.filter(x => x.training_id === t.id && x.active);
+    const canQuiz = canEdit || htSelfOffices(t, D.myStaff).length > 0;
     const chips = t.months.map(x => `<span class="chip ${x === m ? 'now' : htIdx(x) < htIdx(m) && s.late ? 'late' : ''}">${x}月</span>`).join('');
     return `<tr><td><b>${esc(t.id)} ${esc(t.name)}</b><br><small>${esc(t.category || '')}</small><br>${chips}<br><small>${esc(t.frequency || '')}</small></td>
     <td>${s.done}/${s.target}人${s.late ? `<br><span class="chip late">遅れ ${s.late}人</span>` : ''}</td>
     <td><span class="chip ok">証跡あり ${s.evOk}</span><br><span class="chip ng">証跡なし ${s.evNg}</span>${s.unconf ? `<br><small>未確認 ${s.unconf}</small>` : ''}</td>
     <td>${mats.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.kind)}</a>`).join('　')}</td>
     <td><button class="htb g" onclick="htImpl('${t.id}')">実施記録PDF</button><button class="htb g" onclick="htCert()">受講証明書</button>
-    ${canEdit ? `<button class="htb" onclick="htRecForm('${t.id}')">記録を入力</button><button class="htb" onclick="htQuiz('${t.id}')">テストを受ける</button>` : ''}
+    ${canEdit ? `<button class="htb" onclick="htRecForm('${t.id}')">記録を入力</button>` : ''}
+    ${canQuiz ? `<button class="htb" onclick="htQuiz('${t.id}')">テストを受ける</button>` : ''}
     ${D.isAll ? `<button class="htb" onclick="htConfirm('${t.id}')"${s.unconf ? '' : ' disabled style="opacity:.4"'}>統括責任者確認</button>` : ''}</td></tr>`; }).join('');
   const ev = D.ev.filter(e => e.active && htAppliesScope(e)).map(e => {
     const logs = D.evl.filter(l => l.event_id === e.id && l.done_on >= HT.fy + '-04-01' && l.done_on <= (HT.fy + 1) + '-03-31' && htScope().some(o => o.id === l.office_id));
@@ -187,26 +227,53 @@ function htRecForm(tid) {
       offices: offs, score: rate, max_score: rate == null ? null : 100, rate, passed, impression: o.impression, plan: o.plan, source: '手入力' }) });
   });
 }
-// ポータルで受講（ログインしたメールが本人確認の証跡になる）
+// ポータルで受講。閲覧のみはサーバが本人の行だけ採点して入れる。編集者の代理入力は従来どおり。
 function htQuiz(tid) {
   const D = HT.D, t = D.tr.find(x => x.id === tid), qs = D.qs.filter(q => q.training_id === tid);
-  const mine = D.staff.find(s => (s.email || '').toLowerCase() === D.me), cand = mine ? [mine] : D.staff.filter(s => s.status === '在籍' && htStaffOffs(s).some(o => D.editOffs.includes(o)));
+  const viewOnly = htViewOnly();
+  let cand;
+  if (viewOnly) {
+    const mine = D.myStaff && D.myStaff.status === '在籍' ? D.myStaff : null;
+    if (!mine) return alert('名簿とログインが結びついていません。管理者に連絡してください。');
+    if (!htSelfOffices(t, mine).length) return alert('この研修の対象ではありません。');
+    cand = [mine];
+  } else {
+    const mine = D.staff.find(s => (s.email || '').toLowerCase() === D.me);
+    cand = mine ? [mine] : D.staff.filter(s => s.status === '在籍' && htStaffOffs(s).some(o => D.editOffs.includes(o)));
+  }
+  if (!cand.length) return alert('受講できる職員がいません');
   const m = document.createElement('div'); m.className = 'htm';
   const mats = D.mat.filter(x => x.training_id === tid && x.active);
-  m.innerHTML = `<div><h3 style="margin-top:0">${esc(t.name)}　確認テスト</h3><p class="note">教材：${mats.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.kind)}</a>`).join('　') || 'なし'}<br>ログインしているメール（${esc(D.me)}）が本人確認として記録されます。理解度テスト・所感・実践計画は必須です。</p>
-  <label>受講する職員<select id="qz_s">${cand.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></label>
-  ${qs.map(q => `<p><b>問${q.no}．${esc(q.question)}</b></p>${['a', 'b', 'c', 'd'].map(c => `<label style="color:#222"><input type="radio" name="qz${q.no}" value="${c.toUpperCase()}"> ${c.toUpperCase()}．${esc(q['opt_' + c])}</label>`).join('')}`).join('') || '<p>この研修にはテストがありません。</p>'}
+  const who = viewOnly
+    ? `<p><b>受講する職員</b><br>${esc(cand[0].name)}</p>`
+    : `<label>受講する職員<select id="qz_s">${cand.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></label>`;
+  m.innerHTML = `<div><h3 style="margin-top:0">${esc(t.name)}　確認テスト</h3><p class="note">教材：${mats.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.kind)}</a>`).join('　') || 'なし'}<br>${viewOnly ? 'ログイン中のアカウントが本人確認として記録されます。提出できるのは、名簿で結びついた本人の分だけです。' : 'ログインしているメール（' + esc(D.me) + '）が本人確認として記録されます。'}理解度テスト・所感・実践計画は必須です。</p>
+  ${who}
+  ${qs.map(q => `<p><b>問${q.no}．${esc(q.question)}</b></p>${['a', 'b', 'c', 'd'].filter(c => q['opt_' + c]).map(c => `<label style="color:#222"><input type="radio" name="qz${q.no}" value="${c.toUpperCase()}"> ${c.toUpperCase()}．${esc(q['opt_' + c])}</label>`).join('')}`).join('') || '<p>この研修にはテストがありません。</p>'}
   <label>所感・気づき *<textarea id="qz_i" rows="3"></textarea></label><label>現場実践計画 *<textarea id="qz_p" rows="2"></textarea></label><p id="qz_m" style="color:#c00"></p>
   <button id="qz_ok">提出する</button><button class="back" style="width:100%" onclick="this.closest('.htm').remove()">やめる</button></div>`;
   document.body.appendChild(m);
   m.querySelector('#qz_ok').onclick = async () => {
-    const msg = m.querySelector('#qz_m'); let sc = 0, mx = 0;
-    for (const q of qs) { const a = m.querySelector(`input[name=qz${q.no}]:checked`); if (!a) { msg.textContent = `問${q.no}に答えてください`; return; } mx += q.points; if (a.value === q.answer) sc += q.points; }
+    const msg = m.querySelector('#qz_m');
+    const answers = {};
+    for (const q of qs) { const a = m.querySelector(`input[name=qz${q.no}]:checked`); if (!a) { msg.textContent = `問${q.no}に答えてください`; return; } answers[String(q.no)] = a.value; }
     const i = m.querySelector('#qz_i').value.trim(), p = m.querySelector('#qz_p').value.trim(); if (!i || !p) { msg.textContent = '所感と実践計画は必須です'; return; }
-    const s = D.staff.find(x => x.id === m.querySelector('#qz_s').value), rate = mx ? Math.round(sc / mx * 100) : null;
-    const offs = htStaffOffs(s).filter(x => D.editOffs.includes(x) && htApplies(t, D.allOff.find(y => y.id === x)));
-    try { await sb('ht_records', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ fy: htFy(), training_id: t.id, training_name: t.name, staff_id: s.id, staff_name: s.name, email: s.email, offices: offs, score: sc, max_score: mx, rate,
-      passed: rate == null || rate >= t.pass_score ? '合格' : '不合格', impression: i, plan: p, source: 'ポータル' }) }); m.remove(); alert(`提出しました。得点 ${rate ?? '-'}%（${rate == null || rate >= t.pass_score ? '合格' : '不合格・再受講してください'}）`); await htRefresh(); } catch (e) { msg.textContent = e.message; }
+    try {
+      if (viewOnly) {
+        const res = await htRpc('ht_submit_own_quiz', { p_training_id: t.id, p_answers: answers, p_impression: i, p_plan: p });
+        const rate = res && res.rate, passed = res && res.passed;
+        m.remove(); alert(`提出しました。得点 ${rate ?? '-'}%（${passed === '合格' ? '合格' : '不合格・再受講してください'}）`);
+      } else {
+        let sc = 0, mx = 0;
+        for (const q of qs) { mx += q.points; if (answers[String(q.no)] === q.answer) sc += q.points; }
+        const s = D.staff.find(x => x.id === m.querySelector('#qz_s').value), rate = mx ? Math.round(sc / mx * 100) : null;
+        const offs = htStaffOffs(s).filter(x => D.editOffs.includes(x) && htApplies(t, D.allOff.find(y => y.id === x)));
+        await sb('ht_records', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ fy: htFy(), training_id: t.id, training_name: t.name, staff_id: s.id, staff_name: s.name, email: s.email, offices: offs, score: sc, max_score: mx, rate,
+          passed: rate == null || rate >= t.pass_score ? '合格' : '不合格', impression: i, plan: p, source: 'ポータル' }) });
+        m.remove(); alert(`提出しました。得点 ${rate ?? '-'}%（${rate == null || rate >= t.pass_score ? '合格' : '不合格・再受講してください'}）`);
+      }
+      await htRefresh();
+    } catch (e) { msg.textContent = e.message; }
   };
 }
 function htEvForm(eid) {
@@ -409,6 +476,18 @@ function htEditForm(key, i) {
     for(const k of ['offices','office_ids','committee_ids','target_types','types']) if(k in row && !row[k].length) throw new Error('対象を1つ以上選んでください');
     if(key==='plan' && row.planned_on) {const d=new Date(row.planned_on+'T12:00:00+09:00');if(htFy(d)!==row.fy || Number(row.planned_on.slice(5,7))!==row.month) throw new Error('予定日と年度・予定月を合わせてください');}
     if(key==='acc') htAccessCheck(old,row);
+    if(key==='qs') {
+      if(!row.answer || !['A','B','C','D'].includes(row.answer)) throw new Error('正解を選んでください');
+      const tid = row.training_id || (old && old.training_id), no = row.no != null ? row.no : (old && old.no);
+      const qrow = Object.assign({}, row); delete qrow.answer;
+      const keys = await htTry('ht_question_keys?select=training_id&limit=1');
+      if(keys.ok) {
+        await htWrite(key, qrow, old);
+        const saved = await sb('ht_question_keys?on_conflict=training_id,no', { method:'POST', headers:{ Prefer:'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ training_id: tid, no, answer: row.answer }) });
+        if(!Array.isArray(saved) || saved.length !== 1) throw new Error('正解を保存できませんでした');
+        return;
+      }
+    }
     if(key==='rec') {
       const t=HT.D.tr.find(t=>t.id===row.training_id),s=HT.D.staff.find(s=>s.id===row.staff_id);
       row.training_name=t.name;row.staff_name=s.name;row.email=s.email;
