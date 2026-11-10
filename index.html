@@ -468,7 +468,7 @@ async function render() {
   // 休止・閉鎖予定：事務・管理者・会長は全部。現場職員のトップには出さない（所属・兼務にあるときだけ出す。見本の現場は所属なしなので出さない）
   const pausedOff = (typeof DEMO !== 'undefined' && DEMO && !canSeePaused && !MY_OFFICE) ? []
     : (canSeePaused ? C.offices : officesHome).filter(x => officePaused(x));
-  // 並び：あなたへのお知らせ → 出退勤打刻＋毎日占い → 稼働中の事業所 → 休止・閉鎖予定 → 相談・報告 → 研修・発信 → 総務 → 会長
+  // 並び：あなたへのお知らせ → 出退勤打刻＋今日のお仕事占い → 稼働中の事業所 → 休止・閉鎖予定 → 相談・報告 → 研修・発信 → 総務 → 会長
   $('view').innerHTML = `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">あなたへのお知らせ</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
     <p id="ht_jump" class="ht-jump" hidden><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
     <div class="pl-hero"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span><small>スマホで出勤・退勤。事業所の近くだけ</small></a>
@@ -496,7 +496,7 @@ function plClock() {
     const d = new Date(Date.now() + 9 * 3600000); el.textContent = `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
   f(); if (!window.__plClk) window.__plClk = setInterval(f, 20000);
 }
-// 毎日占い（全体の空の動き）。portal_daily_sky の今日（JST）分。取れなければ枠ごと隠す。
+// 今日のお仕事占い（全体の空の動きを、その日の仕事に結びつけて）。portal_daily_sky の今日（JST）分。取れなければ枠ごと隠す。
 function skyCanEdit() {
   if (DEMO) return false;
   return (typeof ROLE !== 'undefined' && ROLE === '事務')
@@ -508,7 +508,7 @@ async function loadDailySky() {
   const day = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
   let r = null;
   try {
-    if (DEMO) r = { day, body: '月は昼に乙女座へ。話は進むが、現場は動かない日。急がず、一つだけ片づける。', tip: '散らかっても慌てず、目の前の一つを拾え。' };
+    if (DEMO) r = { day, body: '月は夕方に射手座へ。新月前後は動きを急がず、記録と申し送りを先に整える日。', tip: '送迎の前に、報連相を一つ済ませよう。' };
     else if (typeof sb === 'function') {
       r = ((await sb(`portal_daily_sky?day=eq.${day}&select=day,body,tip`)) || [])[0];
     }
@@ -518,9 +518,9 @@ async function loadDailySky() {
   const esc = x => String(x || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const editBtn = skyCanEdit() ? `<button type="button" class="inl back" style="margin-left:8px;font-size:12px" onclick="skyEditOpen('${esc(day)}')">直す</button>` : '';
   if (!r || !r.body) {
-    el.innerHTML = `<div class="ds-h">毎日占い ${editBtn}</div><div class="ds-b note">今日分はまだありません（管理者は「直す」から書けます）。</div>`;
+    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b note">今日分はまだありません（管理者は「直す」から書けます）。</div>`;
   } else {
-    el.innerHTML = `<div class="ds-h">毎日占い ${editBtn}</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
+    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
   }
   el.hidden = false;
 }
@@ -531,7 +531,7 @@ async function skyEditOpen(day) {
     const rows = await sb(`portal_daily_sky?day=eq.${day}&select=body,tip`) || [];
     if (rows[0]) cur = rows[0];
   } catch (e) {}
-  const body = prompt('本文（2〜3文）', cur.body || '');
+  const body = prompt('本文（2〜3文。その日の仕事について）', cur.body || '');
   if (body === null) return;
   const tip = prompt('今日のひとこと', cur.tip || '');
   if (tip === null) return;

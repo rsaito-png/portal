@@ -1,4 +1,4 @@
--- 毎日占い（全体の空の動き。個人natalではない）。トップ最上段に出す。
+-- 今日のお仕事占い（全体の空の動きを、その日の仕事に結びつけて。個人natalではない）。トップに出す。
 -- 書き込みは Edge daily-sky（service_role）だけ。ログイン職員は読むだけ。
 create table if not exists public.portal_daily_sky (
   day date primary key,            -- Asia/Tokyo の日付
@@ -14,8 +14,8 @@ create policy daily_sky_read on public.portal_daily_sky for select to authentica
 
 insert into public.portal_daily_sky(day, body, tip) values
   ((now() at time zone 'Asia/Tokyo')::date,
-   '月は昼に乙女座へ。話は進むが、現場は動かない日。急がず、一つだけ片づける。',
-   '散らかっても慌てず、目の前の一つを拾え。')
+   '月は夕方に射手座へ。新月前後は動きを急がず、記録と申し送りを先に整える日。',
+   '送迎の前に、報連相を一つ済ませよう。')
 on conflict (day) do nothing;
 
 -- 毎日 JST 5:10（UTC 20:10）に daily-sky を叩く。秘密は private_config 'daily_sky_secret'（値はDBにだけ保存）。
