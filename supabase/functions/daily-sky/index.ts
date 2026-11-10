@@ -40,13 +40,13 @@ export function factLine(f: ReturnType<typeof skyFacts>) {
 }
 export function fallback(f: ReturnType<typeof skyFacts>) {
   const m = f.ingress ? `月は${when(f.ingress.hour)}に${f.ingress.to}へ。` : `月は${f.moon}で落ち着く。`;
-  return { body: `${m}記録と申し送りを先に整え、送迎も一つずつ確かめる日。`, tip: "報連相は、短く一つ済ませよう。" };
+  return { body: `${m}太陽は${f.sun}。${f.phase}。記録と申し送りを先に整え、送迎も一つずつ確かめる日。連絡は短く事実だけに。`, tip: "報連相は、短く一つ済ませよう。" };
 }
 export function parse(t: string) {
-  const b = t.match(/BODY\s*[:：]\s*(.+?)(?:\n|$)/s), p = t.match(/TIP\s*[:：]\s*(.+?)(?:\n|$)/);
-  if (!b || !p) return null;
-  const body = b[1].replace(/\s*TIP\s*[:：].*$/s, "").trim(), tip = p[1].trim();
-  if (!body || !tip || body.length > 120 || tip.length > 50) return null;
+  const m = t.match(/BODY\s*[:：]\s*([\s\S]+?)\s*TIP\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (!m) return null;
+  const body = m[1].trim(), tip = m[2].trim();
+  if (!body || !tip || body.length > 400 || tip.length > 80) return null;
   return { body, tip };
 }
 function redact(s: string, key: string) {
@@ -54,13 +54,10 @@ function redact(s: string, key: string) {
   return key ? o.split(key).join("***") : o;
 }
 const SYSTEM = `あなたは障害福祉の職員ポータル「今日のお仕事占い」係。読む人は児発・放デイ、居宅介護、生活介護の現場職員と事務。
-個人の出生図や星座別運勢は禁止。今日の空全体の動き（太陽・月の星座、月の移動、月相）を、その日の仕事の手がかりとして短く述べる。
-本文のすべての文は、その日の仕事について書く（チームワーク、利用者対応、記録、送迎、報連相、集中とペースのどれか）。健康・病気・医療の予言、怖い言い方、事故や災いの暗示は禁止。
-規則: BODYは2〜3文、合計80字以内。TIPは1文、30字以内。命令形・言い切りで静かなトーン。専門用語の解説や長文は禁止。
-例:
-BODY: 月は夕方に射手座へ。新月前後は動きを急がず、記録と申し送りを先に整える日。
-TIP: 送迎の前に、報連相を一つ済ませよう。
-出力はこの2行だけ:
+個人の出生図や星座別運勢は禁止。今日の空全体の動き（太陽・月の星座、月の移動、月相、必要なら水星などその日に目立つ動き）を、その日の仕事の手がかりとして述べる。
+本文はチームワーク、利用者対応、記録、送迎、報連相、集中とペースなど、その日の仕事に結びつける。健康・病気・医療の予言、怖い言い方、事故や災いの暗示は禁止。
+BODYは2〜3行、TIPは「今日のひとこと」1行。字数の上限は設けない。空の動きは時刻や星座を略さず具体的に。落ち着いた言い切り。専門用語の解説はしない。薄い一文で済ませない。
+出力は次の2項目だけ（BODYは改行してよい）:
 BODY: ...
 TIP: ...`;
 
