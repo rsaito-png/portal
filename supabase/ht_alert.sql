@@ -29,7 +29,7 @@ cm as (
    coalesce(pl.planned_on,(make_date(pl.fy+(pl.month<4)::int,pl.month,1)+interval '1 month - 1 day')::date) 期限
   from ht_committee_plan pl join p on pl.fy=p.fy cross join lateral unnest(pl.committee_ids) cid join ht_committees c on c.id=cid
   where coalesce(pl.planned_on,make_date(pl.fy+(pl.month<4)::int,pl.month,1))<=p.today+14
-   and not exists(select 1 from ht_committee_logs l where l.committee_id=cid and (l.held_at at time zone 'Asia/Tokyo')::date
+   and not exists(select 1 from ht_committee_logs l where l.committee_id=cid and l.status='確定' and (l.held_at at time zone 'Asia/Tokyo')::date
      between make_date(pl.fy+(pl.month<4)::int,pl.month,1) and (make_date(pl.fy+(pl.month<4)::int,pl.month,1)+interval '1 month - 1 day')::date))
 select 事業所,種別,項目,対象,case when over_n>done then '期限超過' else '14日以内' end 状況,期限 from (select * from st union all select * from ev) x where need>done
 union all
