@@ -339,7 +339,8 @@ function sgMonthHtml(ym, evs, todayStr) {
     if (cell % 7 === 0) rows += '<tr>';
     const es = (evs || []).filter(e => e.day === d);
     const closed = es.some(e => e.kind === '休所');
-    const n = es.filter(e => e.kind === '利用').length;
+    // 同じ児童の「利用」が二重に入っていても1人と数える（今日の利用児童と同じ数え方）
+    const n = new Set(es.filter(e => e.kind === '利用' && e.child).map(e => String(e.child).replace(/\s/g, ''))).size;
     const trips = es.filter(e => e.kind === '迎え' || e.kind === '送り').length;
     const sub = closed ? '<span class="sub off">休</span>' : n ? `<span class="sub use">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
     const isToday = d === todayStr;
@@ -447,6 +448,14 @@ async function sgLoad(a, b, mode, anchor) {
   const LEFT = typeof loadLeftIndex === 'function' ? await loadLeftIndex() : {};
   evs = typeof filterEventsByLeft === 'function' ? filterEventsByLeft(evs || [], LEFT) : (evs || []);
   evs = evs.filter(e => typeof leoCalHidden !== 'function' || !leoCalHidden(e));
+  // 型表から同時に2回作られた同じ児童の「利用」（同じ日・同じ時刻）は1件だけ残す
+  const seen = new Set();
+  evs = evs.filter(e => {
+    if (e.kind !== '利用' || e.source !== 'kata' || !e.child) return true;
+    const k = [e.day, String(e.child).replace(/\s/g, ''), e.start_time || '', e.end_time || ''].join('|');
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
   return evs.filter(e => e.day >= a && e.day <= b);
 }
 function sgTodayJst() {
