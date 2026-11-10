@@ -162,3 +162,42 @@ html.th-planet body.ui-app main .sgm.sgm.sgm.sgm.sgm td button.today{background:
 html.th-planet body.ui-app main .sgm-h.sgm-h.sgm-h.sgm-h.sgm-h button,html.th-planet body.ui-app main .sg-top.sg-top.sg-top.sg-top.sg-top button,html.th-planet body.ui-app main .sg-add.sg-add.sg-add.sg-add.sg-add button{background:#fff!important;color:var(--pl-ink)!important;border:1.5px solid var(--pl-line)!important;border-radius:999px!important;box-shadow:none!important}
 html.th-planet body.ui-app main .sg-top.sg-top.sg-top.sg-top.sg-top button.sg-on{background:var(--pl-g)!important;color:#fff!important;border-color:var(--pl-g)!important}
 @media (min-width:900px){html.th-planet body.ui-app .home-todo .ht-h{font-size:46px!important}}
+
+/* ===== 画面ごとに残っていた太い黒枠・ずらし影（旧ドット絵）を、惑星の空のやわらかい形に（2026-11-10） ===== */
+/* パネル類 */
+html.th-planet body.ui-app .htk div,html.th-planet body.ui-app .htbar,html.th-planet body.ui-app .htmo,html.th-planet body.ui-app .htm>div,
+html.th-planet body.ui-app .kv-card,html.th-planet body.ui-app .kv-sv,html.th-planet body.ui-app .kv-instr,html.th-planet body.ui-app .kv-empty,html.th-planet body.ui-app .kv-prev,
+html.th-planet body.ui-app .ry .jr,html.th-planet body.ui-app .cm .jr,html.th-planet body.ui-app .nc-card,html.th-planet body.ui-app .cm-dlg .box,html.th-planet body.ui-app #uk_ask .uk_panel,
+html.th-planet body.ui-app .cm .cm-staff-rec,html.th-planet body.ui-app .cm pre.cm-mail{border:1px solid var(--pl-line)!important;border-radius:20px!important;box-shadow:var(--shadow)!important}
+html.th-planet body.ui-app .htk div{background:var(--pl-card)!important;padding:14px 12px!important}
+html.th-planet body.ui-app .htbar{background:#fff6d9!important;border-color:#ecd48a!important;box-shadow:none!important}
+html.th-planet body.ui-app .htmo.now{border-left:6px solid #e6b800!important}
+html.th-planet body.ui-app .kv-req{border-radius:999px!important;box-shadow:none!important}
+/* お知らせ枠（良い・注意・だめ） */
+html.th-planet body.ui-app .ry .ng,html.th-planet body.ui-app .ry .okb,html.th-planet body.ui-app .ry .wn,html.th-planet body.ui-app .cm .ng,html.th-planet body.ui-app .cm .okb,html.th-planet body.ui-app .cm .wn,html.th-planet body.ui-app .ry .aib{border:1.5px solid #b9ad92!important;border-radius:14px!important;box-shadow:none!important}
+/* 2番手ボタン・メニューのリンク */
+html.th-planet body.ui-app .htb.g,html.th-planet body.ui-app .sctb.g,html.th-planet body.ui-app .ry button.sec,html.th-planet body.ui-app .cm button.sec,html.th-planet body.ui-app #uk_ask_close,html.th-planet body.ui-app .cm a.btn,html.th-planet body.ui-app button.nc-mini{background:#fff!important;color:var(--pl-g2)!important;border:2px solid var(--pl-g)!important;border-radius:14px!important;box-shadow:none!important}
+html.th-planet body.ui-app .ry button.del{border:2px solid #c0392b!important;border-radius:14px!important;box-shadow:none!important}
+html.th-planet body.ui-app .ry-nav a,html.th-planet body.ui-app .cm-nav a{border:1.5px solid var(--pl-line)!important;border-radius:999px!important;box-shadow:none!important}
+html.th-planet body.ui-app .chip{border:1px solid #c9bda3!important;border-radius:999px!important}
+html.th-planet body.ui-app #uk_fab,html.th-planet body.ui-app #uk_help_btn{border:2px solid #fff!important;border-radius:999px!important;box-shadow:0 8px 18px -8px rgba(33,48,42,.55)!important}
+/* 署名欄は枠を残して、やわらかく */
+html.th-planet body.ui-app .ry canvas.sig,html.th-planet body.ui-app .ry img.sg,html.th-planet body.ui-app .cm img.cm-sg,html.th-planet body.ui-app .cm .pad canvas{border:2px solid #9c8c6c!important;border-radius:12px!important;box-shadow:none!important}
+/* 上に戻るボタン */
+html.th-planet body.ui-app #to-top{background:var(--pl-g)!important;color:#fff!important;border:3px solid #fff!important;box-shadow:0 8px 18px -8px rgba(33,48,42,.6)!important}
+/* 法定研修の表：見出しを折り返さず、はみ出す分は横にスクロール */
+html.th-planet body.ui-app .htw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+html.th-planet body.ui-app .htt{width:auto;min-width:100%}
+html.th-planet body.ui-app .htt th{background:#eef2e6!important;color:var(--pl-ink)!important;white-space:nowrap;word-break:keep-all}
+/* 金斗雲 記録記入（GASと同じ並び）：青を惑星の緑に。選択中は緑で塗る */
+html.th-planet body.ui-app .kv-gas h3,html.th-planet body.ui-app .kv-gas h4,html.th-planet body.ui-app .kv-title{color:var(--pl-g2)!important}
+html.th-planet body.ui-app .kv-gas .gas-btn{border:2px solid var(--pl-g)!important;background:#fff!important;color:var(--pl-g2)!important}
+html.th-planet body.ui-app .kv-gas .gas-check:checked + .gas-btn{background:var(--pl-g)!important;color:#fff!important}
+html.th-planet body.ui-app .kv-gas .gas-check:checked + .gas-btn::before{content:"✔ "}
+html.th-planet body.ui-app .kv-gas .gas-btn.ok{border-color:#198754!important;color:#146c43!important}
+html.th-planet body.ui-app .kv-gas .gas-check:checked + .gas-btn.ok{background:#198754!important;color:#fff!important}
+html.th-planet body.ui-app .kv-gas .gas-chip,html.th-planet body.ui-app .kv-gas .gas-now,html.th-planet body.ui-app .kv-gas .week button{background:#fff!important;color:var(--pl-g2)!important;border:2px solid var(--pl-g)!important}
+html.th-planet body.ui-app .kv-gas .gas-chip.on{background:var(--pl-g)!important;color:#fff!important}
+html.th-planet body.ui-app .kv-gas .gas-go,html.th-planet body.ui-app .kv-save{background:var(--pl-g)!important;color:#fff!important;border:0!important;border-radius:16px!important}
+html.th-planet body.ui-app .kv-gas .gas-badge{background:var(--pl-g)!important}
+html.th-planet body.ui-app .kv-gas .gas-link{color:#1f5d3f!important}
