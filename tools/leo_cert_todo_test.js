@@ -82,7 +82,7 @@ const idx = read('index.html');
 assert.ok(cfg.includes("'今日やること（児発管）', '#leo/home'"));
 const whoLine = cfg.split('\n').find(l => l.includes('who:') && l.includes('中村 友香がする'));
 const who = whoLine.slice(whoLine.indexOf('中村 友香がする'), whoLine.indexOf('宮本がする'));
-assert.ok(who.includes('今日やること（児発管）'), '中村の欄から今日やることを開く');
+assert.ok(!who.includes('今日やること（児発管）') && cfg.includes("todoTop: '今日やること（児発管）'"), '今日やることはホーム最上段に1つだけ（中村の欄に重ねない）');
 const homeFn = read('leo.js').slice(read('leo.js').indexOf('LEO_VIEWS.home = async function'), read('leo.js').indexOf('async function leoRecordDay'));
 assert.ok(homeFn.includes('leoCertTodos'), '同じ今日やること画面に出す');
 assert.ok(!/if \(canLeoHomeTodo\(\)\)[\s\S]{0,120}leoCertTodos/.test(homeFn), '中村が見る一覧を、依頼ボタンの人だけにしない');
