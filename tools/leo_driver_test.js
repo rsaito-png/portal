@@ -5,11 +5,11 @@ const path = require('path');
 const assert = require('assert');
 const D = require('../leo_driver.js');
 
-assert.strictEqual(D.filingDriverName('横田祥'), '齊藤');
-assert.strictEqual(D.filingDriverName('横田　祥'), '齊藤');
-assert.strictEqual(D.filingDriverName(' 横田 祥 '), '齊藤');
-assert.strictEqual(D.filingDriverName('祥先生'), '齊藤');
-assert.strictEqual(D.filingDriverName('祥　先生'), '齊藤');
+assert.strictEqual(D.filingDriverName('横田祥', '2026-11-02'), '齊藤');
+assert.strictEqual(D.filingDriverName('横田　祥', '2026-11-02'), '齊藤');
+assert.strictEqual(D.filingDriverName(' 横田 祥 ', '2026-11-02'), '齊藤');
+assert.strictEqual(D.filingDriverName('祥先生', '2026-11-02'), '齊藤');
+assert.strictEqual(D.filingDriverName('祥　先生', '2026-11-02'), '齊藤');
 assert.strictEqual(D.filingDriverName('齊藤'), '齊藤');
 assert.strictEqual(D.filingDriverName('職員X'), '職員X');
 assert.strictEqual(D.filingDriverName('送迎なし'), '送迎なし');
@@ -30,26 +30,32 @@ assert.strictEqual(D.filingDriverName('安藤　尚子'), '安藤　尚子');
 assert.strictEqual(D.filingDriverName('宮本幸子（代理）'), '宮本幸子（代理）');
 assert.strictEqual(D.filingDriverName('齊藤　連'), '齊藤　連');
 
-// 定例: 月曜朝・碧音くん迎え 10:20。運転は横田祥。届け出の担当は齊藤。
+// 定例: 月曜朝・碧音くん迎え 10:20。運転は横田祥。2026-11-09 までは届け出の担当は齊藤、11-10 からは横田　祥のまま。
 const mondayPick = { dow: '月', child: '碧音', time: '10:20', kind: '迎え', driver: '横田祥' };
 assert.strictEqual(mondayPick.driver, '横田祥');
-assert.strictEqual(D.filingDriverName(mondayPick.driver), '齊藤');
-assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '横田祥', drop_driver: '職員Y' }), { pick: '齊藤', drop: '職員Y' });
-assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '祥先生', drop_driver: '送迎なし' }), { pick: '齊藤', drop: '送迎なし' });
+assert.strictEqual(D.filingDriverName(mondayPick.driver, '2026-11-09'), '齊藤');
+assert.strictEqual(D.filingDriverName(mondayPick.driver, '2026-11-16'), '横田祥');
+assert.deepStrictEqual(D.filingTripDrivers({ day: '2026-11-02', pick_driver: '横田祥', drop_driver: '職員Y' }), { pick: '齊藤', drop: '職員Y' });
+// 2026-11-10 から横田はレオ職員。読み替えない
+assert.deepStrictEqual(D.filingTripDrivers({ day: '2026-11-16', pick_driver: '横田　祥', drop_driver: '職員Y' }), { pick: '横田　祥', drop: '職員Y' });
+assert.strictEqual(D.filingDriverName('横田祥'), '横田祥');
+assert.strictEqual(D.filingDriverName('祥先生', '2026/11/10'), '祥先生');
+assert.deepStrictEqual(D.filingTripDrivers({ day: '2026-10-30', pick_driver: '祥先生', drop_driver: '送迎なし' }), { pick: '齊藤', drop: '送迎なし' });
 assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '宮本　幸子', drop_driver: '宮本さん' }), { pick: '齊藤連', drop: '齊藤連' });
-assert.deepStrictEqual(D.filingTripDrivers({ pick_driver: '安藤　尚子', drop_driver: '横田祥' }), { pick: '安藤　尚子', drop: '齊藤' });
+assert.deepStrictEqual(D.filingTripDrivers({ day: '2026-11-09', pick_driver: '安藤　尚子', drop_driver: '横田祥' }), { pick: '安藤　尚子', drop: '齊藤' });
 
-assert.strictEqual(D.nikkiShownValue('pick_driver', '横田祥'), '齊藤');
-assert.strictEqual(D.nikkiShownValue('drop_driver', '祥先生'), '齊藤');
+// 2026-11-10 から：今日の日誌では横田は横田のまま
+assert.strictEqual(D.nikkiShownValue('pick_driver', '横田祥'), '横田祥');
+assert.strictEqual(D.nikkiShownValue('drop_driver', '横田　祥'), '横田　祥');
 assert.strictEqual(D.nikkiShownValue('pick_driver', '宮本　幸子'), '齊藤連');
 assert.strictEqual(D.nikkiShownValue('drop_driver', '宮本さん'), '齊藤連');
 assert.strictEqual(D.nikkiShownValue('pick_time', '10:20'), '10:20');
 assert.strictEqual(D.nikkiShownValue('pick_place', '横田祥'), '横田祥');
 
 // 画面が届け出名のままなら、日誌へは書き戻さない（シート上の実運転名を消さない）
-assert.strictEqual(D.nikkiEditValue('pick_driver', '横田祥', '齊藤'), null);
+assert.deepStrictEqual(D.nikkiEditValue('pick_driver', '横田祥', '齊藤'), { old_value: '横田祥', new_value: '齊藤' });
 assert.strictEqual(D.nikkiEditValue('pick_driver', '横田祥', '横田祥'), null);
-assert.strictEqual(D.nikkiEditValue('pick_driver', '横田祥', '祥先生'), null);
+assert.deepStrictEqual(D.nikkiEditValue('pick_driver', '横田祥', '横田　祥'), { old_value: '横田祥', new_value: '横田　祥' });
 assert.deepStrictEqual(D.nikkiEditValue('pick_driver', '横田祥', '山田'), { old_value: '横田祥', new_value: '山田' });
 assert.strictEqual(D.nikkiEditValue('pick_driver', '宮本　幸子', '齊藤連'), null);
 assert.strictEqual(D.nikkiEditValue('pick_driver', '宮本　幸子', '宮本幸子'), null);
@@ -72,7 +78,7 @@ const cal = read('leo_cal.js');
 const yotei = read('leo_yotei.js');
 const index = read('index.html');
 
-assert.ok(index.includes('leo_driver.js?v=20261105ren'));
+assert.ok(index.includes('leo_driver.js?v=20261110yokota'));
 assert.ok(!cal.includes('filingDriverName'), 'カレンダーは写さない');
 assert.ok(!yotei.includes('filingDriverName'), '予定の作成・自分の送迎は写さない');
 for (const [a, b] of [

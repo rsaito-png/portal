@@ -613,7 +613,7 @@ const LEO_VIEWS = {
     return `<h3>職員配置表（見るだけ）</h3>${demoNote()}<p class="note">日誌から作られた配置です（${pick.length ? '今日以降' : '直近'}）。職員名は届け出上の名前です。<b>配置の手直しは <a href="#leo/master">配置表・型表・管理表・送迎の配慮の入力（#leo/master）</a> で行います。</b></p>` + show.map(d => {
       const rs = rows.filter(r => r['日付'] === d);
       return `<h4>${esc(d)}（${esc(rs[0]['曜日'])}） 児童${esc(rs[0]['利用児童数'])}人</h4><table><tr><th>職員</th><th>時間</th><th>役割</th></tr>${rs.map(r =>
-        `<tr><td>${esc(filingDriverName(r['職員名']))}<br><small>${esc(r['常勤/非常勤'])}</small></td><td>${esc(r['配置開始'])}〜${esc(r['配置終了'])}</td><td><small>${esc(r['役割(日誌)'])}</small></td></tr>`).join('')}</table>`;
+        `<tr><td>${esc(filingDriverName(r['職員名'], r['日付']))}<br><small>${esc(r['常勤/非常勤'])}</small></td><td>${esc(r['配置開始'])}〜${esc(r['配置終了'])}</td><td><small>${esc(r['役割(日誌)'])}</small></td></tr>`).join('')}</table>`;
     }).join('');
   },
   async edits() {
@@ -646,7 +646,7 @@ const LEO_VIEWS = {
     const abs = rows.filter(r => r.kind === '欠席');
     let act = [];
     const bundle = await leoLoadDayBundle(day);
-    // 運転手欄のプルダウン：届け出名（祥先生→齊藤 など）に揃え、保護者も選べる。
+    // 運転手欄のプルダウン：届け出名（宮本→齊藤連）に揃え、保護者も選べる。横田　祥はそのまま。
     const drvRaw = await leoDriverNames().catch(() => []);
     const drvNames = [...drvRaw.filter(n => filingDriverName(n) === n), ...drvRaw.map(n => filingDriverName(n)), '保護者'];
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${day}`); } catch (e) { }
@@ -2357,9 +2357,9 @@ async function renderMasterEditor(view) {
   const rows = own.length ? own.map(r => r.data) : g;
   let cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
   if (MASTER_KIND === 'kata') cols = orderKataCols(cols);
-  // 型表の迎え担当・送り担当はプルダウン（職員名＋祥先生＋保護者）。祥先生は従来どおり予定・日誌側で読み替える
+  // 型表の迎え担当・送り担当はプルダウン（在籍のレオ職員＋保護者）。祥先生は「横田　祥」に統一（2026-11-10）
   const kataDrv = MASTER_KIND === 'kata' && typeof driverOptionsHtml === 'function'
-    ? [...await leoDriverNames().catch(() => []), '祥先生', '保護者'] : null;
+    ? [...await leoDriverNames().catch(() => []), '保護者'] : null;
   const title = MASTER_KIND === 'kata' ? '送迎 型表' : `${labels[MASTER_KIND]}の入力`;
   return `<h3>${title}</h3>${demoNote()}${tabs}
     <p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
@@ -2580,7 +2580,7 @@ LEO_VIEWS.diary = async function () {
       const d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
       const mealRec = meals[leoMealNorm(k)];
       return `<details class="card" open style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／食事 ${esc((mealRec && mealRec.meal) || '未記入')}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
-        <div style="padding:0 14px 14px"><p class="note">迎え：${esc(filingDriverName(r.pick_driver) || '-')}　送り：${esc(filingDriverName(r.drop_driver) || '-')}</p>
+        <div style="padding:0 14px 14px"><p class="note">迎え：${esc(filingDriverName(r.pick_driver, DIA_DAY) || '-')}　送り：${esc(filingDriverName(r.drop_driver, DIA_DAY) || '-')}</p>
         ${actText ? `<p style="white-space:pre-wrap"><b>日誌の活動記録${actSrc ? '（' + esc(actSrc) + '）' : ''}</b><br>${esc(actText)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
         <div id="${id}_meal">${leoMealBox(k, meals[leoMealNorm(k)], r, false)}</div>
         <b>下書き（です・ます調）</b>${d ? `<small>　${esc(d.author || '')}</small>` : ''}
