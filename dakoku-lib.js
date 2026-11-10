@@ -117,6 +117,10 @@
   function isProxyMemo(memo) {
     return String(memo || '').indexOf('管理者記録') === 0;
   }
+  // 本人申告（打刻忘れ申告を管理者が承認した打刻）のメモ（先頭一致）
+  function isRequestMemo(memo) {
+    return String(memo || '').indexOf('本人申告') === 0;
+  }
   // punched_at_jst（YYYY-MM-DD HH:MM:SS）から日・分を取る
   function parseJst(at) {
     const m = String(at || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
@@ -129,7 +133,7 @@
     (rows || []).forEach(r => {
       const p = parseJst(r.at);
       if (!p) return;
-      const item = { at: String(r.at || ''), kind: r.kind, memo: r.memo || '', proxy: r.proxy === true || isProxyMemo(r.memo), day: p.day, hm: p.hm, minutes: p.minutes };
+      const item = { at: String(r.at || ''), kind: r.kind, memo: r.memo || '', proxy: r.proxy === true || isProxyMemo(r.memo), req: r.request === true || isRequestMemo(r.memo), day: p.day, hm: p.hm, minutes: p.minutes };
       (byDay[p.day] = byDay[p.day] || []).push(item);
     });
     const pairs = [];
@@ -139,21 +143,21 @@
       let open = null;
       list.forEach(ev => {
         if (ev.kind === '出勤') {
-          if (open) pairs.push({ day: day, inAt: open.hm, outAt: null, minutes: null, proxy: !!open.proxy, missing: '退勤なし' });
+          if (open) pairs.push({ day: day, inAt: open.hm, outAt: null, minutes: null, proxy: !!open.proxy, req: !!open.req, inReq: !!open.req, outReq: false, missing: '退勤なし' });
           open = ev;
         } else if (ev.kind === '退勤') {
           if (open) {
             const mins = ev.minutes - open.minutes;
             const ok = Number.isFinite(mins) && mins >= 0;
             if (ok) totalMinutes += mins;
-            pairs.push({ day: day, inAt: open.hm, outAt: ev.hm, minutes: ok ? mins : null, proxy: !!(open.proxy || ev.proxy), missing: null });
+            pairs.push({ day: day, inAt: open.hm, outAt: ev.hm, minutes: ok ? mins : null, proxy: !!(open.proxy || ev.proxy), req: !!(open.req || ev.req), inReq: !!open.req, outReq: !!ev.req, missing: null });
             open = null;
           } else {
-            pairs.push({ day: day, inAt: null, outAt: ev.hm, minutes: null, proxy: !!ev.proxy, missing: '出勤なし' });
+            pairs.push({ day: day, inAt: null, outAt: ev.hm, minutes: null, proxy: !!ev.proxy, req: !!ev.req, inReq: false, outReq: !!ev.req, missing: '出勤なし' });
           }
         }
       });
-      if (open) pairs.push({ day: day, inAt: open.hm, outAt: null, minutes: null, proxy: !!open.proxy, missing: '退勤なし' });
+      if (open) pairs.push({ day: day, inAt: open.hm, outAt: null, minutes: null, proxy: !!open.proxy, req: !!open.req, inReq: !!open.req, outReq: false, missing: '退勤なし' });
     });
     return { pairs: pairs, totalMinutes: totalMinutes };
   }
@@ -170,6 +174,44 @@
     const d = new Date(Date.UTC(y, m - 1 + (delta || 0), 1));
     return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
   }
+  function todayJst(now) {
+    const d = now || new Date();
+    try { return d.toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 10); } catch (e) { return d.toISOString().slice(0, 10); }
+  }
+  function nowHmJst(now) {
+    const d = now || new Date();
+    try { return d.toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(11, 16); } catch (e) { return d.toISOString().slice(11, 16); }
+  }
+  function addDays(ymd, n) {
+    const p = String(ymd || '').split('-').map(Number);
+    const d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + (n || 0)));
+    return d.toISOString().slice(0, 10);
+  }
+  const REQ_MAX_DAYS = 31;
+  // 打刻忘れ申告の入力チェック（サーバー dakoku_request_submit と同じ規則。最終判定はサーバー）
+  function checkRequest(f, now) {
+    f = f || {};
+    const today = todayJst(now);
+    const date = String(f.date || '').trim();
+    const time = String(f.time || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: '日付を選んでください / Escolha a data' };
+    if (!kindOk(f.kind)) return { ok: false, error: '出勤か退勤を選んでください / Escolha entrada ou saída' };
+    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) return { ok: false, error: '時刻を入れてください / Informe o horário' };
+    if (date > today) return { ok: false, error: '先の日付は申告できません / Não é possível informar data futura' };
+    if (date < addDays(today, -REQ_MAX_DAYS)) return { ok: false, error: '31日より前の分は責任者に伝えてください / Mais de 31 dias: avise o responsável' };
+    const hm = time.padStart(5, '0');
+    if (date === today && hm > nowHmJst(now)) return { ok: false, error: 'まだ来ていない時刻は申告できません / Horário ainda não chegou' };
+    if (!String(f.reason || '').trim()) return { ok: false, error: '理由を書いてください / Escreva o motivo' };
+    return { ok: true, date: date, kind: f.kind, time: hm, reason: String(f.reason).trim().slice(0, 200) };
+  }
+  // 月別一覧の「なし」から申告できるか（期間内の日だけ）
+  function canRequestDay(day, now) {
+    const today = todayJst(now);
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(day || '')) && day <= today && day >= addDays(today, -REQ_MAX_DAYS);
+  }
+  const REQ_STATUS = { pending: '承認待ち / Pendente', approved: '承認済み / Aprovado', rejected: '却下 / Recusado' };
+  const reqStatusLabel = st => REQ_STATUS[st] || String(st || '');
+
   function currentMonthJst(now) {
     const d = now || new Date();
     try {
@@ -197,7 +239,7 @@
   const sample = () => JSON.parse(JSON.stringify(SAMPLE));
 
   const api = {
-    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, staffByEmail, officesForEmail, resolveStaff, gpsRequired, judge, kindOk, isProxyMemo, parseJst, pairMonth, formatHours, shiftMonth, currentMonthJst, sample,
+    R, KINDS, on, num, meters, officeView, staffView, visibleOffices, staffFor, staffByEmail, officesForEmail, resolveStaff, gpsRequired, judge, kindOk, isProxyMemo, isRequestMemo, parseJst, pairMonth, formatHours, shiftMonth, currentMonthJst, todayJst, nowHmJst, addDays, checkRequest, canRequestDay, reqStatusLabel, REQ_MAX_DAYS, sample,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Dakoku = api;

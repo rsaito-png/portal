@@ -1,7 +1,8 @@
 // 出退勤打刻（#dakoku）。スマホ向け。出勤・退勤だけ。
 // 記録先は Supabase（dakoku_* RPC）のみ。Google シート／GAS は使わない。
 // ログインは法人ポータルの sess。本番は dakoku_staff.email と一致する本人だけ自動選択（他人は選べない）。
-const DK = { data: null, office: '', staffId: '', pos: null, posError: '', locating: false, msg: '', bad: false, busy: false, lunch: false, recent: [], month: '', monthRows: [], monthErr: '', monthBusy: false, sess: { email: '', demo: false } };
+const DK = { data: null, office: '', staffId: '', pos: null, posError: '', locating: false, msg: '', bad: false, busy: false, lunch: false, recent: [], month: '', monthRows: [], monthErr: '', monthBusy: false, sess: { email: '', demo: false },
+  req: { loaded: false, admin: false, mine: [], pending: [], done: [], err: '', busy: false, open: false, msg: '', bad: false, form: { date: '', kind: '退勤', time: '', reason: '' } } };
 let DK_LOC_SEQ = 0;
 
 (function () {
@@ -21,6 +22,11 @@ let DK_LOC_SEQ = 0;
 .dk table.dkm th{background:#ead9b4}
 .dk table.dkm .miss{background:#fde8e8;font-weight:700}
 .dk table.dkm .proxy{display:inline-block;margin-left:4px;font-size:12px;background:#fff6d6;border:2px solid #1a120c;padding:0 4px}
+.dk table.dkm .reqb{display:inline-block;margin-left:4px;font-size:12px;padding:1px 6px;border:2px solid #1a120c;background:#fff4dc;color:#1c140c;box-shadow:2px 2px 0 #1a120c}
+.dk .req label{display:block;margin:8px 0 2px;color:inherit;font-weight:700}.dk .req .rqh{color:inherit;opacity:.85;font-size:15px;margin:8px 0 4px}.dk .req input,.dk .req textarea{font-size:18px;width:100%;box-sizing:border-box;padding:10px;border:3px solid #1a120c;border-radius:0;background:#fffef8;color:#1c140c}
+.dk .req textarea{min-height:70px}.dk .req .send{margin-top:10px}.dk .req .open{background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c}
+.dk .rq{border:2px solid #1a120c;background:#fffef8;color:#1c140c;padding:8px;margin:6px 0;font-size:15px;line-height:1.5}.dk .rq .st{display:inline-block;font-size:12px;border:2px solid #1a120c;padding:0 4px;margin-left:4px}
+.dk .rq .st.pending{background:#fff6d6}.dk .rq .st.approved{background:#e6f4ea}.dk .rq .st.rejected{background:#fde8e8}.dk .rq .btns{display:flex;gap:8px;margin-top:6px}.dk .rq .btns button{flex:1;font-size:16px;padding:10px}.dk .rq .btns .ng2{background:#b23b3b}
 .dk .montotal{margin:8px 0 0;font-size:16px;color:#1c140c;background:#e6f4ea;border:3px solid #1a120c;padding:8px}`;
   document.head.appendChild(st);
 })();
@@ -78,6 +84,24 @@ async function dkRpc(payload) {
     if (j && j.error) throw new Error(j.error);
     throw new Error('月の打刻を読めませんでした');
   }
+  if (action === 'req-submit') {
+    const j = await sb('rpc/dakoku_request_submit', { method: 'POST', body: JSON.stringify({ p_staff_id: payload.staffId, p_date: payload.date, p_kind: payload.kind, p_time: payload.time, p_reason: payload.reason }) });
+    if (j && j.ok) return j;
+    if (j && j.error) throw new Error(j.error);
+    throw new Error('申告を送れませんでした');
+  }
+  if (action === 'req-list') {
+    const j = await sb('rpc/dakoku_request_list', { method: 'POST', body: '{}' });
+    if (j && j.ok) return j;
+    if (j && j.error) throw new Error(j.error);
+    throw new Error('申告の一覧を読めませんでした');
+  }
+  if (action === 'req-decide') {
+    const j = await sb('rpc/dakoku_request_decide', { method: 'POST', body: JSON.stringify({ p_id: Number(payload.id), p_approve: !!payload.approve, p_note: payload.note || null }) });
+    if (j && j.ok) return j;
+    if (j && j.error) throw new Error(j.error);
+    throw new Error('承認・却下できませんでした');
+  }
   if (action === 'punch') {
     const j = await sb('rpc/dakoku_punch', { method: 'POST', body: JSON.stringify({
       p_office: payload.office, p_staff_id: payload.staffId, p_kind: payload.kind,
@@ -132,7 +156,17 @@ function dkBind() {
     else if (act === 'out') dkPunch('退勤');
     else if (act === 'mon-prev') dkChangeMonth(-1);
     else if (act === 'mon-next') dkChangeMonth(1);
+    else if (act === 'req-open') { DK.req.open = !DK.req.open; DK.req.msg = ''; dkPaint(); }
+    else if (act === 'req-fill') dkReqFill(b.getAttribute('data-day'), b.getAttribute('data-kind'));
+    else if (act === 'req-send') dkReqSend();
+    else if (act === 'req-ok') dkReqDecide(b.getAttribute('data-id'), true);
+    else if (act === 'req-ng') dkReqDecide(b.getAttribute('data-id'), false);
   };
+  const rf = DK.req.form;
+  [['dk_rq_date', 'date'], ['dk_rq_kind', 'kind'], ['dk_rq_time', 'time'], ['dk_rq_reason', 'reason']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.oninput = el.onchange = () => { rf[key] = el.value; };
+  });
   const lu = document.getElementById('dk_lunch');
   if (lu) lu.onchange = () => { DK.lunch = !!lu.checked; };
   const sel = document.getElementById('dk_staff');
@@ -182,8 +216,8 @@ function dkPaint() {
     <button type="button" class="go" data-dk="in"${dis}>出勤<br><small>Entrada</small></button>
     <button type="button" class="go out" data-dk="out"${dis}>退勤<br><small>Saída</small></button>
     ${locBtn}${demoBtn}
-    <p class="meta">押し忘れを直す画面は、まだありません。責任者に伝えてください。<br>Esqueceu de registrar? Avise o responsável.</p>
-    ${monthHtml}` : ''}`;
+    <p class="meta">押し忘れたら、下の「打刻忘れを申告」から送れます（管理者が承認すると記録に入ります）。<br>Esqueceu de registrar? Use “Informar registro esquecido” abaixo (entra no registro após aprovação).</p>
+    ${monthHtml}${dkReqHtml(v)}` : ''}${dkReqAdminHtml()}`;
   dkBind();
 }
 function dkMonthHtml(v) {
@@ -197,14 +231,100 @@ function dkMonthHtml(v) {
   const rows = packed.pairs.map(pr => {
     const dayLabel = pr.day.slice(5).replace('-', '/');
     const proxy = pr.proxy ? '<span class="proxy">代理 / Proxy</span>' : '';
-    const inCell = pr.inAt ? dkEsc(pr.inAt) + proxy : '<span class="miss">出勤なし / Sem entrada</span>';
-    const outCell = pr.outAt ? dkEsc(pr.outAt) + (pr.proxy && !pr.inAt ? proxy : '') : '<span class="miss">退勤なし / Sem saída</span>';
+    const reqTag = '<span class="proxy">申告 / Declarado</span>';
+    const canReq = !DK.sess.demo && Dakoku.canRequestDay(pr.day);
+    const fillBtn = kind => canReq ? `<button type="button" class="reqb" data-dk="req-fill" data-day="${dkEsc(pr.day)}" data-kind="${kind}">申告 / Informar</button>` : '';
+    const inCell = pr.inAt ? dkEsc(pr.inAt) + (pr.proxy ? proxy : '') + (pr.inReq ? reqTag : '') : '<span class="miss">出勤なし / Sem entrada</span>' + fillBtn('出勤');
+    const outCell = pr.outAt ? dkEsc(pr.outAt) + (pr.proxy && !pr.inAt ? proxy : '') + (pr.outReq ? reqTag : '') : '<span class="miss">退勤なし / Sem saída</span>' + fillBtn('退勤');
     const hrs = pr.missing ? '<span class="miss">—</span>' : dkEsc(Dakoku.formatHours(pr.minutes));
     const missClass = pr.missing ? ' class="miss"' : '';
     return `<tr${missClass}><td>${dkEsc(dayLabel)}</td><td>${inCell}</td><td>${outCell}</td><td>${hrs}</td></tr>`;
   }).join('');
   const total = `<p class="montotal"><b>月合計 / Total do mês</b>：${dkEsc(Dakoku.formatHours(packed.totalMinutes))}</p>`;
   return `<div class="card"><h4>月別一覧 / Registro mensal</h4>${nav}<div class="mon"><table class="dkm"><thead><tr><th>日付<br><small>Data</small></th><th>出勤<br><small>Entrada</small></th><th>退勤<br><small>Saída</small></th><th>勤務時間<br><small>Horas</small></th></tr></thead><tbody>${rows}</tbody></table></div>${total}</div>`;
+}
+// 打刻忘れ申告（本人）。記録は管理者承認後に dakoku_punches へ入る。
+function dkReqHtml(v) {
+  const R = DK.req;
+  const head = '<h4>打刻忘れを申告 / Informar registro esquecido</h4>';
+  if (DK.sess.demo) return `<div class="card req">${head}<p class="meta">見本モードでは申告できません。 / Indisponível no modo de demonstração.</p></div>`;
+  if (!v.staff) return '';
+  const msg = R.msg ? `<div class="${R.bad ? 'ng' : 'okb'}">${dkEsc(R.msg)}</div>` : '';
+  const today = Dakoku.todayJst();
+  const f = R.form;
+  const form = R.open ? `<label for="dk_rq_date">日付 / Data</label><input type="date" id="dk_rq_date" value="${dkEsc(f.date)}" min="${Dakoku.addDays(today, -Dakoku.REQ_MAX_DAYS)}" max="${today}">
+    <label for="dk_rq_kind">出勤・退勤 / Entrada ou saída</label><select id="dk_rq_kind"><option value="出勤"${f.kind === '出勤' ? ' selected' : ''}>出勤 / Entrada</option><option value="退勤"${f.kind === '退勤' ? ' selected' : ''}>退勤 / Saída</option></select>
+    <label for="dk_rq_time">時刻 / Horário</label><input type="time" id="dk_rq_time" value="${dkEsc(f.time)}" step="60">
+    <label for="dk_rq_reason">理由 / Motivo</label><textarea id="dk_rq_reason" maxlength="200" placeholder="例：押し忘れた / Ex.: esqueci de registrar">${dkEsc(f.reason)}</textarea>
+    <button type="button" class="go send" data-dk="req-send"${R.busy ? ' disabled' : ''}>申告を送る<br><small>Enviar</small></button>
+    <p class="meta">管理者が承認すると月別一覧に「申告」と付いて入ります。 / Após aprovação aparece no registro mensal com “Declarado”.</p>` : '';
+  const toggle = `<button type="button" class="open" data-dk="req-open">${R.open ? '閉じる / Fechar' : '打刻忘れを申告する / Informar registro esquecido'}</button>`;
+  const mine = (R.mine || []).filter(r => r.staffId === v.staff.id);
+  const list = mine.length ? '<p class="rqh">自分の申告 / Meus pedidos</p>' + mine.map(r => `<div class="rq">${dkEsc(r.date.slice(5).replace('-', '/'))} ${dkEsc(r.kind)} ${dkEsc(r.time)}<span class="st ${dkEsc(r.status)}">${dkEsc(Dakoku.reqStatusLabel(r.status))}</span><br><small>${dkEsc(r.reason)}${r.note ? '／' + dkEsc(r.note) : ''}${r.decidedBy ? '（' + dkEsc(r.decidedBy) + '）' : ''}</small></div>`).join('') : '';
+  const err = R.err ? `<div class="ng">${dkEsc(R.err)}</div>` : '';
+  return `<div class="card req" id="dk_req">${head}${msg}${toggle}${form}${err}${list}</div>`;
+}
+// 管理者：承認待ち一覧
+function dkReqAdminHtml() {
+  const R = DK.req;
+  if (DK.sess.demo || !R.admin) return '';
+  const pend = R.pending || [];
+  const rows = pend.length ? pend.map(r => `<div class="rq"><b>${dkEsc(r.name)}</b>（${dkEsc(r.office)}） ${dkEsc(r.date.slice(5).replace('-', '/'))} ${dkEsc(r.kind)} <b>${dkEsc(r.time)}</b><br><small>理由：${dkEsc(r.reason)}　申告 ${dkEsc(r.createdAt)}</small>
+    <div class="btns"><button type="button" data-dk="req-ok" data-id="${dkEsc(r.id)}"${R.busy ? ' disabled' : ''}>承認</button><button type="button" class="ng2" data-dk="req-ng" data-id="${dkEsc(r.id)}"${R.busy ? ' disabled' : ''}>却下</button></div></div>`).join('') : '<p class="rqh">承認待ちはありません。</p>';
+  const done = (R.done || []).length ? '<p class="rqh">最近の処理</p>' + R.done.map(r => `<div class="rq">${dkEsc(r.name)} ${dkEsc(r.date.slice(5).replace('-', '/'))} ${dkEsc(r.kind)} ${dkEsc(r.time)}<span class="st ${dkEsc(r.status)}">${dkEsc(Dakoku.reqStatusLabel(r.status))}</span>${r.note ? '<br><small>' + dkEsc(r.note) + '</small>' : ''}</div>`).join('') : '';
+  return `<div class="card req" id="dk_req_admin"><h4>打刻忘れ申告の承認（管理者） <small>${pend.length}件</small></h4>${R.adminMsg ? `<div class="${R.adminBad ? 'ng' : 'okb'}">${dkEsc(R.adminMsg)}</div>` : ''}${rows}${done}</div>`;
+}
+async function dkLoadRequests() {
+  if (DK.sess.demo) return;
+  try {
+    const j = await dkRpc({ action: 'req-list' });
+    DK.req.mine = j.mine || []; DK.req.admin = !!j.admin; DK.req.pending = j.pending || []; DK.req.done = j.recentDone || []; DK.req.err = '';
+  } catch (e) { DK.req.err = e.message || '申告の一覧を読めませんでした'; }
+  DK.req.loaded = true;
+  dkPaint();
+}
+function dkReqFill(day, kind) {
+  DK.req.open = true; DK.req.msg = '';
+  DK.req.form.date = day || ''; DK.req.form.kind = Dakoku.kindOk(kind) ? kind : '退勤';
+  dkPaint();
+  const box = document.getElementById('dk_req');
+  if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const t = document.getElementById('dk_rq_time');
+  if (t) setTimeout(() => t.focus(), 300);
+}
+async function dkReqSend() {
+  const v = dkView();
+  if (DK.req.busy || !v.staff || DK.sess.demo) return;
+  const c = Dakoku.checkRequest(DK.req.form);
+  if (!c.ok) { DK.req.msg = c.error; DK.req.bad = true; dkPaint(); return; }
+  DK.req.busy = true; DK.req.msg = ''; dkPaint();
+  try {
+    await dkRpc({ action: 'req-submit', staffId: v.staff.id, date: c.date, kind: c.kind, time: c.time, reason: c.reason });
+    DK.req.msg = '申告を送りました。管理者の承認を待ってください。 / Pedido enviado. Aguarde a aprovação.';
+    DK.req.bad = false; DK.req.open = false;
+    DK.req.form = { date: '', kind: '退勤', time: '', reason: '' };
+  } catch (e) {
+    DK.req.msg = e.message || '申告を送れませんでした / Não foi possível enviar'; DK.req.bad = true;
+  }
+  DK.req.busy = false;
+  await dkLoadRequests();
+}
+async function dkReqDecide(id, approve) {
+  if (DK.req.busy || !id) return;
+  const r = (DK.req.pending || []).find(x => String(x.id) === String(id));
+  const label = r ? `${r.name} ${r.date} ${r.kind} ${r.time}` : '';
+  let note = null;
+  if (approve) { if (!window.confirm(label + ' を承認して記録に入れますか？')) return; }
+  else { note = window.prompt(label + ' を却下します。理由（任意）', ''); if (note === null) return; }
+  DK.req.busy = true; DK.req.adminMsg = ''; dkPaint();
+  try {
+    const j = await dkRpc({ action: 'req-decide', id: id, approve: approve, note: note });
+    DK.req.adminMsg = approve ? (j.skipped ? '承認しました（同じ日の同じ打刻が既にあるため追加はしていません）' : '承認して記録しました（' + (j.at || '') + '）') : '却下しました';
+    DK.req.adminBad = false;
+  } catch (e) { DK.req.adminMsg = e.message || '処理できませんでした'; DK.req.adminBad = true; }
+  DK.req.busy = false;
+  await dkLoadRequests();
+  dkLoadMonth();
 }
 async function dkLocate() {
   const seq = ++DK_LOC_SEQ;
@@ -342,6 +462,7 @@ async function renderDakoku() {
   DK.msg = ''; DK.bad = false; DK.busy = false; DK.recent = [];
   DK.month = Dakoku.currentMonthJst(); DK.monthRows = []; DK.monthErr = ''; DK.monthBusy = false;
   DK.pos = null; DK.posError = ''; DK.locating = false;
+  DK.req = { loaded: false, admin: false, mine: [], pending: [], done: [], err: '', busy: false, open: false, msg: '', bad: false, adminMsg: '', adminBad: false, form: { date: '', kind: '退勤', time: '', reason: '' } };
   try {
     DK.data = DK.sess.demo ? Dakoku.sample() : await dkRpc({ action: 'bootstrap' });
   } catch (e) {
@@ -359,4 +480,5 @@ async function renderDakoku() {
   dkPaint();
   if (needGps) dkLocate();
   if (offices.length) dkLoadMonth();
+  dkLoadRequests();
 }

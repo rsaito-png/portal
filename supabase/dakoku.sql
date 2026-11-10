@@ -258,7 +258,8 @@ begin
       'office', office,
       'lunch', case when lunch then 'はい' else 'いいえ' end,
       'memo', coalesce(memo,''),
-      'proxy', coalesce(memo,'') like '管理者記録%'
+      'proxy', coalesce(memo,'') like '管理者記録%',
+      'request', coalesce(memo,'') like '本人申告%'
     ) as obj
     from public.dakoku_punches
     where staff_id = s.id
