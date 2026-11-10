@@ -229,7 +229,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="dakoku_admin.js?v=20261106dakoku"></script>
 <script src="soudan.js?v=202611042130"></script>
 <script src="staff.js?v=20261106staff"></script>
-<script src="me.js?v=20261110me2"></script>
+<script src="me.js?v=20261110soumu"></script>
 <script src="taxcal.js?v=20261106manual"></script>
 <script src="banto.js?v=202610211550"></script>
 <script src="sns.js?v=202610271650"></script>
@@ -439,8 +439,6 @@ async function render() {
     <p id="ht_jump" class="ht-jump" hidden><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
     <div class="pl-hero"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span><small>スマホで出勤・退勤。事業所の近くだけ</small></a>
     <div id="daily_sky" class="daily-sky" hidden></div></div>
-    <h3>給与口座・マイナンバー</h3>
-    <div class="grid pl-links">${tileHtml(['📝', '給与口座・マイナンバー', '#me', '振込口座と本人の個人番号の届出', 'main'])}</div>
     <h3 id="home_offices">障害福祉事業</h3>
     <div class="grid pl-offices">${officesHome.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
     <div id="kankoyo_sec"><h3>官公需</h3><div id="sct_slot"></div></div>
@@ -540,7 +538,7 @@ async function accAdmin() {
     return r.ok && (await r.json()) === true; } catch (e) { return false; }
 }
 // 総合トップの「総務」。全員が開ける（自分の書類の署名）。中の人事労務・補助金・経理は事務、会計（簡易）は法人管理者
-const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>書類の署名は全員。人事労務・補助金・経理は事務</small></a></div>`;
+const soumuTile = () => `<div class="grid"><a id="soumu_tile" class="tile main" href="#soumu" style="border-top:4px solid #555"><span>🗂️</span>総務<small>書類の署名・給与口座の届出は全員。人事労務・補助金・経理は事務</small></a></div>`;
 async function accTile() {
   if (ROLE === C.clerk.role || document.getElementById('soumu_tile')) return;
   if (!(await accAdmin())) return;
@@ -557,12 +555,17 @@ async function renderSoumu() {
   }).join('');
   $('view').innerHTML = back + `<h3>🗂️ 総務</h3><div id="sumu_sec">${groups}</div>`;
   const sec = document.getElementById('sumu_sec');
+  // 給与口座・マイナンバー（本人の届出 #me）は全職員。トップから総務へ移した（2026-11-10 会長）。書類の署名の隣に出す
+  if (!sec.querySelector('a[href="#me"]')) {
+    const t = tileHtml(['📝', '給与口座・マイナンバー', '#me', '振込口座と本人の個人番号の届出'], '#555'), sg = sec.querySelector('a[href="#sign"]');
+    if (sg) sg.insertAdjacentHTML('afterend', t); else sec.insertAdjacentHTML('afterbegin', '<div class="grid">' + t + '</div>');
+  }
   if (await accAdmin()) {
     const t = '<a id="acc_tile" class="tile" href="acc.html" style="border-top:4px solid #2e6b4f"><span>📒</span>会計（簡易）<small>取引入力・仕訳帳・試算表（法人管理者のみ）</small></a>';
     const kh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '経理'), kg = kh && kh.nextElementSibling;
     const tt = sec.querySelector('a[href="#taxcal"]') ? '' : tileHtml(['🧾', '税カレンダー', '#taxcal', '源泉・住民税（毎月10日）と年次の期限'], '#555');
     if (kg && kg.classList.contains('grid')) kg.insertAdjacentHTML('beforeend', tt + t); else sec.insertAdjacentHTML('beforeend', '<h4>経理</h4><div class="grid">' + tt + t + '</div>');
-  } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.innerHTML = '<p>総務は事務の方だけが見られます。</p>';
+  } else if (!clerk && !sec.querySelector('a[href="#sign"]')) sec.insertAdjacentHTML('beforeend', '<p>そのほかの総務は事務の方だけが見られます。</p>');
   if (!clerk && !sec.querySelector('a[href="#shogu"]') && (DUTY === '管理者' || (typeof shoguUiCan === 'function' && await shoguUiCan()))) {
     const t = tileHtml(['💴', '処遇改善加算（試作）', '#shogu', '国保連PDF→自動配分案→フリーウェイCSV。本番運用前の試作'], '#555');
     const hh = [...sec.querySelectorAll('h4')].find(h => h.textContent.trim() === '人事労務'), hg = hh && hh.nextElementSibling;
