@@ -290,20 +290,31 @@ html.th-yamen body.portal .sgm td button.today .sg-tday{color:#1c140c;font-size:
 .sg-chips{display:flex;flex-wrap:wrap;gap:4px;padding:6px}
 .sg-chip{border-radius:0;padding:3px 6px;font-size:12px;line-height:1.35;max-width:100%;border:2px solid #1a120c}
 .sg-chip.neutral{background:#fff;border:1px solid #ccc;color:#222}
-.sg-time{display:flex}
+.sg-time{display:flex;min-width:0}
 .sg-gut{flex:0 0 46px;position:relative}
 .sg-gut span{position:absolute;right:4px;transform:translateY(-50%);font-size:10px;color:#70757a;background:#fff}
-.sg-scroll{flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.sg-canvas{position:relative}
+.sg-scroll{flex:1 1 auto;min-width:0;overflow-x:clip}
+.sg-canvas{position:relative;width:100%;max-width:100%;container:sgc / inline-size}
 .sg-line{position:absolute;left:0;right:0;border-top:1px solid #eee;pointer-events:none}
 .sg-half{position:absolute;left:0;right:0;border-top:1px dashed #f3f3f3;pointer-events:none}
 .sg-add{margin:0 0 8px}
 .sg-add button{display:block;width:100%;min-height:44px;padding:8px 12px;font-size:16px;font-weight:700;border:3px solid #1a120c;background:#fff4e4;color:#1c140c;border-radius:0;box-shadow:3px 3px 0 #1a120c}
 .sg-ev[onclick],.sg-chip[onclick]{cursor:pointer}
-.sg-ev{position:absolute;box-sizing:border-box;border-radius:0;padding:2px 4px;overflow:hidden;line-height:1.25;z-index:1;box-shadow:2px 2px 0 #1a120c}
+.sg-ev{position:absolute;box-sizing:border-box;border-radius:0;padding:2px 4px;overflow:hidden;line-height:1.25;z-index:1;box-shadow:2px 2px 0 #1a120c;container:sgev / inline-size}
 .sg-ev .k{font-size:11px;font-weight:800}
 .sg-ev.drop .k{text-decoration:underline;text-underline-offset:2px}
 .sg-ev .nm{font-size:13px;font-weight:700;white-space:pre-wrap;word-break:break-all}
+@container sgc (max-width:720px){
+  .sg-ev{height:auto !important;padding:1px 3px}
+}
+@container sgev (max-width:110px){
+  .sg-ev .k{font-size:10px;line-height:1.2;word-break:keep-all;overflow-wrap:anywhere}
+  .sg-ev .nm{font-size:12px;line-height:1.2;word-break:keep-all;overflow-wrap:anywhere}
+}
+@container sgev (max-width:72px){
+  .sg-ev .k{font-size:10px;line-height:1.15}
+  .sg-ev .nm{font-size:11px;line-height:1.15}
+}
 .sg-ev.neutral{background:#fff;color:#222;border:1px solid #c5c5c5}
 .sg-ev .ng{color:#c00;background:#fff;border-radius:3px;padding:0 2px}
 .sg-now{position:absolute;left:0;right:0;border-top:2px solid #ea4335;z-index:3;pointer-events:none}
@@ -402,7 +413,6 @@ function sgDayHtml(day, evs, care, opt) {
   for (let t = start + 30; t < end; t += 60) lines.push(`<span class="sg-half" style="top:${(t - start) / 60 * PX}px"></span>`);
   const labels = [];
   for (let t = start; t <= end; t += 60) labels.push(`<span style="top:${(t - start) / 60 * PX}px">${sgHH(t)}</span>`);
-  const maxCols = timed.reduce((m, e) => Math.max(m, e.cols || 1), 1);
   const blocks = timed.map(e => {
     const ev = e.e, p = sgEventPaint(ev, { demo });
     const top = (e.start - start) / 60 * PX;
@@ -410,16 +420,17 @@ function sgDayHtml(day, evs, care, opt) {
     const left = `calc((100% * ${e.col} / ${e.cols}) + 2px)`;
     const width = `calc((100% * ${e.span} / ${e.cols}) - 4px)`;
     const cls = `sg-ev${p ? '' : ' neutral'}${ev.kind === '送り' ? ' drop' : ''}${ev.kind === '迎え' ? ' pick' : ''}`;
-    const style = `top:${top}px;height:${height}px;left:${left};width:${width};${p ? `background:${p.hex};color:${p.ink}` : ''}`;
+    const style = `top:${top}px;height:${height}px;min-height:${height}px;left:${left};width:${width};${p ? `background:${p.hex};color:${p.ink}` : ''}`;
     const shown = ev.staff ? sgStaffShow(ev.staff, { demo }) : '';
     const who = shown ? sgEsc(shown) : (ev.kind === '迎え' || ev.kind === '送り' ? '<b class="ng">未定</b>' : '');
     const t0 = sgMin(ev.start_time), t1 = sgMin(ev.end_time);
     const when = t0 == null ? sgHH(e.start) : (t1 != null && t1 > t0 ? `${sgHH(t0)}–${sgHH(t1)}` : sgHH(t0));
+    const whenHtml = t0 != null && t1 != null && t1 > t0 ? `${sgEsc(sgHH(t0))}<wbr>–${sgEsc(sgHH(t1))}` : sgEsc(when);
     const careLine = (ev.kind === '利用' || ev.kind === '休み') && care && care[sgNk(ev.child)] ? `⚠ ${care[sgNk(ev.child)]}` : '';
     const lines = ev.kind === 'その他' ? [ev.title || ev.note || ev.place || ''].filter(Boolean) : sgLines(ev);   // その他は担当名を上の行に出すので本文では繰り返さない
     const body = lines.concat(careLine ? [careLine] : []).map(sgEsc).join('\n');
     const tip = `${sgKind(ev)} ${when} ${lines.join(' / ')} ${shown}`.trim();
-    return `<div class="${cls}" style="${style}"${openAttr(ev.id)} title="${sgEsc(tip)}"><div class="k">${sgEsc(sgKind(ev))} ${when}${who ? '　' + who : ''}</div><div class="nm">${body}</div></div>`;
+    return `<div class="${cls}" style="${style}"${openAttr(ev.id)} title="${sgEsc(tip)}"><div class="k">${sgEsc(sgKind(ev))} ${whenHtml}${who ? '　' + who : ''}</div><div class="nm">${body}</div></div>`;
   }).join('');
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';
   const [, mm, dd] = day.split('-');
@@ -428,7 +439,7 @@ function sgDayHtml(day, evs, care, opt) {
   const slot = canEdit ? ` data-start="${start}" data-px="${PX}" onclick="sgEditSlot('${day}', event)"` : '';
   return `<div class="sg-page">${sgCss()}<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${todayArg}')">今日</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" class="sg-mine${mineOn ? ' sg-on' : ''}" aria-pressed="${mineOn ? 'true' : 'false'}" onclick="sgToggleMine()">自分の担当</button></div>
     ${addBtn}${mineNote}<div class="sg-leg">${legend}</div>
-    <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px;min-width:${Math.max(240, maxCols * 132)}px"${slot}>${lines.join('')}${blocks}${nowEl}</div></div></div></div>
+    <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px"${slot}>${lines.join('')}${blocks}${nowEl}</div></div></div></div>
     <p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>
     <p class="sg-foot">利用児童は山吹色、送迎の色は担当ごとです。一覧に無い担当は赤です。☆は迎え、下線の★は送りです。</p></div>`;
 }
