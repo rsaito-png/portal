@@ -217,3 +217,5 @@ create policy syedoc_upd on storage.objects for update to authenticated
 drop policy if exists syedoc_del on storage.objects;
 create policy syedoc_del on storage.objects for delete to authenticated
   using (bucket_id = 'staff-ye-docs' and (storage.foldername(name))[1] = auth.uid()::text);
+
+revoke truncate, references, trigger on public.staff_bank_accounts, public.staff_my_numbers, public.staff_dependent_my_numbers, public.staff_ye_declarations from authenticated, public, anon;
