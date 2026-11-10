@@ -1,0 +1,164 @@
+/* 星心会 職員ポータル — 惑星の空テーマ（2026-11-10 会長承認・既定）
+   html.th-planet のときだけ効く。?theme=yamen / ?theme=retro で旧テーマ（その場だけ）。
+   色・枠・書体・背景だけ。並び・機能・権限は変えない。retro を読まないので、retro にあった最低限の部品の直し（チェックボックスの幅・カレンダーのボタンなど）もここに置く。 */
+html.th-planet{
+  --pl-ink:#21302a;--pl-sub:#4f6157;--pl-g:#2f7350;--pl-g2:#245c40;--pl-card:#fffefa;--pl-line:#e2d9c4;
+  --pl-red:#c4452c;--pl-night:#2c3a6b;--pl-night2:#4b5a94;--pl-gold:#e9b949;--pl-cream:#f6efe1;
+  --pl-font:"Zen Maru Gothic","Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --pl-disp:"Kaisei Opti","Zen Maru Gothic","Noto Serif JP","Hiragino Mincho ProN",serif;
+  --bg:#f6efe1;--surface:#fffefa;--text:#21302a;--text-sub:#4f6157;--line:#e2d9c4;
+  --primary:#2f7350;--primary-active:#245c40;--navy:#2c3a6b;--accent:#e9b949;--danger:#c4452c;
+  --font:var(--pl-font);--r-md:22px;--r-sm:14px;--shadow:0 10px 22px -16px rgba(33,48,42,.45),0 0 0 1px rgba(33,48,42,.05);
+  color-scheme:light;
+}
+html.th-planet body.ui-app{background:linear-gradient(180deg,#f6efe1,#ecf1e4 75%) fixed!important;color:var(--pl-ink)!important;font-family:var(--pl-font)!important;position:relative;min-height:100vh}
+html.th-planet body.ui-app::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:url(img/planet/bg.svg) center/cover no-repeat}
+html.th-planet body.ui-app main{position:relative;padding-bottom:84px}
+@media (min-width:900px){html.th-planet body.ui-app main{padding-bottom:120px}}
+html.th-planet body.ui-app,html.th-planet body.ui-app button,html.th-planet body.ui-app input,html.th-planet body.ui-app select,html.th-planet body.ui-app textarea{font-family:var(--pl-font)!important}
+/* 公式の印刷様式は明朝のまま */
+html.th-planet body.ui-app .nc-form,html.th-planet body.ui-app .sui-doc,html.th-planet body.ui-app .sui-doc *{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif CJK JP","MS PMincho",serif!important}
+
+/* 帯：明るいクリームに濃い字 */
+html.th-planet body.ui-app header{background:rgba(255,254,250,.86)!important;color:var(--pl-ink)!important;border-bottom:1px solid var(--pl-line)!important;box-shadow:0 6px 16px -14px rgba(33,48,42,.5)!important;font-family:var(--pl-disp)!important;font-weight:700;text-shadow:none!important;letter-spacing:.02em;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+html.th-planet body.ui-app header #out,html.th-planet body.ui-app header button{background:#fff!important;color:var(--pl-ink)!important;border:1.5px solid var(--pl-line)!important;border-radius:999px!important;box-shadow:none!important;font-family:var(--pl-font)!important;font-weight:700}
+html.th-planet body.ui-app header a{color:var(--pl-ink)}
+
+/* 見出し */
+html.th-planet body.ui-app h1,html.th-planet body.ui-app h2,html.th-planet body.ui-app h3,html.th-planet body.ui-app h4{font-family:var(--pl-disp)!important;color:var(--pl-ink);text-shadow:none!important;letter-spacing:.02em}
+html.th-planet body.ui-app #view > h3,html.th-planet body.ui-app #view > h4,html.th-planet body.ui-app h3.nx{color:var(--pl-ink)!important;border:0!important;width:auto;display:flex;align-items:center;gap:.4em}
+html.th-planet body.ui-app #view > h3::before,html.th-planet body.ui-app h3.nx::before{content:"";flex:none;width:.7em;height:.7em;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f3d3a6,#d79d5f);box-shadow:0 0 0 .12em rgba(217,178,124,.35)}
+html.th-planet body.ui-app h3 small{font-family:var(--pl-font);font-weight:400;color:var(--pl-sub)}
+
+/* ログイン中の表示・説明 */
+html.th-planet body.ui-app #hi{background:none!important;border:0!important;box-shadow:none!important;color:var(--pl-sub)!important;padding:0!important;margin:6px 0 12px;font-weight:500;display:block}
+html.th-planet body.ui-app #help,html.th-planet body.ui-app #home > p:not(#hi),html.th-planet body.ui-app .note{color:var(--pl-sub)!important}
+html.th-planet body.ui-app a{color:#1f5d3f}
+html.th-planet body.ui-app #msg,html.th-planet body.ui-app .err{color:#a8321f!important}
+
+/* カード・パネル */
+html.th-planet body.ui-app .card,html.th-planet body.ui-app .ui-card,html.th-planet body.ui-app .nc-card,html.th-planet body.ui-app .kv-card,html.th-planet body.ui-app .uk_panel,html.th-planet body.ui-app .sg-card.wait,html.th-planet body.ui-app .sg-amount,html.th-planet body.ui-app .sg-list,html.th-planet body.ui-app .sg-person,html.th-planet body.ui-app .htmo{background:var(--pl-card)!important;color:var(--pl-ink)!important;border:1px solid var(--pl-line)!important;border-radius:22px!important;box-shadow:var(--shadow)!important;background-image:none!important}
+html.th-planet body.ui-app details{border-radius:16px}
+
+/* タイル */
+html.th-planet body.ui-app .tile,html.th-planet body.ui-app .nxc,html.th-planet body.ui-app a.tile{background:var(--pl-card)!important;color:var(--pl-ink)!important;border:1px solid var(--pl-line)!important;border-radius:24px!important;box-shadow:var(--shadow)!important;background-image:none!important;text-decoration:none;transition:transform .15s,box-shadow .15s;position:relative}
+html.th-planet body.ui-app .tile small,html.th-planet body.ui-app .nxc small,html.th-planet body.ui-app .office small{color:var(--pl-sub)!important}
+html.th-planet body.ui-app .tile.office{border-left:1px solid var(--pl-line)!important;overflow:hidden}
+html.th-planet body.ui-app .tile.office::after{content:"";position:absolute;right:-16px;top:-16px;width:52px;height:52px;border-radius:50%;background:var(--c,#2f7350);opacity:.18}
+html.th-planet body.ui-app .tile.office::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:5px;border-radius:0 4px 4px 0;background:var(--c,#2f7350)}
+html.th-planet body.ui-app .office .lg{border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--pl-line);background:#fff}
+@media (hover:hover){html.th-planet body.ui-app .tile:hover,html.th-planet body.ui-app .nxc:hover{transform:translateY(-2px);box-shadow:0 14px 26px -16px rgba(33,48,42,.55),0 0 0 2px var(--pl-g)!important}}
+html.th-planet body.ui-app .tile:focus-visible,html.th-planet body.ui-app a:focus-visible,html.th-planet body.ui-app button:focus-visible,html.th-planet body.ui-app input:focus,html.th-planet body.ui-app select:focus,html.th-planet body.ui-app textarea:focus{outline:3px solid #e9b949!important;outline-offset:2px}
+
+/* バッジ */
+html.th-planet body.ui-app .badge,html.th-planet body.ui-app .tile .badge{background:var(--pl-red)!important;color:#fff!important;border:0!important;outline:0!important;border-radius:999px!important;box-shadow:0 4px 10px -6px rgba(196,69,44,.9)!important;transform:none!important;font-weight:700;padding:2px 12px}
+html.th-planet body.ui-app .kk.soon .badge{background:#b88a00!important}
+html.th-planet body.ui-app .kk.ok .badge{background:#7a807c!important}
+
+/* 入力 */
+html.th-planet body.ui-app input,html.th-planet body.ui-app select,html.th-planet body.ui-app textarea{background:#fff!important;color:var(--pl-ink)!important;border:1.5px solid #c9bda3!important;border-radius:14px!important;box-shadow:none!important;min-height:44px}
+html.th-planet body.ui-app textarea{min-height:88px}
+html.th-planet body.ui-app input[type="checkbox"],html.th-planet body.ui-app input[type="radio"],html.th-planet body.ui-app input[type="file"],html.th-planet body.ui-app input[type="range"],html.th-planet body.ui-app input[type="hidden"]{width:auto!important;min-height:0!important;border:0!important;background:transparent!important;accent-color:var(--pl-g)}
+html.th-planet body.ui-app input[type="checkbox"],html.th-planet body.ui-app input[type="radio"]{width:1.25em!important;height:1.25em!important;vertical-align:-.2em}
+html.th-planet body.ui-app ::placeholder{color:#7b857f;opacity:1}
+
+/* ボタン：主ボタンは緑・大きく丸く */
+html.th-planet body.ui-app button,html.th-planet body.ui-app .btn,html.th-planet body.ui-app a.btn{border-radius:16px!important;font-weight:700}
+html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button),
+html.th-planet body.ui-app #login button:not(.btn-ghost),html.th-planet body.ui-app #forgot button:not(.btn-ghost),html.th-planet body.ui-app #setpw button{background:var(--pl-g)!important;color:#fff!important;border:2px solid var(--pl-g)!important;box-shadow:0 6px 14px -10px rgba(36,92,64,.9)!important;background-image:none!important;min-height:48px}
+html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):hover{background:var(--pl-g2)!important}
+html.th-planet body.ui-app main button:disabled{opacity:.55}
+html.th-planet body.ui-app .back,html.th-planet body.ui-app .btn-ghost,html.th-planet body.ui-app button.sub,html.th-planet body.ui-app button.sec,html.th-planet body.ui-app button.g,html.th-planet body.ui-app button.inl,html.th-planet body.ui-app a.btn.sub{background:#fff!important;color:var(--pl-g2)!important;border:2px solid var(--pl-g)!important;border-radius:16px!important;box-shadow:none!important;min-height:44px}
+html.th-planet body.ui-app .ptabs button{background:#fff!important;color:var(--pl-ink)!important;border:1.5px solid var(--pl-line)!important;border-radius:999px!important;box-shadow:none!important}
+html.th-planet body.ui-app .ptabs .on,html.th-planet body.ui-app .ptabs button.on,html.th-planet body.ui-app nav a.on,html.th-planet body.ui-app .ry-nav a.on,html.th-planet body.ui-app .cm-nav a.on{background:var(--pl-g)!important;color:#fff!important;border-color:var(--pl-g)!important}
+html.th-planet body.ui-app nav a,html.th-planet body.ui-app .ry-nav a,html.th-planet body.ui-app .cm-nav a{border-radius:999px;text-decoration:none}
+/* 選択チップ（日中一時の送迎・食事など）：未選択=白地＋枠、選択中=朱で塗り＋白字＋✔（shell.css の直しを引き継ぐ） */
+html.th-planet body.ui-app main button.nc-chip{background:#fff!important;color:var(--pl-ink)!important;border:2px solid #9c8c6c!important;border-radius:999px!important;box-shadow:none!important;min-height:44px;font-weight:500}
+html.th-planet body.ui-app main button.nc-chip.on{background:#b3261e!important;color:#fff!important;border:2px solid #7a1414!important;box-shadow:0 0 0 2px #7a1414!important;font-weight:700}
+html.th-planet body.ui-app main button.nc-chip.on::before{content:"✔ "}
+/* 日誌の児童ボタン */
+html.th-planet body.ui-app .nk-kids button.nk-kid{background:#fff;color:var(--pl-ink);border:2px solid #9c8c6c;border-radius:16px}
+html.th-planet body.ui-app .nk-kids button.nk-kid.on{background:var(--pl-g);color:#fff;border-color:var(--pl-g2)}
+html.th-planet body.ui-app .nk-kids button.nk-kid.abs{background:#fff0ee;color:#8e1b1b;border-color:#c0392b}
+html.th-planet body.ui-app .nk-kids button.nk-kid.abs.on{background:#8e1b1b;color:#fff;border-color:#5c0f0f}
+
+/* 表 */
+html.th-planet body.ui-app table{background:#fff;color:var(--pl-ink);border-radius:0}
+html.th-planet body.ui-app th{background:#eef2e6;color:var(--pl-ink)}
+html.th-planet body.ui-app td,html.th-planet body.ui-app th{border-bottom-color:#e6dfcf}
+html.th-planet body.ui-app table.msheet,html.th-planet body.ui-app table.kata-view,html.th-planet body.ui-app table.sougei-view,html.th-planet body.ui-app .nc-form table,html.th-planet body.ui-app .sui-doc table{background:#fff;border:1px solid #1a120c}
+html.th-planet body.ui-app table.msheet th,html.th-planet body.ui-app table.kata-view th,html.th-planet body.ui-app table.sougei-view th{background:#efe6d2}
+
+/* レオのカレンダー（leo_home_cal）：やわらかい枠に */
+html.th-planet body.ui-app .sgm,html.th-planet body.ui-app .sg-cal{background:var(--pl-card)!important;border:1px solid var(--pl-line)!important;border-radius:22px!important;box-shadow:var(--shadow)!important}
+html.th-planet body.ui-app .sgm button,html.th-planet body.ui-app .sg-page button{background:transparent;border:0;box-shadow:none;width:auto;min-height:0;color:var(--pl-ink)}
+html.th-planet body.ui-app .sgm td button{width:100%;border-radius:10px!important}
+html.th-planet body.ui-app .sgm td button.today{background:#fff3cf!important;color:#1c140c!important;border:3px solid #d9a92a!important;box-shadow:none!important}
+html.th-planet body.ui-app .sg-top button,html.th-planet body.ui-app .sgm-h button,html.th-planet body.ui-app .sg-add button,html.th-planet body.ui-app .sgm-h button.sg-today{background:#fff;color:var(--pl-ink);border:1.5px solid var(--pl-line);box-shadow:none;border-radius:999px!important}
+html.th-planet body.ui-app .sg-top button.sg-on{background:var(--pl-g);color:#fff;border-color:var(--pl-g)}
+html.th-planet body.ui-app .sg-empty,html.th-planet body.ui-app .sg-chip,html.th-planet body.ui-app .sg-ev{border-radius:10px!important}
+html.th-planet body.ui-app .sg-ev{box-shadow:none}
+
+/* ===== トップ ===== */
+html.th-planet body.ui-app .pl-hero{display:grid;grid-template-columns:1fr;gap:14px;margin:4px 0 8px}
+@media (min-width:900px){html.th-planet body.ui-app .pl-hero{grid-template-columns:1fr 1fr;gap:24px}html.th-planet body.ui-app .pl-hero:has(> #daily_sky[hidden]){grid-template-columns:1fr}}
+html.th-planet body.ui-app a.pl-punch{display:flex;flex-direction:column;gap:4px;background:var(--pl-card);color:var(--pl-ink);border:1px solid var(--pl-line);border-radius:28px;padding:20px 22px;box-shadow:var(--shadow);text-decoration:none}
+html.th-planet body.ui-app .pl-punch .pl-ph{font-family:var(--pl-disp);font-weight:700;font-size:1.25em}
+html.th-planet body.ui-app .pl-punch .pl-clock{font-family:var(--pl-disp);font-size:2.9em;line-height:1.05;letter-spacing:.02em}
+html.th-planet body.ui-app .pl-punch .pl-go{display:block;text-align:center;background:var(--pl-g);color:#fff;border-radius:20px;padding:14px 10px;font-size:1.3em;font-weight:700;margin-top:8px;box-shadow:0 6px 14px -10px rgba(36,92,64,.9)}
+html.th-planet body.ui-app .pl-punch small{color:var(--pl-sub);font-size:.85em}
+html.th-planet body.ui-app .daily-sky{position:relative;overflow:hidden;margin:0!important;color:#fff!important;background:url(img/planet/ring.svg) right -26px top -18px/170px auto no-repeat,radial-gradient(120% 140% at 85% 0%,var(--pl-night2),var(--pl-night) 60%,#1f2a52)!important;border:0!important;border-radius:28px!important;padding:20px 22px!important;box-shadow:0 14px 28px -18px rgba(31,42,82,.8)!important;line-height:1.75;font-size:1em!important}
+html.th-planet body.ui-app .daily-sky .ds-h{font-family:var(--pl-disp);font-weight:700;font-size:1.25em!important;opacity:1!important;color:#fff!important;margin:0 0 6px}
+html.th-planet body.ui-app .daily-sky .ds-h::before{content:"🔮 "}
+html.th-planet body.ui-app .daily-sky .ds-b{font-size:1.08em;margin-right:110px;color:#fff}
+html.th-planet body.ui-app .daily-sky .ds-b.note{color:#e6ebff!important}
+html.th-planet body.ui-app .daily-sky .ds-t{margin-top:12px;background:rgba(255,255,255,.14);border-radius:16px;padding:10px 14px;color:#ffe7a8!important;font-weight:700}
+html.th-planet body.ui-app .daily-sky button{background:rgba(255,255,255,.92)!important;color:var(--pl-night)!important;border:0!important;width:auto}
+@media (max-width:600px){html.th-planet body.ui-app .daily-sky{background-size:120px auto,auto!important}html.th-planet body.ui-app .daily-sky .ds-b{margin-right:0;margin-top:26px}}
+/* あなたへのお知らせ */
+html.th-planet body.ui-app .home-todo{border-left:0!important;border-radius:24px!important;background:var(--pl-card)!important;box-shadow:0 0 0 2px #e9b949,var(--shadow)!important}
+html.th-planet body.ui-app .home-todo .ht-h{font-family:var(--pl-disp)}
+html.th-planet body.ui-app .home-todo .ht-h::before{content:"📣 "}
+html.th-planet body.ui-app .home-todo .ui-list-row{background:transparent;border-bottom:1px dashed var(--pl-line);border-radius:0;min-height:56px;color:var(--pl-ink)}
+html.th-planet body.ui-app .home-todo .ui-badge{background:var(--pl-red);height:auto;padding:2px 8px}
+/* 事業所は PC で3〜4列 */
+@media (min-width:900px){html.th-planet body.ui-app .grid.pl-offices{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}}
+
+/* 印刷は白地 */
+@media print{html.th-planet body.ui-app{background:#fff!important}html.th-planet body.ui-app::before{display:none}html.th-planet body.ui-app header{backdrop-filter:none}}
+@media (prefers-reduced-motion:reduce){html.th-planet body.ui-app .tile,html.th-planet body.ui-app .nxc{transition:none}html.th-planet body.ui-app .tile:hover{transform:none}}
+/* 事業所タイルの名前（.tile span のアイコン用44pxを受けないように） */
+html.th-planet body.ui-app .tile.office .tx{font-size:19px;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+html.th-planet body.ui-app .tile.office .tx small{display:block;margin:2px 0 0;font-size:13px;font-weight:500}
+@media (min-width:900px){html.th-planet body.ui-app .tile.office .tx{font-size:34px}html.th-planet body.ui-app .tile.office .tx small{font-size:30px}}
+/* トップの相談・報告・研修／総務／会長：横長の小さめカード（アイコン左） */
+html.th-planet body.ui-app .grid.pl-links,html.th-planet body.ui-app .pl-links-wrap .grid{grid-template-columns:1fr;gap:12px}
+@media (min-width:700px){html.th-planet body.ui-app .grid.pl-links{grid-template-columns:repeat(2,1fr)}}
+
+html.th-planet body.ui-app .pl-links a.tile,html.th-planet body.ui-app .pl-links-wrap a.tile{display:grid!important;grid-template-columns:auto 1fr;column-gap:14px;align-items:center;text-align:left;padding:16px 18px!important;font-size:18px;font-weight:700;margin-bottom:12px}
+html.th-planet body.ui-app .grid.pl-links a.tile{margin-bottom:0}
+html.th-planet body.ui-app .pl-links a.tile > span:not(.badge),html.th-planet body.ui-app .pl-links-wrap a.tile > span:not(.badge){grid-row:1 / span 2;font-size:26px;width:52px;height:52px;border-radius:50%;background:#e8eedb;display:grid;place-items:center}
+html.th-planet body.ui-app .pl-links a.tile small,html.th-planet body.ui-app .pl-links-wrap a.tile small{grid-column:2;margin:2px 0 0;font-size:14px;font-weight:500;white-space:normal}
+html.th-planet body.ui-app .pl-links a.tile .badge,html.th-planet body.ui-app .pl-links-wrap a.tile .badge{position:absolute;top:-10px;right:14px;margin:0;font-size:14px}
+@media (min-width:900px){
+  html.th-planet body.ui-app .pl-links a.tile,html.th-planet body.ui-app .pl-links-wrap a.tile{font-size:34px;padding:22px 24px!important}
+  html.th-planet body.ui-app .pl-links a.tile > span:not(.badge),html.th-planet body.ui-app .pl-links-wrap a.tile > span:not(.badge){font-size:40px;width:76px;height:76px}
+  html.th-planet body.ui-app .pl-links a.tile small,html.th-planet body.ui-app .pl-links-wrap a.tile small{font-size:30px}
+  html.th-planet body.ui-app .pl-links a.tile .badge,html.th-planet body.ui-app .pl-links-wrap a.tile .badge{font-size:30px;top:-18px}
+}
+html.th-planet body.ui-app .grid.pl-links a.tile.main{grid-column:auto}
+html.th-planet body.ui-app .pl-links a.tile small,html.th-planet body.ui-app .pl-links-wrap a.tile small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* 暗い背景向けに淡い字色を決め打ちしている画面（打刻・茶夢・官公需）を、明るい背景で読める色に */
+html.th-planet body.ui-app .dk h3{color:var(--pl-ink)!important;text-shadow:none!important}
+html.th-planet body.ui-app .dk .meta,html.th-planet body.ui-app .sctnote,html.th-planet body.ui-app .cm>.note{color:var(--pl-sub)!important}
+html.th-planet body.ui-app .dk .monnav b{color:var(--pl-ink)!important}
+html.th-planet body.ui-app a.sctman{color:#1f5d3f!important}
+html.th-planet body.ui-app .dk .okb,html.th-planet body.ui-app .dk .ng,html.th-planet body.ui-app .dk .wn,html.th-planet body.ui-app .dk .montotal{border:1.5px solid #b9ad92!important;border-radius:14px!important}
+html.th-planet body.ui-app .dk select,html.th-planet body.ui-app .dk .loc,html.th-planet body.ui-app .dk .monnav button{border:1.5px solid #c9bda3!important;border-radius:14px!important;box-shadow:none!important}
+/* レオのカレンダーの日付マス：主ボタンの緑を受けない（shell.css の main button 規則より強くするためクラスを重ねる） */
+html.th-planet body.ui-app main .sgm.sgm.sgm.sgm.sgm button,html.th-planet body.ui-app main .sg-page.sg-page.sg-page.sg-page.sg-page button{background:transparent!important;color:var(--pl-ink)!important;border:0!important;box-shadow:none!important;min-height:0!important}
+html.th-planet body.ui-app main .sgm.sgm.sgm.sgm.sgm td button{background:#fff!important;border:1px solid #e6dfcf!important;border-radius:10px!important}
+html.th-planet body.ui-app main .sgm.sgm.sgm.sgm.sgm td button.today{background:#fff3cf!important;border:3px solid #d9a92a!important}
+html.th-planet body.ui-app main .sgm-h.sgm-h.sgm-h.sgm-h.sgm-h button,html.th-planet body.ui-app main .sg-top.sg-top.sg-top.sg-top.sg-top button,html.th-planet body.ui-app main .sg-add.sg-add.sg-add.sg-add.sg-add button{background:#fff!important;color:var(--pl-ink)!important;border:1.5px solid var(--pl-line)!important;border-radius:999px!important;box-shadow:none!important}
+html.th-planet body.ui-app main .sg-top.sg-top.sg-top.sg-top.sg-top button.sg-on{background:var(--pl-g)!important;color:#fff!important;border-color:var(--pl-g)!important}
+@media (min-width:900px){html.th-planet body.ui-app .home-todo .ht-h{font-size:46px!important}}

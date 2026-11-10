@@ -82,7 +82,7 @@ async function myTodoBox() {
   } catch (e) { }
 }
 
-// 総合トップの「私のやること」：自分宛ての未完了の依頼。未着手(open)は「新」、期限切れ・今日は赤
+// 総合トップの「あなたへのお知らせ」（旧「私のやること」）：自分宛ての未完了の依頼。未着手(open)は「新」、期限切れ・今日は赤
 // 依頼が0件の人（多くの現場職員）には枠ごと出さない。依頼が1件でもあれば出す（職員への指示はポータルの依頼で出すため）
 async function homeTodo() {
   const el = document.getElementById('home_todo_body'); if (!el) return;
@@ -97,8 +97,8 @@ async function homeTodo() {
     show(true);
     el.innerHTML = `<p class="ht-sub">${t.length}件${nNew ? `（うち新しい依頼 ${nNew}件）` : ''}</p>` + t.map(x => {
       const ok = x.link && /^#[\w/-]*$/.test(x.link), od = x.due && x.due <= today;
-      const meta = [x.office ? esc(x.office) : '', x.due ? `<span class="${od ? 'ht-over' : ''}">期限 ${esc(x.due.slice(5).replace('-', '/'))}${x.due < today ? '（過ぎています）' : x.due === today ? '（今日）' : ''}</span>` : '', x.status === 'doing' ? 'やっている' : '未着手'].filter(Boolean).join('・');
+      const meta = [x.office ? esc(x.office) : '', x.due ? `<span class="${od ? 'ht-over' : ''}">期限 ${esc(x.due.slice(5).split('-').map(Number).join('/'))}${x.due < today ? '（過ぎています）' : x.due === today ? '（今日）' : ''}</span>` : '', x.status === 'doing' ? 'やっている' : '未着手'].filter(Boolean).join('・');
       return `<a class="ui-list-row" href="${ok ? x.link : '#report'}">${x.status === 'open' ? '<span class="ui-badge">新</span>' : ''}<span class="ht-t"><b>${esc(x.title)}</b><small>${meta}</small></span><span aria-hidden="true">›</span></a>`;
-    }).join('') + '<p class="ht-sub" style="margin-top:8px">終わったら <a href="#report">私への依頼</a> ので「済」に。</p>';
+    }).join('') + '<p class="ht-sub" style="margin-top:8px">終わったら <a href="#report">私への依頼</a> で「済」にしてください。</p>';
   } catch (e) { show(true); el.innerHTML = `<p class="ht-sub">読み込めませんでした（${esc(e.message)}）</p>`; }
 }

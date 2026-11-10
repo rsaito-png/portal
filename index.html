@@ -2,7 +2,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="theme-color" content="#121a2f">
+<meta name="theme-color" content="#f6efe1">
 <title>星心会 職員ポータル</title>
 <style>
 .daily-sky{margin:4px 0 14px;padding:10px 14px;border:1px solid #c9b27a;border-radius:8px;background:#fffaf0;line-height:1.6;font-size:.95em}.daily-sky .ds-h{font-weight:bold;font-size:.85em;opacity:.75;margin-bottom:2px}.daily-sky .ds-t{margin-top:4px;font-weight:bold}
@@ -121,10 +121,11 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="theme-retro.css?v=20261103pc">
-<script>/* テーマ切替：未指定=官吏(yamen)、?theme=retro で従来。localStorage に覚える */
-(function(){try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')localStorage.setItem('portalTheme',q);var t=q||localStorage.getItem('portalTheme')||'yamen';if(t==='yamen')document.documentElement.classList.add('th-yamen');}catch(e){document.documentElement.classList.add('th-yamen');}})();</script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap">
+<link id="th_retro" rel="stylesheet" href="theme-retro.css?v=20261103pc">
+<script>/* テーマ切替：既定=惑星の空(planet・2026-11-10 会長承認)。?theme=yamen（官吏）/ ?theme=retro（ドット絵）はそのページを開いたときだけ。覚えない */
+(function(){var t='planet';try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')t=q;localStorage.removeItem('portalTheme');}catch(e){}
+document.documentElement.classList.add('th-'+t);var l=document.getElementById('th_retro');if(l&&t!=='retro')l.disabled=true;})();</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@700&family=Zen+Maru+Gothic:wght@500;700&display=swap">
 <link rel="stylesheet" href="theme-yamen.css?v=20261109chip">
 <style>
 /* 今日の日誌：児童名のボタン。入力欄は隠すだけで残す（保存は全員分） */
@@ -160,6 +161,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
 <link rel="stylesheet" href="shell.css?v=20261110chip2">
+<link rel="stylesheet" href="theme-planet.css?v=20261110pl9">
 <style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}#home_todo[hidden],#ht_jump[hidden]{display:none!important}</style>
 </head><body class="portal ui-app">
 <header class="ui-topbar"><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
@@ -201,7 +203,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="kin_contract.js?v=202610221354"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
-<script src="report.js?v=20261110todo0"></script>
+<script src="report.js?v=20261110pl1"></script>
 <script src="ht.js?v=20261110self"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
@@ -432,27 +434,32 @@ async function render() {
   const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   const officesHome = (typeof visibleOffices === 'function' ? visibleOffices() : C.offices);
-  $('view').innerHTML = `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">私のやること</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
+  // 並び（2026-11-10 会長）：あなたへのお知らせ（依頼があるときだけ）→ 出退勤打刻＋毎日占い → 事業所 → 相談・報告 → 会長
+  $('view').innerHTML = `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">あなたへのお知らせ</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
     <p id="ht_jump" class="ht-jump" hidden><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
-    <h3 id="home_offices">出退勤</h3>
-    <div class="grid">${tileHtml(['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤。事業所の近くだけ', 'main'])}</div>
-    <h3>入職・年末調整</h3>
-    <div class="grid">${tileHtml(['📝', '入職・年末調整の届出', '#me', '振込口座・マイナンバー・年末調整の申告', 'main'])}</div>
-    <h3>障害福祉事業</h3>
-    <div class="grid">${officesHome.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
-    <div id="chair_slot"></div>
+    <div class="pl-hero"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span><small>スマホで出勤・退勤。事業所の近くだけ</small></a>
+    <div id="daily_sky" class="daily-sky" hidden></div></div>
+    <h3 id="home_offices">障害福祉事業</h3>
+    <div class="grid pl-offices">${officesHome.map(x => `<a class="tile office" href="#${x.id}" style="--c:${x.color}">${x.logo?`<img class="lg${x.logoFit?' ct':''}" src="${x.logo}" alt="" loading="lazy">`:''}<span class="tx">${x.name}<small>${x.kind}</small></span></a>`).join('')}</div>
     <div id="kankoyo_sec"><h3>官公需</h3><div id="sct_slot"></div></div>
-    <h3>共通</h3>
-    <div class="grid">${topT.map(t => tileHtml(t)).join('')}</div>
-    <div id="soumu_slot">${soumuTile()}</div>
+    <h3>相談・報告・研修</h3>
+    <div class="grid pl-links">${topT.map(t => tileHtml(t)).join('')}</div>
+    <div id="soumu_slot" class="pl-links-wrap">${soumuTile()}</div>
+    <div id="chair_slot" class="pl-links-wrap"></div>
     <h3 id="misc_h">未整理</h3>
-    <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>
-    <div id="daily_sky" class="daily-sky" hidden></div>`;
+    <div class="grid">${C.shared.tiles.map(t => tileHtml(t, '#999')).join('')}</div>`;
+  plClock();
   if (typeof esignBadge === 'function') esignBadge();
   if (typeof lbBadge === 'function') lbBadge();
   if (typeof soudanBadge === 'function') soudanBadge();
   chairTile().then(() => typeof bnBadge === 'function' && bnBadge()); chairMsgShow(); accTile(); sctAdminTile();
   loadDailySky(); if (typeof homeTodo === 'function') homeTodo();
+}
+// トップの打刻カードの時計（日本時間・表示だけ）
+function plClock() {
+  const f = () => { const el = document.getElementById('pl_clock'); if (!el) { clearInterval(window.__plClk); window.__plClk = 0; return; }
+    const d = new Date(Date.now() + 9 * 3600000); el.textContent = `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
+  f(); if (!window.__plClk) window.__plClk = setInterval(f, 20000);
 }
 // 毎日占い（全体の空の動き）。portal_daily_sky の今日（JST）分。取れなければ枠ごと隠す。
 function skyCanEdit() {
