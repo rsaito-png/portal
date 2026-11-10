@@ -634,10 +634,10 @@ const LEO_VIEWS = {
   },
   async nikki() {
     PERIOD = 'today';
-    if (!DEMO) await leoRecordDay(today());
-    const day = today();
+    const day = nkDay();
+    if (!DEMO) await leoRecordDay(day);
     const [rowsAll, kinds, flags, left] = await Promise.all([
-      loadNikki(),
+      (DEMO || day === today()) ? loadNikki() : sb(`leo_nikki?day=eq.${day}&order=row_no`),
       leoChildKinds(),
       DEMO ? Promise.resolve(leoDemoAbsFlags(day)) : sb(`leo_day_flags?day=eq.${day}&select=day,child,absent_support,absent_note`).catch(() => []),
       loadLeftIndex()]);
@@ -680,7 +680,7 @@ const LEO_VIEWS = {
       }),
     ];
     const noteOpen = leoFoldOpen('leo_nikki_note_open');
-    return `<h3 class="nk-fold-h">${leoFoldBtn('leo_nikki_note_open', 'nk_note', '今日の日誌（見る・直す）')}</h3>${demoNote()}<p class="note" id="nk_note"${noteOpen ? '' : ' hidden'}>ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
+    return `<h3 class="nk-fold-h">${leoFoldBtn('leo_nikki_note_open', 'nk_note', (day === today() ? '今日' : fmtDay(day)) + 'の日誌（見る・直す）')}</h3>${nkDayNav(day)}${demoNote()}<p class="note" id="nk_note"${noteOpen ? '' : ' hidden'}>ポータルの日誌が正です。直すのはこの画面です（元のGoogleシートは使いません）。予定の利用児童を出し、開始・終了を保存するとサービス提供実績に載ります。欠席の子もここに出ます。欠席時対応（誰に連絡したか、何を話したか、次の利用）を書いて、加算対応をしたらチェックを入れて保存してください。活動記録はLINE報告から入ります（である調のボット文があればそれを使い、無ければ補います）。食事提供と食事メニューは、この画面の総合日誌と各児童の欄に書きます。運転手欄は届け出上の担当名です（送迎・予定の画面は実際の運転者のままです）。</p>` +
       leoDayLogHtml(day, bundle.log, 'nk', bundle.missing) +
       leoNikkiKidBar(kids) +
       kids.map((k, i) => leoNikkiChildWrap(i, k.kind, k.child, k.html)).join('') +
@@ -1433,6 +1433,15 @@ async function leoAddKesseki(prefix, day) {
     else await renderLeoView('nikki');
   } catch (e) { say(e.message); }
 }
+// 日誌（今日の画面）で開いている日。空なら今日。過去の日の活動記録も、ここで直接打って後から直せる。
+let NK_DAY = null;
+const nkDay = () => NK_DAY || today();
+function nkGo(d) { NK_DAY = (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < today()) ? d : null; renderLeoView('nikki'); }
+function nkDayNav(day) {
+  if (DEMO) return '';
+  const t = today();
+  return `<p class="ptabs"><button onclick="nkGo(addDays('${day}',-1))">← 前の日</button> <input type="date" value="${day}" max="${t}" onchange="nkGo(this.value)" style="font-size:16px"> <button onclick="nkGo(addDays('${day}',1))"${day >= t ? ' disabled' : ''}>次の日 →</button> <button onclick="nkGo(null)">今日</button></p>${day === t ? '' : `<p class="note"><b>${esc(fmtDay(day))}の日誌を開いています。</b>活動記録などを直接入力して保存すると、日誌とサービス提供実績に反映されます。</p>`}`;
+}
 async function saveNikki() {
   const view = document.getElementById('view');
   const absRows = leoReadAbs(view);
@@ -1457,13 +1466,13 @@ async function saveNikki() {
   if (DEMO) { $('saved').textContent = `見本モードなので保存しません（${n}件の修正）。`; return; }
   try {
     for (const [row, fields] of rows) {
-      await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: today(), p_row: Number(row), p_fields: fields }) });
+      await sb('rpc/leo_nikki_apply', { method: 'POST', body: JSON.stringify({ p_day: nkDay(), p_row: Number(row), p_fields: fields }) });
     }
     if (mealForms.length) {
-      const err = await leoUpsertMeals(today(), mealForms);
+      const err = await leoUpsertMeals(nkDay(), mealForms);
       if (err.length) { $('saved').textContent = err[0]; return; }
     }
-    if (absRows.length) await leoSaveAbsFlags(today(), absRows);
+    if (absRows.length) await leoSaveAbsFlags(nkDay(), absRows);
     const msg = rows.length ? `${rows.length}人分を日誌に保存し、実績へ転記しました。食事の記録も保存しました。` : (mealForms.length ? '食事の記録を保存しました。' : '');
     $('saved').textContent = msg + (absRows.length ? '欠席時対応を保存しました。' : '');
   } catch (e) { $('saved').textContent = e.message; }
