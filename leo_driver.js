@@ -51,13 +51,16 @@
     const q = typeof sb === 'function' ? sb : null;
     if (!q) return [];
     const since = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
-    const [evs, prof] = await Promise.all([
+    // 全職員分は leo_staff_names()（名前だけ返す関数・supabase/leo_staff_names.sql）。読めなければ職員マスタ直読みで補う
+    const [evs, rpc, prof] = await Promise.all([
       q(`leo_events?select=staff&staff=not.is.null&day=gte.${since}&limit=5000`).catch(() => []),
+      q('rpc/leo_staff_names', { method: 'POST', body: '{}' }).catch(() => null),
       q('staff_profiles?select=full_name,nikki_name,office,extra_offices,active').catch(() => []),
     ]);
     const out = [], seen = new Set();
     const add = n => { const v = String(n ?? '').trim(); const k = normDriver(v); if (!v || seen.has(k)) return; seen.add(k); out.push(v); };
     (evs || []).forEach(e => add(e.staff));
+    (Array.isArray(rpc) ? rpc : []).forEach(r => add(r && typeof r === 'object' ? r.name : r));
     (prof || []).filter(r => r && r.active !== false && (r.office === 'レオ' || (Array.isArray(r.extra_offices) && r.extra_offices.includes('レオ'))))
       .forEach(r => add(r.nikki_name || r.full_name));
     out.sort((a, b) => a.localeCompare(b, 'ja'));
