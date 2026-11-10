@@ -203,13 +203,61 @@ async function renderDocsAdmin() {
       <td>${esDate(x.contract_end)}${soon(x) ? ' <span class="badge">近い</span>' : ''}</td><td>${cell(x.pledge_status, x.pledge_method, x.pledge_date)}</td></tr>`).join('')}</table>`;
   } catch (e) { $('view').innerHTML = ES_PRINT_CSS + back + `<p>${esc(e.message)}</p>`; }
 }
+function esTermsObj(terms) {
+  if (!terms) return {};
+  if (typeof terms === 'string') { try { terms = JSON.parse(terms); } catch (e) { return {}; } }
+  return (terms && typeof terms === 'object' && !Array.isArray(terms)) ? terms : {};
+}
+// 発行時（doc_issue）と同じ置換。表示だけに使う（保存・発行・通知はしない）
+function esRenderPreview(body, name, terms) {
+  let txt = String(body || '').split('{{name}}').join(name || '');
+  const t = esTermsObj(terms);
+  for (const k of Object.keys(t)) {
+    const v = t[k];
+    const s = v == null ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+    txt = txt.split('{{' + k + '}}').join(s);
+  }
+  return txt;
+}
+function esDraftFallback(name, terms) {
+  const labels = { sign_date: '契約締結日', name: '氏名', employer_name: '名称', employer_address: '所在地', employer_rep: '職氏名',
+    period: '雇用期間', probation: '試用期間', place: '就業の場所', job: '仕事の内容', hours: '就業時間', overtime: '所定時間外・休日労働',
+    holidays: '休日', leave: '休暇', retire: '退職に関する事項', wage: '賃金（基本給・単位・交通費）', premium: '割増賃金率',
+    pay: '締切日・支払日・支払方法', bonus: '賞与', raise: '昇給', retirement_pay: '退職金', insurance: '社会保険・雇用保険', remarks: '備考' };
+  const t = esTermsObj(terms);
+  const lines = name ? ['氏名：' + name] : [];
+  for (const k of Object.keys(t)) {
+    if (k === 'name') continue;
+    const v = t[k];
+    if (v == null || v === '') continue;
+    lines.push((labels[k] || k) + '：' + (typeof v === 'object' ? JSON.stringify(v) : String(v)));
+  }
+  return lines.join('\n') || '（下書きの項目がまだ入っていません）';
+}
 async function esAdminDetail(x, back) {
   if (!x) { ES_SEL = null; return renderDocsAdmin(); }
   const docs = DEMO ? ES_DEMO.docs : await sb(`staff_docs?user_id=eq.${encodeURIComponent(x.user_id)}&select=*&order=id.desc`);
   const sigs = DEMO ? ES_DEMO.sigs : await sb(`doc_signatures?user_id=eq.${encodeURIComponent(x.user_id)}&select=*`);
   const sg = Object.fromEntries(sigs.map(s => [s.doc_id, s]));
+  const tpls = {};
+  const ids = [...new Set(docs.filter(d => d.status === 'draft' && d.template_id != null).map(d => Number(d.template_id)).filter(n => Number.isInteger(n) && n > 0))];
+  if (!DEMO && ids.length) {
+    try {
+      const rows = await sb(`doc_templates?id=in.(${ids.join(',')})&select=id,body,title,version`);
+      for (const t of rows) tpls[t.id] = t;
+    } catch (e) { }
+  }
   const blocks = [];
-  for (const d of docs.filter(d => d.status !== 'draft' && d.status !== 'void')) {
+  for (const d of docs.filter(d => d.status !== 'void')) {
+    if (d.status === 'draft') {
+      const tpl = tpls[d.template_id];
+      const preview = (tpl && tpl.body) ? esRenderPreview(tpl.body, x.full_name || '', d.terms) : esDraftFallback(x.full_name || '', d.terms);
+      const note = preview.includes('{{') ? '<div class="esrec">未入力の項目が残っています（発行前の確認用です）。</div>' : '';
+      blocks.push(`<div class="esdoc-wrap"><h4>${esc(ES_TYPE(d.doc_type))}　📝 下書き（未発行）</h4>
+        <div class="esrec">📝 下書き（未発行）です。本人への発行・通知はしていません。</div>
+        <div class="esdoc">${esc(preview)}</div>${note}</div>`);
+      continue;
+    }
     const s = sg[d.id];
     const body = d.method === 'paper'
       ? `<div class="esrec">📄 <b>紙で締結済み</b>（電子署名はありません）／締結日：${esDate(d.paper_date)}${d.period_end ? '／期間：〜' + esDate(d.period_end) : ''}<br>備考：${esc(d.note || '—')}</div>`
