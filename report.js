@@ -83,19 +83,22 @@ async function myTodoBox() {
 }
 
 // 総合トップの「私のやること」：自分宛ての未完了の依頼。未着手(open)は「新」、期限切れ・今日は赤
+// 依頼が0件の人（多くの現場職員）には枠ごと出さない。依頼が1件でもあれば出す（職員への指示はポータルの依頼で出すため）
 async function homeTodo() {
   const el = document.getElementById('home_todo_body'); if (!el) return;
-  const empty = '<div class="ui-empty"><b>今日の依頼はありません</b>いつもの仕事を、ひとつずつ。</div>';
-  if (DEMO || typeof sb !== 'function') { el.innerHTML = empty; return; }
+  const show = on => { const s = document.getElementById('home_todo'), j = document.getElementById('ht_jump'); if (s) s.hidden = !on; if (j) j.hidden = !on; };
+  show(false);
+  if (DEMO || typeof sb !== 'function') return;
   try {
     const t = await sb(`staff_todo?assignee=eq.${srMe()}&status=neq.done&order=due.asc.nullslast,created_at&select=id,title,link,due,status,office`);
     const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
     const nNew = t.filter(x => x.status === 'open').length;
-    if (!t.length) { el.innerHTML = empty; return; }
+    if (!t.length) { el.innerHTML = ''; return; }
+    show(true);
     el.innerHTML = `<p class="ht-sub">${t.length}件${nNew ? `（うち新しい依頼 ${nNew}件）` : ''}</p>` + t.map(x => {
       const ok = x.link && /^#[\w/-]*$/.test(x.link), od = x.due && x.due <= today;
       const meta = [x.office ? esc(x.office) : '', x.due ? `<span class="${od ? 'ht-over' : ''}">期限 ${esc(x.due.slice(5).replace('-', '/'))}${x.due < today ? '（過ぎています）' : x.due === today ? '（今日）' : ''}</span>` : '', x.status === 'doing' ? 'やっている' : '未着手'].filter(Boolean).join('・');
       return `<a class="ui-list-row" href="${ok ? x.link : '#report'}">${x.status === 'open' ? '<span class="ui-badge">新</span>' : ''}<span class="ht-t"><b>${esc(x.title)}</b><small>${meta}</small></span><span aria-hidden="true">›</span></a>`;
     }).join('') + '<p class="ht-sub" style="margin-top:8px">終わったら <a href="#report">私への依頼</a> ので「済」に。</p>';
-  } catch (e) { el.innerHTML = `<p class="ht-sub">読み込めませんでした（${esc(e.message)}）</p>`; }
+  } catch (e) { show(true); el.innerHTML = `<p class="ht-sub">読み込めませんでした（${esc(e.message)}）</p>`; }
 }

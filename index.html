@@ -160,7 +160,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
 <link rel="stylesheet" href="shell.css?v=20261110chip2">
-<style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}</style>
+<style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}#home_todo[hidden],#ht_jump[hidden]{display:none!important}</style>
 </head><body class="portal ui-app">
 <header class="ui-topbar"><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
@@ -187,7 +187,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="leo_driver.js?v=20261105ren"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261109nikki"></script>
+<script src="leo.js?v=20261110todo0"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261106manual"></script>
 <script src="kin_visit.js?v=20261104all"></script>
@@ -201,7 +201,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="kin_contract.js?v=202610221354"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
-<script src="report.js?v=20261104home"></script>
+<script src="report.js?v=20261110todo0"></script>
 <script src="ht.js?v=20261110self"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
@@ -428,8 +428,8 @@ async function render() {
   const topT = [['🏯', '評定所', '#leaderboard', '職員みんなと会長の報連相（報告・連絡・相談）', 'main'], ['🧑‍💼', '番頭さん', '#banto', '報告・連絡・相談はここへ（AIがすぐ返事、要るものは会長へ取り次ぎ）', 'main'], ['📸', 'SNS投稿素材', '#sns', 'Instagram・Googleマップ用の写真とひとことを送る', 'main'], ['🍵', '人事労務の相談所', '#soudan', '休み・給料・働き方の相談', 'main'], ['🎓', '法定研修', '#ht', '研修・委員会・訓練の記録と受講証明', 'main'], ['📚', '自主研鑽資料集', '', '準備中（中身はこれから）', 'main']].filter(t => t[2] !== '#leaderboard' || !(typeof HYOJOSHO_HOLD !== 'undefined' && HYOJOSHO_HOLD));
   const sec = C.sections || { sumu: { name: '総務', groups: [] }, misc: { name: '未整理', tiles: [] } };
   const officesHome = (typeof visibleOffices === 'function' ? visibleOffices() : C.offices);
-  $('view').innerHTML = `<section id="home_todo" class="ui-card home-todo"><h2 class="ht-h">私のやること</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
-    <p class="ht-jump"><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
+  $('view').innerHTML = `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">私のやること</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>
+    <p id="ht_jump" class="ht-jump" hidden><a href="#home_offices">事業所・共通メニューへ ↓</a></p>
     <h3 id="home_offices">出退勤</h3>
     <div class="grid">${tileHtml(['⏰', '出退勤打刻', '#dakoku', 'スマホで出勤・退勤。事業所の近くだけ', 'main'])}</div>
     <h3>障害福祉事業</h3>

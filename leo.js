@@ -787,7 +787,7 @@ let IS_CHAIR = false;
 let EXTRA_OFFICES = [];
 const canManage = () => ROLE === '事務' || ['管理者', '児発管'].includes(DUTY);
 let MY_FULL_NAME = '';
-const canLeoHomeTodo = () => canManage() || ['安藤尚子', '加藤幸弘'].includes(MY_FULL_NAME);
+const canLeoHomeTodo = () => canManage() || IS_CHAIR || ['安藤尚子', '加藤幸弘'].includes(MY_FULL_NAME);
 function extraOfficeList(v) {
   const raw = Array.isArray(v) ? v : (typeof v === 'string' ? v.replace(/^\{|\}$/g, '').split(',') : []);
   return raw.map(s => String(s || '').trim().replace(/^"|"$/g, '')).filter(Boolean);
@@ -993,6 +993,8 @@ function leoPlanEditFromHash() {
 // ===== 児発管ホーム：今日やること（一画面に、やることだけ） =====
 // 中村 友香がする、の「今日やること」も、加藤・安藤の同じ名前も、この画面（#leo/home）を開く。
 LEO_VIEWS.home = async function () {
+  // 今日やること（児発管）は管理する人だけ（会長・事務・管理者・児発管・安藤・加藤）。現場職員がURLで開いても中身は出さない
+  if (!DEMO && !canLeoHomeTodo()) return '<h3>今日やること（児発管）</h3><p class="note">この画面は児発管・管理者・事務の人が使います。</p><p><a href="#leo">レオのホームへもどる</a></p>';
   const todo = [];
   // 1. 個別支援計画：個別支援計画（管理）と同じ進み具合。退所済み、次の計画が退所日よりあと、本案まで終わった子、急ぎでない子は出さない
   try {
