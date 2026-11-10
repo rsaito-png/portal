@@ -2319,6 +2319,7 @@ function orderKataCols(cols) {
   return out.concat(left);
 }
 // 型表の見出しだけ。保存する列名（data-c）は変えない。
+const KATA_DRIVER_COLS = { '迎え担当': 1, '送り担当': 1 };
 function kataColLabel(c) {
   if (c === '迎え開始') return '迎え時間';
   if (c === '送り終了') return '送り時間';
@@ -2356,10 +2357,13 @@ async function renderMasterEditor(view) {
   const rows = own.length ? own.map(r => r.data) : g;
   let cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
   if (MASTER_KIND === 'kata') cols = orderKataCols(cols);
+  // 型表の迎え担当・送り担当はプルダウン（職員名＋祥先生＋保護者）。祥先生は従来どおり予定・日誌側で読み替える
+  const kataDrv = MASTER_KIND === 'kata' && typeof driverOptionsHtml === 'function'
+    ? [...await leoDriverNames().catch(() => []), '祥先生', '保護者'] : null;
   const title = MASTER_KIND === 'kata' ? '送迎 型表' : `${labels[MASTER_KIND]}の入力`;
   return `<h3>${title}</h3>${demoNote()}${tabs}
     <p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
-    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td><input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)"></td>`).join('')}</tr>`).join('')}</table></div>
+    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td>${kataDrv && KATA_DRIVER_COLS[c] ? `<select class="kata-drv" data-c="${esc(c)}" style="min-width:9em">${driverOptionsHtml(kataDrv, r[c] ?? '')}</select>` : `<input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)">`}</td>`).join('')}</tr>`).join('')}</table></div>
     <button onclick="renderLeoView('${view}').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
 }
 // 型表などの入力欄。短い列は中身（曜日は1文字、時刻は HH:MM）に合わせ、見出しは折り返す。保存する中身は変えない。
@@ -2424,12 +2428,12 @@ function fitMasterInput(el) {
 function addMasterRow() {
   const t = document.querySelector('tr.mrow:last-child');
   const row = t.cloneNode(true);
-  row.querySelectorAll('input').forEach(i => { i.value = ''; });
+  row.querySelectorAll('input, select.kata-drv').forEach(i => { i.value = ''; });
   t.parentNode.appendChild(row);
   fitMasterSheet();
 }
 async function saveMaster() {
-  const rows = [...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length);
+  const rows = [...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input, select.kata-drv')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length);
   const m = $('ms_msg'); if (DEMO) { m.textContent = `見本モードなので保存しません（${rows.length}行）。`; return; }
   try { await sb(`leo_master?kind=eq.${MASTER_KIND}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     if (rows.length) await sb('leo_master', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows.map((d, i) => ({ kind: MASTER_KIND, row_no: i + 1, data: d }))) });
