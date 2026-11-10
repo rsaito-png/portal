@@ -121,7 +121,10 @@ async function renderHt() {
   $('view').innerHTML = back + '<p>読み込み中…</p>';
   try { HT.fy = htFy(); await htLoad(); } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; return; }
   if (!HT.D.myOffs.length && !HT.D.isAll) { $('view').innerHTML = back + '<h3>法定研修</h3><p>このアカウントには、法定研修を見る権限がありません。研修統括責任者に権限の追加を頼んでください。</p>'; return; }
+  const hp = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
+  if (hp[0] === 'ht' && HT_TABS.some(([k]) => k === hp[1])) HT.tab = hp[1];
   htDraw();
+  if (hp[0] === 'ht' && hp[1] === 'train' && hp[2]) { const r = document.getElementById('httr_' + hp[2]); if (r) { r.style.outline = '4px solid #E8833A'; r.scrollIntoView({ block: 'center' }); } }
 }
 function htDraw() {
   const D = HT.D, back = `<button class="back" onclick="location.hash=''">← 事業所えらびへ</button>`;
@@ -197,7 +200,7 @@ function htTrain() {
   const rows = trs.map(t => { const s = htTrainStat(t), mats = D.mat.filter(x => x.training_id === t.id && x.active);
     const canQuiz = canEdit || htSelfOffices(t, D.myStaff).length > 0;
     const chips = t.months.map(x => `<span class="chip ${x === m ? 'now' : htIdx(x) < htIdx(m) && s.late ? 'late' : ''}">${x}月</span>`).join('');
-    return `<tr><td><b>${esc(t.id)} ${esc(t.name)}</b><br><small>${esc(t.category || '')}</small><br>${chips}<br><small>${esc(t.frequency || '')}</small></td>
+    return `<tr id="httr_${esc(t.id)}"><td><b>${esc(t.id)} ${esc(t.name)}</b><br><small>${esc(t.category || '')}</small><br>${chips}<br><small>${esc(t.frequency || '')}</small></td>
     <td>${s.done}/${s.target}人${s.late ? `<br><span class="chip late">遅れ ${s.late}人</span>` : ''}</td>
     <td><span class="chip ok">証跡あり ${s.evOk}</span><br><span class="chip ng">証跡なし ${s.evNg}</span>${s.unconf ? `<br><small>未確認 ${s.unconf}</small>` : ''}</td>
     <td>${mats.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.kind)}</a>`).join('　')}</td>
