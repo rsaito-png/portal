@@ -413,4 +413,21 @@ assert.ok(leo.tiles.find(t => t[2] === 'gl:g4')[1].includes('参考・旧'));
   assert.ok(mine.includes('研修') && !mine.includes('見学者') && mine.includes('その他（研修・見学など）'), '自分の担当では自分のその他だけ（赤）');
 }
 
+sandbox.leoListedStaff = n => String(n).replace(/[\s\u3000]/g, '') !== '河合尚美';
+{
+  const day = '2026-11-11';
+  const rows = [
+    { day, kind: '勤務', staff: '河合　尚美', title: '10:00〜18:00', source: 'shift', _shift: true },
+    { day, kind: '勤務', staff: '中村　友香', title: '10:00〜18:00', source: 'shift', _shift: true },
+    { day, kind: '迎え', staff: '河合 尚美', kids: ['児童A'], start_time: '15:00', end_time: '15:30', place: '見本公園' },
+    { day, kind: '迎え', staff: '連先生', kids: ['児童B'], start_time: '14:00', end_time: '14:30' },
+  ];
+  const h = sgDayHtml(day, rows, {}, { demo: false, today: '2026-10-01' });
+  const chips = h.slice(h.indexOf('class="sg-chips"'), h.indexOf('class="sg-time"'));
+  assert.ok(!chips.includes('河合'), '日の予定の終日（勤務）に河合を出さない');
+  assert.ok(chips.includes('友香先生'), 'ほかの勤務は残す');
+  assert.ok(h.includes('河合 尚美'), '保存済みの迎え担当は残す');
+  assert.ok(h.includes('連先生'));
+}
+delete sandbox.leoListedStaff;
 console.log('leo_home_cal_test ok');

@@ -852,7 +852,10 @@ LEO_VIEWS.hiyari = async function () {
     const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); unread = new Set(rows.filter(r => !mine.has(r.id)).map(r => r.id));
     rd.forEach(x => (readers[x.hiyari_id] ||= new Set()).add(x.user_id));
     if (unread.size) sb('hiyari_reads?on_conflict=hiyari_id,user_id', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify([...unread].map(id => ({ hiyari_id: id }))) }).catch(() => {});
-    if (canManage()) try { staff = await sb('staff_profiles?office=eq.レオ&select=user_id,nikki_name'); } catch (e) { } }
+    if (canManage()) try {
+      staff = await sb('staff_profiles?office=eq.レオ&select=user_id,nikki_name');
+      if (typeof leoListedStaff === 'function') staff = (staff || []).filter(p => leoListedStaff(p && p.nikki_name));
+    } catch (e) { } }
   const isNew = r => unread ? unread.has(r.id) : r.id > seen;
   const notRead = r => staff.filter(p => !(readers[r.id] || new Set()).has(p.user_id)).map(p => p.nikki_name);
   const dt = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });

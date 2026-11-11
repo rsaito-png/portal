@@ -77,4 +77,33 @@ assert.ok(gaps.some(g => /11\/24.*安藤.*予定はありません/.test(g)));
 assert.ok(gaps.some(g => /11\/20.*加藤.*出勤の打刻がありません/.test(g)));
 assert.ok(!gaps.some(g => /11\/27/.test(g)));
 assert.deepStrictEqual(S.shiftPunchGaps(data, ['2026-11-20'], '2026-11-26'), []);
-console.log('leo_shift_test: ok');
+
+(async () => {
+  const D = require('../leo_driver.js');
+  global.leoListedStaff = D.leoListedStaff;
+  global.sb = async () => ({
+    can_edit: true,
+    staff: [{ user_id: 'k', name: '河合　尚美' }, { user_id: 'a', name: '安藤　尚子' }],
+    pick: [{ user_id: 'k', name: '河合尚美' }, { user_id: 's', name: '齊藤　連' }, { user_id: 'm', name: '宮本　幸子' }],
+    base: [{ user_id: 'k', dow: 1, start: '10:00', end: '12:00' }, { user_id: 'a', dow: 1, start: '10:30', end: '14:30' }],
+    days: [{ id: 9, day: '2026-11-16', user_id: 'k', kind: '休み', note: '' }],
+    punches: [{ user_id: 'k', day: '2026-11-16', in: '10:00', out: '12:00' }, { user_id: 'a', day: '2026-11-16', in: '10:30', out: '14:30' }],
+  });
+  S.shiftClear();
+  const loaded = await S.shiftLoad('2026-11-16', '2026-11-22');
+  assert.ok(loaded.staff.some(s => s.name.includes('安藤')) && !loaded.staff.some(s => s.name.includes('河合')));
+  assert.ok(loaded.pick.some(p => p.name.includes('齊藤')) && loaded.pick.some(p => p.name.includes('宮本')));
+  assert.ok(!loaded.pick.some(p => p.name.includes('河合')));
+  assert.ok(!loaded.base.some(b => b.user_id === 'k') && loaded.base.some(b => b.user_id === 'a'));
+  assert.ok(!loaded.days.some(d => d.user_id === 'k'));
+  assert.ok(!loaded.punches.some(p => p.user_id === 'k') && loaded.punches.some(p => p.user_id === 'a'));
+  const ev = S.shiftEvents(loaded, '2026-11-16', '2026-11-16');
+  assert.ok(!ev.some(e => String(e.staff).includes('河合')));
+  assert.ok(ev.some(e => String(e.staff).includes('安藤')));
+  const opts = S.shiftOptionsHtml(['河合　尚美', '安藤　尚子', '齊藤連'], loaded, '2026-11-16', '11:00', '');
+  assert.ok(!opts.includes('河合') && opts.includes('安藤'));
+  const kept = S.shiftOptionsHtml(['安藤　尚子'], loaded, '2026-11-16', '11:00', '河合 尚美');
+  assert.ok(kept.includes('value="河合 尚美"') && kept.includes('selected'));
+  delete global.sb;
+  console.log('leo_shift_test: ok');
+})().catch(e => { console.error(e); process.exit(1); });
