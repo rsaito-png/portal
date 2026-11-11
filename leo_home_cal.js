@@ -389,7 +389,7 @@ function sgDayHtml(day, evs, care, opt) {
   const staff = [];
   const seen = new Set();
   for (const e of es) {
-    if (!e.staff || e.kind === 'その他') continue;   // その他は常に赤なので、担当色の凡例には入れない
+    if (!e.staff || e.kind === 'その他' || e._shift) continue;   // シフトの勤務・休みは送迎の担当色の凡例に入れない   // その他は常に赤なので、担当色の凡例には入れない
     const show = sgStaffShow(e.staff, { demo });
     if (!show || seen.has(sgNk(show))) continue;
     seen.add(sgNk(show));
@@ -467,7 +467,14 @@ async function sgLoad(a, b, mode, anchor) {
     if (seen.has(k)) return false;
     seen.add(k); return true;
   });
-  return evs.filter(e => e.day >= a && e.day <= b);
+  evs = evs.filter(e => e.day >= a && e.day <= b);
+  // 日の画面だけ、職員の「勤務」「休み」を実態のシフト（leo_shift.js）から足す（勤務実績表は見ない）
+  if (mode === 'day' && typeof shiftLoad === 'function' && typeof shiftMergeEvents === 'function') {
+    const sh = await shiftLoad(a, b).catch(() => null);
+    if (typeof window !== 'undefined') window.CAL_SHIFT = sh;
+    evs = shiftMergeEvents(evs, sh, a, b);
+  }
+  return evs;
 }
 function sgTodayJst() {
   if (typeof today === 'function') {

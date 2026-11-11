@@ -650,6 +650,8 @@ const LEO_VIEWS = {
     const drvRaw = await leoDriverNames().catch(() => []);
     const drvNames = [...drvRaw.filter(n => filingDriverName(n) === n), ...drvRaw.map(n => filingDriverName(n)), '保護者'];
     if (!DEMO) try { act = await sb(`leo_activity?day=eq.${day}`); } catch (e) { }
+    // 運転手欄の候補は実態のシフト（leo_shift.js）で絞る：その日の時刻に入っている非常勤＋常勤。休みの人は外す。入力済みの値はそのまま残す
+    const shData = typeof shiftLoad === 'function' ? await shiftLoad(day, day).catch(() => null) : null;
     const A = Object.fromEntries(act.map(x => [String(x.child || '').replace(/\s/g, ''), x]));
     const meals = leoMealByChild(bundle.meals);
     LEO_SNACK_YEN = bundle.yen !== false;
@@ -664,7 +666,7 @@ const LEO_VIEWS = {
           const attrs = `data-row="${r.row_no}" data-child="${esc(r.child)}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
             ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
-            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${driverOptionsHtml(drvNames, shown)}</select></label>`
+            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${shData && typeof shiftOptionsHtml === 'function' ? shiftOptionsHtml(drvNames, shData, day, f === 'pick_driver' ? r.pick_time : r.drop_time, shown) : driverOptionsHtml(drvNames, shown)}</select></label>`
             : `<label>${labelOf[f]}<input ${attrs} value="${esc(shown)}"></label>`;
         };
         const rideRows = NIKKI_RIDE_ROWS.map(fs => `<div class="nk-row">${fs.map(f => fieldHtml(f, r[f] ?? '')).join('')}</div>`).join('');

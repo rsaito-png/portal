@@ -182,14 +182,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261110org"></script>
+<script src="config.js?v=20261111shift"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261110yokota"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261111nkfix"></script>
+<script src="leo.js?v=20261111shift"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261106manual"></script>
 <script src="kin_visit.js?v=20261104all"></script>
@@ -212,8 +212,9 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="contact_inbox.js?v=20261108inq"></script>
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=20261026calov"></script>
-<script src="leo_cal.js?v=20261110drv"></script>
-<script src="leo_home_cal.js?v=20261110fit"></script>
+<script src="leo_cal.js?v=20261111shift"></script>
+<script src="leo_home_cal.js?v=20261111shift"></script>
+<script src="leo_shift.js?v=20261111shift"></script>
 <script src="leo_jippi.js?v=20261103mealfee"></script>
 <script src="leo_jogan.js?v=20261106hand"></script>
 <script src="leo_jissekihyo.js?v=202610201000"></script>
@@ -243,7 +244,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261110req';
+  var BUILD = '20261111shift';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -349,6 +350,9 @@ function leoHomeBody(o) {
   const sougeiNames = ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'];
   const sougei = sougeiNames.flatMap(n => vis.filter(t => t[1] === n));
   const sougeiRow = sougei.length ? `<h3 class="nx">送迎</h3><div class="grid">${sougei.map(tileBig).join('')}</div>` : '';
+  // 実態のシフト（#leo/shift）。職員はみな見られる。直すのは管理者（画面の中で切り替え）。勤務実績表とは別
+  const shiftT = vis.filter(t => t[1] === '実態のシフト');
+  const shiftRow = shiftT.length ? `<h3 class="nx">職員のシフト</h3><div class="grid">${shiftT.map(tileBig).join('')}</div>` : '';
   // 今日やること（児発管）はここ1か所だけ（担当者名の欄には重ねない）
   const todoT = o.todoTop ? vis.filter(t => t[1] === o.todoTop) : [];
   const todoRow = todoT.length ? `<div class="grid">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
@@ -358,6 +362,7 @@ function leoHomeBody(o) {
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
     ${big('#leo/nikki', '📔', '日誌', '', '')}</div>
     ${sougeiRow}
+    ${shiftRow}
     ${duty}
     ${who}${rt}`;
 }

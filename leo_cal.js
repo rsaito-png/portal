@@ -409,7 +409,7 @@ function calForm(e, kids, staffs) {
   <p>日付 <input type="date" id="cf_day" value="${v('day')}" onchange="calAbsSync()"> 種類 <select id="cf_kind" onchange="calKindChange()">${opt(['利用', '休み', '迎え', '送り', '勤務', '不在', '休所', 'その他'], e.kind)}</select></p>
   <p>児童（利用・休み） <input id="cf_child" list="calkids" value="${v('child')}"></p>
   <p>乗る順（迎え・送り、「→」区切り） <input id="cf_kids" list="calkids" value="${esc((e.kids || []).join(' → '))}" style="width:95%"></p>
-  <p>職員・運転 <select id="cf_staff">${driverOptionsHtml(staffs, e.staff)}</select></p>
+  <p>職員・運転 <select id="cf_staff">${typeof shiftOptionsHtml === 'function' && window.CAL_SHIFT ? shiftOptionsHtml(staffs, window.CAL_SHIFT, e.day, e.start_time, e.staff) : driverOptionsHtml(staffs, e.staff)}</select></p>
   <p>時刻 <input type="time" id="cf_st" value="${v('start_time')}">〜<input type="time" id="cf_en" value="${v('end_time')}"></p>
   <p><label><input type="checkbox" id="cf_pd"${e.parent_drop ? ' checked' : ''}> 保護者が送ってくる（☆なし）</label><br><label><input type="checkbox" id="cf_pp"${e.parent_pick ? ' checked' : ''}> 保護者が迎えに来る（★なし）</label></p>
   <p>場所 <input id="cf_place" value="${v('place')}" style="width:95%"></p><p>メモ <input id="cf_note" value="${esc(memo)}" style="width:95%"></p>
@@ -516,7 +516,11 @@ LEO_VIEWS.cal = async function () {
   CAL.d = CAL.d || today();
   const [evs0, cc, ch, LEFT] = await Promise.all([calLoad(), DEMO ? [] : sb('leo_child_care?select=child,note').catch(() => []), canManage() && !DEMO ? sb('leo_children?select=name').catch(() => []) : [], loadLeftIndex()]);
   const shown = (evs0 || []).filter(e => typeof leoCalHidden !== 'function' || !leoCalHidden(e));
-  const evs = filterEventsByLeft(shown, LEFT);
+  // 職員の「勤務」「休み」は実態のシフト（leo_shift.js）から出す。勤務実績表は見ない。同じ日・同じ人の古い勤務行はシフトを優先
+  const [sa, sbb] = calRange();
+  const shData = typeof shiftLoad === 'function' ? await shiftLoad(sa, sbb) : null;
+  window.CAL_SHIFT = shData;
+  const evs = typeof shiftMergeEvents === 'function' ? shiftMergeEvents(filterEventsByLeft(shown, LEFT), shData, sa, sbb) : filterEventsByLeft(shown, LEFT);
   const care = Object.fromEntries(cc.filter(x => x.note).map(x => [nk(x.child), x.note]));
   if (DEMO) care[nk('児童B')] = '（見本）車に乗るとき、抱っこが必要です。';
   const [a, b] = calRange(), btn = (m, l) => `<button onclick="calMode('${m}')"${CAL.mode === m ? ' style="font-weight:bold;background:#e8833a;color:#fff"' : ''}>${l}</button>`;
