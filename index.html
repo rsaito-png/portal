@@ -182,14 +182,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261111shift2"></script>
+<script src="config.js?v=20261111mon"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261111staff"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261111staff"></script>
+<script src="leo.js?v=20261111monstaff"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261106manual"></script>
 <script src="kin_visit.js?v=20261104all"></script>
@@ -244,7 +244,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261111shift2';
+  var BUILD = '20261111mon';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -345,7 +345,7 @@ function leoHomeBody(o) {
   const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
   const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}`;
   const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`);
-  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。
+  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。その隣がモニタリングシート（#leo/monitoring。相談員に渡す用紙）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。
   // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
   const sougeiNames = ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'];
   const sougei = sougeiNames.flatMap(n => vis.filter(t => t[1] === n));
@@ -360,6 +360,7 @@ function leoHomeBody(o) {
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
+    ${big('#leo/monitoring', '📄', 'モニタリングシート', '', '')}
     ${big('#leo/nikki', '📔', '日誌', '', '')}</div>
     ${sougeiRow}
     ${shiftRow}
@@ -525,7 +526,12 @@ async function loadDailySky() {
   if (!r || !r.body) {
     el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b note">今日分はまだありません（管理者は「直す」から書けます）。</div>`;
   } else {
-    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
+    // 長いときは最初のひとかたまりだけ出し、残りは「くわしく」で開く（文章は削らない）
+    const paras = String(r.body).split(/\n+/).filter(Boolean);
+    let head = paras[0] || '', rest = paras.slice(1).join('\n');
+    if (!rest && head.length > 110) { const ss = head.match(/[^。]+。?/g) || [head]; head = ss[0]; rest = ss.slice(1).join(''); }
+    const more = rest ? `<div class="ds-more" hidden>${esc(rest).replace(/\n/g, '<br>')}</div><button type="button" class="inl back" style="font-size:12px;margin-top:4px" onclick="var m=this.previousElementSibling;m.hidden=!m.hidden;this.textContent=m.hidden?'くわしく':'たたむ'">くわしく</button>` : '';
+    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b">${esc(head)}</div>${more}<div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
   }
   el.hidden = false;
 }
