@@ -1,5 +1,4 @@
-// モニタリングシート（#leo/monitoring）：児童選択・手入力・印刷・計画画面からのリンク
-// node tools/leo_monitoring_test.js
+// モニタリングシート（表・計画の目標・印刷）。node tools/leo_monitoring_test.js
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -7,18 +6,17 @@ const assert = require('assert');
 
 const root = path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const els = {};
 const sandbox = {
   DEMO: true,
   console,
   ROLE: '職員',
-  DUTY: '現場支援員',
-  C: { offices: [{ id: 'leo', name: 'レオ' }] },
+  DUTY: '児発管',
+  C: { offices: [{ id: 'leo', name: 'レオ' }], supabaseUrl: 'http://example.test', supabaseKey: 'x' },
   localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-  location: { origin: 'http://localhost', pathname: '/', hash: '#leo/monitoring', search: '?demo=1' },
-  navigator: { clipboard: { writeText: async () => {} } },
+  location: { origin: 'http://localhost', pathname: '/', hash: '#leo/monitoring', search: '?demo=1&duty=児発管' },
+  navigator: {},
   document: {
-    getElementById: id => els[id] || null,
+    getElementById: () => null,
     addEventListener() {},
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -26,131 +24,135 @@ const sandbox = {
   },
   fetch: async () => { throw new Error('no fetch'); },
   setInterval() { return 0; },
-  setTimeout(fn) { if (typeof fn === 'function') fn(); return 0; },
+  setTimeout(fn) { return 0; },
   clearTimeout() {},
   confirm: () => false,
   alert() {},
-  btoa,
-  atob,
-  URLSearchParams,
+  btoa, atob, URLSearchParams,
 };
 sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
-sandbox.$ = id => els[id] || null;
+sandbox.$ = () => null;
 vm.createContext(sandbox);
 vm.runInContext(read('leo_left.js'), sandbox, { filename: 'leo_left.js' });
 vm.runInContext(read('gl.js'), sandbox, { filename: 'gl.js' });
-vm.runInContext(read('leo.js') + '\nthis.__m = { LEO_VIEWS, monPrintHtml, monLatestRow, monOffice, monDateLabel, monSave, monRebuild, monPrint, monOpen };', sandbox, { filename: 'leo.js' });
-const { LEO_VIEWS, monPrintHtml, monLatestRow, monOffice, monSave, monRebuild, monPrint } = sandbox.__m;
+vm.runInContext(read('leo.js') + '\nthis.__m = { LEO_VIEWS, monGoalsFromHonan, monGoalList, monPrintHtml, monDiaryLines, monOffice };', sandbox, { filename: 'leo.js' });
+const { LEO_VIEWS, monGoalsFromHonan, monGoalList, monPrintHtml, monDiaryLines, monOffice } = sandbox.__m;
 
 (async () => {
+  const honan = `#T 個別支援計画書（第2期）
+【長期目標】
+生活の中で、自分からやってみようとする。
+【短期目標と支援内容】
+1.健康・生活
+目標：衣服を自分で整える。
+支援：一緒に確かめる。
+
+2.運動・感覚
+目標：
+支援：声をかける。
+
+3.認知・行動
+目標：もう一度やってみる。
+支援：できたことを伝える。
+`;
+  const parsed = monGoalsFromHonan(honan);
+  assert.strictEqual(parsed.long_term, '生活の中で、自分からやってみようとする。');
+  assert.strictEqual(parsed.short_term.join('|'), '衣服を自分で整える。|もう一度やってみる。');
+  assert.strictEqual(monGoalList(parsed)[0], parsed.long_term);
+
+  const lines = monDiaryLines([
+    { day: '2026-05-01', child: '児童A', activity_text: '鬼ごっこをした。' },
+    { day: '2026-05-01', child: '児童B', text: '別の子の記録' },
+    { day: '2026-05-02', child: '児童 A', text: '順番をゆずった。' },
+  ], '児童A');
+  assert.strictEqual(lines.map(x => x.text).join('|'), '鬼ごっこをした。|順番をゆずった。');
+
   sandbox.location.hash = '#leo/monitoring';
   const blank = await LEO_VIEWS.monitoring();
-  assert.ok(blank.includes('モニタリングシート'));
-  assert.ok(blank.includes('>児童A<'), '在籍の児童A');
-  assert.ok(blank.includes('>児童C<'), '在籍の児童C');
-  assert.ok(!blank.includes('value="児童B"'), '退所の児童Bは一覧に出さない');
-  assert.ok(!blank.includes('value="児童D"'), '退所の児童Dは一覧に出さない');
-  assert.ok(!blank.includes('<textarea'), '児童を選ぶまでは本文欄を出さない');
+  assert.ok(blank.includes('モニタリングシート（相談員へ渡す印刷）'));
+  assert.ok(blank.includes('>児童A<') && blank.includes('>児童C<'));
+  assert.ok(!blank.includes('value="児童B"') && !blank.includes('value="児童D"'));
+  assert.ok(!blank.includes('mon-goal'), '児童を選ぶまでは表を出さない');
+  assert.ok(blank.includes('確認して直してから印刷') === false);
 
   sandbox.location.hash = '#leo/monitoring?child=' + encodeURIComponent('児童A');
   const a = await LEO_VIEWS.monitoring();
-  assert.ok(a.includes('<textarea'), '選んだ児童の本文');
-  assert.ok(a.includes('公園で鬼ごっこ'), '最新の期の本文');
-  assert.ok(a.includes('value="第3期"'), '児童Aの最新は第3期');
-  assert.ok(a.includes('value="2026-05-01"') && a.includes('value="2026-10-31"'));
-  assert.ok(a.includes('onblur="monSave()"'), '欄を離れると保存');
-  assert.ok(a.includes('>保存<') && a.includes('活動記録から作り直す') && a.includes('>印刷する<'));
-  assert.ok(a.includes('手入力'));
+  assert.ok(a.includes('class="mon-goal"'), '目標の欄');
+  assert.ok(a.includes('衣服を自分で整える') || a.includes('排泄のあと、衣服を自分で整える'));
+  assert.ok(a.includes('順番を守って遊ぶ'));
+  assert.ok(a.includes('value="第2期"'), '今の期');
+  assert.ok(a.includes('AIで評価を作る') && a.includes('>印刷する<') && a.includes('>保存<'));
+  assert.ok(a.includes('id="mon_draftnote"'));
+  assert.ok(a.includes('確認して直してから印刷してください'));
   assert.ok(!a.includes('value="児童B"'));
 
-  sandbox.location.hash = '#leo/monitoring?child=' + encodeURIComponent('児童 C');
+  sandbox.location.hash = '#leo/monitoring?child=' + encodeURIComponent('児童C');
   const c = await LEO_VIEWS.monitoring();
-  assert.ok(c.includes('まだモニタリングがありません'), '行が無い児童は空欄から作る');
-  assert.ok(c.includes('value="第4期"'), '計画の次の期を初期値にする');
-  assert.ok(c.includes('value="2026-04-01"') && c.includes('value="2026-09-30"'));
+  assert.ok(c.includes('計画書から目標を取り出せませんでした') || c.includes('行を足して'));
+  assert.ok(c.includes('value="第3期"'));
 
-  sandbox.location.hash = '#leo/monitoring?child=' + encodeURIComponent('児童B');
-  const left = await LEO_VIEWS.monitoring();
-  assert.ok(left.includes('value="児童B"'), '計画画面からのリンクでは退所児童も開ける');
-  assert.ok(left.includes('児童B（退所）'));
+  const doc = monPrintHtml({
+    child: '児童A',
+    update_label: '１１月１１日更新',
+    rows: [{ goal: '衣服を自分で整える。', trend: '自分で上着を整えました（5月）。', rating: '3', issues: 'これからも一緒に取り組んでいきます。' }],
+  });
+  assert.strictEqual(monOffice().no, '2450201047');
+  assert.ok(doc.includes('<h1>モニタリング</h1>'));
+  assert.ok(doc.includes('事業所名：レオ') && doc.includes('事業所番号：2450201047'));
+  assert.ok(doc.includes('児童名：児童A') && doc.includes('更新日：１１月１１日更新'));
+  assert.ok(doc.includes('期間中の主な行動の推移') && doc.includes('総合評価') && doc.includes('進捗と現在の課題'));
+  assert.ok(doc.includes('自分で上着を整えました（5月）。'));
+  assert.ok(doc.includes('size: A4 landscape'));
+  assert.ok(doc.includes('相談支援専門員　御中') && doc.includes('作成者（児発管）'));
+  assert.ok(!doc.includes('確認して直してから印刷'), '確認の注記は印刷しない');
+  assert.ok(!doc.includes('<button'));
+  assert.ok(!doc.includes('日誌'));
 
-  const latest = monLatestRow([
-    { child: '児童A', term: '第2期', text: 'old', made_at: '2026-01-01' },
-    { child: '児童A　', term: '第１０期', text: 'new', made_at: '2026-02-01' },
-    { child: '児童A', term: '第3期', text: 'mid', made_at: '2026-06-01' },
-  ], '児童 A');
-  assert.strictEqual(latest.text, 'new');
+  const bad = monPrintHtml({ child: '<script>', update_label: '', rows: [{ goal: '<b>', trend: '', rating: '', issues: '' }] });
+  assert.ok(bad.includes('&lt;script&gt;') && bad.includes('&lt;b&gt;'));
 
-  const off = monOffice();
-  assert.strictEqual(off.name, 'レオ');
-  assert.strictEqual(off.no, '2450201047');
-  const doc = monPrintHtml({ child: '児童A', term: '第3期', from: '2026-05-01', to: '2026-10-31', text: '1行目\n2行目 <b>', made: '2026-11-11' });
-  assert.ok(doc.includes('<h1>モニタリングシート</h1>'));
-  assert.ok(doc.includes('事業所名：レオ'));
-  assert.ok(doc.includes('事業所番号：2450201047'));
-  assert.ok(doc.includes('児童名：児童A'));
-  assert.ok(doc.includes('期間：第3期　令和8年5月1日 〜 令和8年10月31日'));
-  assert.ok(doc.includes('作成日：令和8年11月11日'));
-  assert.ok(doc.includes('1行目\n2行目 &lt;b&gt;'), '改行を残し、本文の記号はエスケープ');
-  assert.ok(doc.includes('font-size: 12pt'));
-  assert.ok(doc.includes('white-space: pre-wrap') || doc.includes('white-space:pre-wrap'));
-  assert.ok(doc.includes('size: A4 portrait'));
-  assert.ok(doc.includes('margin: 20mm'));
-  assert.ok(doc.includes('相談支援専門員　御中'));
-  assert.ok(doc.includes('作成者（児発管）'));
-  assert.ok(!doc.includes('<button'), '印刷ページに操作ボタンを出さない');
-  assert.ok(!doc.includes('<b>'), '本文のタグは出さない');
-
-  const bad = monPrintHtml({ child: '<script>', term: '第1期', from: '', to: '', text: '', made: '' });
-  assert.ok(bad.includes('&lt;script&gt;'));
-  assert.ok(!bad.includes('<script><'), '児童名をスクリプトにしない');
-
-  els.mon_child = { value: '児童A' };
-  els.mon_term = { value: '第3期' };
-  els.mon_from = { value: '2026-05-01' };
-  els.mon_to = { value: '2026-10-31' };
-  els.mon_text = { value: '手で直した本文' };
-  els.mon_id = { value: '11' };
-  els.mon_msg = { textContent: '', innerHTML: '' };
-  await monSave(true);
-  assert.strictEqual(els.mon_msg.textContent, '見本モードなので保存しません。');
-
-  sandbox.confirm = () => false;
-  els.mon_msg.innerHTML = '';
-  els.mon_msg.textContent = 'before';
-  await monRebuild();
-  assert.strictEqual(els.mon_msg.textContent, 'before', '確認を断ると上書きしない');
-
-  sandbox.confirm = () => true;
-  await monRebuild();
-  assert.ok(els.mon_msg.innerHTML.includes('見本モードなので作りません'), '見本では活動記録から作らない');
-
-  let written = '';
-  sandbox.open = () => ({ document: { write(h) { written += h; }, close() {} } });
-  els.mon_text.value = '印刷する本文\n2行';
-  monPrint();
-  assert.ok(written.includes('印刷する本文\n2行'));
-  assert.ok(written.includes('モニタリングシート'));
-  assert.ok(!written.includes('<button'));
+  sandbox.DUTY = '現場支援員';
+  sandbox.DEMO = false;
+  const denied = await LEO_VIEWS.monitoring();
+  assert.ok(denied.includes('児発管'));
+  sandbox.DEMO = true;
+  sandbox.DUTY = '児発管';
 
   sandbox.location.hash = '#leo/plan';
-  sandbox.DUTY = '児発管';
   const plan = await LEO_VIEWS.plan();
   assert.ok(plan.includes('モニタリングシートを開く'));
   assert.ok(plan.includes('#leo/monitoring?child=' + encodeURIComponent('児童A')));
-  assert.ok(plan.includes('#leo/monitoring?child=' + encodeURIComponent('児童C')));
+
+  const rules = await import('file://' + path.join(root, 'supabase/functions/monitoring-eval/rules.js'));
+  const okRow = [{ goal: '衣服を整える。', trend: '自分で上着を整えました（5月）。公園で順番をゆずりました（6月）。', rating: 3, issues: 'これからも活動の中で様子を見守っていきます。' }];
+  assert.deepStrictEqual(rules.checkDraft(okRow, { child: '児童A', other_names: ['児童B'], staff_names: ['職員X'] }), []);
+  const ng = rules.checkDraft([{ goal: '衣服を整える。', trend: '児童Bくんが一緒でした（5月）。日誌には少ない。', rating: 9, issues: '次期は記録する。' }], { child: '児童A', other_names: ['児童B'], staff_names: ['職員X'] });
+  assert.ok(ng.some(x => x.includes('評価')));
+  assert.ok(ng.some(x => x.includes('保護者へ出さない') || x.includes('人名') || x.includes('他の児童')));
+  const only = rules.childOnlyDiary([
+    { day: '2026-05-01', child: '児童A', text: '鬼ごっこ' },
+    { day: '2026-05-01', child: '児童B', text: '別' },
+  ], '児童A');
+  assert.strictEqual(only.length, 1);
+  assert.strictEqual(only[0].text, '鬼ごっこ');
+  const norm = rules.normalizeRows({ rows: [{ goal: '別', trend: '遊んだ（5月）。', rating: '３', issues: '見守ります。' }] }, ['衣服を整える。']);
+  assert.strictEqual(norm[0].goal, '衣服を整える。');
+  assert.strictEqual(norm[0].rating, 3);
 
   const cfg = read('config.js');
   const idx = read('index.html');
-  const sql = read('supabase/leo_staff_mon_staff.sql');
-  assert.ok(cfg.includes("['📄', 'モニタリングシート', '#leo/monitoring'"));
-  assert.ok(idx.includes('config.js?v=20261111mon'));
-  assert.ok(idx.includes('leo.js?v=20261111monstaff'));
-  assert.ok(idx.includes("big('#leo/monitoring', '📄', 'モニタリングシート'"));
-  assert.ok(sql.includes("public.my_office() = 'レオ' or public.can_manage()"));
-  assert.ok(sql.includes('for insert') && sql.includes('for update'));
-  assert.ok(sql.includes('drop policy if exists lsm_write'));
-  assert.ok(sql.includes('for delete') && sql.includes('public.can_manage()'));
+  const sql = read('supabase/leo_monitoring.sql');
+  const fn = read('supabase/functions/monitoring-eval/index.ts');
+  assert.ok(cfg.includes("['📄', 'モニタリングシート（相談員へ渡す印刷）', '#leo/monitoring'"));
+  assert.ok(cfg.includes("'児発管']") && cfg.includes('#leo/monitoring'));
+  assert.ok(!cfg.includes("毎日やる＝今日の利用児童・ヒヤリハット・LINE報告を書く・モニタリングシート"));
+  assert.ok(idx.includes('leo.js?v=20261111moneval'));
+  assert.ok(!idx.includes("big('#leo/monitoring'"));
+  assert.ok(fn.includes('ログインが必要です'));
+  assert.ok(fn.includes('https://api.x.ai/v1/chat/completions'));
+  assert.ok(fn.includes('XAI_API_KEY'));
+  assert.ok(fn.includes('childOnlyDiary'));
+  assert.ok(sql.includes('leo_monitoring') && sql.includes("my_office() = 'レオ' or public.can_manage()"));
   console.log('leo_monitoring_test ok');
 })().catch(e => { console.error(e); process.exit(1); });

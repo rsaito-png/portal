@@ -227,7 +227,7 @@ const planFn = between(leo, 'function leoKidPlanHtml', 'function leoKindOf');
 assert.ok(!planFn.includes('source_url') && !planFn.includes('target="_blank"') && !planFn.includes('PDF未登録'));
 assert.ok(planFn.includes('本計画PDFはまだ登録されていません'));
 assert.ok(leo.includes('元の計画書を開く'));
-assert.ok(index.includes('leo.js?v=20261111monstaff'));
+assert.ok(index.includes('leo.js?v=20261111moneval'));
 const leoMergeNikki = grab('leoMergeNikki');
 const leoDropClock = grab('leoDropClock');
 assert.strictEqual(leoDropClock({ start_time: '17:00', end_time: '17:25', kid_times: { '下宮蒼偉': '17:00' } }, '下宮蒼偉', '17:00'), '17:25', '利用終了の写しより便の着');

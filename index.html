@@ -182,14 +182,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261111mon"></script>
+<script src="config.js?v=20261111moneval"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261111staff"></script>
 <script src="leo_meal.js?v=20261102snack"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261111monstaff"></script>
+<script src="leo.js?v=20261111moneval"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261106manual"></script>
 <script src="kin_visit.js?v=20261104all"></script>
@@ -244,7 +244,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261111mon';
+  var BUILD = '20261111moneval';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -345,7 +345,7 @@ function leoHomeBody(o) {
   const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
   const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}`;
   const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`);
-  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。その隣がモニタリングシート（#leo/monitoring。相談員に渡す用紙）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。
+  // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。モニタリングシートは事務・計画（個別支援計画の隣）。
   // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
   const sougeiNames = ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'];
   const sougei = sougeiNames.flatMap(n => vis.filter(t => t[1] === n));
@@ -360,7 +360,6 @@ function leoHomeBody(o) {
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
-    ${big('#leo/monitoring', '📄', 'モニタリングシート', '', '')}
     ${big('#leo/nikki', '📔', '日誌', '', '')}</div>
     ${sougeiRow}
     ${shiftRow}
@@ -409,7 +408,7 @@ async function render() {
   const route = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (!(route[0] === 'leo' && route[1] === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(route[2] || '')) && typeof sgClearEdit === 'function') sgClearEdit();
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
-  if (!(id === 'leo' && (sub === 'kata' || sub === 'master' || sub === 'kinmu')) && !(id === 'chamu' && sub === 'kinmu')) document.body.classList.remove('wide-sheet');
+  if (!(id === 'leo' && (sub === 'kata' || sub === 'master' || sub === 'kinmu' || sub === 'monitoring')) && !(id === 'chamu' && sub === 'kinmu')) document.body.classList.remove('wide-sheet');
   if (id === 'leo' && sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '') && typeof renderSgDay === 'function') return renderSgDay(sub2);
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
