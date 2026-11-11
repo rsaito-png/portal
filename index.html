@@ -182,7 +182,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261111leocontract"></script>
+<script src="config.js?v=20261112quota"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -192,7 +192,8 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="leo.js?v=20261111car2"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261106manual"></script>
-<script src="kin_visit.js?v=20261104all"></script>
+<script src="kin_visit.js?v=20261112quota"></script>
+<script src="kin_quota.js?v=20261112quota"></script>
 <script src="kin_check.js?v=202610171730"></script>
 <script src="signpad.js?v=202610170620"></script>
 <script src="nicchu.js?v=20261107b"></script>
@@ -245,7 +246,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261111leocontract';
+  var BUILD = '20261112quota';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -425,6 +426,7 @@ async function render() {
   if (id === 'kintoun' && sub === 'check') return renderKinCheck();
   if (id === 'kintoun' && sub === 'visit') { KV.id = null; return renderKinVisit(); }
   if (id === 'kintoun' && sub === 'write') return renderKinWrite();
+  if (id === 'kintoun' && sub === 'quota' && typeof renderKinQuota === 'function') return renderKinQuota();
   if (id === 'nicchu' && sub === 'log' && typeof renderNicchu === 'function') return renderNicchu();
   if (id === 'nicchu' && sub === 'jisseki' && typeof renderNicchuJisseki === 'function') return renderNicchuJisseki();
   if (id === 'nicchu' && sub === 'sign' && typeof renderNicchuSign === 'function') return renderNicchuSign();

@@ -110,11 +110,11 @@ window.PORTAL_CONFIG = {
       ['📁', '書類', '', '準備中'] ] },
     { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227',
       pt: { '打刻': 'Ponto', '記録記入': 'Preencher registro', 'スケジュール表': 'Escala / agenda', '今月の記録': 'Registros deste mês', '利用者・契約': 'Usuários e contratos', '請求情報': 'Informações de cobrança', 'その他': 'Outros',
-        '土日スケジュール': 'Agenda de sábado e domingo', '利用契約書・重要事項説明書': 'Contrato e explicação de itens importantes', '居宅介護計画の同意': 'Consentimento do plano de cuidados', 'サービス提供実績記録表': 'Registro de serviços prestados', '記録・署名チェック': 'Verificar registros e assinaturas', '台帳': 'Livro de registros', 'アセスメント・会議録': 'Avaliação e atas de reunião', 'ヒヤリハット週報': 'Relatório semanal de quase-acidentes', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
+        '土日スケジュール': 'Agenda de sábado e domingo', '支給量と土曜の予定': 'Cota mensal e visitas de sábado', '利用契約書・重要事項説明書': 'Contrato e explicação de itens importantes', '居宅介護計画の同意': 'Consentimento do plano de cuidados', 'サービス提供実績記録表': 'Registro de serviços prestados', '記録・署名チェック': 'Verificar registros e assinaturas', '台帳': 'Livro de registros', 'アセスメント・会議録': 'Avaliação e atas de reunião', 'ヒヤリハット週報': 'Relatório semanal de quase-acidentes', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
       // GAS・印刷タイルは外し、ポータル記録中心。請求CSV専用画面(#kintoun/seikyu)は未作成→実績記録表に請求用JSONあり
       groups: [
         ['📝', '記録記入', ['記録記入']],
-        ['📅', '土日スケジュール', ['土日スケジュール']],
+        ['📅', '土日スケジュール', ['土日スケジュール', '支給量と土曜の予定']],
         ['📋', '今月の記録', ['今月の記録']],
         ['👤', '利用者・契約', ['利用契約書・重要事項説明書', '居宅介護計画の同意']],
         ['💴', '請求情報', ['サービス提供実績記録表', '記録・署名チェック', '台帳']],
@@ -122,6 +122,7 @@ window.PORTAL_CONFIG = {
       tiles: [
       ['📝', '記録記入', '#kintoun/write', 'サービス実施記録。通常・同じ建物で連続・まとめて署名', 'main'],
       ['📅', '土日スケジュール', 'gl:g23', '居宅介護・日中一時の土日。別タブで開く', 'main'],
+      ['🧮', '支給量と土曜の予定', '#kintoun/quota', '支給量から平日の分を引いて、土曜に入れられる回数を出す・休みを入れる'],
       ['📋', '今月の記録', '#kintoun/visit', '今月の訪問を見る・直す／特記ありだけ抽出', 'main'],
       ['📄', '利用契約書・重要事項説明書', '#kintoun/contract', '契約書・重要事項説明書・計画書の署名状況／署名リンク発行'],
       ['📝', '居宅介護計画の同意', '#kintoun/consent', '計画を見て、iPadで同意（Googleフォームの代わり）'],

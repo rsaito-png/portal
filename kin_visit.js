@@ -375,6 +375,7 @@ async function kvList() {
     sb('kin_user?select=id,name&order=name'),
     sb('kin_instruction?select=*&order=id').catch(() => null)
   ]);
+  const overNote = typeof kqOverNote === 'function' ? await kqOverNote(m) : '';
   KV.users = us; KV.instructions = ins || []; KV.instrMissing = ins === null;
   const nm = Object.fromEntries(us.map(u => [u.id, u.name]));
   const hasNote = v => !!(v.note && String(v.note).trim());
@@ -398,7 +399,7 @@ async function kvList() {
   const summary = KV.noteOnly
     ? `<p>特記あり ${vs.length}件（この月の全記録 ${vsAll.length}件）</p>`
     : `<p>${vs.length}件／特記あり ${noteN}件／未署名 ${vs.filter(v => v.sign_status !== '署名済み').length}件</p>`;
-  return `<h3>今月の記録</h3><p>月 <input type="month" id="kv_m" value="${esc(m)}" onchange="KV.month=this.value||KV.month;renderKinVisit()"> <a class="back" href="#kintoun/write">＋記録を書く</a> <button class="back" onclick="location.hash='kintoun/check'">✅記録・署名チェック／署名リンク発行へ</button> ${filt} ${kvSched()}</p>` +
+  return `<h3>今月の記録</h3>${overNote}<p>月 <input type="month" id="kv_m" value="${esc(m)}" onchange="KV.month=this.value||KV.month;renderKinVisit()"> <a class="back" href="#kintoun/write">＋記録を書く</a> <button class="back" onclick="location.hash='kintoun/check'">✅記録・署名チェック／署名リンク発行へ</button> ${filt} ${kvSched()}</p>` +
     (vs.length ? `<table class="tbl">${head}${rows}</table>${summary}` : empty) +
     kvCss() + kvInstrAdmin(us, ins);
 }
@@ -1304,6 +1305,7 @@ async function renderKinWrite() {
     ]);
     KW.users = users || [];
     KW.slots = kvSlotsFromSupplies(supplies || [], KW.users);
+    if (typeof kqExtraSlots === 'function') KW.slots = KW.slots.concat(await kqExtraSlots(KW.users, supplies || []));
     KW.buildings = kvBuildingsFromSlots(KW.slots);
     KW.instructions = ins || [];
     KW.instrMissing = ins === null;
