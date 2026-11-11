@@ -250,8 +250,8 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
       localStorage.setItem('portalBuild', BUILD);
-      location.reload();
-      return;
+      // 同じ画面（タブ）では同じ版につき1回だけ再読込する（古い版と新しい版の画面を同時に開いていても、くり返し読み込まない）
+      if (sessionStorage.getItem('portalReloaded') !== BUILD) { sessionStorage.setItem('portalReloaded', BUILD); location.reload(); return; }
     }
     localStorage.setItem('portalBuild', BUILD);
   } catch (e) {}
