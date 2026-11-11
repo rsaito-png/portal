@@ -1488,7 +1488,7 @@ async function renderLeoView(name) {
   try {
     const planEdit = name === 'plan' ? leoPlanEditFromHash() : '';
     $('view').innerHTML = `<button class="back" onclick="location.hash='leo'">← レオへ</button>` + await LEO_VIEWS[name]();
-    if (name === 'master' || name === 'kata') fitMasterSheet();
+    if (name === 'master' || name === 'kata') { fitMasterSheet(); if (document.fonts) { document.fonts.ready.then(fitMasterSheet); document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', fitMasterSheet); } setTimeout(fitMasterSheet, 800); }
     if (planEdit && typeof trackEdit === 'function' && canManage()) {
       const det = document.querySelector('#plan_editor') && document.querySelector('details summary');
       // 管理表の行を直す欄を開いてから編集フォームを出す
@@ -2420,7 +2420,7 @@ function fitMasterSheet() {
   table.querySelectorAll('input').forEach(inp => {
     const col = inp.dataset.c || '';
     const basis = masterBasis(col, inp.value, cs.font);
-    byCol[col] = Math.max(byCol[col] || 0, Math.ceil(masterTextPx(basis, cs.font) + extra));
+    byCol[col] = Math.max(byCol[col] || 0, Math.ceil(masterTextPx(basis, cs.font) + extra + 4));
   });
   table.querySelectorAll('input').forEach(inp => { inp.style.width = byCol[inp.dataset.c] + 'px'; });
   table.querySelectorAll('th').forEach(th => {
@@ -2434,7 +2434,7 @@ function fitMasterInput(el) {
   if (!el) return;
   const cs = getComputedStyle(el);
   const basis = masterBasis(el.dataset.c || '', el.value, cs.font);
-  const need = Math.ceil(masterTextPx(basis, cs.font) + masterPad(cs));
+  const need = Math.ceil(masterTextPx(basis, cs.font) + masterPad(cs) + 4);
   if (need > el.getBoundingClientRect().width + 1) el.style.width = need + 'px';
 }
 function addMasterRow() {
