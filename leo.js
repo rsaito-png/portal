@@ -2009,7 +2009,8 @@ const PLAN_DEMO_DB = { plans: [{ id: 1, child: '児童B', term_no: 2, start_on: 
     assessment: null, genan: null, kaigi: null, honan: null, plan_made: false, genan_consent_at: null, honan_consent_at: null, verified: true },
   { id: 2, child: '児童A', term_no: 2, start_on: '2026-05-01', end_on: '2026-10-31', imported_from: '（見本）既存の計画書ドキュメント', verified: true, note: '実際の期間：令和8年5月8日〜令和8年11月7日。元：Googleドキュメント（4書類に分けて取り込み）', honan: '（見本）取り込んだ今期の本案の本文', plan_made: true, genan_consent_at: '2026-04-28', honan_consent_at: '2026-04-30' }],
   mon: [{ child: '児童B', term: '第2期', answers: { grade: '小1', adl: 3, body: 4, emo: 2, env: 3, comm: 3, social: 2, wish: '（見本）友だちとの関わりを増やしたい' }, submitted_at: '2026-10-12' }],
-  staff: [{ child: '児童B', term: '第2期', text: '（見本）5/1〜10/14 の活動記録から：公園で鬼ごっこ…', source: '自動（簡易）' }] };
+  staff: [{ child: '児童B', term: '第2期', period_from: '2026-03-01', period_to: '2026-08-31', text: '（見本）5/1〜10/14 の活動記録から：公園で鬼ごっこ…', source: '自動（簡易）' },
+    { id: 11, child: '児童A', term: '第3期', period_from: '2026-05-01', period_to: '2026-10-31', text: '（見本）公園で鬼ごっこ。友だちに順番をゆずれた。おやつは完食。', source: '手入力', made_at: '2026-11-01T00:00:00+09:00' }] };
 PLAN_DEMO_DB.sends = [{ kind: 'mon', child: '児童C', term: '第5期', sent_at: '2026-10-03T10:00:00+09:00', via: 'ポータル' }, { kind: 'doui', child: '児童B', term: '第2期', plan_id: 1, doc: '原案', sent_at: '2026-10-05T10:00:00+09:00', via: 'ポータル' }, { kind: 'doui', child: '児童B', term: '第2期', plan_id: 1, doc: '原案', sent_at: '2026-10-11T10:00:00+09:00', via: 'ポータル' }];
 PLAN_DEMO_DB.clinks = [];
 // 管理表：ポータルの leo_plan_track（児童1行）を読む。空・取得失敗のときは従来の sheetRows('keikaku') に戻す（読み取りだけ。シートへは書き戻さない）
@@ -2154,7 +2155,7 @@ LEO_VIEWS.plan = async function () {
         <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '　✅ 確認済' : '　<span class="badge">未確認</span>'}</small></p>${now.note ? `<p><small>${esc(now.note)}</small></p>` : ''}${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
         <h4>1. 保護者アンケート</h4>${mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
         ${mg ? btn('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`) : ''}
-        <h4>2. 職員モニタリング</h4>${sm ? `<details><summary>${esc(sm.source)}（タップで読む）</summary><p style="white-space:pre-wrap"><small>${esc(sm.text)}</small></p></details>` : '<p class="note">まだありません。</p>'}
+        <h4>2. 職員モニタリング</h4><p><a href="#leo/monitoring?child=${encodeURIComponent(name)}">モニタリングシートを開く</a></p>${sm ? `<details><summary>${esc(sm.source)}（タップで読む）</summary><p style="white-space:pre-wrap"><small>${esc(sm.text)}</small></p></details>` : '<p class="note">まだありません。</p>'}
         ${mg ? btn('活動記録から作る（今の計画期間）', `staffMon('${esc(name)}','${term}',${cur})`) : ''}
         <h4>3. 計画書（4書類）</h4>
         ${p ? `${btn('書類を開いて直す', `planEdit(${p.id})`)}${btn('印刷する', `planPrint(${p.id})`)}
@@ -2284,13 +2285,16 @@ async function planResend(kind, child, term, planId, doc) {
   } catch (e) { copyError(B, e.message, child); }
 }
 // ④ 職員モニタリング：今の計画期間の活動記録（日誌Q列＋ポータルの下書き由来）を日付順にまとめる。ボットが文章に整える
-async function staffMon(name, term, cur) {
+// opt.view があると、作り終えたあとでその画面を開き直す（モニタリングシート）。opt.onNote は結果の表示先。
+async function staffMon(name, term, cur, opt) {
+  opt = opt || {};
   const B = copyBtnEl(), NN = x => String(x || '').replace(/[\s\u3000]/g, '');
-  const bad = h => copyNote(B, `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">${h}</p>`, name);
-  if (DEMO) { copyNote(B, '<p class="note">見本モードなので作りません。</p>', name); return; }
+  const say = h => { if (typeof opt.onNote === 'function') opt.onNote(h); else copyNote(B, h, name); };
+  const bad = h => say(`<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">${h}</p>`);
+  if (DEMO) { say('<p class="note">見本モードなので作りません。</p>'); return; }
   if (B) B.disabled = true;
   try {
-    copyNote(B, '<p class="note">作っています…</p>', name);
+    say('<p class="note">作っています…</p>');
     const r = (await trackRows()).find(x => NN(x['児童名']) === NN(name)) || {}, tk = r._track || {};
     const m = String(r['現在の計画期間'] || '').match(/(\d{4})年\s*(\d{1,2})月/);
     let from = m ? `${m[1]}-${String(m[2]).padStart(2, '0')}-01` : (tk.period_from || null);
@@ -2305,10 +2309,225 @@ async function staffMon(name, term, cur) {
     if (!rows.length) { bad(`この期間（${from}〜${to}）の活動記録がありません。日誌に活動記録が入っていません`); return; }
     const text = `【${from}〜${to} の活動記録から（${rows.length}日分）】\n` + rows.map(x => `${fmtDay(x.day)}　${x.activity_text}`).join('\n');
     await sb('leo_staff_mon?on_conflict=child,term', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ child: name, term, period_from: from, period_to: to, text: text.slice(0, 20000), source: '自動（簡易）' }) });
-    copyNote(B, `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">作りました（${rows.length}日分）</p>`, name);
-    setTimeout(() => renderLeoView('plan'), 1500);
+    say(`<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">作りました（${rows.length}日分）</p>`);
+    if (opt.view) MON_FLASH = `活動記録から作り直しました（${rows.length}日分）。`;
+    setTimeout(() => renderLeoView(opt.view || 'plan'), opt.view ? 400 : 1500);
   } catch (e) { bad('失敗しました：' + esc(e.message)); }
   finally { if (B) B.disabled = false; }
+}
+// ===== モニタリングシート（#leo/monitoring）：相談員に渡す用紙。最新の期を手入力し、印刷する =====
+let MON_LOADED = '';
+let MON_FLASH = '';
+function monChildFromHash() {
+  const hash = String((typeof location !== 'undefined' && location.hash) || '');
+  const i = hash.indexOf('?');
+  if (i < 0) return '';
+  return (new URLSearchParams(hash.slice(i + 1)).get('child') || '').trim();
+}
+function monLatestRow(staff, name) {
+  const want = planNormName(name);
+  const hit = (staff || []).filter(x => x && planNormName(x.child) === want);
+  hit.sort((a, b) => (planTermNo(b.term) || 0) - (planTermNo(a.term) || 0) || String(b.made_at || '').localeCompare(String(a.made_at || '')));
+  return hit[0] || null;
+}
+function monBlankTerm(rows, name) {
+  const r = (rows || []).find(x => x && planNormName(x['児童名']) === planNormName(name));
+  if (!r) return { term: '第1期', from: '', to: '' };
+  const cur = parseInt(String(r['現在の期'] || '').replace(/\D/g, ''), 10) || 0;
+  const tk = r._track || {};
+  let from = tk.period_from ? String(tk.period_from).slice(0, 10) : '';
+  const to = tk.period_to ? String(tk.period_to).slice(0, 10) : '';
+  if (!from) {
+    const m = String(r['現在の計画期間'] || '').match(/(\d{4})年\s*(\d{1,2})月/);
+    if (m) from = `${m[1]}-${String(m[2]).padStart(2, '0')}-01`;
+  }
+  return { term: `第${cur + 1}期`, from, to };
+}
+function monOffice() {
+  let list = [];
+  try { list = (typeof C !== 'undefined' && C && C.offices) || (typeof PORTAL_CONFIG !== 'undefined' && PORTAL_CONFIG && PORTAL_CONFIG.offices) || []; } catch (e) { list = []; }
+  const o = (list || []).find(x => x && x.id === 'leo') || {};
+  return { name: o.name || 'レオ', no: String(o.officeNo || o.office_no || o.no || '2450201047') };
+}
+function monDateLabel(iso) {
+  const m = String(iso || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const y = +m[1], mo = +m[2], d = +m[3];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return y >= 2019 ? `令和${y - 2018}年${mo}月${d}日` : `${y}年${mo}月${d}日`;
+}
+function monPeriodLabel(term, from, to) {
+  const a = monDateLabel(from), b = monDateLabel(to);
+  const span = a && b ? `${a} 〜 ${b}` : (a || b);
+  return [term, span].filter(Boolean).join('　');
+}
+function monPrintHtml(v) {
+  const off = monOffice();
+  const period = monPeriodLabel(v.term || '', v.from || '', v.to || '');
+  const made = monDateLabel(v.made || '');
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>モニタリングシート ${esc(v.child || '')}</title>
+<style>
+@page { size: A4 portrait; margin: 0; }
+body { font-family: "Hiragino Mincho ProN", "Yu Mincho", "Hiragino Sans", "Noto Sans JP", serif; font-size: 12pt; line-height: 1.85; color: #111; margin: 20mm; }
+h1 { text-align: center; font-size: 18pt; letter-spacing: 0.35em; margin: 0 0 12mm; font-weight: 700; }
+.meta { margin: 0 0 8mm; }
+.meta p { margin: 1mm 0; }
+.body { white-space: pre-wrap; font-size: 12pt; min-height: 80mm; margin: 0; }
+.foot { margin-top: 18mm; page-break-inside: avoid; }
+.foot p { margin: 12mm 0; font-size: 12pt; }
+.ul { display: inline-block; width: 70mm; border-bottom: 1px solid #111; margin-left: 6mm; height: 1.2em; vertical-align: bottom; }
+</style></head><body>
+<h1>モニタリングシート</h1>
+<div class="meta">
+<p>事業所名：${esc(off.name)}</p>
+<p>事業所番号：${esc(off.no)}</p>
+<p>児童名：${esc(v.child || '')}</p>
+<p>期間：${esc(period)}</p>
+<p>作成日：${esc(made)}</p>
+</div>
+<div class="body">${esc(v.text || '')}</div>
+<div class="foot">
+<p>相談支援専門員　御中</p>
+<p>作成者（児発管）<span class="ul"></span></p>
+</div>
+<script>setTimeout(function(){print()},300)<\/script>
+</body></html>`;
+}
+async function monRoster(rows) {
+  const LEFT = await loadLeftIndex();
+  const tday = today();
+  let raw = [];
+  if (DEMO) {
+    raw = [...PLAN_DEMO_ROWS.map(r => r['児童名']), ...DEMO_DATA.nikki.map(r => r.child), ...DEMO_DATA.kata.map(r => r['児童名']), ...DEMO_BILL.kids.map(k => k.name)];
+  } else {
+    const [info, kata, kei] = await Promise.all([
+      sb('leo_child_info?select=name&order=name').catch(() => []),
+      sheetRows('kata').catch(() => []),
+      Promise.resolve(rows || []),
+    ]);
+    raw = [...(info || []).map(x => x.name), ...(kata || []).map(r => r['児童名']), ...(kei || []).map(r => r['児童名'])];
+  }
+  const seen = new Set();
+  const all = [];
+  for (const n of raw) {
+    if (!n || String(n).startsWith('※')) continue;
+    const k = planNormName(n);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    all.push(String(n));
+  }
+  all.sort((a, b) => a.localeCompare(b, 'ja'));
+  const names = all.filter(n => !leftDone(LEFT, n, tday));
+  const want = monChildFromHash();
+  let sel = '';
+  if (want) {
+    sel = names.find(n => planNormName(n) === planNormName(want)) || '';
+    if (!sel) {
+      const left = all.find(n => planNormName(n) === planNormName(want));
+      if (left) { names.push(left); sel = left; }
+    }
+  }
+  return { names, sel, LEFT, tday };
+}
+function monSnapNow() {
+  const child = ($('mon_child') || {}).value || '';
+  const term = (($('mon_term') || {}).value || '').trim();
+  const from = ($('mon_from') || {}).value || '';
+  const to = ($('mon_to') || {}).value || '';
+  const text = ($('mon_text') || {}).value || '';
+  return { child, term, from, to, text };
+}
+LEO_VIEWS.monitoring = async function () {
+  const data = DEMO ? { rows: PLAN_DEMO_ROWS, staff: PLAN_DEMO_DB.staff } : { rows: await trackRows().catch(() => []), staff: await sb('leo_staff_mon?select=id,child,term,period_from,period_to,text,source,made_at').catch(() => []) };
+  const roster = await monRoster(data.rows);
+  const sel = roster.sel;
+  const row = sel ? monLatestRow(data.staff, sel) : null;
+  const blank = sel && !row ? monBlankTerm(data.rows, sel) : { term: '', from: '', to: '' };
+  const term = row ? (row.term || '') : blank.term;
+  const from = row && row.period_from ? String(row.period_from).slice(0, 10) : blank.from;
+  const to = row && row.period_to ? String(row.period_to).slice(0, 10) : blank.to;
+  const text = row ? (row.text || '') : '';
+  const id = row && row.id != null ? String(row.id) : '';
+  MON_LOADED = sel ? JSON.stringify({ child: sel, term, from, to, text }) : '';
+  const flash = MON_FLASH;
+  MON_FLASH = '';
+  const opt = n => `<option value="${esc(n)}"${n === sel ? ' selected' : ''}>${esc(n)}${leftDone(roster.LEFT, n, roster.tday) ? '（退所）' : ''}</option>`;
+  const form = !sel ? '<p class="note">児童を選ぶと、いちばん新しい期のモニタリングが出ます。まだ無い児童は、空欄から作れます。</p>' : `
+    <p class="note">${row ? `この児童のいちばん新しい期です。出典：${esc(row.source || '')}。直して欄を離れると「手入力」で保存します。` : 'まだモニタリングがありません。空欄から作れます。保存すると「手入力」になります。'}</p>
+    ${flash ? `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold">${esc(flash)}</p>` : ''}
+    <input type="hidden" id="mon_id" value="${esc(id)}">
+    <label style="display:block;margin:8px 0">期（例：第3期）<br><input id="mon_term" value="${esc(term)}" onblur="monSave()" style="font-size:18px;padding:8px;width:12em"></label>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin:8px 0">
+      <label>期間のはじめ<br><input type="date" id="mon_from" value="${esc(from)}" onblur="monSave()" style="font-size:16px;padding:8px"></label>
+      <label>期間のおわり<br><input type="date" id="mon_to" value="${esc(to)}" onblur="monSave()" style="font-size:16px;padding:8px"></label>
+    </div>
+    <label style="display:block;margin:8px 0">本文<br><textarea id="mon_text" rows="18" onblur="monSave()" style="width:100%;box-sizing:border-box;font-size:16px;line-height:1.7">${esc(text)}</textarea></label>
+    <p style="display:flex;flex-wrap:wrap;gap:8px">
+      <button type="button" onclick="monSave(true)" style="font-size:16px;padding:10px 16px">保存</button>
+      <button type="button" onclick="monRebuild()" style="font-size:16px;padding:10px 16px">活動記録から作り直す</button>
+      <button type="button" onclick="monPrint()" style="font-size:16px;padding:10px 16px">印刷する</button>
+    </p>
+    <p class="note">欄を離れたときと「保存」で保存します。活動記録から作り直すと、いまの本文を上書きします（作る前に確認します）。印刷はA4縦です。</p>`;
+  return `<h3>モニタリングシート</h3>${demoNote()}
+    <p class="note">相談支援専門員に渡す用紙です。在籍の児童を選んで、本文を手で直し、印刷してください。退所した児童は一覧に出しません。</p>
+    <label style="display:block;margin:8px 0">児童<br>
+      <select id="mon_child" onchange="monOpen(this.value)" style="font-size:18px;padding:8px;width:100%;max-width:28em">
+        <option value="">選んでください</option>
+        ${roster.names.map(opt).join('')}
+      </select>
+    </label>
+    ${form}
+    <div id="mon_msg"></div>`;
+};
+function monOpen(name) {
+  const q = name ? '?child=' + encodeURIComponent(name) : '';
+  location.hash = 'leo/monitoring' + q;
+}
+async function monSave(force) {
+  const msg = $('mon_msg');
+  const got = monSnapNow();
+  if (!got.child) { if (force && msg) msg.textContent = '児童を選んでください。'; return; }
+  if (!got.term) { if (msg) msg.textContent = '期を入れてください。'; return; }
+  if (got.text.length > 20000) { if (msg) msg.textContent = '本文が長すぎます（20000字まで）。'; return; }
+  const snap = JSON.stringify(got);
+  if (!force && snap === MON_LOADED) return;
+  if (DEMO) { MON_LOADED = snap; if (msg) msg.textContent = '見本モードなので保存しません。'; return; }
+  const body = { child: got.child, term: got.term, period_from: got.from || null, period_to: got.to || null, text: got.text, source: '手入力', made_at: new Date().toISOString() };
+  const uid = typeof leoMyUid === 'function' ? leoMyUid() : '';
+  if (uid) body.made_by = uid;
+  const id = (($('mon_id') || {}).value || '').trim();
+  try {
+    if (id) {
+      await sb(`leo_staff_mon?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+    } else {
+      const rows = await sb('leo_staff_mon?on_conflict=child,term', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body) });
+      const nid = rows && rows[0] && rows[0].id;
+      if (nid != null && $('mon_id')) $('mon_id').value = String(nid);
+    }
+    MON_LOADED = snap;
+    if (msg) msg.textContent = '保存しました。';
+  } catch (e) { if (msg) msg.textContent = e.message; }
+}
+async function monRebuild() {
+  const got = monSnapNow();
+  const msg = $('mon_msg');
+  if (!got.child) { if (msg) msg.textContent = '児童を選んでください。'; return; }
+  if (!got.term) { if (msg) msg.textContent = '期を入れてください。'; return; }
+  if (!confirm('活動記録から作り直します。いまの本文は上書きされます。よろしいですか？')) return;
+  await staffMon(got.child, got.term, 0, {
+    view: 'monitoring',
+    onNote: h => { const el = $('mon_msg'); if (el) el.innerHTML = h; },
+  });
+}
+function monPrint() {
+  const got = monSnapNow();
+  const msg = $('mon_msg');
+  if (!got.child) { if (msg) msg.textContent = '児童を選んでください。'; return; }
+  const html = monPrintHtml({ child: got.child, term: got.term, from: got.from, to: got.to, text: got.text, made: today() });
+  const w = window.open('', '_blank');
+  if (!w) { alert('ポップアップを許可してください'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 // ===== 型表・送迎の配慮はレオの職員が直す。管理表・配置表は児発管・管理者・事務 =====
 const MASTER_LABEL = { kata: '送迎 型表', keikaku: '個別支援計画 管理表', haichi: '職員配置表', care: '送迎の配慮（児童ごと）' };
