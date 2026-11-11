@@ -127,13 +127,13 @@ async function myName() {
   return p[0]?.nikki_name || '';
 }
 const same = (a, b) => a && b && a.replace(/\s/g, '') === b.replace(/\s/g, '');
-// 車：日誌に車が入っていなければ、運転手から決める（齊藤＝アクア、中村友香＝フリード、それ以外の職員＝モコ）。保護者送迎・送迎なしは「—」。
+// 車：日誌に車が入っていなければ、運転手から決める（齊藤・宮本＝アクア、中村友香＝フリード、それ以外の職員＝モコ）。保護者送迎・送迎なしは「—」。
 function leoCarFor(driver, car) {
   if (String(car || '').trim()) return car;
   const d = String(driver || '').replace(/\s/g, '');
   if (!d) return '';
   if (/保護者|送迎なし|^なし$|徒歩|自力/.test(d)) return '—';
-  if (/齊藤|斉藤|齋藤|^連/.test(d)) return 'アクア';
+  if (/齊藤|斉藤|齋藤|^連|宮本/.test(d)) return 'アクア';   // 宮本さんの運転は記録上「齊藤」なのでアクア
   if (/中村友香|友香/.test(d)) return 'フリード';
   return 'モコ';
 }
