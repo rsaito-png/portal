@@ -38,6 +38,7 @@ const leoKidWarnHtml = grab('leoKidWarnHtml');
 const leoSougeiAllHtml = grab('leoSougeiAllHtml');
 const LEO_PLAN_NOTE = grab('LEO_PLAN_NOTE');
 const same = grab('same');
+const leoCarFor = grab('leoCarFor');
 const filterEventsByLeft = grab('filterEventsByLeft');
 const leftIndex = grab('leftIndex');
 
@@ -57,13 +58,24 @@ const jobs = leoPlanJobs(events);
 assert.strictEqual(jobs.length, 5, '迎え2 + 送り2 + 明日の迎え');
 const got = jobs.map(j => [j.day, j.t, j.k, j.c, j.p, j.dr, j.car]);
 const want = [
-  [day, '14:30', '迎え', '児童A', '見本小学校', '連先生', ''],
-  [day, '14:40', '迎え', '児童B', 'にじ学園', '連先生', ''],
+  [day, '14:30', '迎え', '児童A', '見本小学校', '連先生', 'アクア'],
+  [day, '14:40', '迎え', '児童B', 'にじ学園', '連先生', 'アクア'],
   [day, '17:10', '送り', '児童A', '', '友香先生', '1号車'],
   [day, '17:20', '送り', '児童B', '', '', ''],
-  [next, '09:40', '迎え', '児童C', '見本園', '連 先生', ''],
+  [next, '09:40', '迎え', '児童C', '見本園', '連 先生', 'アクア'],
 ];
 assert.deepStrictEqual(JSON.parse(JSON.stringify(got)), want);
+// 車は運転手から決める（日誌に車があればそれを優先）
+assert.strictEqual(leoCarFor('齊藤 連', ''), 'アクア');
+assert.strictEqual(leoCarFor('連先生', ''), 'アクア');
+assert.strictEqual(leoCarFor('中村 友香', ''), 'フリード');
+assert.strictEqual(leoCarFor('友香先生', ''), 'フリード');
+assert.strictEqual(leoCarFor('宮本 幸子', ''), 'モコ');
+assert.strictEqual(leoCarFor('安藤尚子', ''), 'モコ');
+assert.strictEqual(leoCarFor('保護者', ''), '—');
+assert.strictEqual(leoCarFor('送迎なし', ''), '—');
+assert.strictEqual(leoCarFor('', ''), '');
+assert.strictEqual(leoCarFor('連先生', '2号車'), '2号車');
 const kidsCopy = events[2].kids.slice();
 leoPlanJobs(events);
 assert.deepStrictEqual(events[2].kids, kidsCopy, '予定の児童配列は変えない');
@@ -227,7 +239,7 @@ const planFn = between(leo, 'function leoKidPlanHtml', 'function leoKindOf');
 assert.ok(!planFn.includes('source_url') && !planFn.includes('target="_blank"') && !planFn.includes('PDF未登録'));
 assert.ok(planFn.includes('本計画PDFはまだ登録されていません'));
 assert.ok(leo.includes('元の計画書を開く'));
-assert.ok(index.includes('leo.js?v=20261111moneval'));
+assert.ok(index.includes('leo.js?v=20261111car'));
 const leoMergeNikki = grab('leoMergeNikki');
 const leoDropClock = grab('leoDropClock');
 assert.strictEqual(leoDropClock({ start_time: '17:00', end_time: '17:25', kid_times: { '下宮蒼偉': '17:00' } }, '下宮蒼偉', '17:00'), '17:25', '利用終了の写しより便の着');

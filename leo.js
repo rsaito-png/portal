@@ -127,6 +127,16 @@ async function myName() {
   return p[0]?.nikki_name || '';
 }
 const same = (a, b) => a && b && a.replace(/\s/g, '') === b.replace(/\s/g, '');
+// 車：日誌に車が入っていなければ、運転手から決める（齊藤＝アクア、中村友香＝フリード、それ以外の職員＝モコ）。保護者送迎・送迎なしは「—」。
+function leoCarFor(driver, car) {
+  if (String(car || '').trim()) return car;
+  const d = String(driver || '').replace(/\s/g, '');
+  if (!d) return '';
+  if (/保護者|送迎なし|^なし$|徒歩|自力/.test(d)) return '—';
+  if (/齊藤|斉藤|齋藤|^連/.test(d)) return 'アクア';
+  if (/中村友香|友香/.test(d)) return 'フリード';
+  return 'モコ';
+}
 const LEO_PLAN_NOTE = '予定表から表示（日誌取り込み前）。車は日誌の取り込み後に出ます。';
 function leoKidVal(obj, name) {
   if (!obj || !name) return '';
@@ -153,7 +163,7 @@ function leoPlanJobs(events) {
     const kids = (e.kids && e.kids.length) ? e.kids.slice() : (e.child ? [e.child] : ['']);
     kids.forEach(c => jobs.push({
       day: e.day, t: e.kind === '送り' ? leoDropClock(e, c, '') : (leoKidVal(e.kid_times, c) || e.start_time || ''), k: e.kind, c,
-      p: leoKidVal(e.kid_places, c) || e.place || '', dr: e.staff || '', car: e.car || '',
+      p: leoKidVal(e.kid_places, c) || e.place || '', dr: e.staff || '', car: leoCarFor(e.staff, e.car),
     }));
   }
   jobs.sort((a, b) => (a.day || '').localeCompare(b.day || '') || (a.t || '99').localeCompare(b.t || '99') || (a.k === b.k ? 0 : a.k === '迎え' ? -1 : 1));
@@ -298,7 +308,7 @@ function leoTileStatus(nikkiRows, events, day) {
     const merged = leoMergeNikki(all, ev);
     const rs = merged.filter(r => r.kind === '利用' && !r._hide);
     if (!rs.length) return merged.some(r => r._hide) ? '0人' : '日誌なし';
-    const bad = rs.reduce((n, r) => n + (r._calPick === 'del' ? 0 : (!r.pick_driver || !r.pick_car ? 1 : 0)) + (r._calDrop === 'del' ? 0 : (!r.drop_driver || !r.drop_car ? 1 : 0)), 0);
+    const bad = rs.reduce((n, r) => n + (r._calPick === 'del' ? 0 : (!r.pick_driver || !leoCarFor(r.pick_driver, r.pick_car) ? 1 : 0)) + (r._calDrop === 'del' ? 0 : (!r.drop_driver || !leoCarFor(r.drop_driver, r.drop_car) ? 1 : 0)), 0);
     return bad ? `<b style="color:#c00">未確定 ${bad}件</b>（${rs.length}人）` : `${rs.length}人・確定`;
   }
   const live = ev.filter(e => !leoCalHidden(e));
@@ -461,8 +471,8 @@ function leoSougeiMineHtml(me, rows, events, care) {
     const merged = leoMergeNikki((rows || []).filter(r => r.day === d), (events || []).filter(e => e.day === d));
     const jobs = [];
     merged.filter(r => r.kind === '利用' && !r._hide).forEach(r => {
-      if (r._calPick === 'del' ? same(r._pickWas, me) : same(r.pick_driver, me)) jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, car: r.pick_car, cal: r._calPick || false });
-      if (r._calDrop === 'del' ? same(r._dropWas, me) : same(r.drop_driver, me)) jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, car: r.drop_car, cal: r._calDrop || false });
+      if (r._calPick === 'del' ? same(r._pickWas, me) : same(r.pick_driver, me)) jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, car: leoCarFor(r.pick_driver, r.pick_car), cal: r._calPick || false });
+      if (r._calDrop === 'del' ? same(r._dropWas, me) : same(r.drop_driver, me)) jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, car: leoCarFor(r.drop_driver, r.drop_car), cal: r._calDrop || false });
     });
     jobs.sort((a, b) => (a.t || '99').localeCompare(b.t || '99'));
     const tr = j => `<tr><td>${j.cal === 'del' ? '' : esc(j.t || '')}</td><td>${esc(j.k)}</td><td>${esc(j.c)}${CARE[j.c] ? `<br><small style="color:#c60">⚠ ${esc(CARE[j.c])}</small>` : ''}${leoCalMark(!!j.cal)}</td><td>${j.cal === 'del' ? '' : esc(j.p || '')}</td><td>${j.cal === 'del' ? '' : esc(j.car || '')}</td></tr>`;
@@ -484,8 +494,8 @@ function leoSougeiAllHtml(rows, events, care) {
     if (!rs.length) return gone.length ? `<h4>${fmtDay(d)}</h4><p><small>カレンダーで変更（この日の利用なし）：${gone.map(r => esc(r.child)).join('、')}</small></p>` : '';
     const jobs = [];
     rs.forEach(r => {
-      jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, dr: r.pick_driver, car: r.pick_car, cal: r._calPick || false });
-      jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, dr: r.drop_driver, car: r.drop_car, cal: r._calDrop || false });
+      jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, dr: r.pick_driver, car: leoCarFor(r.pick_driver, r.pick_car), cal: r._calPick || false });
+      jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, dr: r.drop_driver, car: leoCarFor(r.drop_driver, r.drop_car), cal: r._calDrop || false });
     });
     jobs.sort((a, b) => (a.t || '99').localeCompare(b.t || '99') || (a.k === '迎え' ? -1 : 1));
     const bad = jobs.filter(j => j.cal !== 'del' && (!j.dr || !j.car)).length;
@@ -509,8 +519,8 @@ const LEO_VIEWS = {
     return `<h3>${PLABEL[PERIOD]}の送迎（${esc(me) || '名前未登録'} さんの担当）</h3>${periodTabs('sougei')}${demoNote()}` + (days.length ? days.map(([d, rs]) => {
       const jobs = [];
       rs.forEach(r => {
-        if (same(r.pick_driver, me)) jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, car: r.pick_car });
-        if (same(r.drop_driver, me)) jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, car: r.drop_car });
+        if (same(r.pick_driver, me)) jobs.push({ t: r.pick_time, k: '迎え', c: r.child, p: r.pick_place, car: leoCarFor(r.pick_driver, r.pick_car) });
+        if (same(r.drop_driver, me)) jobs.push({ t: r.drop_time, k: '送り', c: r.child, p: r.drop_place, car: leoCarFor(r.drop_driver, r.drop_car) });
       });
       jobs.sort((a, b) => (a.t || '').localeCompare(b.t || ''));
       return `<h4>${fmtDay(d)}</h4>` + (jobs.length ? `<table><tr><th>時刻</th><th></th><th>児童</th><th>場所</th><th>車</th></tr>${jobs.map(j =>
