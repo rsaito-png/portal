@@ -267,7 +267,7 @@ vm.runInNewContext(cfg, { window: cfgWin });
 const leo = cfgWin.PORTAL_CONFIG.offices.find(o => o.id === 'leo');
 assert.strictEqual(leo.groups.map(g => g[1]).join('|'), '現場|事務・計画');
 assert.strictEqual(leo.groups[0][2].join('|'), ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'].join('|'));
-assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '個別支援計画（管理）', 'モニタリングシート（相談員へ渡す印刷）', '個別支援計画 管理表', '利用者情報（児童ごと）', '来月の利用予定（保護者に聞く）', '利用料実費請求', '国保連請求', '保護者の実績確認', 'サービス提供実績記録表', '勤務実績及び利用者の実績表', '直した所', '請求の印（欠席時対応・子育てサポート）', '実績記録（請求元）'].join('|'));
+assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '利用契約書・重要事項説明書', '個別支援計画（管理）', 'モニタリングシート（相談員へ渡す印刷）', '個別支援計画 管理表', '利用者情報（児童ごと）', '来月の利用予定（保護者に聞く）', '利用料実費請求', '国保連請求', '保護者の実績確認', 'サービス提供実績記録表', '勤務実績及び利用者の実績表', '直した所', '請求の印（欠席時対応・子育てサポート）', '実績記録（請求元）'].join('|'));
 assert.strictEqual(leo.mine['現場支援員'].join('|'), '');
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
@@ -369,6 +369,9 @@ assert.ok(mgr.includes('中村友香担当') && mgr.includes('事務担当'), '�
   assert.ok(leo.groups[1][2].includes('保護者の実績確認'), '事務・計画にも残す');
   assert.ok(!leo.who[0][1].includes('利用料実費請求'), '中村の一覧から実費を外す');
   assert.strictEqual(leo.tiles.find(t => t[2] === '#leo/jippi')[6], '児発管', '実費画面の役割は変えない');
+  assert.strictEqual(leo.tiles.find(t => t[2] === '#leo/contract')[6], '児発管', '契約書の役割は児発管（現場には出さない）');
+  assert.ok(leo.groups[1][2].includes('利用契約書・重要事項説明書'), '事務・計画に契約書');
+  assert.ok(!leo.who[0][1].includes('利用契約書・重要事項説明書'), '中村の欄に契約書を重ねない');
   assert.ok(leo.who[1][1].includes('利用料実費請求'), '事務担当の欄には残す');
   assert.ok(leo.groups[1][2].includes('利用料実費請求'), '事務・計画にも残す');
   assert.ok(!leo.who[1][1].includes('配置表・型表・管理表・送迎の配慮の入力'), '事務担当の欄には置かない');

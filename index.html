@@ -182,7 +182,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261111moneval"></script>
+<script src="config.js?v=20261111leocontract"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
@@ -238,13 +238,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="jukyusha_lib.js?v=202610281700"></script>
 <script src="leo_jukyusha.js?v=20261106edit"></script>
 <script src="leo_assess.js?v=20261106link"></script>
+<script src="leo_contract.js?v=20261111contract"></script>
 <script src="shogu_logic.js?v=20261030flow"></script>
 <script src="shogu.js?v=20261030proto"></script>
 <script>
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261111moneval';
+  var BUILD = '20261111leocontract';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -410,6 +411,7 @@ async function render() {
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (!(id === 'leo' && (sub === 'kata' || sub === 'master' || sub === 'kinmu' || sub === 'monitoring')) && !(id === 'chamu' && sub === 'kinmu')) document.body.classList.remove('wide-sheet');
   if (id === 'leo' && sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '') && typeof renderSgDay === 'function') return renderSgDay(sub2);
+  if (id === 'leo' && sub === 'contract' && typeof renderLeoContract === 'function') { LC.link = null; return renderLeoContract(); }
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);
   { const oo = C.offices.find(x => x.id === id); if (oo && oo.groups && /^g\d+$/.test(sub || '') && groupView(oo, sub.slice(1))) return; }
   if (id === 'suishodama' && sub === 'ledger') { SUI.edit = null; return renderSuiLedger(); }
