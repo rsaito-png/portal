@@ -59,6 +59,7 @@ returns text language sql immutable as $$
   end
 $$;
 revoke all on function public.leo_wareki(date) from public;
+revoke execute on function public.leo_wareki(date) from anon;
 grant execute on function public.leo_wareki(date) to authenticated;
 
 create or replace function public.leo_doc_fill(p_body text, p_child text, p_guardian text, p_relation text, p_address text, p_start date, p_end date, p_explainer text, p_sign_date date, p_explain_date date)
@@ -75,6 +76,7 @@ returns text language sql immutable as $$
     '{続柄}', coalesce(nullif(p_relation,''),'＿＿＿＿'))
 $$;
 revoke all on function public.leo_doc_fill from public;
+revoke execute on function public.leo_doc_fill from anon;
 grant execute on function public.leo_doc_fill to authenticated;
 
 create or replace function public.leo_doc_issue(p_child_name text, p_guardian_name text, p_docs text[], p_explainer text, p_guardian_relation text default null, p_guardian_address text default null, p_contract_start date default null, p_contract_end date default null)
