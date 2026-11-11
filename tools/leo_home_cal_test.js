@@ -273,7 +273,8 @@ assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
 assert.strictEqual(leo.who[0][0], '中村友香担当');
 assert.strictEqual(leo.who[1][0], '事務担当');
-assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|日誌（見る・直す）|配置表・型表・管理表・送迎の配慮の入力|受給者証の入力（保護者から）');
+assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|配置表・型表・管理表・送迎の配慮の入力|受給者証の入力（保護者から）');
+assert.ok(!leo.who[0][1].includes('日誌（見る・直す）'), '中村友香担当の欄から日誌を外す');
 assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|上限額管理');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
@@ -328,7 +329,12 @@ assert.ok(!field.includes('中村友香担当') && !field.includes('事務担当
 assert.ok(!field.includes('事務・計画') && !field.includes('href="#leo/g1"'), '現場職員のホームから事務・計画を外す');
 assert.ok(!field.includes('href="#leo/g0"'), '送迎は直置き（現場フォルダはホームに出さない）');
 const nakaField = renderLeoHome('職員', '現場支援員', '中村友香');
-assert.ok(nakaField.includes('中村友香担当') && nakaField.includes('今日の日誌'), '中村本人（現場職責でも）には担当欄を出す');
+assert.ok(nakaField.includes('中村友香担当'), '中村本人（現場職責でも）には担当欄を出す');
+{
+  const nsec = nakaField.slice(nakaField.indexOf('中村友香担当'));
+  assert.ok(!nsec.includes('今日の日誌') && !nsec.includes('href="#leo/nikki"'), '中村本人の担当欄から今日の日誌を外す');
+  assert.ok(nakaField.slice(0, nakaField.indexOf('中村友香担当')).includes('href="#leo/nikki"'), '中村本人も毎日やるの日誌は残す');
+}
 assert.ok(!nakaField.includes('事務担当'), '中村本人でも事務担当は出さない');
 const kanri = renderLeoHome('職員', '児発管');
 assert.ok(kanri.includes('中村友香担当'), '児発管に中村友香担当');
@@ -344,8 +350,8 @@ assert.ok(mgr.includes('中村友香担当') && mgr.includes('事務担当'), '�
   assert.ok(!leo.who[1][1].includes('日誌（見る・直す）'), '事務担当の欄には置かない');
   const nakamura = renderLeoHome('職員', '児発管');
   const sec = nakamura.slice(nakamura.indexOf('中村友香担当'), nakamura.includes('事務担当') ? nakamura.indexOf('事務担当') : undefined);
-  assert.ok(sec.includes('href="#leo/nikki"') && sec.includes('今日の日誌'), '中村の欄に今日の日誌');
-  assert.ok(sec.indexOf('今日の日誌') < sec.indexOf('配置表・型表・管理表'), '入力画面は日誌のあと');
+  assert.ok(!sec.includes('href="#leo/nikki"') && !sec.includes('今日の日誌'), '中村の欄に今日の日誌を出さない');
+  assert.ok(nakamura.slice(0, nakamura.indexOf('中村友香担当')).includes('href="#leo/nikki"'), '児発管の毎日やるに日誌は残す');
   assert.ok(sec.includes('href="#leo/master"'), '中村の欄に入力画面');
   assert.ok(sec.includes('href="#leo/jukyusha"') && sec.includes('受給者証の入力（保護者から）'), '中村の欄の最後に受給者証');
   assert.ok(sec.indexOf('href="#leo/master"') < sec.indexOf('href="#leo/jukyusha"'), '受給者証は入力画面のあと');
