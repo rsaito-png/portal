@@ -4,11 +4,11 @@ alter table public.staff_todo add column if not exists office text;
 alter table public.staff_todo add column if not exists source_key text;
 create unique index if not exists staff_todo_source_open on public.staff_todo (source_key) where source_key is not null and status <> 'done';
 
--- 担当の決め方（名簿から引く。固定IDは使わない）。kind: plan/hiyari/edits → 児発管、kakunin → 宮本（事務）。いなければ管理者
+-- 担当の決め方（名簿から引く。固定IDは使わない）。kind: plan/hiyari/edits → 児発管、kakunin → 会長（宮本は休職）。いなければ管理者
 create or replace function public.leo_todo_assignee(p_kind text) returns uuid language sql stable security definer set search_path = public as $$
   select coalesce(
     case when p_kind = 'kakunin' then
-      (select user_id from staff_profiles where active and office = 'レオ' and (replace(replace(coalesce(full_name,''),'　',''),' ','') like '宮本%' or replace(replace(coalesce(nikki_name,''),'　',''),' ','') like '宮本%') order by full_name limit 1)
+      (select user_id from staff_profiles where active and office = 'レオ' and duty = '管理者' order by is_chair desc limit 1)
     else (select user_id from staff_profiles where active and office = 'レオ' and duty = '児発管' order by full_name limit 1) end,
     (select user_id from staff_profiles where active and office = 'レオ' and duty = '管理者' order by is_chair desc limit 1));
 $$;

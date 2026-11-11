@@ -1,4 +1,4 @@
--- 人事労務の相談所：相談した本人と総務奉行だけが見られる（会長も見ない）
+-- 人事労務の相談所：相談した本人と、総務奉行・会長が見られる（2026-11-11 総務不在のため会長も）
 create table if not exists public.hr_soudan (
   id bigint generated always as identity primary key,
   user_id uuid not null default auth.uid() references auth.users(id),
@@ -6,7 +6,7 @@ create table if not exists public.hr_soudan (
   reply text, replied_at timestamptz, created_at timestamptz not null default now());
 alter table public.hr_soudan enable row level security;
 create or replace function public.is_soumu_bugyo() returns boolean language sql stable security definer set search_path=public as
-$$ select exists(select 1 from staff_profiles where user_id=auth.uid() and rank='総務奉行' and active) $$;
+$$ select exists(select 1 from staff_profiles where user_id=auth.uid() and active and (rank='総務奉行' or is_chair)) $$;
 grant execute on function public.is_soumu_bugyo() to authenticated;
 drop policy if exists hs_sel on public.hr_soudan; drop policy if exists hs_ins on public.hr_soudan; drop policy if exists hs_upd on public.hr_soudan;
 create policy hs_sel on public.hr_soudan for select to authenticated using (user_id=auth.uid() or public.is_soumu_bugyo());

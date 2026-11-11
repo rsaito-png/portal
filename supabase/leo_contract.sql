@@ -46,6 +46,7 @@ do $$ declare t text; begin
   end loop;
 end $$;
 grant select on public.leo_doc_type, public.leo_doc_party, public.leo_doc_links, public.leo_doc_log to authenticated;
+revoke truncate, references, trigger on public.leo_doc_type, public.leo_doc_party, public.leo_doc_links, public.leo_doc_log from authenticated;
 
 drop policy if exists leo_doc_type_u on public.leo_doc_type;
 create policy leo_doc_type_u on public.leo_doc_type for update to authenticated using (public.can_manage_for('レオ')) with check (public.can_manage_for('レオ'));
