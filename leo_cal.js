@@ -534,7 +534,7 @@ LEO_VIEWS.cal = async function () {
     const e = CAL.edit === 'new' ? { day: CAL.d, kind: '利用', kids: [] } : evs.find(x => x.id === CAL.edit) || {};
     CAL.row = e.id ? e : null;
     const staffPick = [...new Set([...evs.map(x => x.staff).filter(Boolean), ...await leoDriverNames().catch(() => [])])];
-    h += calForm(e, [...new Set([...ch.map(x => x.name), ...evs.map(x => x.child).filter(Boolean)])].sort(), typeof leoPickerNames === 'function' ? leoPickerNames(staffPick) : staffPick);
+    h += calForm(e, [...new Set(ch.map(x => (typeof canonChildName === 'function' ? canonChildName(x.name) : x.name)).filter(Boolean))].sort(), typeof leoPickerNames === 'function' ? leoPickerNames(staffPick) : staffPick);
   }
   h += calWrap(`<p class="calv-date">${head}</p><p class="calv-hint">横軸は時刻、色の棒は児童の利用時間です。棒をタップすると、迎え（☆）・送り（★）の担当・時刻・場所と、保護者の備考が出ます。</p>${body}`);
   h += `<p style="margin-top:12px;font-size:13px;line-height:1.5">関連：<a href="#leo/sougei">自分の送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/userinfo">利用者情報</a>' : ''}</p>
