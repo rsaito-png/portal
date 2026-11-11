@@ -1,4 +1,4 @@
-// レオ（共生型）職員の「実態のシフト」（#leo/shift）。2026-11-11 齊藤さん。
+// レオ（共生型）職員の「シフト」（#leo/shift）。2026-11-11 齊藤さん。
 // 大前提：実態と勤務実績表は別。勤務実績表（kinmu_* / leo_kinmu_lib.js）・茶夢配置表とは一切つながない。
 // データは staff_shift_base（いつもの型）＋ staff_shift_day（その日だけ：休み／時間変更／追加）。読むのは rpc/staff_shift_get、書くのは rpc/staff_shift_set_base・staff_shift_set_day。
 // ここを見る所：予定カレンダーの「勤務」（leo_cal.js / leo_home_cal.js）、送迎の運転手候補・日誌の運転手欄（leo.js / leo_cal.js）。
@@ -192,14 +192,13 @@
     const a = SH.week, b = addDays(a, 6);
     const data = await shiftLoad(a, b);
     SH.data = data;
-    if (!data) return `<h3>実態のシフト</h3><p class="note">シフトを読み込めませんでした。少し待ってから開き直してください。</p>`;
+    if (!data) return `<h3>シフト</h3><p class="note">シフトを読み込めませんでした。少し待ってから開き直してください。</p>`;
     const ed = !!data.can_edit;
     let days = [0, 1, 2, 3, 4].map(i => addDays(a, i));
     [5, 6].forEach(i => { const d = addDays(a, i); if (shiftDay(data, d).some(c => c.state !== 'none')) days.push(d); });
     const staff = data.staff || [];
     const fumi = staff.some(s => nz(s.name) === '中村文');
-    const head = `<h3>実態のシフト</h3>
-      <p class="note">実際に入る時間の表です。勤務実績表（監査用）とは別で、つながっていません。予定カレンダーの「勤務」、送迎の運転手の候補、日誌の運転手欄がこの表を見ます。休みの人は候補から外れます。</p>
+    const head = `<h3>シフト</h3>
       <div class="sh-nav"><button class="sub" onclick="shWeek(-1)">◀ 前の週</button><b>${md(a)}〜${md(days[days.length - 1])}</b><button class="sub" onclick="shWeek(1)">次の週 ▶</button><button class="sub" onclick="shWeek(0)">今週</button></div>`;
     const table = `<div class="sh-wrap${ed ? ' sh-ed' : ''}"><table class="sh-t"><tr><th>職員</th>${days.map(d => `<th class="${d === t ? 'today' : ''}">${DOWS[dowOf(d)]} ${+d.slice(8, 10)}</th>`).join('')}</tr>
       ${staff.map(s => `<tr><td class="nm">${nameHtml(s, ed)}</td>${days.map(d => `<td>${cellHtml(shiftCell(data, d, s.user_id), d, s.user_id, ed)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${days.length + 1}">まだ誰も入っていません。</td></tr>`}</table></div>`;
@@ -208,10 +207,10 @@
       return `<div class="sh-card${d === t ? ' today' : ''}"><h4>${md(d)}${d === t ? '　今日' : ''}</h4>${cs.map(c => `<div class="sh-row">${nameHtml(c, ed)}${cellHtml(c, d, c.user_id, ed)}</div>`).join('') || '<p class="note" style="margin:0">入る人はいません。</p>'}</div>`;
     }).join('')}</div>`;
     const legend = `<p class="sh-lg"><span><i style="background:#cfe6d6"></i>いつもの型</span><span><i style="background:#f7dc85"></i>その日だけ時間変更・追加</span><span><i style="background:#eeb3a8"></i>その日だけ休み</span></p>`;
-    const how = ed ? `<p class="note sh-note">マスをタップ →「休み」「時間変更」「追加」「型に戻す」。名前をタップ → その人の曜日ごとの型を直す。${(data.pick || []).length ? '<button class="sub" onclick="shAddStaff()">＋ 職員を表に足す</button>' : ''}</p>` : '<p class="note">見るだけの画面です。変更は管理者に伝えてください。</p>';
-    const fumiNote = fumi ? '<p class="note" style="font-size:12px;opacity:.8">中村 文さんの終了時刻（17:00）は仮です。わかったら名前をタップして直してください。</p>' : '';
+    const how = ed && (data.pick || []).length ? `<p class="sh-note"><button class="sub" onclick="shAddStaff()">＋ 職員を表に足す</button></p>` : '';
+    const fumiNote = '';
     const gaps = shiftPunchGaps(data, days, t);
-    const warn = data.punches ? (gaps.length ? `<div class="sh-warn"><b>管理者だけに表示：打刻とのずれ</b><br>${gaps.map(esc).join('<br>')}</div>` : '<p class="note" style="font-size:12px">管理者だけに表示：この週の打刻と予定のずれはありません。</p>') : '';
+    const warn = data.punches ? (gaps.length ? `<div class="sh-warn"><b>打刻とのずれ</b><br>${gaps.map(esc).join('<br>')}</div>` : '') : '';
     return css + head + table + cards + legend + how + fumiNote + warn + `<div id="sh_pop"></div>`;
   };
   const rerender = () => { if (typeof renderLeoView === 'function') renderLeoView('shift'); };
@@ -224,7 +223,6 @@
     const s0 = (c.slots[0] || c.base[0] || {}).start || '', e0 = (c.slots[c.slots.length - 1] || c.base[c.base.length - 1] || {}).end || '';
     const adds = (c.rows || []).filter(r => r.kind === '追加');
     pop(`<h4>${esc(md(day))} ${esc(nameOfUid(uid))}</h4>
-      <p class="note" style="margin:0 0 6px">いつもの型：${c.base.length ? c.base.map(span).join('・') : 'なし'}　今：${c.state === 'off' ? '休み' : c.slots.length ? c.slots.map(span).join('・') : 'なし'}</p>
       <label>時間 <input type="time" id="sh_st" value="${esc(String(s0).slice(0, 5))}"> 〜 <input type="time" id="sh_en" value="${esc(String(e0).slice(0, 5))}"></label>
       <label>メモ <input id="sh_note" maxlength="80" style="width:100%" placeholder="例：通院のため" value="${esc(c.note || '')}"></label>
       <div class="sh-acts"><button onclick="shSaveDay('${day}','${uid}','休み')">休み</button><button onclick="shSaveDay('${day}','${uid}','時間変更')">時間変更</button><button onclick="shSaveDay('${day}','${uid}','追加')">追加</button>${(c.rows || []).length ? `<button class="sub" onclick="shSaveDay('${day}','${uid}','型に戻す')">型に戻す</button>` : ''}</div>
@@ -248,7 +246,7 @@
       const list = (sl.length ? sl : []).map(s => `<div class="sh-slot"><input type="time" data-dw="${dw}" class="sh-bs" value="${esc(String(s.start).slice(0, 5))}"> 〜 <input type="time" data-dw="${dw}" class="sh-be" value="${esc(String(s.end).slice(0, 5))}"> <button class="inl" onclick="this.parentNode.remove()">消す</button></div>`).join('');
       return `<div data-day="${dw}" style="border-top:1px solid #eee;padding:6px 0"><b>${DOWS[dw]}</b> <span class="sh-slots">${list || '<small class="note">なし</small>'}</span> <button class="inl" onclick="shAddSlot(this,${dw})">＋ 時間</button></div>`;
     }).join('');
-    return `<h4>${esc(nameOfUid(uid))} さんのいつもの型</h4><p class="note" style="margin:0">曜日ごとの入る時間。直すと、その日だけの変更がない日に効きます。</p>${rows}
+    return `<h4>${esc(nameOfUid(uid))} さんのいつもの型</h4>${rows}
       <div class="sh-acts"><button onclick="shSaveBase('${uid}')">保存する</button><button class="sub" onclick="shClose()">閉じる</button></div><p id="sh_msg" class="note"></p>`;
   }
   g.shOpenBase = uid => pop(baseForm(uid));
@@ -277,7 +275,7 @@
     const inT = new Set(((SH.data && SH.data.staff) || []).map(s => s.user_id));
     const cand = ((SH.data && SH.data.pick) || []).filter(p => !inT.has(p.user_id));
     if (!cand.length) return pop('<p>足せる職員はいません。</p><p><button class="sub" onclick="shClose()">閉じる</button></p>');
-    pop(`<h4>表に足す職員</h4><p class="note">選んで、曜日ごとの型を入れてください。型を入れると表に出て、その人は毎日の候補ではなくシフトで絞られます。</p>
+    pop(`<h4>表に足す職員</h4>
       <select id="sh_pick" style="width:100%">${cand.map(p => `<option value="${esc(p.user_id)}">${esc(showName(p.name))}</option>`).join('')}</select>
       <div class="sh-acts"><button onclick="(function(){var u=document.getElementById('sh_pick').value;shOpenBase(u);})()">型を入れる</button><button class="sub" onclick="shClose()">閉じる</button></div>`);
   };
