@@ -676,7 +676,7 @@ const LEO_VIEWS = {
           const attrs = `data-row="${r.row_no}" data-child="${esc(r.child)}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
             ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
-            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${shData && typeof shiftOptionsHtml === 'function' ? shiftOptionsHtml(drvNames, shData, day, f === 'pick_driver' ? r.pick_time : r.drop_time, shown) : driverOptionsHtml(drvNames, shown)}</select></label>`
+            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${shData && typeof shiftOptionsHtml === 'function' ? shiftOptionsHtml(drvNames, shData, day, f === 'pick_driver' ? r.pick_time : r.drop_time, shown) : driverOptionsHtml(drvNames, shown)}</select>${(() => { const cr = leoCarFor(r[f === 'pick_driver' ? 'pick_driver' : 'drop_driver'], r[f === 'pick_driver' ? 'pick_car' : 'drop_car']); return cr ? `<small>車：${esc(cr)}（運転手から自動）</small>` : ''; })()}</label>`
             : `<label>${labelOf[f]}<input ${attrs} value="${esc(shown)}"></label>`;
         };
         const rideRows = NIKKI_RIDE_ROWS.map(fs => `<div class="nk-row">${fs.map(f => fieldHtml(f, r[f] ?? '')).join('')}</div>`).join('');
