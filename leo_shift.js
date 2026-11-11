@@ -66,7 +66,8 @@
     const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const v = String(cur ?? '').trim();
     const seen = new Set(), uniq = [];
-    (names || []).forEach(n => { const t = String(n ?? '').trim(), k = nz(t); if (t && !seen.has(k)) { seen.add(k); uniq.push(t); } });
+    const src = typeof leoPickerNames === 'function' ? leoPickerNames(names) : names;
+    (src || []).forEach(n => { const t = String(n ?? '').trim(), k = nz(t); if (t && !seen.has(k)) { seen.add(k); uniq.push(t); } });
     const c = shiftCandidates(uniq, data, day, time);
     const sortJa = a => a.sort((x, y) => x.localeCompare(y, 'ja'));
     const has = v && uniq.some(n => nz(n) === nz(v));
@@ -130,7 +131,26 @@
     if (typeof sb !== 'function') return null;
     const k = from + '|' + to;
     if (!cache.has(k)) cache.set(k, sb('rpc/staff_shift_get', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to }) }).catch(() => null));
-    return cache.get(k);
+    const data = await cache.get(k);
+    return shiftWithoutHidden(data);
+  }
+  // シフトの戻りは名前だけ（所属は付かない）。レオの職員でない人は表・候補・その人の型から外す。データベースは変えない。
+  function shiftWithoutHidden(data) {
+    if (!data || typeof leoListedStaff !== 'function') return data;
+    const hidden = row => !!(row && row.name && !leoListedStaff(row.name));
+    const ids = new Set();
+    (data.staff || []).forEach(s => { if (hidden(s)) ids.add(s.user_id); });
+    (data.pick || []).forEach(s => { if (hidden(s)) ids.add(s.user_id); });
+    if (!ids.size) return data;
+    const keep = row => !row || !ids.has(row.user_id);
+    return {
+      ...data,
+      staff: (data.staff || []).filter(s => !hidden(s)),
+      pick: (data.pick || []).filter(s => !hidden(s)),
+      base: (data.base || []).filter(keep),
+      days: (data.days || []).filter(keep),
+      punches: Array.isArray(data.punches) ? data.punches.filter(keep) : data.punches,
+    };
   }
   const shiftClear = () => cache.clear();
 

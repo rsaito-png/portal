@@ -146,7 +146,7 @@ const { LEO_VIEWS, monPrintHtml, monLatestRow, monOffice, monSave, monRebuild, m
   const sql = read('supabase/leo_staff_mon_staff.sql');
   assert.ok(cfg.includes("['📄', 'モニタリングシート', '#leo/monitoring'"));
   assert.ok(idx.includes('config.js?v=20261111mon'));
-  assert.ok(idx.includes('leo.js?v=20261111mon'));
+  assert.ok(idx.includes('leo.js?v=20261111monstaff'));
   assert.ok(idx.includes("big('#leo/monitoring', '📄', 'モニタリングシート'"));
   assert.ok(sql.includes("public.my_office() = 'レオ' or public.can_manage()"));
   assert.ok(sql.includes('for insert') && sql.includes('for update'));

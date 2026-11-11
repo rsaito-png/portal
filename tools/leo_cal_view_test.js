@@ -16,6 +16,7 @@ const sandbox = {
   console,
   alert() {},
   document: { getElementById() { return null; }, querySelectorAll() { return []; } },
+  driverOptionsHtml: (names, cur) => '<option value="">—</option>' + (names || []).map(n => `<option${n === cur ? ' selected' : ''}>${n}</option>`).join(''),
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
@@ -50,6 +51,15 @@ assert.ok(day.includes('抱っこが必要') && day.includes('配慮'), '送迎�
 assert.ok(day.includes('保護者が迎えに来る'), '保護者のお迎え');
 assert.ok(day.includes('☆ 迎え') && day.includes('★ 送り'), '送迎の便');
 assert.ok(day.includes('職員Z') && day.includes('午後不在'), '職員の不在');
+sandbox.leoListedStaff = n => String(n).replace(/[\s\u3000]/g, '') !== '河合尚美';
+const withKawai = calDay('2026-11-04', evs.concat([
+  { day: '2026-11-04', kind: '勤務', staff: '河合　尚美', title: '10:00〜18:00' },
+  { day: '2026-11-04', kind: '迎え', staff: '河合 尚美', kids: ['児童A'], start_time: '09:00', end_time: '09:30' },
+]), {});
+assert.ok(!withKawai.includes('河合　尚美'), '勤務の職員一覧に河合を出さない');
+assert.ok(withKawai.includes('河合 尚美'), '保存済みの送迎担当は残す');
+assert.ok(withKawai.includes('職員Z'), 'ほかの職員の不在は残す');
+delete sandbox.leoListedStaff;
 assert.ok(day.includes('利用 4人'), '利用人数');
 assert.ok(!day.includes('リーダー'), '職名は使わない');
 

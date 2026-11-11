@@ -205,6 +205,6 @@ const docs = { genan: '原案', honan: '本案', assessment: 'アセス', kaigi:
   assert.ok(!homeFn.includes("sheetRows('keikaku')"));
   assert.ok(!homeFn.includes('#leo/keikaku'));
   assert.ok(homeFn.includes('planHomeTodos'));
-  assert.ok(read('index.html').includes('leo.js?v=20261111mon'));
+  assert.ok(read('index.html').includes('leo.js?v=20261111monstaff'));
   console.log('leo_home_plan_test ok');
 })().catch(e => { console.error(e); process.exit(1); });

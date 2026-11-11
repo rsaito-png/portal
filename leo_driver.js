@@ -48,8 +48,31 @@
   // 運転手・職員のプルダウンに出す名前。職員マスタ（レオ所属・在籍中）＋送迎予定に入ったことのある名前。
   // 一般職員は RLS で自分の行しか読めないので、予定の名前で補う。保存値（全角空白入り）の形を優先する。
   let driverCache = null;
-  // 選択肢に出さない人（今の保存値なら残る）。宮本幸子は休職（2026-11-10 会長）。運転は齊藤　連が担当
-  const DRIVER_HIDE = new Set(['宮本幸子', '宮本']);
+  // 選択肢に出さない人（今の保存値なら残る）。空白の有無は normDriver で吸収する。
+  // 宮本幸子は休職（2026-11-10 会長）。運転は齊藤　連が担当。レオの人なので、シフト表やヒヤリハットの在籍一覧には残す。
+  // 河合尚美は RYDEEN の責任者（dakoku の所属は RYDEEN）。レオの候補にも、レオの職員一覧（シフト・勤務・不在）にも出さない。
+  // 画面に届く名前は所属が付いていない（leo_staff_names は名前だけ、予定の staff も名前だけ、シフトの name も名前だけ）。
+  // 職員マスタの所属がレオでも、兼務にレオが入っていても、過去の予定に名前が残っていても、ここから先のレオの一覧には出さない。
+  // すでに保存された担当名は消さない（その欄の今の値だけ残す）。データベースの行は変えない。RYDEEN・水晶玉・出退勤は別画面なのでここを見ない。
+  const LEO_NOT_STAFF = new Set(['河合尚美']);
+  const DRIVER_HIDE = new Set(['宮本幸子', '宮本', ...LEO_NOT_STAFF]);
+  // レオの職員一覧に出してよいか。空の名前は判定しない（呼び出し側が空を捨てる）。河合尚美は出さない。宮本は休職でも在籍のまま。
+  function leoListedStaff(name) {
+    const k = normDriver(name);
+    if (!k) return true;
+    return !LEO_NOT_STAFF.has(k);
+  }
+  // プルダウンの候補。休職の宮本と、レオ以外の河合尚美は出さない。今の保存値は driverOptionsHtml / shiftOptionsHtml が足す。
+  function leoPickerNames(names) {
+    const seen = new Set(), out = [];
+    (names || []).forEach(n => {
+      const v = String(n ?? '').trim(), k = normDriver(v);
+      if (!k || seen.has(k) || DRIVER_HIDE.has(k)) return;
+      seen.add(k);
+      out.push(v);
+    });
+    return out;
+  }
   async function leoDriverNames() {
     if (typeof DEMO !== 'undefined' && DEMO) return ['職員X', '職員Y'];
     if (driverCache) return driverCache;
@@ -79,7 +102,13 @@
     const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const v = String(cur ?? '').trim();
     const seen = new Set(), list = [];
-    (names || []).forEach(n => { const t = String(n ?? '').trim(), k = normDriver(t); if (t && !seen.has(k)) { seen.add(k); list.push(t); } });
+    (names || []).forEach(n => {
+      const t = String(n ?? '').trim(), k = normDriver(t);
+      if (!t || seen.has(k)) return;
+      if (DRIVER_HIDE.has(k) && k !== normDriver(v)) return;
+      seen.add(k);
+      list.push(t);
+    });
     list.sort((a, b) => a.localeCompare(b, 'ja'));
     if (v) {
       const i = list.findIndex(n => normDriver(n) === normDriver(v));
@@ -87,7 +116,8 @@
     }
     return `<option value="">${e(blank || '— 選んでください —')}</option>` + list.map(n => `<option value="${e(n)}"${n === v ? ' selected' : ''}>${e(n)}</option>`).join('');
   }
-  const api = { LEO_FILING_DRIVERS, normDriver, filingDriverName, nikkiShownValue, nikkiEditValue, filingTripDrivers, leoDriverNames, driverOptionsHtml };
+  function resetLeoDriverNames() { driverCache = null; }
+  const api = { LEO_FILING_DRIVERS, LEO_NOT_STAFF, normDriver, filingDriverName, nikkiShownValue, nikkiEditValue, filingTripDrivers, leoListedStaff, leoPickerNames, leoDriverNames, resetLeoDriverNames, driverOptionsHtml };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   Object.assign(g, api);
 })(typeof window !== 'undefined' ? window : globalThis);

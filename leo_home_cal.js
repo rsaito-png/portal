@@ -365,6 +365,8 @@ function sgMonthHtml(ym, evs, todayStr) {
 let SG_MINE = false;
 function sgDayHtml(day, evs, care, opt) {
   let es = (evs || []).filter(e => e.day === day);
+  // 勤務・不在は職員の一覧。レオの職員でない人は出さない。迎え・送りに保存された担当名はそのまま残す。
+  es = es.filter(e => (e.kind !== '勤務' && e.kind !== '不在') || typeof leoListedStaff !== 'function' || leoListedStaff(e.staff));
   const mineOn = !!(opt && opt.mine);
   const me = opt && opt.me != null ? String(opt.me) : '';
   let mineNote = '';
@@ -524,7 +526,8 @@ async function renderSgDay(day) {
       };
       const names = evs.flatMap(e => [e.child, ...(e.kids || [])]).filter(Boolean);
       const staffs = evs.map(e => e.staff).filter(Boolean);
-      form = calForm(row, [...new Set(names)].sort(), [...new Set([...staffs, ...(typeof leoDriverNames === 'function' ? await leoDriverNames().catch(() => []) : [])])]);
+      const staffPick = [...new Set([...staffs, ...(typeof leoDriverNames === 'function' ? await leoDriverNames().catch(() => []) : [])])];
+      form = calForm(row, [...new Set(names)].sort(), typeof leoPickerNames === 'function' ? leoPickerNames(staffPick) : staffPick);
     }
     $('view').innerHTML = back + form + sgDayHtml(day, evs, care, { me: me || '', mine: SG_MINE, canEdit });
     if (form) { const box = document.querySelector('#cf_day'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'start' }); }

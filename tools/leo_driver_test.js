@@ -78,7 +78,7 @@ const cal = read('leo_cal.js');
 const yotei = read('leo_yotei.js');
 const index = read('index.html');
 
-assert.ok(index.includes('leo_driver.js?v=20261110yokota'));
+assert.ok(index.includes('leo_driver.js?v=20261111staff'));
 assert.ok(!cal.includes('filingDriverName'), 'カレンダーは写さない');
 assert.ok(!yotei.includes('filingDriverName'), '予定の作成・自分の送迎は写さない');
 for (const [a, b] of [
@@ -96,5 +96,64 @@ assert.ok(!between(leo, 'LEO_VIEWS.master', 'async function saveMaster').include
 const checks = between(leo, 'async function billChecks', '// ===== ① LINE報告');
 assert.ok(!checks.includes('filingDriverName'));
 
-console.log('leo_driver_test ok');
-console.log('例: 月曜朝 碧音くん迎え 10:20 / 実運転 ' + mondayPick.driver + ' / 日誌・実績 ' + D.filingDriverName(mondayPick.driver));
+assert.strictEqual(D.leoListedStaff('河合尚美'), false);
+assert.strictEqual(D.leoListedStaff('河合　尚美'), false);
+assert.strictEqual(D.leoListedStaff(' 河合 尚美 '), false);
+assert.strictEqual(D.leoListedStaff('宮本幸子'), true, '宮本は休職でもレオの在籍。一覧から消すのは河合だけ');
+assert.strictEqual(D.leoListedStaff('中村　友香'), true);
+assert.strictEqual(D.leoListedStaff(''), true);
+assert.deepStrictEqual(
+  D.leoPickerNames(['中村　友香', '河合 尚美', '河合尚美', '齊藤　連', '宮本　幸子', '宮本さん', '保護者']),
+  ['中村　友香', '齊藤　連', '宮本さん', '保護者']
+);
+const offered = D.driverOptionsHtml(['中村　友香', '河合　尚美', '齊藤　連', '宮本　幸子'], '');
+assert.ok(!offered.includes('河合') && !offered.includes('宮本'), offered);
+assert.ok(offered.includes('中村　友香') && offered.includes('齊藤　連'));
+const kept = D.driverOptionsHtml(['中村　友香', '齊藤　連'], '河合　尚美');
+assert.ok(kept.includes('value="河合　尚美"') && kept.includes('selected'), '保存済みの担当は、その欄だけ残す');
+assert.ok(between(cal, 'LEO_VIEWS.cal', 'return h;').includes('leoPickerNames'));
+assert.ok(read('leo_home_cal.js').includes('leoPickerNames') && read('leo_home_cal.js').includes('leoListedStaff'));
+assert.ok(read('leo_shift.js').includes('leoListedStaff') && read('leo_shift.js').includes('leoPickerNames'));
+assert.ok(between(leo, 'LEO_VIEWS.hiyari', 'const isNew').includes('leoListedStaff'));
+
+(async () => {
+  function fakeSb(map) {
+    return async (path) => {
+      const p = String(path);
+      if (p.startsWith('leo_events')) return map.events || [];
+      if (p.startsWith('rpc/leo_staff_names')) return map.rpc;
+      if (p.startsWith('staff_profiles')) return map.prof || [];
+      return [];
+    };
+  }
+  D.resetLeoDriverNames();
+  global.sb = fakeSb({ rpc: [{ name: '河合　尚美' }, { name: '中村　友香' }, { name: '宮本　幸子' }, { name: '齊藤　連' }] });
+  let names = await D.leoDriverNames();
+  assert.ok(!names.some(n => D.normDriver(n) === '河合尚美'), '所属がレオ扱いでも河合は出さない ' + names.join(','));
+  assert.ok(!names.some(n => D.normDriver(n).startsWith('宮本')));
+  assert.ok(names.some(n => D.normDriver(n) === '中村友香') && names.some(n => D.normDriver(n) === '齊藤連'));
+
+  D.resetLeoDriverNames();
+  global.sb = fakeSb({
+    rpc: [],
+    events: [{ staff: '河合 尚美' }, { staff: '齊藤　連' }, { staff: '宮本さん' }],
+    prof: [
+      { active: true, office: 'RYDEEN', full_name: '河合尚美', nikki_name: '河合　尚美', extra_offices: ['レオ'] },
+      { active: true, office: 'レオ', full_name: '安藤尚子', nikki_name: '安藤　尚子', extra_offices: [] },
+      { active: true, office: 'RYDEEN', full_name: '横田祥', nikki_name: '横田　祥', extra_offices: ['レオ'] },
+      { active: true, office: 'RYDEEN', full_name: '金彌倞', nikki_name: '金彌　倞', extra_offices: [] },
+    ],
+  });
+  names = await D.leoDriverNames();
+  assert.ok(!names.some(n => D.normDriver(n) === '河合尚美'), '予定と兼務に残っていても河合は出さない ' + names.join(','));
+  assert.ok(!names.some(n => D.normDriver(n) === '宮本幸子'));
+  assert.ok(names.some(n => D.normDriver(n) === '宮本さん'), '呼び名「宮本さん」はこれまでどおり候補に残る');
+  assert.ok(!names.some(n => D.normDriver(n) === '金彌倞'), 'RYDEENだけの人は候補に入らない');
+  assert.ok(names.some(n => D.normDriver(n) === '齊藤連'));
+  assert.ok(names.some(n => D.normDriver(n) === '安藤尚子'));
+  assert.ok(names.some(n => D.normDriver(n) === '横田祥'), '兼務がレオの人は残す');
+  D.resetLeoDriverNames();
+  delete global.sb;
+  console.log('leo_driver_test ok');
+  console.log('例: 月曜朝 碧音くん迎え 10:20 / 実運転 ' + mondayPick.driver + ' / 日誌・実績 ' + D.filingDriverName(mondayPick.driver));
+})().catch(e => { console.error(e); process.exit(1); });

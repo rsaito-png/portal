@@ -228,7 +228,8 @@ function calRuns(es, folded) {
   return `<details class="calv-fold"><summary>送迎の便（${route.length}）</summary>${body}</details>`;
 }
 function calPeople(es) {
-  const staff = es.filter(e => e.kind === '勤務' || e.kind === '不在');
+  // 勤務・不在は職員の一覧。レオの職員でない人（河合尚美）は出さない。保存済みの送迎の担当名は calRun 側に残す。
+  const staff = es.filter(e => (e.kind === '勤務' || e.kind === '不在') && (typeof leoListedStaff !== 'function' || leoListedStaff(e.staff)));
   if (!staff.length) return '';
   return `<p class="calv-h4">職員</p>${staff.map(e => `<p class="calv-person">${calTag(e.kind)} ${esc(e.staff || '')} ${esc(e.title || e.note || '')}${calEd(e)}</p>`).join('')}`;
 }
@@ -532,7 +533,8 @@ LEO_VIEWS.cal = async function () {
   if (CAL.edit) {
     const e = CAL.edit === 'new' ? { day: CAL.d, kind: '利用', kids: [] } : evs.find(x => x.id === CAL.edit) || {};
     CAL.row = e.id ? e : null;
-    h += calForm(e, [...new Set([...ch.map(x => x.name), ...evs.map(x => x.child).filter(Boolean)])].sort(), [...new Set([...evs.map(x => x.staff).filter(Boolean), ...await leoDriverNames().catch(() => [])])]);
+    const staffPick = [...new Set([...evs.map(x => x.staff).filter(Boolean), ...await leoDriverNames().catch(() => [])])];
+    h += calForm(e, [...new Set([...ch.map(x => x.name), ...evs.map(x => x.child).filter(Boolean)])].sort(), typeof leoPickerNames === 'function' ? leoPickerNames(staffPick) : staffPick);
   }
   h += calWrap(`<p class="calv-date">${head}</p><p class="calv-hint">横軸は時刻、色の棒は児童の利用時間です。棒をタップすると、迎え（☆）・送り（★）の担当・時刻・場所と、保護者の備考が出ます。</p>${body}`);
   h += `<p style="margin-top:12px;font-size:13px;line-height:1.5">関連：<a href="#leo/sougei">自分の送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/userinfo">利用者情報</a>' : ''}</p>
