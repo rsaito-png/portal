@@ -639,7 +639,9 @@ async function renderSoumu() {
   }
   if (typeof esignBadge === 'function') esignBadge();
 }
-window.addEventListener('hashchange', render);
+// 画面を移ったときは一番上から見せる（描き終わったあとにも戻す）
+try { history.scrollRestoration = 'manual'; } catch (e) {}
+window.addEventListener('hashchange', async () => { window.scrollTo(0, 0); try { await render(); } finally { window.scrollTo(0, 0); } });
 let ROLE = C.defaultRole;
 
 // 見本モードだけ: 職員／事務 の見え方を切り替え
