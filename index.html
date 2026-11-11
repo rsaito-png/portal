@@ -525,7 +525,12 @@ async function loadDailySky() {
   if (!r || !r.body) {
     el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b note">今日分はまだありません（管理者は「直す」から書けます）。</div>`;
   } else {
-    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b">${esc(r.body)}</div><div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
+    // 長いときは最初のひとかたまりだけ出し、残りは「くわしく」で開く（文章は削らない）
+    const paras = String(r.body).split(/\n+/).filter(Boolean);
+    let head = paras[0] || '', rest = paras.slice(1).join('\n');
+    if (!rest && head.length > 110) { const ss = head.match(/[^。]+。?/g) || [head]; head = ss[0]; rest = ss.slice(1).join(''); }
+    const more = rest ? `<div class="ds-more" hidden>${esc(rest).replace(/\n/g, '<br>')}</div><button type="button" class="inl back" style="font-size:12px;margin-top:4px" onclick="var m=this.previousElementSibling;m.hidden=!m.hidden;this.textContent=m.hidden?'くわしく':'たたむ'">くわしく</button>` : '';
+    el.innerHTML = `<div class="ds-h">今日のお仕事占い ${editBtn}</div><div class="ds-b">${esc(head)}</div>${more}<div class="ds-t">今日のひとこと：${esc(r.tip)}</div>`;
   }
   el.hidden = false;
 }
