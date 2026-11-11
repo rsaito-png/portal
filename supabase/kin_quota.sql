@@ -1,7 +1,8 @@
 -- 金斗雲：支給量の枠と、日ごとの予定の増減（休み・追加）。土曜などで支給量を使い切るための表。2026-11-12
 -- 数え方：1回＝count_minutes 分（石田大雅さん 身体介護は30分。実際は20分でも30分）。
 -- 予定の分＝（週の固定予定 kin_supply の回数 − 休みの日の回数 ＋ 追加の回数）× count_minutes。
--- 追加・休みの取り消しで支給量（monthly_minutes）を超える場合は DB で止める。実績（kin_visit）は止めず、画面で警告する。
+-- 支給量：身体介護は台帳 kin_user.supply_body_hours（時間）が正。kin_quota.monthly_minutes は身体介護では持たない（null）。ほかの種類だけ monthly_minutes を使う。
+-- 追加・休みの取り消しで支給量を超える場合は DB で止める。実績（kin_visit）は止めず、画面で警告する。
 
 create table if not exists public.kin_quota (
   id bigint generated always as identity primary key,
@@ -24,6 +25,27 @@ create table if not exists public.kin_plan_day (
   memo text check (char_length(memo) <= 300),
   created_by uuid default auth.uid(), created_at timestamptz not null default now(),
   unique (user_id, service, plan_date));
+-- 2026-11-12 追記：土曜などの既定の時刻、支給量の正を台帳に
+alter table public.kin_quota add column if not exists default_start time;
+alter table public.kin_quota add column if not exists default_end time;
+alter table public.kin_quota alter column monthly_minutes drop not null;
+create or replace function public.kin_quota_src() returns trigger language plpgsql as $$
+begin
+  if new.service = '身体介護' then new.monthly_minutes := null;
+  elsif new.monthly_minutes is null then raise exception '% の支給量（分）を入れてください。', new.service; end if;
+  return new;
+end $$;
+drop trigger if exists kin_quota_src on public.kin_quota;
+create trigger kin_quota_src before insert or update on public.kin_quota for each row execute function public.kin_quota_src();
+-- その利用者・種類の1か月の支給量（分）。身体介護は台帳の時間×60。入っていなければ null
+create or replace function public.kin_quota_minutes(p_user bigint, p_service text)
+returns int language sql stable security definer set search_path = public as $$
+  select case when q.service = '身体介護' then (select round(u.supply_body_hours * 60)::int from public.kin_user u where u.id = q.user_id)
+              else q.monthly_minutes end
+    from public.kin_quota q where q.user_id = p_user and q.service = p_service;
+$$;
+revoke all on function public.kin_quota_minutes(bigint, text) from public, anon, authenticated;
+
 create index if not exists kin_plan_day_month on public.kin_plan_day(user_id, service, plan_date);
 
 alter table public.kin_quota enable row level security;
@@ -64,7 +86,7 @@ revoke all on function public.kin_planned_count(bigint, text, date) from public,
 -- 追加・休みの取り消しで支給量を超えるなら止める
 create or replace function public.kin_plan_day_guard() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare q public.kin_quota; cur int; add_n int; r public.kin_plan_day;
+declare q public.kin_quota; cur int; add_n int; r public.kin_plan_day; cap int;
 begin
   if tg_op = 'UPDATE' then
     if (new.user_id, new.service, new.plan_date, new.kind) is distinct from (old.user_id, old.service, old.plan_date, old.kind) then
@@ -72,9 +94,15 @@ begin
     end if;
     return new;
   end if;
+  if tg_op = 'INSERT' and new.kind = '追加' and new.start_time is null and new.end_time is null then
+    select k.default_start, k.default_end into new.start_time, new.end_time from public.kin_quota k where k.user_id = new.user_id and k.service = new.service;
+  end if;
   r := case when tg_op = 'DELETE' then old else new end;
   if tg_op = 'INSERT' and r.kind = '休み' and public.kin_regular_count(r.user_id, r.service, r.plan_date) = 0 then
     raise exception '% はもともと予定のない日です（休みにできません）。', r.plan_date;
+  end if;
+  if tg_op = 'INSERT' and r.kind = '追加' and r.plan_date < (now() at time zone 'Asia/Tokyo')::date then
+    raise exception '% はもう過ぎた日です（過ぎた日には追加できません）。', r.plan_date;
   end if;
   if tg_op = 'INSERT' and r.kind = '追加' and public.kin_regular_count(r.user_id, r.service, r.plan_date) > 0 then
     raise exception '% はもともと予定のある日です（追加はいりません）。', r.plan_date;
@@ -83,10 +111,12 @@ begin
   if (tg_op = 'INSERT' and r.kind = '追加') or (tg_op = 'DELETE' and r.kind = '休み') then
     select * into q from public.kin_quota where user_id = r.user_id and service = r.service;
     if found then
+      cap := public.kin_quota_minutes(r.user_id, r.service);
+      if cap is null then raise exception '支給量が台帳に入っていません。先に台帳で支給量を入れてください。'; end if;
       cur := public.kin_planned_count(r.user_id, r.service, r.plan_date);
       add_n := case when r.kind = '追加' then 1 else public.kin_regular_count(r.user_id, r.service, r.plan_date) end;
-      if (cur + add_n) * q.count_minutes > q.monthly_minutes then
-        raise exception '支給量をこえます（月 % 分のうち、予定 % 分。あと % 分しかありません）。', q.monthly_minutes, cur * q.count_minutes, q.monthly_minutes - cur * q.count_minutes;
+      if (cur + add_n) * q.count_minutes > cap then
+        raise exception '支給量をこえます（月 % 分のうち、予定 % 分。あと % 分しかありません）。', cap, cur * q.count_minutes, cap - cur * q.count_minutes;
       end if;
     end if;
   end if;
@@ -99,11 +129,12 @@ create trigger kin_plan_day_guard before insert or update or delete on public.ki
 -- 画面用：その月の数字（予定・実績・入れられる回数）
 create or replace function public.kin_quota_month(p_month text)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
-declare d0 date; d1 date; out jsonb := '[]'::jsonb; q record; pc int; fill_free int; fill_added int; act int; reg int; off int; addn int; remain int;
+declare d0 date; d1 date; out jsonb := '[]'::jsonb; q record; pc int; cap int; fill_free int; fill_added int; act int; reg int; off int; addn int; remain int;
 begin
   if not ((public.my_office() = '金斗雲') or public.can_manage_for('金斗雲')) then raise exception '権限がありません'; end if;
   d0 := to_date(p_month || '-01', 'YYYY-MM-DD'); d1 := (d0 + interval '1 month')::date;
-  for q in select k.*, u.name, u.supply_body_hours from public.kin_quota k join public.kin_user u on u.id = k.user_id order by u.name, k.service loop
+  for q in select k.*, u.name from public.kin_quota k join public.kin_user u on u.id = k.user_id order by u.name, k.service loop
+    cap := public.kin_quota_minutes(q.user_id, q.service);
     pc := public.kin_planned_count(q.user_id, q.service, d0);
     select coalesce(sum(public.kin_regular_count(q.user_id, q.service, g::date)), 0) into reg from generate_series(d0, d1 - 1, interval '1 day') g;
     select coalesce(sum(public.kin_regular_count(q.user_id, q.service, x.plan_date)), 0) into off from public.kin_plan_day x
@@ -116,17 +147,17 @@ begin
     select count(*) into fill_added from public.kin_plan_day x where x.user_id = q.user_id and x.service = q.service and x.kind = '追加'
       and extract(dow from x.plan_date)::int = q.fill_weekday and x.plan_date >= d0 and x.plan_date < d1;
     select count(*) into act from public.kin_visit v where v.user_id = q.user_id and v.service = q.service and v.visit_date >= d0 and v.visit_date < d1;
-    remain := q.monthly_minutes - pc * q.count_minutes;
+    remain := cap - pc * q.count_minutes;
     out := out || jsonb_build_object(
       'quota_id', q.id, 'user_id', q.user_id, 'name', q.name, 'service', q.service,
-      'monthly_minutes', q.monthly_minutes, 'count_minutes', q.count_minutes, 'fill_weekday', q.fill_weekday,
-      'ledger_hours', case when q.service = '身体介護' then q.supply_body_hours end,
+      'monthly_minutes', cap, 'from_ledger', q.service = '身体介護', 'count_minutes', q.count_minutes, 'fill_weekday', q.fill_weekday,
+      'default_start', q.default_start, 'default_end', q.default_end,
       'regular_count', reg, 'off_count', off, 'add_count', addn, 'planned_count', pc,
       'planned_minutes', pc * q.count_minutes, 'remain_minutes', remain,
       'fill_added', fill_added, 'fill_free', fill_free,
-      'fill_can_add', greatest(0, least(fill_free, floor(greatest(remain, 0)::numeric / q.count_minutes)::int)),
+      'fill_can_add', case when cap is null then 0 else greatest(0, least(fill_free, floor(greatest(remain, 0)::numeric / q.count_minutes)::int)) end,
       'actual_count', act, 'actual_minutes', act * q.count_minutes,
-      'over_plan', pc * q.count_minutes > q.monthly_minutes, 'over_actual', act * q.count_minutes > q.monthly_minutes,
+      'over_plan', coalesce(pc * q.count_minutes > cap, false), 'over_actual', coalesce(act * q.count_minutes > cap, false),
       'days', (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'date', x.plan_date, 'kind', x.kind, 'start', x.start_time, 'end', x.end_time, 'memo', x.memo) order by x.plan_date), '[]'::jsonb)
                  from public.kin_plan_day x where x.user_id = q.user_id and x.service = q.service and x.plan_date >= d0 and x.plan_date < d1));
   end loop;
@@ -136,9 +167,19 @@ revoke all on function public.kin_quota_month(text) from public, anon;
 grant execute on function public.kin_quota_month(text) to authenticated;
 
 -- 石田大雅さん：身体介護 月12.5時間＝750分、1回30分で数える、土曜で埋める
-insert into public.kin_quota (user_id, service, monthly_minutes, count_minutes, fill_weekday, memo)
-select id, '身体介護', 750, 30, 6, '受給者証 身体介護 月12.5時間。20分の支援も30分で数える（齊藤さん指定 2026-11-12）'
+-- 支給量は台帳（supply_body_hours 12.5）を読む。土曜は 18:00〜18:30（齊藤さん決定 2026-11-12）
+insert into public.kin_quota (user_id, service, monthly_minutes, count_minutes, fill_weekday, default_start, default_end, memo)
+select id, '身体介護', null, 30, 6, '18:00', '18:30', '受給者証 身体介護 月12.5時間（台帳の値を使う）。20分の支援も30分で数える（齊藤さん指定 2026-11-12）'
   from public.kin_user where name = '石田大雅'
 on conflict (user_id, service) do nothing;
+update public.kin_quota set default_start = '18:00', default_end = '18:30', monthly_minutes = null,
+  memo = '受給者証 身体介護 月12.5時間（台帳の値を使う）。20分の支援も30分で数える（齊藤さん指定 2026-11-12）'
+ where service = '身体介護' and user_id = (select id from public.kin_user where name = '石田大雅') and default_start is null;
+-- 石田さんの土曜（上限の範囲。11月3回・12月2回）。あとで画面から入れ替えられる
+insert into public.kin_plan_day (user_id, service, plan_date, kind, start_time, end_time, memo)
+select u.id, '身体介護', d::date, '追加', '18:00', '18:30', '支給量の残りで土曜'
+  from public.kin_user u, unnest(array['2026-11-14','2026-11-21','2026-11-28','2026-12-05','2026-12-12']) d
+ where u.name = '石田大雅'
+on conflict (user_id, service, plan_date) do nothing;
 
 notify pgrst, 'reload schema';
