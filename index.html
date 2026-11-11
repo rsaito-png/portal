@@ -356,7 +356,7 @@ function leoHomeBody(o) {
   // 今日やること（児発管）はここ1か所だけ（担当者名の欄には重ねない）
   const todoT = o.todoTop ? vis.filter(t => t[1] === o.todoTop) : [];
   const todoRow = todoT.length ? `<div class="grid">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
-  return `${todoRow}<div id="my_todo"></div><div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
+  return `${todoRow}<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
