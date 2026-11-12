@@ -1184,7 +1184,7 @@ async function leoFetchMeals(filter) {
 function leoMealSelect(field, value, extra) {
   const v = leoMealFlag(value);
   const opt = (val, label) => `<option value="${val}"${v === val ? ' selected' : ''}>${label}</option>`;
-  const width = extra ? 'width:8em' : 'width:100%';
+  const width = 'width:100%';
   return `<select data-kind="meal" data-f="${field}" ${extra || ''} style="${width}">${opt('', '未記入')}${opt('あり', 'あり')}${opt('なし', 'なし')}</select>`;
 }
 function leoSnackYenSync(sel) {
