@@ -148,6 +148,14 @@ document.documentElement.classList.add('th-'+t);var l=document.getElementById('t
 [data-meal-child] [data-snack-yen][hidden]{display:none}
 @media (min-width:900px){.nk-row > label input,.nk-row > label select{font-size:20px;padding:8px 10px}}
 #nk_day textarea,.rec textarea[data-f="activity"]{font-size:16px;padding:6px 8px}
+html body .rec[data-abs] .abs-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:4px}
+html body .rec[data-abs] .abs-grid > label{display:flex;flex-direction:column;gap:2px;margin:0;font-size:15px;line-height:1.3;min-width:0}
+html body .rec[data-abs] .abs-grid > .abs-wide{grid-column:1 / -1}
+html body .rec[data-abs] .abs-grid input,html body .rec[data-abs] .abs-grid select,html body .rec[data-abs] .abs-grid textarea{width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:0;font-size:16px;padding:6px 8px;min-height:0;height:auto}
+html body .rec[data-abs] .abs-check{display:flex;align-items:center;gap:6px;margin:4px 0 0;font-size:15px}
+html body .rec[data-abs] .abs-check input{width:auto;margin:0}
+@media (min-width:900px){html body .rec[data-abs] .abs-grid > label,html body .rec[data-abs] .abs-check{font-size:18px}html body .rec[data-abs] .abs-grid input,html body .rec[data-abs] .abs-grid select,html body .rec[data-abs] .abs-grid textarea{font-size:20px;padding:8px 10px}}
+
 html body .nk-child .rec label,html body .nk-child .rec [data-meal-child] > label{font-size:15px;line-height:1.3;margin:0}
 html body .nk-child .rec .nk-row{margin:6px 0 0}
 html body .nk-child .rec > label{margin:6px 0 0}
@@ -260,7 +268,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="leo_driver.js?v=20261111staff"></script>
 <script src="leo_meal.js?v=20261112sheet"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261112nkcompact"></script>
+<script src="leo.js?v=20261112absform"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261112sat"></script>
 <script src="kin_visit.js?v=20261112quota"></script>

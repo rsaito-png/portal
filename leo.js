@@ -688,7 +688,7 @@ const LEO_VIEWS = {
       }),
       ...abs.map(r => {
         const flag = leoAbsFlag(flags, r.child);
-        return { child: r.child, kind: '欠席', filled: leoNikkiFilledAbs(flag), html: leoAbsCardHtml(r.child, flag) };
+        return { child: r.child, kind: '欠席', filled: leoNikkiFilledAbs(flag), html: leoAbsCardHtml(r.child, flag, false, day, drvRaw) };
       }),
     ];
     const noteOpen = leoFoldOpen('leo_nikki_note_open');
@@ -1417,6 +1417,10 @@ function nikkiControlDirty(el) {
   const kind = el.dataset ? el.dataset.kind : '';
   if (kind === 'day') return false;
   if (el.type === 'checkbox') return !!el.checked !== !!el.defaultChecked;
+  if (el.tagName === 'SELECT' && (kind === 'meal' || kind === 'abs')) {
+    const d = [...el.options].find(o => o.defaultSelected) || el.options[0];
+    return String(el.value || '') !== String(d ? d.value : '');
+  }
   if (kind === 'meal' || kind === 'abs') {
     return String(el.value == null ? '' : el.value) !== String(el.defaultValue == null ? '' : el.defaultValue);
   }
@@ -1438,12 +1442,53 @@ function nikkiMarkDirty(card) {
   const mark = btn.querySelector('[data-nk-dirty]');
   if (mark) mark.hidden = !nikkiCardDirty(card);
 }
-function leoAbsCardHtml(child, flag, withSave) {
+// 欠席時対応は項目ごとに入れて、leo_day_flags.absent_note に「項目：値」の行でまとめて保存する（SQL不要）
+const LEO_ABS_ITEMS = [
+  ['contact', '連絡日', 'date'], ['plan', '利用予定日', 'date'],
+  ['who', '連絡者', ['母', '父', '本人']], ['how', '連絡手段', ['電話', 'メール', '対面']],
+  ['staff', '対応職員', 'staff'], ['reason', '欠席理由', 'text'],
+  ['record', '対応記録', 'area'], ['next', '次回利用予定日', 'date'],
+];
+let LEO_ABS_STAFF = [];
+function leoAbsParse(note) {
+  const out = {};
+  const labels = LEO_ABS_ITEMS.map(([, l]) => l).sort((x, y) => y.length - x.length);
+  const text = String(note || '').replace(new RegExp('\\s*(?<!次回)(?=(' + labels.join('|') + ')[：:])', 'g'), '\n').replace(/^\n/, '');
+  if (!text.trim()) return out;
+  const byLabel = Object.fromEntries(LEO_ABS_ITEMS.map(([k, l]) => [l, k]));
+  let last = null, hit = false;
+  text.split('\n').forEach(line => {
+    const m = line.match(/^([^：:]{2,8})[：:](.*)$/);
+    if (m && byLabel[m[1].trim()]) { last = byLabel[m[1].trim()]; out[last] = m[2].trim(); hit = true; }
+    else if (last === 'record') out.record += '\n' + line;
+    else if (!hit) out.record = (out.record ? out.record + '\n' : '') + line;
+  });
+  if (!hit) out.record = text.trim();
+  return out;
+}
+function leoAbsPack(v) {
+  return LEO_ABS_ITEMS.filter(([k]) => String(v[k] || '').trim()).map(([k, l]) => `${l}：${String(v[k]).trim()}`).join('\n');
+}
+function leoAbsCardHtml(child, flag, withSave, day, staff) {
   const f = flag || {};
+  const v = leoAbsParse(f.absent_note);
+  if (!v.plan && day) v.plan = day;
+  const names = (staff && staff.length ? staff : LEO_ABS_STAFF) || [];
+  const sel = (k, list) => {
+    const cur = v[k] || '';
+    const all = cur && !list.includes(cur) ? [...list, cur] : list;
+    return `<select data-kind="abs" data-af="${k}"><option value=""${cur ? '' : ' selected'}>選ぶ</option>${all.map(o => `<option value="${esc(o)}"${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  };
+  const item = ([k, l, t]) => {
+    if (t === 'date') return `<label>${l}<input type="date" data-kind="abs" data-af="${k}" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(v[k] || '') ? v[k] : '')}"></label>`;
+    if (t === 'staff') return `<label>${l}${sel(k, names)}</label>`;
+    if (Array.isArray(t)) return `<label>${l}${sel(k, t)}</label>`;
+    if (t === 'area') return `<label class="abs-wide">${l}<textarea data-kind="abs" data-af="${k}" rows="3" maxlength="280">${esc(v[k] || '')}</textarea></label>`;
+    return `<label>${l}<input data-kind="abs" data-af="${k}" maxlength="60" value="${esc(v[k] || '')}"></label>`;
+  };
   return `<div class="card rec" data-abs="1" data-child="${esc(child)}"><b>${esc(child)}</b> <span class="badge">欠席</span>
-    <p class="note">休んだ日の対応です。誰に連絡したか、何を話したか、次の利用を書いてください。加算対応をしたときは、話した内容が必要です。</p>
-    <label><input type="checkbox" data-kind="abs" data-k="absent_support"${f.absent_support ? ' checked' : ''}> 加算対応をした</label>
-    <label>欠席時対応（誰に連絡したか・何を話したか・次の利用）<textarea data-kind="abs" data-k="absent_note" rows="4" maxlength="500">${esc(f.absent_note || '')}</textarea></label>
+    <label class="abs-check"><input type="checkbox" data-kind="abs" data-k="absent_support"${f.absent_support ? ' checked' : ''}> 加算対応をした</label>
+    <div class="abs-grid">${LEO_ABS_ITEMS.map(item).join('')}</div>
     ${withSave ? '<button type="button" onclick="saveAbsDiary(this)">保存</button><div class="abs_msg"></div>' : ''}</div>`;
 }
 function leoAbsAddHtml(prefix, day, names) {
@@ -1476,12 +1521,18 @@ function leoReadAbs(root) {
   return nodes.map(el => {
     const box = el.querySelector('[data-k="absent_support"]');
     const note = el.querySelector('[data-k="absent_note"]');
+    const parts = el.querySelectorAll('[data-af]');
+    if (parts.length) {
+      const v = {};
+      parts.forEach(p => { v[p.getAttribute('data-af')] = p.value; });
+      return { child: el.getAttribute('data-child') || '', absent_support: !!(box && box.checked), absent_note: leoAbsPack(v), core: String(v.record || '') + String(v.reason || '') };
+    }
     return { child: el.getAttribute('data-child') || '', absent_support: !!(box && box.checked), absent_note: note ? note.value : '' };
   });
 }
 function leoAbsError(rows) {
-  const bad = (rows || []).find(r => r.absent_support && !(r.absent_note || '').trim());
-  return bad ? `${bad.child}さん：加算対応をしたときは、連絡した相手と話した内容を書いてください。` : '';
+  const bad = (rows || []).find(r => r.absent_support && !String(r.core != null ? r.core : (r.absent_note || '')).trim());
+  return bad ? `${bad.child}さん：加算対応をしたときは、欠席理由か対応記録を書いてください。` : '';
 }
 async function leoSaveAbsFlags(day, rows) {
   if (!rows || !rows.length) return;
@@ -3059,13 +3110,14 @@ LEO_VIEWS.diary = async function () {
   const kinds = DEMO ? (DEMO_BILL.kids || []) : await leoChildKinds();
   const left = await loadLeftIndex();
   const choices = leoAbsChoices(rows, kinds, left, DIA_DAY);
+  const absStaff = await leoDriverNames().catch(() => []);
   return `<h3>日誌（児童ごと）</h3>${demoNote()}
     <p class="ptabs"><button onclick="DIA_DAY=addDays(DIA_DAY,-1);renderLeoView('diary')">← 前の日</button> <b>${fmtDay(DIA_DAY)}</b> <button onclick="DIA_DAY=addDays(DIA_DAY,1);renderLeoView('diary')">次の日 →</button></p>
     <p class="note">ポータルの日誌が正です。下書きも食事も、この画面で保存できます（元のGoogleシートは使いません）。予定の利用児童を日誌に出します。欠席の子は、欠席時対応をここに書いて保存します。加算対応をしたときは、話した内容が必要です。LINE報告を保存すると、活動記録がここに入ります（である調のボット文があればそれを使い、無ければ補います）。下書きを保存しても活動記録に入ります。出席・欠席はサービス提供実績へ自動で載ります。国保連は簡易入力への手打ちです。迎え・送りの名前は届け出上の担当です。</p>
     ${leoDayLogHtml(DIA_DAY, bundle.log, 'dr', bundle.missing)}
     ${noTable ? '<p style="color:#c00">下書きの保存場所がまだありません（管理者が準備中です）。</p>' : ''}
     ${rows.map(r => { const k = r.child;
-      if (r.kind === '欠席') return leoAbsCardHtml(k, leoAbsFlag(flags, k), true);
+      if (r.kind === '欠席') return leoAbsCardHtml(k, leoAbsFlag(flags, k), true, DIA_DAY, absStaff);
       const d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
       const mealRec = meals[leoMealNorm(k)];
       return `<details class="card" open style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／食事 ${esc((mealRec && mealRec.meal) || '未記入')}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
