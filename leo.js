@@ -1539,7 +1539,7 @@ function nkGo(d) { NK_DAY = (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < today()) 
 function nkDayNav(day) {
   if (DEMO) return '';
   const t = today();
-  return `<p class="ptabs"><button onclick="nkGo(addDays('${day}',-1))">← 前の日</button> <input type="date" value="${day}" max="${t}" onchange="nkGo(this.value)" style="font-size:16px"> <button onclick="nkGo(addDays('${day}',1))"${day >= t ? ' disabled' : ''}>次の日 →</button> <button onclick="nkGo(null)">今日</button></p>${day === t ? '' : `<p class="note"><b>${esc(fmtDay(day))}の日誌を開いています。</b>活動記録などを直接入力して保存すると、日誌とサービス提供実績に反映されます。</p>`}`;
+  return `<div class="nk-daynav"><button type="button" onclick="nkGo(addDays('${day}',-1))">← 前の日</button><button type="button" onclick="nkGo(null)">今日</button><button type="button" onclick="nkGo(addDays('${day}',1))"${day >= t ? ' disabled' : ''}>次の日 →</button><input type="date" value="${day}" max="${t}" onchange="nkGo(this.value)" aria-label="日付"></div>${day === t ? '' : `<p class="note"><b>${esc(fmtDay(day))}の日誌を開いています。</b>活動記録などを直接入力して保存すると、日誌とサービス提供実績に反映されます。</p>`}`;
 }
 async function saveNikki() {
   const view = document.getElementById('view');

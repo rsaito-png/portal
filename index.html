@@ -148,6 +148,11 @@ document.documentElement.classList.add('th-'+t);var l=document.getElementById('t
 [data-meal-child] [data-snack-yen][hidden]{display:none}
 @media (min-width:900px){.nk-row > label input,.nk-row > label select{font-size:20px;padding:8px 10px}}
 #nk_day textarea,.rec textarea[data-f="activity"]{font-size:16px;padding:6px 8px}
+html body .nk-daynav{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:8px 0}
+html body .nk-daynav button,html body.ui-app .nk-daynav button{width:auto;flex:0 0 auto;margin:0;font-size:15px;padding:8px 10px;min-height:44px;white-space:nowrap}
+html body .nk-daynav input,html body.ui-app .nk-daynav input{flex:1 1 0;width:auto;min-width:0;margin:0;font-size:15px;padding:6px;min-height:44px}
+@media (min-width:900px){html body .nk-daynav button,html body.ui-app .nk-daynav button,html body .nk-daynav input,html body.ui-app .nk-daynav input{font-size:18px}}
+
 @media (min-width:900px){#nk_day textarea,.rec textarea[data-f="activity"]{font-size:20px;padding:8px 10px}}
 html.th-yamen body.portal .nk-kids button.nk-kid{background:#fffaf0;color:#3a2208;border:2px solid #8a6a3a;box-shadow:none}
 html.th-yamen body.portal .nk-kids button.nk-kid.on{background:#7a1414;color:#fff3e6;border-color:#c6a15b}
@@ -245,7 +250,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="leo_driver.js?v=20261111staff"></script>
 <script src="leo_meal.js?v=20261112sheet"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261112kidnote"></script>
+<script src="leo.js?v=20261112daynav"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261112sat"></script>
 <script src="kin_visit.js?v=20261112quota"></script>
