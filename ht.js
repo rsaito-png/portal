@@ -94,7 +94,19 @@ function htTrainStat(t) {
   for (const r of htRecScope().filter(r => r.training_id === t.id)) { htHasEv(r) ? evOk++ : evNg++; if (!r.confirmed_at) unconf++; }
   return { target, done, late, evOk, evNg, unconf };
 }
-function htModal(title, fields, onSave, okText = '保存', extra = null) {
+// 書きかけを sessionStorage に残す（画面が再読み込みされても消えないように。2026-11-12 齊藤さん「途中で消えた」）
+const htDraftKey = k => 'htdraft:' + String(k).replace(/<[^>]*>/g, '');
+function htDraftWatch(m, key) {
+  const K = htDraftKey(key), els = () => [...m.querySelectorAll('input,select,textarea')].filter(e => e.id || e.name || e.dataset.k);
+  const id = e => e.id || (e.name ? e.name + '=' + e.value : e.dataset.k + '=' + e.value);
+  try { const d = JSON.parse(sessionStorage.getItem(K) || 'null');
+    if (d) els().forEach(e => { const v = d[id(e)]; if (v == null) return; if (e.type === 'radio' || e.type === 'checkbox') e.checked = !!v; else e.value = v; });
+  } catch (e) {}
+  const save = () => { const d = {}; els().forEach(e => { d[id(e)] = (e.type === 'radio' || e.type === 'checkbox') ? e.checked : e.value; }); try { sessionStorage.setItem(K, JSON.stringify(d)); } catch (e) {} };
+  m.addEventListener('input', save); m.addEventListener('change', save);
+  return () => { try { sessionStorage.removeItem(K); } catch (e) {} };
+}
+function htModal(title, fields, onSave, okText = '保存', extra = null, draft = null) {
   const m = document.createElement('div'); m.className = 'htm';
   const f = x => { const v = x.val ?? ''; const id = 'htf_' + x.k;
     if (x.type === 'textarea') return `<label>${x.label}${x.req ? ' *' : ''}<textarea id="${id}" rows="3">${esc(v)}</textarea></label>`;
@@ -103,11 +115,12 @@ function htModal(title, fields, onSave, okText = '保存', extra = null) {
     return `<label>${x.label}${x.req ? ' *' : ''}<input id="${id}" type="${x.type || 'text'}" value="${esc(v)}"></label>`; };
   m.innerHTML = `<div><h3 style="margin-top:0">${title}</h3>${fields.map(f).join('')}<p id="htmsg" style="color:#c00"></p>${extra ? `<button id="htex" class="htb g" style="width:100%!important">${extra[0]}</button>` : ''}<button id="htok">${okText}</button><button class="back" style="width:100%" id="htcancel">やめる</button></div>`;
   document.body.appendChild(m);
-  m.querySelector('#htcancel').onclick = () => m.remove();
+  const clearDraft = draft ? htDraftWatch(m, draft) : () => {};
+  m.querySelector('#htcancel').onclick = () => { clearDraft(); m.remove(); };
   const run = async (fn, strict) => {
     const o = {};
     for (const x of fields) { if (x.type === 'checks') o[x.k] = [...m.querySelectorAll(`[data-k="${x.k}"]:checked`)].map(e => e.value); else { const v = m.querySelector('#htf_' + x.k).value.trim(); o[x.k] = v; if (strict && x.req && !v) { m.querySelector('#htmsg').textContent = `「${x.label}」は必須です`; return; } } }
-    try { if (await fn(o) === false) return; m.remove(); await htRefresh(); } catch (e) { m.querySelector('#htmsg').textContent = e.message; }
+    try { if (await fn(o) === false) return; clearDraft(); m.remove(); await htRefresh(); } catch (e) { m.querySelector('#htmsg').textContent = e.message; }
   };
   m.querySelector('#htok').onclick = () => run(onSave, true);
   if (extra) m.querySelector('#htex').onclick = () => run(extra[1], false);
@@ -123,6 +136,7 @@ async function renderHt() {
   if (!HT.D.myOffs.length && !HT.D.isAll) { $('view').innerHTML = back + '<h3>法定研修</h3><p>このアカウントには、法定研修を見る権限がありません。研修統括責任者に権限の追加を頼んでください。</p>'; return; }
   const hp = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (hp[0] === 'ht' && HT_TABS.some(([k]) => k === hp[1])) HT.tab = hp[1];
+  HT.focus = hp[0] === 'ht' && hp[1] === 'train' && hp[2] ? hp[2] : null;
   htDraw();
   if (hp[0] === 'ht' && hp[1] === 'train' && hp[2]) { const r = document.getElementById('httr_' + hp[2]); if (r) { r.style.outline = '4px solid #E8833A'; r.scrollIntoView({ block: 'center' }); } }
 }
@@ -205,22 +219,38 @@ function htTrain() {
     <td><span class="chip ok">証跡あり ${s.evOk}</span><br><span class="chip ng">証跡なし ${s.evNg}</span>${s.unconf ? `<br><small>未確認 ${s.unconf}</small>` : ''}</td>
     <td>${mats.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.kind)}</a>`).join('　')}</td>
     <td><button class="htb g" onclick="htImpl('${t.id}')">実施記録PDF</button><button class="htb g" onclick="htCert()">受講証明書</button>
-    ${canEdit ? `<button class="htb" onclick="htRecForm('${t.id}')">記録を入力</button>` : ''}
-    ${canQuiz ? `<button class="htb" onclick="htQuiz('${t.id}')">テストを受ける</button>` : ''}
+    ${canQuiz ? `<br><button class="htb" onclick="htQuiz('${t.id}')">テストを受ける</button><br><small>点数・気づき・計画は自動で記録されます</small><br>` : ''}
+    ${canEdit ? `<button class="htb g" onclick="htRecForm('${t.id}')">紙で受けた分の記録を入力</button>` : ''}
     ${D.isAll ? `<button class="htb" onclick="htConfirm('${t.id}')"${s.unconf ? '' : ' disabled style="opacity:.4"'}>統括責任者確認</button>` : ''}</td></tr>`; }).join('');
   const ev = D.ev.filter(e => e.active && htAppliesScope(e)).map(e => {
     const logs = D.evl.filter(l => l.event_id === e.id && l.done_on >= HT.fy + '-04-01' && l.done_on <= (HT.fy + 1) + '-03-31' && htScope().some(o => o.id === l.office_id));
     return `<tr><td><b>${esc(e.id)} ${esc(e.name)}</b><br><small>${esc(e.kind)}</small></td><td>${e.months.map(x => `<span class="chip ${x === m ? 'now' : ''}">${x}月</span>`).join('')}</td><td>${logs.length}/${e.times_per_year}回${logs.length ? '<br><small>' + logs.map(l => htFmtD(l.done_on) + ' ' + esc(htOffName(l.office_id))).join('<br>') + '</small>' : ''}</td><td>${D.editOffs.length ? `<button class="htb" onclick="htEvForm('${e.id}')">実施を記録</button>` : ''}</td></tr>`; }).join('');
-  return `<div class="htw"><table class="htt"><tr><th>研修</th><th>受講</th><th>証跡</th><th>教材</th><th></th></tr>${rows}</table></div>
+  return htGuide() + `<div class="htw"><table class="htt"><tr><th>研修</th><th>受講</th><th>証跡</th><th>教材</th><th></th></tr>${rows}</table></div>
   <p class="note">「実施記録PDF」「受講証明書」は印刷画面が開きます（「PDFに保存」を選べます）。事業所を選んでいるときはその事業所分、「全事業所」のときは事業所ごとに1枚ずつ出ます。手入力の記録は「証跡なし」と区別して表示されます。</p>
   <h4>訓練・点検・計画見直し</h4><div class="htw"><table class="htt"><tr><th>項目</th><th>予定月</th><th>実施</th><th></th></tr>${ev}</table></div>${htLogList('rec')}${htLogList('evl')}`;
+}
+// 「私への依頼」のリンク（#ht/train/T01）から来たときの手順。動画→テストの2つだけ。記録はテストの提出で自動で入る
+function htMeStaff() { const D = HT.D; return D.myStaff || D.staff.find(s => (s.email || '').toLowerCase() === D.me) || null; }
+function htGuide() {
+  const D = HT.D, t = HT.focus && D.tr.find(x => x.id === HT.focus);
+  if (!t) return '';
+  const me = htMeStaff(), canQuiz = D.editOffs.length > 0 || htSelfOffices(t, D.myStaff).length > 0;
+  const mine = me ? D.rec.filter(r => r.fy === HT.fy && r.staff_id === me.id && r.training_id === t.id) : [];
+  const pass = mine.find(htPassed);
+  const mats = D.mat.filter(x => x.training_id === t.id && x.active);
+  const big = 'font-size:28px!important;padding:14px 18px!important;display:block!important;width:100%!important;margin:8px 0!important;text-align:center;box-sizing:border-box';
+  const vid = mats.map(x => `<a class="htb g" style="${big};text-decoration:none" href="${esc(x.url)}" target="_blank" rel="noopener">① ${esc(x.kind)}を見る${x.minutes ? '（約' + x.minutes + '分）' : ''}</a>`).join('');
+  const done = pass ? `<p style="font-size:26px;margin:8px 0">✅ 受講済みです（${htFmtD(pass.taken_at)}${pass.rate != null ? '・得点 ' + pass.rate + '%' : ''}）。</p>` : '';
+  return `<div id="htguide" class="htmo now" style="font-size:26px"><b style="font-size:28px">${esc(t.name)}のやり方</b>${done}
+    ${vid}${canQuiz ? `<button class="htb" style="${big}" onclick="htQuiz('${t.id}')">② テストを受ける</button>` : ''}
+    <p style="font-size:24px;margin:6px 0">テストの答え・気づき・計画を書いて「提出する」を押すだけです。点数・気づき・計画は<b>自動で記録</b>され、合格すれば依頼も自動で「済」になります。</p></div>`;
 }
 function htRecForm(tid) {
   const D = HT.D, t = D.tr.find(x => x.id === tid);
   const cand = D.staff.filter(s => s.status === '在籍' && htStaffOffs(s).some(o => D.editOffs.includes(o) && htApplies(t, D.allOff.find(x => x.id === o))));
   if (!cand.length) return alert('入力できる対象職員がいません');
   const today0 = new Date(Date.now() + 9 * 36e5).toISOString().slice(0, 10);
-  htModal(`${esc(t.name)}：受講記録を入力`, [
+  htModal(`${esc(t.name)}：紙で受けた分の記録<br><small style="font-size:22px;font-weight:normal">本人が「テストを受ける」で提出すれば、点数・気づき・計画は自動で入ります。ここは紙のテストで受けた人の分だけ入れます。</small>`, [
     { k: 'staff', label: '職員', type: 'select', opts: cand.map(s => [s.id, s.name + '（' + htOffName(s.main_office) + '）']), val: cand[0].id },
     { k: 'day', label: '受講日', type: 'date', req: 1, val: today0 },
     { k: 'kind', label: '結果', type: 'select', opts: [['test', '確認テストの点数から判定'], ['参加', '参加（訓練など・点数なし）']], val: 'test' },
@@ -230,7 +260,7 @@ function htRecForm(tid) {
     let passed = '参加', rate = null; if (o.kind === 'test') { rate = +o.rate; if (o.rate === '' || isNaN(rate)) throw new Error('得点率を入れてください'); passed = rate >= t.pass_score ? '合格' : '不合格'; }
     await sb('ht_records', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ taken_at: o.day + 'T12:00:00+09:00', fy: htFy(new Date(o.day + 'T12:00:00+09:00')), training_id: t.id, training_name: t.name, staff_id: s.id, staff_name: s.name, email: s.email,
       offices: offs, score: rate, max_score: rate == null ? null : 100, rate, passed, impression: o.impression, plan: o.plan, source: '手入力' }) });
-  });
+  }, '保存', null, 'rec:' + tid);
 }
 // ポータルで受講。閲覧のみはサーバが本人の行だけ採点して入れる。編集者の代理入力は従来どおり。
 function htQuiz(tid) {
@@ -255,9 +285,11 @@ function htQuiz(tid) {
   m.innerHTML = `<div><h3 style="margin-top:0">${esc(t.name)}　確認テスト</h3><p class="note">教材：${mats.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.kind)}</a>`).join('　') || 'なし'}<br>${viewOnly ? 'ログイン中のアカウントが本人確認として記録されます。提出できるのは、名簿で結びついた本人の分だけです。' : 'ログインしているメール（' + esc(D.me) + '）が本人確認として記録されます。'}理解度テスト・所感・実践計画は必須です。</p>
   ${who}
   ${qs.map(q => `<p><b>問${q.no}．${esc(q.question)}</b></p>${['a', 'b', 'c', 'd'].filter(c => q['opt_' + c]).map(c => `<label style="color:#222"><input type="radio" name="qz${q.no}" value="${c.toUpperCase()}"> ${c.toUpperCase()}．${esc(q['opt_' + c])}</label>`).join('')}`).join('') || '<p>この研修にはテストがありません。</p>'}
-  <label>所感・気づき *<textarea id="qz_i" rows="3"></textarea></label><label>現場実践計画 *<textarea id="qz_p" rows="2"></textarea></label><p id="qz_m" style="color:#c00"></p>
-  <button id="qz_ok">提出する</button><button class="back" style="width:100%" onclick="this.closest('.htm').remove()">やめる</button></div>`;
+  <label>所感・気づき *<textarea id="qz_i" rows="3" placeholder="動画を見て気づいたこと"></textarea></label><label>現場実践計画 *<textarea id="qz_p" rows="2" placeholder="明日からやること（1つでよい）"></textarea></label><p class="note">提出すると、点数・気づき・計画がそのまま受講記録になります。</p><p id="qz_m" style="color:#c00"></p>
+  <button id="qz_ok">提出する</button><button class="back" style="width:100%" id="qz_cancel">やめる</button></div>`;
   document.body.appendChild(m);
+  const clearDraft = htDraftWatch(m, 'quiz:' + t.id);
+  m.querySelector('#qz_cancel').onclick = () => { clearDraft(); m.remove(); };
   m.querySelector('#qz_ok').onclick = async () => {
     const msg = m.querySelector('#qz_m');
     const answers = {};
@@ -267,7 +299,7 @@ function htQuiz(tid) {
       if (viewOnly) {
         const res = await htRpc('ht_submit_own_quiz', { p_training_id: t.id, p_answers: answers, p_impression: i, p_plan: p });
         const rate = res && res.rate, passed = res && res.passed;
-        m.remove(); alert(`提出しました。得点 ${rate ?? '-'}%（${passed === '合格' ? '合格' : '不合格・再受講してください'}）`);
+        clearDraft(); m.remove(); alert(`提出しました。得点 ${rate ?? '-'}%（${passed === '合格' ? '合格' : '不合格・再受講してください'}）`);
       } else {
         let sc = 0, mx = 0;
         for (const q of qs) { mx += q.points; if (answers[String(q.no)] === q.answer) sc += q.points; }
@@ -275,7 +307,7 @@ function htQuiz(tid) {
         const offs = htStaffOffs(s).filter(x => D.editOffs.includes(x) && htApplies(t, D.allOff.find(y => y.id === x)));
         await sb('ht_records', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ fy: htFy(), training_id: t.id, training_name: t.name, staff_id: s.id, staff_name: s.name, email: s.email, offices: offs, score: sc, max_score: mx, rate,
           passed: rate == null || rate >= t.pass_score ? '合格' : '不合格', impression: i, plan: p, source: 'ポータル' }) });
-        m.remove(); alert(`提出しました。得点 ${rate ?? '-'}%（${rate == null || rate >= t.pass_score ? '合格' : '不合格・再受講してください'}）`);
+        clearDraft(); m.remove(); alert(`提出しました。得点 ${rate ?? '-'}%（${rate == null || rate >= t.pass_score ? '合格' : '不合格・再受講してください'}）`);
       }
       await htRefresh();
     } catch (e) { msg.textContent = e.message; }
