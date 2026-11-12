@@ -325,7 +325,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261112login';
+  var BUILD = '20261112login2';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -356,7 +356,7 @@ async function login() {
   });
   const j = await r.json();
   if (!r.ok) { $('msg').textContent = 'ログインできませんでした。メールとパスワードを確認してください。'; return; }
-  localStorage.setItem('sess', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email, role: (j.user.app_metadata || {}).role || C.defaultRole, exp: Date.now() + j.expires_in * 1000 })); if (window.loadGL) loadGL();
+  localStorage.setItem('sess', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email, role: (j.user.app_metadata || {}).role || C.defaultRole, exp: Date.now() + j.expires_in * 1000, day: jstDay() })); if (window.loadGL) loadGL();
   show();
 }
 
@@ -369,8 +369,9 @@ async function portalRefresh() {
     localStorage.setItem('sess', JSON.stringify({ ...s, token: j.access_token, refresh: j.refresh_token || s.refresh, exp: Date.now() + j.expires_in * 1000 })); return true;
   } catch (e) { return false; }
 }
-function portalKeepAlive() { if (DEMO) return; const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (s && s.refresh && s.exp < Date.now() + 15 * 60000) portalRefresh(); }
-setInterval(portalKeepAlive, 30 * 60000);
+function jstDay() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
+function portalKeepAlive() { if (DEMO) return; const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (s && s.day && s.day !== jstDay()) { logout(); return; } if (s && s.refresh && s.exp < Date.now() + 15 * 60000) portalRefresh(); }
+setInterval(portalKeepAlive, 5 * 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') portalKeepAlive(); });
 function logout() { localStorage.removeItem('sess'); location.reload(); }
 
@@ -745,6 +746,9 @@ function roleToggle() {
 function show() {
   const s = DEMO ? { email: '見本（デモ）', exp: Infinity, role: new URLSearchParams(location.search).get('role') || C.defaultRole } : JSON.parse(localStorage.getItem('sess') || 'null');
   if (!s) return;
+  // 毎晩0時（日本時間）でログインを切る。前からのログインには今日の日付をつける
+  if (!DEMO && !s.day) { s.day = jstDay(); localStorage.setItem('sess', JSON.stringify(s)); }
+  if (!DEMO && s.day !== jstDay()) { localStorage.removeItem('sess'); return; }
   // 1時間で切れる鍵は、残っている更新用の鍵で取り直す（スマホでも毎回ログインしなくてよいように）
   if (!DEMO && s.exp < Date.now() + 5 * 60000) {
     if (s.refresh && !show._tried) { show._tried = true; portalRefresh().then(ok => { if (!ok) localStorage.removeItem('sess'); show(); }); return; }
