@@ -157,6 +157,27 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
   .nk-row{flex-wrap:nowrap;gap:6px 16px}
   .nk-row > label{flex:1 1 0;min-width:0}
 }
+/* 児童別表示。半画面（520px前後）でも横にスクロールしない */
+.jd{max-width:100%;overflow-x:clip}
+.jd-title{margin:0 0 8px;font-size:22px;line-height:1.35;overflow-wrap:anywhere}
+.jd-tools{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:0 0 10px}
+.jd-tools label{display:flex;flex-direction:column;gap:2px;font-size:14px;font-weight:700;min-width:min(100%,12em);flex:1 1 12em}
+.jd-tools input,.jd-tools select,.jd-tools button{width:100%;max-width:100%;margin:0;font-size:16px;padding:8px 10px}
+.jd-tools button{width:auto;flex:0 0 auto;min-height:44px}
+.jd-h{margin:0 0 8px}
+.jd-stats{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0;line-height:1.45}
+.jd-stats span{min-width:0;overflow-wrap:anywhere}
+.jd-money .jd-total{font-size:1.15em}
+.jd-day{background:#fff;border:1px solid #e2d9c4;border-radius:12px;padding:8px 10px;margin:8px 0}
+.jd-day header{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.jd-day header b{font-size:18px}
+.jd-meta,.jd-biko{margin:4px 0 0;overflow-wrap:anywhere}
+.jd-day.jd-abs{background:#fdecec;color:#b00020;border-color:#f3c2c2}
+.jd-day.jd-abs .jd-st{font-weight:700}
+@media print{
+  body.jd-on header,body.jd-on #hi,body.jd-on .back,body.jd-on #help,body.jd-on .jd-tools,body.jd-on .jd-staff{display:none !important}
+  .jd-abs{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
@@ -182,14 +203,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261112quota"></script>
+<script src="config.js?v=20261112jido"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261111staff"></script>
-<script src="leo_meal.js?v=20261102snack"></script>
+<script src="leo_meal.js?v=20261112jido"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261112abs"></script>
+<script src="leo.js?v=20261112jido"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261112sat"></script>
 <script src="kin_visit.js?v=20261112quota"></script>
@@ -218,7 +239,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="leo_shift.js?v=20261111staff"></script>
 <script src="leo_jippi.js?v=20261103mealfee"></script>
 <script src="leo_jogan.js?v=20261106hand"></script>
-<script src="leo_jissekihyo.js?v=202610201000"></script>
+<script src="leo_jissekihyo.js?v=20261112jido"></script>
 <script src="uketsuke.js?v=20261110me2"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261102wage"></script>
@@ -246,7 +267,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261112sat';
+  var BUILD = '20261112jido';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {

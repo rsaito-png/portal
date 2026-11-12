@@ -701,26 +701,11 @@ const LEO_VIEWS = {
       `<button onclick="saveNikki()">保存する</button><div id="saved"></div>`;
   },
   async jisseki() {
-    const [y, m] = JIS_MONTH.split('-').map(Number), last = new Date(y, m, 0).getDate();
-    const a = JIS_MONTH + '-01', b = JIS_MONTH + '-' + String(last).padStart(2, '0');
-    const cap = today();
-    if (!DEMO && a <= cap) {
-      try { await sb('rpc/leo_record_span', { method: 'POST', body: JSON.stringify({ p_from: a, p_to: b < cap ? b : cap }) }); } catch (e) { }
-    }
-    let jis, nk, meals, missing = false;
-    if (DEMO) {
-      const demo = leoDemoJisseki(JIS_MONTH);
-      jis = demo.jis; nk = demo.nk;
-      meals = leoDemoExtras(today()).meals.filter(r => r.day >= a && r.day <= b);
-    } else {
-      const [jRows, nRows, mealPack] = await Promise.all([
-        sb(`leo_jisseki?day=gte.${a}&day=lte.${b}&order=day,child`),
-        sb(`leo_nikki?day=gte.${a}&day=lte.${b}&kind=in.(利用,欠席)&select=day,row_no,child,kind,service,start_time,end_time,pick_driver,drop_driver,meal,snack,activity&order=day,row_no`),
-        leoLoadMonthMeals(a, b)]);
-      jis = jRows || []; nk = nRows || []; meals = mealPack.rows; missing = mealPack.missing;
-    }
+    const pack = await leoLoadJissekiMonth(JIS_MONTH);
+    const jis = pack.jis, nk = pack.nk, meals = pack.meals, missing = pack.missing;
     const [yy, mm] = JIS_MONTH.split('-');
     const head = `<h3>実績記録</h3>${demoNote()}
+      <p class="noprint"><a class="back" href="#leo/jidobetsu" onclick="jdFromJisseki()">児童別表示</a></p>
       <p class="ptabs"><button onclick="jisShift(-1)">← 前の月</button> <b>${yy}年${+mm}月</b> <button onclick="jisShift(1)">次の月 →</button></p>
       <p class="note">児童を選ぶと、その子の月と日が見えます。開始・終了を保存すると日誌から実績へ載ります。食事提供とこの日の記録はここに書きます。国保連の請求は簡易入力に手で打ってください。利用料・加算は出しません。</p>
       ${missing ? '<p style="color:#c00">食事の保存場所がまだありません（supabase/leo_meal_log.sql を実行してください）。見ることはできます。</p>' : ''}`;
@@ -741,6 +726,97 @@ const LEO_VIEWS = {
       (sum.days.length ? sum.days.map(d => `<button type="button" class="ptabs" style="width:auto;margin:4px 6px 4px 0;padding:8px 12px;background:${d.day === JIS_DAY ? 'var(--main)' : '#fff'};color:${d.day === JIS_DAY ? '#fff' : '#222'}" onclick="jisOpen('${d.day}')">${esc(fmtDay(d.day))} ${esc(d.status || '')}</button>`).join('') : '<p>この月の記録はまだありません。</p>') +
       (day ? leoJisDayHtml(day) : '<p class="note">日を選ぶと、その日の実績と食事提供を書けます。</p>');
   },
+};
+
+// 実績記録と同じ月の読み込み。児童別表示もここを使う（日数・時刻・食事の出どころを分けない）。
+async function leoLoadJissekiMonth(month, demoPack) {
+  const [y, m] = String(month || '').split('-').map(Number), last = new Date(y, m, 0).getDate();
+  const a = month + '-01', b = month + '-' + String(last).padStart(2, '0');
+  const cap = today();
+  if (!DEMO && a <= cap) {
+    try { await sb('rpc/leo_record_span', { method: 'POST', body: JSON.stringify({ p_from: a, p_to: b < cap ? b : cap }) }); } catch (e) { }
+  }
+  if (DEMO) {
+    if (demoPack) return demoPack;
+    const demo = leoDemoJisseki(month);
+    return { jis: demo.jis, nk: demo.nk, meals: leoDemoExtras(today()).meals.filter(r => r.day >= a && r.day <= b), missing: false, jippi: [] };
+  }
+  const [jRows, nRows, mealPack] = await Promise.all([
+    sb(`leo_jisseki?day=gte.${a}&day=lte.${b}&order=day,child`),
+    sb(`leo_nikki?day=gte.${a}&day=lte.${b}&kind=in.(利用,欠席)&select=day,row_no,child,kind,service,start_time,end_time,pick_driver,drop_driver,meal,snack,activity&order=day,row_no`),
+    leoLoadMonthMeals(a, b)]);
+  return { jis: jRows || [], nk: nRows || [], meals: mealPack.rows, missing: mealPack.missing, jippi: [] };
+}
+// 見本の児童別表示。名前は架空。金額は leoJidoBetsu が日誌の食事から出す（ここには書かない）。
+function leoJidoDemo(month) {
+  const day = n => month + '-' + String(n).padStart(2, '0');
+  const jis = [], nk = [], meals = [];
+  const add = (n, child, status, extra) => {
+    const d = day(n), x = extra || {}, absent = status === '欠席';
+    jis.push({ day: d, child, status, start_time: absent ? '' : (x.start || ''), end_time: absent ? '' : (x.end || ''), source: 'ポータル' });
+    nk.push({ day: d, child, kind: absent ? '欠席' : '利用', row_no: n, service: x.service || '', start_time: absent ? '' : (x.start || ''), end_time: absent ? '' : (x.end || ''), pick_driver: absent ? '' : (x.pick || ''), drop_driver: absent ? '' : (x.drop || ''), meal: '', snack: '' });
+    if (x.meal || x.snack || x.note) meals.push({ day: d, child, meal: x.meal || '', snack: x.snack || '', snack_yen: x.snack === 'あり' ? (x.yen == null ? 0 : x.yen) : null, meal_note: '', day_note: x.note || '' });
+  };
+  [[2, '10:00', '13:00'], [3, '14:45', '17:00'], [5, '10:00', '13:00', '（見本）公園のあと静かに過ごせた'], [6, '14:45', '17:00'], [9, '10:00', '13:00'], [10, '14:45', '17:00'], [12, '10:00', '15:30']].forEach(row => {
+    add(row[0], '児童C', '出席', { start: row[1], end: row[2], pick: '職員X', drop: '職員Y', meal: 'あり', snack: 'なし', service: '児発', note: row[3] || '' });
+  });
+  add(4, '児童C', '欠席', { service: '児発' });
+  add(2, '児童A', '出席', { start: '15:00', end: '17:30', pick: '職員Y', drop: '保護者', meal: 'なし', snack: 'あり', yen: 150, service: '放デイ' });
+  add(8, '児童A', '出席', { start: '10:00', end: '12:00', pick: '送迎なし', drop: '送迎なし', meal: 'あり', snack: 'なし', service: '放デイ' });
+  return { jis, nk, meals, missing: false, jippi: [{ child: '児童C', burden: 2589 }, { child: '児童A', burden: 1000 }] };
+}
+let JD_MONTH = today().slice(0, 7);
+let JD_CHILD = '';
+let JD_TOUCHED = false;
+function jdMonth(v) {
+  if (!/^\d{4}-\d{2}$/.test(v || '')) return;
+  JD_MONTH = v;
+  renderLeoView('jidobetsu');
+}
+function jdPick(name) {
+  JD_CHILD = name || '';
+  JD_TOUCHED = true;
+  renderLeoView('jidobetsu');
+}
+function jdFromJisseki() {
+  JD_MONTH = JIS_MONTH;
+  JD_CHILD = JIS_CHILD || '';
+  JD_TOUCHED = !!JD_CHILD;
+}
+function leoJidoBurden(rows, child) {
+  const hit = (rows || []).find(r => r && leoMealNorm(r.child) === leoMealNorm(child));
+  return hit ? Number(hit.burden || 0) : 0;
+}
+function leoJidoService(child, kinds, nk) {
+  const row = (nk || []).find(r => r && leoMealNorm(r.child) === leoMealNorm(child) && r.service);
+  return leoCardService(child, kinds, row && row.service);
+}
+LEO_VIEWS.jidobetsu = async function () {
+  const demoPack = DEMO ? leoJidoDemo(JD_MONTH) : null;
+  const pack = await leoLoadJissekiMonth(JD_MONTH, demoPack);
+  let jippi = pack.jippi || [];
+  if (!DEMO) {
+    try { jippi = await sb(`leo_jippi?ym=eq.${JD_MONTH}&select=child,lunch,snack,burden`) || []; }
+    catch (e) { jippi = []; }
+  }
+  const names = leoJissekiChildren(JD_MONTH, pack.jis, pack.nk);
+  if (DEMO && !JD_TOUCHED && !JD_CHILD) {
+    const pref = names.find(n => leoMealNorm(n) === leoMealNorm('児童C'));
+    if (pref) JD_CHILD = pref;
+  }
+  if (JD_CHILD && !names.some(n => leoMealNorm(n) === leoMealNorm(JD_CHILD))) JD_CHILD = '';
+  const kinds = await leoChildKinds();
+  const sheet = JD_CHILD ? leoJidoBetsu(JD_CHILD, JD_MONTH, pack.jis, pack.nk, pack.meals, {
+    burden: leoJidoBurden(jippi, JD_CHILD),
+    tripOf(row) {
+      const t = filingTripDrivers(row);
+      return { pick: t.pick || '', drop: t.drop || '' };
+    },
+  }) : null;
+  return leoJidoHtml({
+    month: JD_MONTH, child: JD_CHILD, names, sheet, missing: pack.missing,
+    service: JD_CHILD ? leoJidoService(JD_CHILD, kinds, pack.nk) : '',
+  });
 };
 
 // 保護者の実績・実費の確認：児童ごとのリンクを作ってコピー → 公式LINEで送る。確認済みかを一覧で見る
@@ -1496,6 +1572,7 @@ async function saveNikki() {
 
 async function renderLeoView(name) {
   document.body.classList.toggle('wide-sheet', name === 'kata' || name === 'master' || name === 'kinmu' || name === 'monitoring');
+  document.body.classList.toggle('jd-on', name === 'jidobetsu');
   $('view').innerHTML = '<p>読み込み中…</p>';
   await loadDuty();
   try {
