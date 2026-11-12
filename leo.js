@@ -676,7 +676,7 @@ const LEO_VIEWS = {
           const attrs = `data-row="${r.row_no}" data-child="${esc(r.child)}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
             ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
-            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${shData && typeof shiftOptionsHtml === 'function' ? shiftOptionsHtml(drvNames, shData, day, f === 'pick_driver' ? r.pick_time : r.drop_time, shown) : driverOptionsHtml(drvNames, shown)}</select>${(() => { const cr = leoCarFor(r[f === 'pick_driver' ? 'pick_driver' : 'drop_driver'], r[f === 'pick_driver' ? 'pick_car' : 'drop_car']); return cr ? `<small>車：${esc(cr)}（運転手から自動）</small>` : ''; })()}</label>`
+            : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${shData && typeof shiftOptionsHtml === 'function' ? shiftOptionsHtml(drvNames, shData, day, f === 'pick_driver' ? r.pick_time : r.drop_time, shown) : driverOptionsHtml(drvNames, shown)}</select></label><label>車<input class="nk-car" value="${esc(leoCarFor(r[f], r[f === 'pick_driver' ? 'pick_car' : 'drop_car']) || '')}" readonly tabindex="-1"></label>`
             : `<label>${labelOf[f]}<input ${attrs} value="${esc(shown)}"></label>`;
         };
         const rideRows = NIKKI_RIDE_ROWS.map(fs => `<div class="nk-row">${fs.map(f => fieldHtml(f, r[f] ?? '')).join('')}</div>`).join('');
@@ -1542,6 +1542,7 @@ async function saveNikki() {
   let n = 0;
   for (const i of document.querySelectorAll('#view .rec input, #view .rec textarea, #view .rec select.nk-driver')) {
     if (i.dataset.kind === 'meal' || i.dataset.kind === 'day' || i.dataset.kind === 'abs') continue;
+    if (!i.dataset.f) continue; // 車の欄は表示だけ（運転手から決まる）
     const edit = nikkiEditValue(i.dataset.f, i.dataset.old, i.value);
     if (!edit) continue;
     (by[i.dataset.row] || (by[i.dataset.row] = { _child: i.dataset.child || '' }))[i.dataset.f] = edit.new_value;
@@ -3192,3 +3193,12 @@ function leoCalWatch() {
   if (typeof setInterval === 'function') setInterval(kick, 120000);
 }
 try { leoCalWatch(); } catch (e) { /* 画面が無いとき */ }
+
+// 日誌：運転手を変えたら、となりの「車」の欄もすぐ変える（保存はDB側で運転手から決まる）
+if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (!t || !t.classList || !t.classList.contains('nk-driver')) return;
+  const box = t.closest('label') && t.closest('label').nextElementSibling;
+  const car = box && box.querySelector && box.querySelector('input.nk-car');
+  if (car) car.value = leoCarFor(t.value, '') || '';
+});
