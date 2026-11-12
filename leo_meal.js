@@ -211,7 +211,7 @@
   function leoJidoMd(day) {
     const p = String(day || '').split('-');
     if (p.length < 3) return '';
-    return String(Number(p[1])) + '/' + String(Number(p[2]));
+    return Number(p[1]) + '月' + Number(p[2]) + '日';
   }
   function leoJidoHtml(vm) {
     const v = vm || {};
@@ -222,34 +222,35 @@
     const month = v.month || '';
     const sheet = v.sheet;
     const opt = n => `<option value="${esc(n)}"${leoMealNorm(n) === leoMealNorm(child) ? ' selected' : ''}>${esc(n)}</option>`;
-    const tools = `<div class="jd-tools noprint"><label>対象月<input type="month" value="${esc(month)}" onchange="jdMonth(this.value)"></label><label>お子さま<select onchange="jdPick(this.value)"><option value="">選んでください</option>${names.map(opt).join('')}</select></label><button type="button" class="jd-print" onclick="print()">印刷</button></div>`;
-    if (!sheet) {
-      return `<div class="jd">${tools}<div class="card jd-h"><h3 class="jd-title">サービス提供実績のご確認　レオ</h3><p class="note">お子さまを選ぶと、その子の月の実績がここに出ます。保護者へのリンクは作りません。</p></div></div>`;
-    }
-    const mark = on => on ? '○' : '—';
-    const rows = sheet.days.map(d => {
-      const head = `<header><b>${esc(leoJidoMd(d.day))}</b><span>${esc(d.dow)}</span><span class="jd-st">${esc(d.status || '—')}</span>${d.absent || (!d.start && !d.end) ? '' : `<span class="jd-time">${esc(d.start)}–${esc(d.end)}</span>`}</header>`;
-      const metaBits = [];
-      if (!d.absent) {
-        metaBits.push('送迎（行き）' + mark(d.pick), '送迎（帰り）' + mark(d.drop));
-        metaBits.push('お昼代 ' + (d.lunch ? yen(d.lunch) : '—'), 'おやつ代 ' + (d.snack ? yen(d.snack) : '—'));
-      } else if (d.lunch || d.snack) {
-        if (d.lunch) metaBits.push('お昼代 ' + yen(d.lunch));
-        if (d.snack) metaBits.push('おやつ代 ' + yen(d.snack));
+    const tools = `<div class="jd-tools noprint"><label>対象月<input type="month" value="${esc(month)}" onchange="jdMonth(this.value)"></label><button type="button" class="jd-print" onclick="print()">印刷</button></div>`;
+    const pick = `<select onchange="jdPick(this.value)" aria-label="お子さま"><option value="">選んでください</option>${names.map(opt).join('')}</select>`;
+    const lab = s => `<div class="jd-lab">${esc(s)}</div>`;
+    const val = (s, cls) => `<div class="jd-val${cls ? ' ' + cls : ''}">${s}</div>`;
+    const pair = (label, inner, cls) => lab(label) + val(inner, cls);
+    const blank = '—';
+    const use = sheet ? `<b>${sheet.use}日</b>` : blank;
+    const abs = sheet ? `<b>${sheet.abs}日</b>` : blank;
+    const ride = sheet ? `行き <b>${sheet.pick}回</b>／帰り <b>${sheet.drop}回</b>` : blank;
+    const money = (n, cls) => sheet ? `<b class="${cls || ''}">${yen(n)}</b>` : blank;
+    const attrs = sheet
+      ? ` data-use="${sheet.use}" data-abs="${sheet.abs}" data-pick="${sheet.pick}" data-drop="${sheet.drop}" data-lunch="${sheet.lunch}" data-snack="${sheet.snack}" data-burden="${sheet.burden}" data-total="${sheet.total}"`
+      : '';
+    const rows = sheet ? sheet.days.map(d => {
+      if (d.absent) {
+        return `<tr class="jd-abs"><td class="jd-hot">${esc(leoJidoMd(d.day))}</td><td class="jd-hot">${esc(d.dow)}</td><td class="jd-hot">欠席</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
       }
-      const meta = metaBits.length ? `<p class="jd-meta">${metaBits.map(esc).join('　')}</p>` : '';
-      const note = d.note ? `<p class="jd-biko">備考 ${esc(d.note)}</p>` : '';
-      return `<article class="jd-day${d.absent ? ' jd-abs' : ''}">${head}${meta}${note}</article>`;
-    }).join('');
-    return `<div class="jd">${tools}<div class="card jd-h" data-use="${sheet.use}" data-abs="${sheet.abs}" data-pick="${sheet.pick}" data-drop="${sheet.drop}" data-lunch="${sheet.lunch}" data-snack="${sheet.snack}" data-burden="${sheet.burden}" data-total="${sheet.total}">
-      <h3 class="jd-title">サービス提供実績のご確認　レオ</h3>
-      <div class="jd-stats"><span>対象月 <b>${esc(sheet.era)}</b></span><span>お子さま <b>${esc(child)}</b></span><span>サービス <b>${esc(v.service || '未設定')}</b></span></div>
-      <div class="jd-stats"><span>ご利用日数 <b>${sheet.use}日</b></span><span>欠席 <b>${sheet.abs}日</b></span><span>送迎 行き <b>${sheet.pick}回</b>／帰り <b>${sheet.drop}回</b></span></div>
-      <div class="jd-stats jd-money"><span>お昼代 <b>${yen(sheet.lunch)}</b></span><span>おやつ代 <b>${yen(sheet.snack)}</b></span><span>利用者負担 <b>${yen(sheet.burden)}</b></span><span>合計 <b class="jd-total">${yen(sheet.total)}</b></span></div>
-      <p class="note">※内容に相違がないかご確認ください。お昼代・おやつ代は日誌、利用者負担は利用料実費請求です。</p>
-      ${v.missing ? '<p class="note">食事の記録を一部読めません。お昼代・おやつ代は、読めた分だけです。</p>' : ''}
-    </div>
-    <div class="jd-days">${rows || '<p>この月の記録はまだありません。</p>'}</div>
+      const yenCell = n => n ? yen(n) : '';
+      return `<tr><td>${esc(leoJidoMd(d.day))}</td><td>${esc(d.dow)}</td><td>${esc(d.status || '')}</td><td>${esc(d.start)}</td><td>${esc(d.end)}</td><td>${d.pick ? '○' : ''}</td><td>${d.drop ? '○' : ''}</td><td>${yenCell(d.lunch)}</td><td>${yenCell(d.snack)}</td><td class="jd-note">${esc(d.note)}</td></tr>`;
+    }).join('') : '';
+    const table = sheet ? `<div class="jd-scroll"><table class="jd-days"><colgroup><col class="c-date"><col class="c-wd"><col class="c-st"><col class="c-tm"><col class="c-tm"><col class="c-go"><col class="c-go"><col class="c-yen"><col class="c-yen"><col class="c-note"></colgroup><thead><tr><th>日付</th><th>曜日</th><th>状況</th><th>開始</th><th>終了</th><th>送迎（行き）</th><th>送迎（帰り）</th><th>お昼代</th><th>おやつ代</th><th>備考</th></tr></thead><tbody>${rows || '<tr><td colspan="10">この月の記録はまだありません</td></tr>'}</tbody></table></div>` : '';
+    return `<div class="jd">${tools}<div class="jd-sheet"${attrs}>
+      <div class="jd-bar">サービス提供実績のご確認　レオ</div>
+      <div class="jd-pairs">${pair('対象月', esc(sheet ? sheet.era : ''))}${pair('お子さま', pick, 'jd-child')}${pair('サービス', esc(sheet ? (v.service || '未設定') : ''))}</div>
+      <div class="jd-pairs">${pair('ご利用日数', use)}${pair('欠席', abs)}${pair('送迎', ride)}</div>
+      <div class="jd-pairs jd-money">${pair('お昼代', money(sheet && sheet.lunch))}${pair('おやつ代', money(sheet && sheet.snack))}${pair('利用者負担', money(sheet && sheet.burden))}${pair('合計', money(sheet && sheet.total, 'jd-total'))}</div>
+      ${v.missing ? '<p class="jd-miss">食事の記録を一部読めません。お昼代・おやつ代は、読めた分だけです。</p>' : ''}
+      ${table}
+    </div>${sheet ? '' : '<p class="note noprint">お子さまを選ぶと、その子の月の実績が上の表に出ます。</p>'}
     <p class="note jd-staff noprint">職員の確認用です。この画面から保護者へは送りません。</p></div>`;
   }
   const api = {

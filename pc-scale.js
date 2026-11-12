@@ -6,6 +6,8 @@
     var els=[root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
     els.forEach(function(e){
       if(e.dataset&&e.dataset.pcs)return;
+      // 児童別表示は印刷様式の大きさのまま（狭い画面でも10列が読めるように、ここでは拡大しない）
+      if(e.closest&&e.closest('.jd')){if(e.dataset)e.dataset.pcs='1';return;}
       var t=e.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='SVG'||t==='svg'||t==='CANVAS'||t==='BR')return;
       var cs=getComputedStyle(e),fs=parseFloat(cs.fontSize);
       if(fs&&fs<30){var n=Math.max(30,Math.round(fs*2.2));if(n>48)n=48;e.style.setProperty('font-size',n+'px','important');}
