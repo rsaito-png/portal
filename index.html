@@ -325,7 +325,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261112rec';
+  var BUILD = '20261112login';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -360,6 +360,18 @@ async function login() {
   show();
 }
 
+// 更新用の鍵でログインを延ばす。開いている間も30分ごと・画面に戻ったときに延ばす
+async function portalRefresh() {
+  const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (!s || !s.refresh) return false;
+  try {
+    const r = await fetch(C.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh }) });
+    if (!r.ok) return false; const j = await r.json();
+    localStorage.setItem('sess', JSON.stringify({ ...s, token: j.access_token, refresh: j.refresh_token || s.refresh, exp: Date.now() + j.expires_in * 1000 })); return true;
+  } catch (e) { return false; }
+}
+function portalKeepAlive() { if (DEMO) return; const s = JSON.parse(localStorage.getItem('sess') || 'null'); if (s && s.refresh && s.exp < Date.now() + 15 * 60000) portalRefresh(); }
+setInterval(portalKeepAlive, 30 * 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') portalKeepAlive(); });
 function logout() { localStorage.removeItem('sess'); location.reload(); }
 
 function tileHtml([icon, name, url, note, size, sample], color) {
@@ -732,7 +744,13 @@ function roleToggle() {
 
 function show() {
   const s = DEMO ? { email: '見本（デモ）', exp: Infinity, role: new URLSearchParams(location.search).get('role') || C.defaultRole } : JSON.parse(localStorage.getItem('sess') || 'null');
-  if (!s || s.exp < Date.now()) { localStorage.removeItem('sess'); return; }
+  if (!s) return;
+  // 1時間で切れる鍵は、残っている更新用の鍵で取り直す（スマホでも毎回ログインしなくてよいように）
+  if (!DEMO && s.exp < Date.now() + 5 * 60000) {
+    if (s.refresh && !show._tried) { show._tried = true; portalRefresh().then(ok => { if (!ok) localStorage.removeItem('sess'); show(); }); return; }
+    if (s.exp < Date.now()) { localStorage.removeItem('sess'); return; }
+  }
+  show._tried = false;
   $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
   $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
   if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
