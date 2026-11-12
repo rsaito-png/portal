@@ -50,19 +50,23 @@ async function renderLeoContract() {
       (typeof loadLeftIndex === 'function' ? loadLeftIndex().catch(() => ({})) : {})
     ]);
     LC.types = types; LC.parties = parties; LC.logs = logs;
+    const compact = n => String(n || '').replace(/\s+/g, '');
     const infoOf = Object.fromEntries((infos || []).map(i => [i.name, i]));
+    const infoByC = Object.fromEntries((infos || []).map(i => [compact(i.name), i]));
     const partyOf = Object.fromEntries(parties.map(p => [p.child_name, p]));
+    const partyByC = Object.fromEntries(parties.map(p => [compact(p.child_name), p]));
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
     const isLeft = name => typeof leftDone === 'function' && left && leftDone(left, name, today);
     const rows = [];
     (children || []).forEach(c => {
-      if (isLeft(c.name) && !partyOf[c.name]) return;
-      const p = partyOf[c.name];
-      const g = (p && p.guardian_name) || (infoOf[c.name] && infoOf[c.name].guardian_name) || '';
+      const p = partyOf[c.name] || partyByC[compact(c.name)];
+      if (isLeft(c.name) && !p) return;
+      const inf = infoOf[c.name] || infoByC[compact(c.name)];
+      const g = (p && p.guardian_name) || (inf && inf.guardian_name) || '';
       rows.push({ party: p, child: c.name, guardian: g, start: (p && p.contract_start) || c.contract_start, end: (p && p.contract_end) || c.contract_end, registered: true });
     });
     parties.forEach(p => {
-      if (rows.some(r => r.child === p.child_name)) return;
+      if (rows.some(r => compact(r.child) === compact(p.child_name))) return;
       rows.push({ party: p, child: p.child_name, guardian: p.guardian_name, start: p.contract_start, end: p.contract_end, registered: false });
     });
     const nm = n => esc(n).replace(/'/g, '');

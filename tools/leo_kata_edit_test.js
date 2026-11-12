@@ -78,7 +78,7 @@ const master = () => run('LEO_VIEWS.master()');
   sandbox.document.querySelectorAll = sel => {
     if (sel !== 'tr.mrow') return [];
     return [{
-      querySelectorAll: s => (s === 'input' ? [
+      querySelectorAll: s => (String(s).includes('input') ? [
         { dataset: { c: '曜日' }, value: ' 木 ' },
         { dataset: { c: '児童名' }, value: '児童Z' },
         { dataset: { c: '迎え場所' }, value: '' },
@@ -98,11 +98,12 @@ const master = () => run('LEO_VIEWS.master()');
   };
   msg.textContent = '';
   await run('saveMaster()');
-  assert.strictEqual(calls.length, 2);
+  assert.strictEqual(calls.length, 3);
   assert.ok(calls[0].path.startsWith('leo_master?kind=eq.kata') && calls[0].method === 'DELETE');
   const body = JSON.parse(calls[1].body);
   assert.deepStrictEqual(body, [{ kind: 'kata', row_no: 1, data: { 曜日: '木', 児童名: '児童Z' } }]);
-  assert.ok(msg.textContent.includes('1行を保存しました'));
+  assert.ok(calls[2].path.includes('rpc/leo_kata_apply') && calls[2].method === 'POST');
+  assert.ok(msg.textContent.includes('1行を保存') && msg.textContent.includes('今日以降の予定に反映'));
 
   run("MASTER_KIND = 'keikaku'");
   calls.length = 0;

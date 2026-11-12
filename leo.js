@@ -2881,8 +2881,8 @@ function masterLabels(view) {
 function masterSheetNote(kind, saved) {
   if (kind === 'kata') {
     return saved
-      ? 'ポータルに保存した型表が正です。行を足して直し、「保存」できます。その日だけの変更は日誌・カレンダーです。Googleの表へは書き戻しません。'
-      : 'まだポータルに保存していません。下は古いGoogleの写しです。直して「保存」すると、ポータルの型表が正になります（Googleの表は変わりません）。';
+      ? 'ポータルに保存した型表が正です。行を足して直し、「保存」できます。保存すると、利用者情報と紐づけ、今日以降の予定に反映します。その日だけの変更は日誌・カレンダーです。Googleの表へは書き戻しません。'
+      : 'まだポータルに保存していません。下は古いGoogleの写しです。直して「保存」すると、ポータルの型表が正になり、今日以降の予定に反映します（Googleの表は変わりません）。';
   }
   return (saved
     ? 'ポータルで入力した内容です（ポータルの画面はこちらを使います）。'
@@ -2907,8 +2907,16 @@ async function renderMasterEditor(view) {
   const kataDrv = MASTER_KIND === 'kata' && typeof driverOptionsHtml === 'function'
     ? [...await leoDriverNames().catch(() => []), '保護者'] : null;
   const title = MASTER_KIND === 'kata' ? '送迎 型表' : `${labels[MASTER_KIND]}の入力`;
+  let kataWarn = '';
+  if (MASTER_KIND === 'kata' && !DEMO) {
+    const kids = await sb('leo_children?select=name').catch(() => []);
+    const compact = n => String(n || '').replace(/\s+/g, '');
+    const known = new Set((kids || []).map(k => compact(k.name)));
+    const missing = [...new Set(rows.map(r => r['児童名']).filter(Boolean).filter(n => !known.has(compact(n))))];
+    if (missing.length) kataWarn = `<p style="color:#c00">型表の「${missing.map(esc).join('、')}」は、まだ利用者情報に登録がありません。このままでは予定に入りません。保存すると、契約書があれば自動で登録して今日以降の予定に入れます。契約も無いときは、先に利用者情報へ登録してください。</p>`;
+  }
   return `<h3>${title}</h3>${demoNote()}${tabs}
-    <p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>
+    <p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>${kataWarn}
     <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td>${kataDrv && KATA_DRIVER_COLS[c] ? `<select class="kata-drv" data-c="${esc(c)}" style="min-width:9em">${driverOptionsHtml(kataDrv, r[c] ?? '')}</select>` : `<input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)">`}</td>`).join('')}</tr>`).join('')}</table></div>
     <button onclick="renderLeoView('${view}').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
 }
@@ -2984,8 +2992,15 @@ async function saveMaster() {
   try { await sb(`leo_master?kind=eq.${MASTER_KIND}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     if (rows.length) await sb('leo_master', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows.map((d, i) => ({ kind: MASTER_KIND, row_no: i + 1, data: d }))) });
     if (MASTER_KIND === 'kata') {
-      try { await sb('rpc/leo_kata_resync', { method: 'POST', body: JSON.stringify({}) }); }
-      catch (e) { /* トリガーでも追従する。失敗しても型表自体は保存済み */ }
+      try {
+        const r = await sb('rpc/leo_kata_apply', { method: 'POST', body: JSON.stringify({}) });
+        const bits = [`${rows.length}行を保存し、今日以降の予定に反映しました。`];
+        if (r && Array.isArray(r.registered) && r.registered.length) bits.push('利用者情報へ登録：' + r.registered.map(x => x.name || x).join('、') + '。');
+        if (r && Array.isArray(r.renamed) && r.renamed.length) bits.push('名前を揃えました：' + r.renamed.map(x => `${x.from}→${x.to}`).join('、') + '。');
+        if (r && Array.isArray(r.unregistered) && r.unregistered.length) bits.push('まだ利用者情報にも契約にもいないため、予定に入れていません：' + r.unregistered.join('、') + '。先に利用者情報へ登録してください。');
+        m.textContent = bits.join('');
+        return;
+      } catch (e) { /* トリガーでも追従する。失敗しても型表自体は保存済み */ }
     }
     m.textContent = `${rows.length}行を保存しました。`; } catch (e) { m.textContent = e.message; }
 }
