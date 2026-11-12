@@ -1390,7 +1390,7 @@ function leoNikkiKidBar(kids) {
     const fill = `<span class="nk-mark" data-nk-fill title="記入あり"${k.filled ? '' : ' hidden'}>●</span>`;
     return `<button type="button" class="nk-kid${on ? ' on' : ''}${abs ? ' abs' : ''}" role="tab" aria-selected="${on ? 'true' : 'false'}" data-nk-i="${i}" onclick="nikkiShowChild(${i})">${esc(k.child)}${abs ? '<small>欠席</small>' : ''}${fill}<span class="nk-mark" data-nk-dirty hidden title="未保存の修正">＊</span></button>`;
   }).join('');
-  return `<div class="nk-kids" role="tablist" aria-label="今日の児童">${btns}</div><p class="note">名前を押すと、その子の欄だけ出ます。隠している子に書いた内容も、下の保存で一緒に残ります。</p>`;
+  return `<div class="nk-kids" role="tablist" aria-label="今日の児童">${btns}</div>`;
 }
 function leoNikkiChildWrap(i, kind, child, inner) {
   const hide = i === 0 ? '' : ' hidden';
