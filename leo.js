@@ -1246,15 +1246,18 @@ function leoDayLogHtml(day, log, prefix, missing) {
   const explain = 'その日全体の記録です。食事メニューはここに書きます。児童ごとの食事提供は、下の各児童です。ポータルに保存します。Googleの表と国保連の請求には書きません。';
   const head = prefix === 'nk' ? leoFoldBtn('leo_nk_day_note_open', 'nk_daynote', title) : title;
   const dayOpen = prefix === 'nk' && leoFoldOpen('leo_nk_day_note_open');
-  const note = prefix === 'nk'
-    ? `<p class="note" id="nk_daynote"${dayOpen ? '' : ' hidden'}>${explain}</p>`
-    : `<p class="note">${explain}</p>`;
-  return `<div class="card rec" id="${prefix}_day">${head}
-    ${note}
-    ${missing ? '<p style="color:#c00">保存場所がまだありません（supabase/leo_meal_log.sql を実行してください）。</p>' : ''}
+  const body = `${missing ? '<p style="color:#c00">保存場所がまだありません（supabase/leo_meal_log.sql を実行してください）。</p>' : ''}
     <label>食事メニュー<textarea data-kind="day" id="${prefix}_menu" rows="3" maxlength="500">${esc((log && log.meal_menu) || '')}</textarea></label>
     <label>連絡・報告・備考<textarea data-kind="day" id="${prefix}_notes" rows="4" maxlength="4000">${esc((log && log.notes) || '')}</textarea></label>
-    <button type="button" onclick="saveLeoDayLog('${day}','${prefix}')">総合日誌を保存</button><div id="${prefix}_daymsg"></div></div>`;
+    <button type="button" onclick="saveLeoDayLog('${day}','${prefix}')">総合日誌を保存</button><div id="${prefix}_daymsg"></div>`;
+  if (prefix === 'nk') {
+    return `<div class="card rec" id="${prefix}_day">${head}
+    <div id="nk_daynote"${dayOpen ? '' : ' hidden'}><p class="note">${explain}</p>
+    ${body}</div></div>`;
+  }
+  return `<div class="card rec" id="${prefix}_day">${head}
+    <p class="note">${explain}</p>
+    ${body}</div>`;
 }
 function leoReadMealBoxes(root) {
   return [...root.querySelectorAll('[data-meal-child]')].map(box => {

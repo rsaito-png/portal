@@ -147,7 +147,7 @@ const { LEO_VIEWS, monGoalsFromHonan, monGoalList, monPrintHtml, monDiaryLines, 
   assert.ok(cfg.includes("['📄', 'モニタリングシート（相談員へ渡す印刷）', '#leo/monitoring'"));
   assert.ok(cfg.includes("'児発管']") && cfg.includes('#leo/monitoring'));
   assert.ok(!cfg.includes("毎日やる＝今日の利用児童・ヒヤリハット・LINE報告を書く・モニタリングシート"));
-  assert.ok(idx.includes('leo.js?v=20261112rec'));
+  assert.ok(idx.includes('leo.js?v=20261112dayfold'));
   assert.ok(!idx.includes("big('#leo/monitoring'"));
   assert.ok(fn.includes('ログインが必要です'));
   assert.ok(fn.includes('https://api.x.ai/v1/chat/completions'));
