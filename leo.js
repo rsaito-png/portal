@@ -276,7 +276,7 @@ function leoMergeNikki(rows, events) {
     const label = leoAbsLabel(e);
     if (!label) continue;
     const useHit = hits.get(e.day + '|利用|' + ldNN(e.child));
-    if (useHit && !leoCalHidden(useHit.e) && leoEvNewer(useHit.e, e)) continue;
+    if (useHit && !leoCalHidden(useHit.e) && useHit.e.source !== 'kata' && leoEvNewer(useHit.e, e)) continue;   // 型表の利用は毎回書き直されるので、カレンダーの休みを優先
     const row = ensure(e.day, e.child, true);
     if (!row) continue;
     row._hide = true;

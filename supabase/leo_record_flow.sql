@@ -119,9 +119,9 @@ begin
   select coalesce(u.child, a.child),
     case
       when c.id is not null
-       and (u.updated_at is null or c.updated_at >= u.updated_at)
+       and (u.updated_at is null or u.source = 'kata' or c.updated_at >= u.updated_at)
        and (a.updated_at is null or c.updated_at >= a.updated_at) then null
-      when a.id is not null and (u.updated_at is null or a.updated_at >= u.updated_at) then '欠席'
+      when a.id is not null and (u.updated_at is null or u.source = 'kata' or a.updated_at >= u.updated_at) then '欠席'
       when u.id is not null then '利用'
     end,
     u.start_time, u.end_time, coalesce(u.parent_drop, false), coalesce(u.parent_pick, false)
