@@ -10,10 +10,20 @@ vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'leo_name.js'), 'utf8'), sandbox, { filename: 'leo_name.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'leo_home_cal.js'), 'utf8'), sandbox, { filename: 'leo_home_cal.js' });
 
-const { sgGrid, sgLayout, sgStaffPaint, sgStaffShow, sgMonthHtml, sgDayHtml, sgSplit, sgName, SG_STAFF_COLOR } = sandbox;
+const { sgGrid, sgLayout, sgStaffPaint, sgStaffShow, sgMonthHtml, sgDayHtml, sgSplit, sgName, sgGiven, sgFace, SG_STAFF_COLOR } = sandbox;
 
 assert.strictEqual(sgName('山根\u3000一輝'), '山根 一輝');
 assert.strictEqual(sgName('  山根  一輝 \n'), '山根 一輝');
+assert.strictEqual(sgGiven('加藤 湊'), '湊');
+assert.strictEqual(sgGiven('加藤\u3000湊'), '湊');
+assert.strictEqual(sgGiven('山根 一輝'), '一輝');
+assert.strictEqual(sgGiven('西山琴'), '西山琴');
+assert.strictEqual(sgGiven('  児童A  '), '児童A');
+assert.strictEqual(sgFace({ kind: '迎え', kids: ['加藤 湊'] }), '☆湊');
+assert.strictEqual(sgFace({ kind: '送り', kids: ['山根\u3000一輝'] }), '★一輝');
+assert.strictEqual(sgFace({ kind: '利用', child: '加藤 湊' }), '湊');
+assert.strictEqual(sgFace({ kind: '迎え', kids: ['加藤 湊', '山根 一輝'] }), '☆湊　☆一輝');
+assert.strictEqual(sgFace({ kind: '勤務', staff: '加藤' }), null);
 
 const g = sgGrid('2026-10');
 assert.strictEqual(g.start, '2026-09-28');
@@ -137,6 +147,27 @@ assert.ok(day.includes('data-sg-now'), '今日は現在時刻の線');
 assert.ok(day.includes('終日'));
 assert.ok(day.includes('児童D'));
 assert.ok(day.includes('class="sg-ev drop"') || day.includes('sg-ev drop'), '送りは下線で区別');
+function evFace(html, titleBits) {
+  const re = /<div class="sg-ev[^"]*"[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/g;
+  let m;
+  while ((m = re.exec(html))) {
+    const title = m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+    if (titleBits.every(b => title.includes(b))) {
+      return { title, inner: m[2].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim() };
+    }
+  }
+  return null;
+}
+const useFace = evFace(day, ['利用', '山根 一輝']);
+assert.ok(useFace && useFace.inner === '一輝', '利用のブロックは名だけ');
+assert.ok(useFace.title.includes('山根 一輝') && useFace.title.includes('10:30') && useFace.title.includes('助手席'), '利用の詳細は title に残す');
+const pickFace = evFace(day, ['☆ 迎え', '山根 一輝']);
+assert.ok(pickFace && pickFace.inner === '☆一輝', '迎えのブロックは☆＋名');
+assert.ok(!pickFace.inner.includes('迎え') && !pickFace.inner.includes('10:10') && !pickFace.inner.includes('職員') && !pickFace.inner.includes('山根') && !pickFace.inner.includes('下野'), '迎えの表面に時刻・担当・場所・姓は出さない');
+assert.ok(pickFace.title.includes('10:10') && pickFace.title.includes('下野小学校') && pickFace.title.includes('職員X'), '迎えの詳細は title に残す');
+const dropFace = evFace(day, ['★ 送り', '児童B']);
+assert.ok(dropFace && dropFace.inner === '★児童B', '送りのブロックは★＋名');
+assert.ok(day.includes('.sg-ev.drop .k,.sg-ev.drop .nm{text-decoration:underline'), '送りの名にも下線');
 
 const named = [
   { day: '2026-10-26', kind: '利用', child: '加藤 湊', start_time: '10:00', end_time: '12:00' },
@@ -175,6 +206,20 @@ const useBlock = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(
 assert.ok(useBlock && useBlock[1] === '#f8b500' && useBlock[2] === '#222', '利用は山吹色に黒文字');
 const ride = colored.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6})[^"]*" title="[^"]*加藤先生"/);
 assert.ok(ride && ride[1] === '#4fc3f7', '担当が加藤先生の送迎だけ水色');
+const minatoUse = evFace(colored, ['利用', '加藤 湊']);
+assert.ok(minatoUse && minatoUse.inner === '湊', '加藤 湊の利用は湊');
+assert.ok(minatoUse.title.includes('加藤 湊'), '姓は title に残す');
+const minatoPick = evFace(colored, ['☆ 迎え', '加藤 湊']);
+assert.ok(minatoPick && minatoPick.inner === '☆湊' && minatoPick.title.includes('加藤先生'), '迎えは☆湊、色の担当は title');
+const akihitoUse = evFace(colored, ['利用', '中村 亮仁']);
+assert.ok(akihitoUse && akihitoUse.inner === '亮仁', '中村 亮仁の利用は亮仁');
+
+const parentUse = sgDayHtml('2026-10-26', [
+  { day: '2026-10-26', kind: '利用', child: '加藤 湊', start_time: '10:00', end_time: '12:00', parent_drop: true, parent_pick: true },
+], {}, { demo: false, today: '2026-10-27' });
+const parentFace = evFace(parentUse, ['利用', '加藤 湊']);
+assert.ok(parentFace && parentFace.inner === '湊', '保護者送迎の注記はブロックに出さない');
+assert.ok(parentFace.title.includes('保護者が送る') && parentFace.title.includes('保護者が迎える'), '保護者の注記は title に残す');
 
 const kinmuDay = [
   { day: '2026-10-26', kind: '勤務', staff: '中村 文', title: 'あや先生 １４：００' },

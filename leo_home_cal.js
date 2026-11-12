@@ -250,6 +250,22 @@ function sgLines(e) {
   }
   return [`${e.staff ? sgStaffShow(e.staff) : ''} ${e.title || e.note || ''}`.trim()];
 }
+// 日の時刻軸ブロックの表面。姓は出さない（半角・全角スペースの後ろを名とする。スペースが無ければそのまま）。
+// 迎えは「☆名」、送りは「★名」、利用は名だけ。時刻・場所・担当・保護者の注記は title と編集画面に残す。
+function sgGiven(name) {
+  const p = sgName(name).split(/[\s\u3000]+/).filter(Boolean);
+  return p.length >= 2 ? p.slice(1).join('') : (p[0] || '');
+}
+function sgFace(e) {
+  if (!e) return '';
+  if (e.kind === '迎え' || e.kind === '送り') {
+    const mark = e.kind === '迎え' ? '☆' : '★';
+    const names = (e.kids || []).map(sgGiven).filter(Boolean);
+    return names.length ? names.map(n => mark + n).join('　') : mark;
+  }
+  if (e.kind === '利用') return sgGiven(e.child);
+  return null;
+}
 function sgCss() {
   return `<style>
 .sgm,.sg-page{font-size:13px;color:#1c140c}
@@ -302,7 +318,7 @@ html.th-yamen body.portal .sgm td button.today .sg-tday{color:#1c140c;font-size:
 .sg-ev[onclick],.sg-chip[onclick]{cursor:pointer}
 .sg-ev{position:absolute;box-sizing:border-box;border-radius:0;padding:2px 4px;overflow:hidden;line-height:1.25;z-index:1;box-shadow:2px 2px 0 #1a120c;container:sgev / inline-size}
 .sg-ev .k{font-size:11px;font-weight:800}
-.sg-ev.drop .k{text-decoration:underline;text-underline-offset:2px}
+.sg-ev.drop .k,.sg-ev.drop .nm{text-decoration:underline;text-underline-offset:2px}
 .sg-ev .nm{font-size:13px;font-weight:700;white-space:pre-wrap;word-break:break-all}
 @container sgc (max-width:720px){
   .sg-ev{height:auto !important;padding:1px 3px}
@@ -430,9 +446,13 @@ function sgDayHtml(day, evs, care, opt) {
     const whenHtml = t0 != null && t1 != null && t1 > t0 ? `${sgEsc(sgHH(t0))}<wbr>–${sgEsc(sgHH(t1))}` : sgEsc(when);
     const careLine = (ev.kind === '利用' || ev.kind === '休み') && care && care[sgNk(ev.child)] ? `⚠ ${care[sgNk(ev.child)]}` : '';
     const lines = ev.kind === 'その他' ? [ev.title || ev.note || ev.place || ''].filter(Boolean) : sgLines(ev);   // その他は担当名を上の行に出すので本文では繰り返さない
-    const body = lines.concat(careLine ? [careLine] : []).map(sgEsc).join('\n');
-    const tip = `${sgKind(ev)} ${when} ${lines.join(' / ')} ${shown}`.trim();
-    return `<div class="${cls}" style="${style}"${openAttr(ev.id)} title="${sgEsc(tip)}"><div class="k">${sgEsc(sgKind(ev))} ${whenHtml}${who ? '　' + who : ''}</div><div class="nm">${body}</div></div>`;
+    const detail = lines.concat(careLine ? [careLine] : []);
+    const tip = `${sgKind(ev)} ${when} ${detail.join(' / ')} ${shown || ((ev.kind === '迎え' || ev.kind === '送り') && !ev.staff ? '未定' : '')}`.trim();
+    const face = sgFace(ev);
+    const inner = face != null
+      ? `<div class="nm">${sgEsc(face)}</div>`
+      : `<div class="k">${sgEsc(sgKind(ev))} ${whenHtml}${who ? '　' + who : ''}</div><div class="nm">${detail.map(sgEsc).join('\n')}</div>`;
+    return `<div class="${cls}" style="${style}"${openAttr(ev.id)} title="${sgEsc(tip)}">${inner}</div>`;
   }).join('');
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';
   const [, mm, dd] = day.split('-');
@@ -627,5 +647,7 @@ window.sgStaffShow = sgStaffShow;
 window.sgGrid = sgGrid;
 window.sgSplit = sgSplit;
 window.sgName = sgName;
+window.sgGiven = sgGiven;
+window.sgFace = sgFace;
 window.SG_STAFF_COLOR = SG_STAFF_COLOR;
 window.GCAL_EVENT_COLORS = GCAL_EVENT_COLORS;
