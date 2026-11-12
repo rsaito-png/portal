@@ -675,7 +675,7 @@ const LEO_VIEWS = {
           const shown = nikkiShownValue(f, raw);
           const attrs = `data-row="${r.row_no}" data-child="${esc(r.child)}" data-f="${f}" data-old="${esc(raw)}"`;
           return f === 'activity'
-            ? `<label>${labelOf[f]}<textarea rows="6" ${attrs}>${esc(shown)}</textarea></label>`
+            ? `<label>${labelOf[f]}<textarea rows="3" ${attrs}>${esc(shown)}</textarea></label>`
             : DRIVER_PICK[f] ? `<label>${labelOf[f]}<select class="nk-driver" ${attrs}>${shData && typeof shiftOptionsHtml === 'function' ? shiftOptionsHtml(drvNames, shData, day, f === 'pick_driver' ? r.pick_time : r.drop_time, shown) : driverOptionsHtml(drvNames, shown)}</select></label><label>車<input class="nk-car" value="${esc(leoCarFor(r[f], r[f === 'pick_driver' ? 'pick_car' : 'drop_car']) || '')}" readonly tabindex="-1"></label>`
             : `<label>${labelOf[f]}<input ${attrs} value="${esc(shown)}"></label>`;
         };
@@ -697,8 +697,8 @@ const LEO_VIEWS = {
       leoNikkiKidBar(kids) +
       kids.map((k, i) => leoNikkiChildWrap(i, k.kind, k.child, k.html)).join('') +
       (bundle.yen === false ? '<p class="note">おやつの金額を保存するには、supabase/leo_meal_snack_yen.sql を実行してください。あり／なしはこれまでどおり保存できます。</p>' : '') +
-      leoAbsAddHtml('nk', day, leoAbsChoices(rows, kinds, left, day)) +
-      `<button onclick="saveNikki()">保存する</button><div id="saved"></div>`;
+      `<button onclick="saveNikki()">保存する</button><div id="saved"></div>` +
+      leoAbsAddHtml('nk', day, leoAbsChoices(rows, kinds, left, day));
   },
   async jisseki() {
     const pack = await leoLoadJissekiMonth(JIS_MONTH);
