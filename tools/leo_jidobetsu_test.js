@@ -157,9 +157,11 @@ assert.strictEqual(tile[2], '#leo/jidobetsu');
 assert.strictEqual(tile[6], '児発管');
 assert.ok(office.groups[1][2].includes('児童別表示'));
 assert.ok(office.groups[1][2].indexOf('児童別表示') + 1 === office.groups[1][2].indexOf('実績記録（請求元）'), '請求元のとなり');
-assert.ok(office.who[1][1].includes('児童別表示'));
+assert.ok(office.who[0][1].includes('児童別表示'), 'ホームは中村友香担当');
+assert.ok(office.who[0][1].indexOf('児童別表示') < office.who[0][1].indexOf('受給者証の入力（保護者から）'));
+assert.ok(!office.who[1][1].includes('児童別表示'), '事務担当のホームには置かない');
 assert.ok(read('index.html').includes('leo.js?v=20261112jido'));
 assert.ok(read('index.html').includes('leo_meal.js?v=20261112jido'));
-assert.ok(read('index.html').includes('config.js?v=20261112jido'));
+assert.ok(read('index.html').includes('config.js?v=20261112naka'));
 
 console.log('leo_jidobetsu_test: ok');

@@ -318,9 +318,9 @@ assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
 assert.strictEqual(leo.who[0][0], '中村友香担当');
 assert.strictEqual(leo.who[1][0], '事務担当');
-assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|配置表・型表・管理表・送迎の配慮の入力|受給者証の入力（保護者から）');
+assert.strictEqual(leo.who[0][1].join('|'), '来月の利用予定（保護者に聞く）|個別支援計画（管理）|配置表・型表・管理表・送迎の配慮の入力|児童別表示|受給者証の入力（保護者から）');
 assert.ok(!leo.who[0][1].includes('日誌（見る・直す）'), '中村友香担当の欄から日誌を外す');
-assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|児童別表示|上限額管理');
+assert.strictEqual(leo.who[1][1].join('|'), '利用料実費請求|国保連請求|保護者の実績確認|サービス提供実績記録表|上限額管理');
 assert.ok(cfgWin.PORTAL_CONFIG.offices.every(o => !(o.groups || []).some(g => /全ての画面|すべての画面|請求・事務/.test(g[1]))));
 const groupNames = new Set(leo.groups.flatMap(g => g[2]));
 const onHome = new Set([].concat(...Object.values(leo.mine), ...leo.who.map(w => w[1]), leo.routine, [leo.todoTop, '出退勤打刻', '今日の利用児童', 'ヒヤリハット', 'LINE報告を書く', '日誌（見る・直す）', 'シフト']));
@@ -405,7 +405,8 @@ assert.ok(mgr.includes('中村友香担当') && mgr.includes('事務担当'), '�
   assert.ok(nakamura.slice(0, nakamura.indexOf('中村友香担当')).includes('href="#leo/nikki"'), '児発管の毎日やるに日誌は残す');
   assert.ok(sec.includes('href="#leo/master"'), '中村の欄に入力画面');
   assert.ok(sec.includes('href="#leo/jukyusha"') && sec.includes('受給者証の入力（保護者から）'), '中村の欄の最後に受給者証');
-  assert.ok(sec.indexOf('href="#leo/master"') < sec.indexOf('href="#leo/jukyusha"'), '受給者証は入力画面のあと');
+  assert.ok(sec.includes('href="#leo/jidobetsu"') && sec.includes('児童別表示'), '中村の欄に児童別表示');
+  assert.ok(sec.indexOf('href="#leo/master"') < sec.indexOf('href="#leo/jidobetsu"') && sec.indexOf('href="#leo/jidobetsu"') < sec.indexOf('href="#leo/jukyusha"'), '児童別表示は入力画面のあと、受給者証の前');
   assert.ok(!leo.groups.some(g => g[2].includes('受給者証の入力（保護者から）')), '現場・事務・計画には重ねない');
   assert.ok(!sec.includes('利用料実費請求') && !sec.includes('href="#leo/jippi"'), '中村の欄から実費を外す');
   assert.ok(!sec.includes('href="#leo/kakunin"'), '中村の欄に保護者の実績確認を出さない');
@@ -425,6 +426,7 @@ assert.ok(mgr.includes('中村友香担当') && mgr.includes('事務担当'), '�
   const jsec = jim.slice(jim.indexOf('事務担当'));
   assert.ok(jsec.includes('上限額管理') && jsec.includes('href="#leo/jogan"'), '事務担当に上限額管理');
   assert.ok(!jsec.includes('href="#leo/jukyusha"'), '事務担当に受給者証を置かない');
+  assert.ok(!jsec.includes('href="#leo/jidobetsu"') && !jsec.includes('児童別表示'), '事務担当の欄から児童別表示を外す');
 }
 {
   const sbx = { DUTY: '現場支援員', ROLE: '職員', IS_CHAIR: false, MY_FULL_NAME: '', canManage: () => false, canLeoHomeTodo: () => false, leo };
