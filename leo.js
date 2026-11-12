@@ -705,7 +705,7 @@ const LEO_VIEWS = {
     const jis = pack.jis, nk = pack.nk, meals = pack.meals, missing = pack.missing;
     const [yy, mm] = JIS_MONTH.split('-');
     const head = `<h3>実績記録</h3>${demoNote()}
-      <p class="noprint"><a class="back" href="#leo/jidobetsu" onclick="jdFromJisseki()">児童別表示</a></p>
+      <p class="noprint"><a class="back" href="#leo/jidobetsu" onclick="jdFromJisseki()">サービス提供実績記録</a></p>
       <p class="ptabs"><button onclick="jisShift(-1)">← 前の月</button> <b>${yy}年${+mm}月</b> <button onclick="jisShift(1)">次の月 →</button></p>
       <p class="note">児童を選ぶと、その子の月と日が見えます。開始・終了を保存すると日誌から実績へ載ります。食事提供とこの日の記録はここに書きます。国保連の請求は簡易入力に手で打ってください。利用料・加算は出しません。</p>
       ${missing ? '<p style="color:#c00">食事の保存場所がまだありません（supabase/leo_meal_log.sql を実行してください）。見ることはできます。</p>' : ''}`;

@@ -164,32 +164,58 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
   .nk-row{flex-wrap:nowrap;gap:6px 16px}
   .nk-row > label{flex:1 1 0;min-width:0}
 }
-/* 児童別表示。半画面（520px前後）でも横にスクロールしない */
-.jd{max-width:100%;overflow-x:clip}
-.jd-title{margin:0 0 8px;font-size:22px;line-height:1.35;overflow-wrap:anywhere}
-.jd-tools{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:0 0 10px}
-.jd-tools label{display:flex;flex-direction:column;gap:2px;font-size:14px;font-weight:700;min-width:min(100%,12em);flex:1 1 12em}
-.jd-tools input,.jd-tools select,.jd-tools button{width:100%;max-width:100%;margin:0;font-size:16px;padding:8px 10px}
-.jd-tools button{width:auto;flex:0 0 auto;min-height:44px}
-.jd-h{margin:0 0 8px}
-.jd-stats{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0;line-height:1.45}
-.jd-stats span{min-width:0;overflow-wrap:anywhere}
-.jd-money .jd-total{font-size:1.15em}
-.jd-day{background:#fff;border:1px solid #e2d9c4;border-radius:12px;padding:8px 10px;margin:8px 0}
-.jd-day header{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
-.jd-day header b{font-size:18px}
-.jd-meta,.jd-biko{margin:4px 0 0;overflow-wrap:anywhere}
-.jd-day.jd-abs{background:#fdecec;color:#b00020;border-color:#f3c2c2}
-.jd-day.jd-abs .jd-st{font-weight:700}
-@media print{
-  body.jd-on header,body.jd-on #hi,body.jd-on .back,body.jd-on #help,body.jd-on .jd-tools,body.jd-on .jd-staff{display:none !important}
-  .jd-abs{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
 <link rel="stylesheet" href="shell.css?v=20261110chip2">
 <link rel="stylesheet" href="theme-planet.css?v=20261110org">
+<style>
+/* 児童別表示：Googleシートの児童別表示に寄せた印刷様式。ポータルの拡大よりこちらを優先 */
+html body.ui-app .jd{max-width:100%;overflow-x:clip;color:#1c2833;font-size:15px}
+html body.ui-app .jd-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:0 0 8px}
+html body.ui-app .jd-tools label{display:flex;flex-direction:column;gap:2px;font-size:14px;font-weight:700}
+html body.ui-app .jd-tools input,html body.ui-app .jd-tools button{width:auto;max-width:100%;margin:0;font-size:16px;padding:8px 10px;min-height:44px}
+html body.ui-app .jd-sheet{border:1px solid #8ea0b3;background:#fff;max-width:100%}
+html body.ui-app .jd-bar{background:#3d5a7a;color:#fff;text-align:center;font-weight:700;font-size:18px;line-height:1.35;padding:10px 8px;letter-spacing:.04em}
+html body.ui-app .jd-pairs{display:grid;grid-template-columns:minmax(4.2em,auto) minmax(0,1fr) minmax(4.2em,auto) minmax(0,1fr) minmax(4.2em,auto) minmax(0,1fr);border-top:1px solid #c5d0dc}
+html body.ui-app .jd-money{grid-template-columns:repeat(4,minmax(3.6em,auto) minmax(0,1fr))}
+html body.ui-app .jd-lab,html body.ui-app .jd-val{border-right:1px solid #c5d0dc;border-bottom:1px solid #c5d0dc;padding:7px 4px;text-align:center;min-width:0;overflow-wrap:anywhere}
+html body.ui-app .jd-lab{background:#dfe6ee;font-weight:700}
+html body.ui-app .jd-val{background:#fff}
+html body.ui-app .jd-child{background:#fff6cc}
+html body.ui-app .jd-child select{width:100%;max-width:100%;margin:0;padding:2px 4px;border:0;background:transparent;color:#1c2833;font-weight:700;font-size:15px;text-align:center;text-align-last:center;min-height:0;height:auto;box-shadow:none}
+html body.ui-app .jd-total{font-size:1.35em}
+html body.ui-app .jd-miss{margin:0;padding:4px 8px;color:#a30;font-size:13px}
+html body.ui-app .jd-scroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+html body.ui-app .jd table.jd-days{width:100%;table-layout:fixed;border-collapse:collapse;background:#fff;font-size:13px;line-height:1.25;margin:0}
+html body.ui-app .jd table.jd-days col.c-date{width:15%}
+html body.ui-app .jd table.jd-days col.c-wd{width:7%}
+html body.ui-app .jd table.jd-days col.c-st{width:9%}
+html body.ui-app .jd table.jd-days col.c-tm{width:11%}
+html body.ui-app .jd table.jd-days col.c-go{width:9%}
+html body.ui-app .jd table.jd-days col.c-yen{width:10%}
+html body.ui-app .jd table.jd-days col.c-note{width:9%}
+html body.ui-app .jd table.jd-days th,html body.ui-app .jd table.jd-days td{border:1px solid #c5d0dc;padding:4px 1px;text-align:center;vertical-align:middle;font-size:13px;font-weight:400;color:#1c2833;background:#fff;white-space:nowrap}
+html body.ui-app .jd table.jd-days td.jd-note{white-space:normal}
+html body.ui-app .jd table.jd-days th{background:#3d5a7a;color:#fff;font-weight:700;font-size:11px;line-height:1.2;white-space:normal}
+html body.ui-app .jd table.jd-days tbody tr:nth-child(even):not(.jd-abs) td{background:#f4f7fb}
+html body.ui-app .jd table.jd-days td.jd-note{text-align:left}
+html body.ui-app .jd table.jd-days tr.jd-abs td{background:#fde2e2;color:#1c2833}
+html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight:700}
+@media (max-width:700px){
+  html body.ui-app .jd-pairs,html body.ui-app .jd-money{grid-template-columns:minmax(4.2em,auto) minmax(0,1fr) minmax(4.2em,auto) minmax(0,1fr)}
+  html body.ui-app .jd-bar{font-size:16px}
+  html body.ui-app .jd table.jd-days,html body.ui-app .jd table.jd-days td{font-size:12px}
+  html body.ui-app .jd table.jd-days th{font-size:10px}
+}
+@media print{
+  body.jd-on header,body.jd-on #hi,body.jd-on #help,body.jd-on #home>p,body.jd-on .back,body.jd-on .jd-tools,body.jd-on .jd-staff{display:none !important}
+  html body.ui-app .jd-bar,html body.ui-app .jd-lab,html body.ui-app .jd-child,html body.ui-app .jd table.jd-days th,html body.ui-app .jd table.jd-days tr.jd-abs td,html body.ui-app .jd table.jd-days tbody tr:nth-child(even):not(.jd-abs) td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html body.ui-app .jd-scroll{overflow:visible}
+  html body.ui-app .jd-pairs,html body.ui-app .jd-money{grid-template-columns:minmax(4.2em,auto) minmax(0,1fr) minmax(4.2em,auto) minmax(0,1fr) minmax(4.2em,auto) minmax(0,1fr)}
+  html body.ui-app .jd-money{grid-template-columns:repeat(4,minmax(3.6em,auto) minmax(0,1fr))}
+}
+</style>
 <style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}#home_todo[hidden],#ht_jump[hidden]{display:none!important}</style>
 </head><body class="portal ui-app">
 <header class="ui-topbar"><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
@@ -210,14 +236,14 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261112naka"></script>
+<script src="config.js?v=20261112rec"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261111staff"></script>
-<script src="leo_meal.js?v=20261112jido"></script>
+<script src="leo_meal.js?v=20261112sheet"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261112absadd"></script>
+<script src="leo.js?v=20261112rec"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261112sat"></script>
 <script src="kin_visit.js?v=20261112quota"></script>
@@ -246,7 +272,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <script src="leo_shift.js?v=20261111staff"></script>
 <script src="leo_jippi.js?v=20261103mealfee"></script>
 <script src="leo_jogan.js?v=20261106hand"></script>
-<script src="leo_jissekihyo.js?v=20261112jido"></script>
+<script src="leo_jissekihyo.js?v=20261112rec"></script>
 <script src="uketsuke.js?v=20261110me2"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261102wage"></script>
@@ -274,7 +300,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261112naka';
+  var BUILD = '20261112rec';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -722,6 +748,6 @@ if (AUTH_HASH.get('access_token') && ['recovery', 'invite'].includes(AUTH_HASH.g
 
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 show();
-</script><script src="pc-scale.js?v=20261104b"></script>
+</script><script src="pc-scale.js?v=20261112sheet"></script>
 <script src="to-top.js?v=20261105top"></script>
 </body></html>
