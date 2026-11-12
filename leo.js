@@ -1448,19 +1448,21 @@ function leoAbsAddHtml(prefix, day, names) {
   const title = '<b>欠席（加算対応）を追加</b>';
   const explain = '来所の予定だった子が休むとき、ここに足します。日誌と実績に欠席として載ります。キャンセルはカレンダーで付けます（日誌と実績には出ません）。';
   const noteId = prefix + '_abs_note';
-  // 今日の日誌だけ説明を畳む。児童・連絡日・追加するは開いたまま
+  // 今日の日誌だけ▽で畳む
   const head = prefix === 'nk'
     ? `<div>${leoFoldBtn('leo_kesseki_note_open', noteId, title)}</div>`
     : title;
   const noteOpen = prefix === 'nk' && leoFoldOpen('leo_kesseki_note_open');
-  const note = prefix === 'nk'
-    ? `<p class="note" id="${noteId}"${noteOpen ? '' : ' hidden'}>${explain}</p>`
-    : `<p class="note">${explain}</p>`;
-  return `<div class="card" id="${prefix}_abs_add">${head}
-    ${note}
-    ${opts ? `<label>児童<select id="${prefix}_abs_child">${opts}</select></label>
+  const fields = opts ? `<label>児童<select id="${prefix}_abs_child">${opts}</select></label>
       <label>連絡日<input type="date" id="${prefix}_abs_contact" value="${esc(day)}"></label>
-      <button type="button" onclick="leoAddKesseki('${prefix}','${day}')">追加する</button>` : '<p>追加できる児童はいません。</p>'}
+      <label>欠席時対応（誰に連絡したか・何を話したか・次の利用）<textarea id="${prefix}_abs_text" rows="5" maxlength="500"></textarea></label>
+      <button type="button" onclick="leoAddKesseki('${prefix}','${day}')">追加する</button>` : '<p>追加できる児童はいません。</p>';
+  // 今日の日誌では、説明も入力欄も全部▽の中にしまう（普段は閉じたまま）
+  const body = prefix === 'nk'
+    ? `<div id="${noteId}"${noteOpen ? '' : ' hidden'}><p class="note">${explain}</p>${fields}</div>`
+    : `<p class="note">${explain}</p>${fields}`;
+  return `<div class="card" id="${prefix}_abs_add">${head}
+    ${body}
     <div id="${prefix}_abs_msg"></div></div>`;
 }
 function leoReadAbs(root) {
@@ -1520,6 +1522,9 @@ async function leoAddKesseki(prefix, day) {
   if (DEMO) { say('見本モードなので追加しません。'); return; }
   try {
     await sb('rpc/leo_add_kesseki', { method: 'POST', body: JSON.stringify({ p_day: day, p_child: child, p_contact: contact }) });
+    const textEl = document.getElementById(prefix + '_abs_text');
+    const absNote = textEl ? String(textEl.value || '').trim() : '';
+    if (absNote) await leoSaveAbsFlags(day, [{ child, absent_support: true, absent_note: absNote }]);
     if (prefix === 'dr') { DIA_DAY = day; await renderLeoView('diary'); }
     else await renderLeoView('nikki');
   } catch (e) { say(e.message); }
