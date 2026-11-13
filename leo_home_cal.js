@@ -287,6 +287,8 @@ function sgCss() {
 .sgm td button .sub{font-size:9px;color:#2e6b4f;font-weight:700;line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden}
 .sgm td button .sub.use{color:#222;background:#f8b500;border-radius:3px;padding:0 3px}
 .sgm td button .sub.off{color:#b33}
+.sgm td button .sub.hol{color:#d32f2f}
+.sgm td button:has(.sub.hol + .sub){height:auto;min-height:32px}
 .sgm td button.today,
 html.th-yamen body.portal .sgm td button.today{background:#fff6d0;color:#1c140c;border:3px solid #c9a227;box-shadow:none;height:auto;min-height:44px;overflow:visible}
 .sgm td button.today b,
@@ -373,7 +375,10 @@ function sgMonthHtml(ym, evs, todayStr) {
     // 同じ児童の「利用」が二重に入っていても1人と数える（今日の利用児童と同じ数え方）
     const n = new Set(es.filter(e => e.kind === '利用' && e.child).map(e => String(e.child).replace(/\s/g, ''))).size;
     const trips = es.filter(e => e.kind === '迎え' || e.kind === '送り').length;
-    const sub = closed ? '<span class="sub off">休</span>' : n ? `<span class="sub use">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
+    // 祝日（カレンダーの赤い日）は人数の所に赤で「祝日」（ゆか先生指定 2026-11-13）。利用がある日は人数も出す
+    const hol = typeof JP_HOLIDAYS !== 'undefined' && JP_HOLIDAYS && typeof JP_HOLIDAYS.has === 'function' && JP_HOLIDAYS.has(d);
+    const sub0 = closed ? '<span class="sub off">休</span>' : n ? `<span class="sub use">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
+    const sub = hol ? `<span class="sub hol">祝日</span>${n ? `<span class="sub use">${n}人</span>` : ''}` : sub0;
     const isToday = d === todayStr;
     const cls = isToday ? 'today' : '';
     const mark = isToday ? '<span class="sg-tday">今日</span>' : '';
