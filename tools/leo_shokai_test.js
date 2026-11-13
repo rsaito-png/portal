@@ -1,0 +1,60 @@
+// 初回利用画面：手順①〜④、契約は実データ判定、公式LINEは手チェック。URLは推測で入れない。
+// node tools/leo_shokai_test.js
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const assert = require('assert');
+
+const root = path.join(__dirname, '..');
+const read = f => fs.readFileSync(path.join(root, f), 'utf8');
+const sandbox = {
+  DEMO: true,
+  console,
+  ROLE: '管理者',
+  DUTY: '児発管',
+  C: { supabaseUrl: 'http://example.test', supabaseKey: 'x' },
+  localStorage: { getItem: () => '{}', setItem() {}, removeItem() {} },
+  sessionStorage: { getItem: () => '児童A', setItem() {}, removeItem() {} },
+  location: { origin: 'http://localhost', pathname: '/', hash: '#leo/shokai', search: '?demo=1' },
+  document: { getElementById: () => null, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [], body: { classList: { toggle() {}, add() {}, remove() {} } } },
+  fetch: async () => { throw new Error('no fetch'); },
+  setInterval() { return 0; },
+  setTimeout() { return 0; },
+  clearTimeout() {},
+};
+sandbox.window = sandbox;
+sandbox.globalThis = sandbox;
+sandbox.$ = () => ({ textContent: '', value: '', style: {}, innerHTML: '' });
+sandbox.canManage = () => true;
+sandbox.esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+sandbox.today = () => '2026-11-13';
+sandbox.demoNote = () => '';
+sandbox.LEO_VIEWS = {};
+vm.createContext(sandbox);
+vm.runInContext(read('leo_contract.js'), sandbox, { filename: 'leo_contract.js' });
+vm.runInContext(read('leo_shokai.js'), sandbox, { filename: 'leo_shokai.js' });
+
+(async () => {
+  const html = await sandbox.LEO_VIEWS.shokai();
+  assert.ok(html.includes('<h3>🚪 初回利用</h3>'), '見出し');
+  assert.ok(html.includes('① 利用者情報'), '手順①');
+  assert.ok(html.includes('② 型表と予定'), '手順②');
+  assert.ok(html.includes('③ 契約書・重要事項説明書'), '手順③');
+  assert.ok(html.includes('④ 公式LINE友だち追加'), '手順④');
+  assert.ok(html.includes('href="#leo/contract"'), '契約画面へ飛ぶ');
+  assert.ok(html.includes('href="#leo/userinfo"'), '利用者情報へ飛ぶ');
+  assert.ok(html.includes('href="#leo/kata"'), '型表へ飛ぶ');
+  assert.ok(html.includes('署名済み') || html.includes('✅'), '③は見本の署名記録で判定');
+  assert.ok(html.includes('img/leo-line-qr.png'), 'QRの置き場所');
+  assert.ok(html.includes('友だち追加を確認した（手チェック）'), '手チェック');
+  assert.ok(!/lin\.ee\/|line\.me\/R\//.test(html), '友だち追加URLを推測で入れない');
+  assert.ok(html.includes('まだ未設定'), 'URL未設定を明示');
+  const cfg = read('config.js');
+  assert.ok(cfg.includes("'#leo/shokai'"), 'タイルがある');
+  assert.ok(cfg.includes("'初回利用'"), '事務・計画に初回利用');
+  const idx = read('index.html');
+  assert.ok(idx.includes('leo_shokai.js'), 'スクリプトを読み込む');
+  const src = read('leo_shokai.js');
+  assert.ok(src.includes("const SK_LINE_ADD_URL = '';"), 'URL定数は空（推測禁止）');
+  console.log('leo_shokai_test ok');
+})().catch(e => { console.error(e); process.exit(1); });
