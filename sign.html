@@ -21,13 +21,9 @@ button{font-size:18px;width:100%;padding:14px;border:0;border-radius:8px;backgro
 .sub{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:6px 14px;font-size:14px;margin:6px 0}
 .note{color:#777;font-size:13px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
-<link rel="stylesheet" href="theme-retro.css?v=20261030px">
 </head><body><header>金斗雲　ご利用の確認と署名</header><main id="m"><p>読み込み中…</p></main>
-<script src="config.js"></script>
-<script src="signpad.js"></script>
+<script src="config.js?v=20261113a"></script>
+<script src="signpad.js?v=20261113a"></script>
 <script>
 // 本人向け：ログインなし。リンクのトークンで、その方の署名待ちの訪問だけを表示し、表示分はすべて署名する。選ぶ欄はない。1回限り・期限1週間。
 const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search), T = q.get('t') || '', DEMO = q.get('demo') === '1';
@@ -108,5 +104,5 @@ async function send() {
 }
 load();
 </script>
-<div id="dlg" hidden><div><b id="dlgt"></b><span id="dlgm"></span><button onclick="document.getElementById('dlg').hidden=true">閉じる</button></div></div><script src="pc-scale.js?v=20261112keep"></script>
+<div id="dlg" hidden><div><b id="dlgt"></b><span id="dlgm"></span><button onclick="document.getElementById('dlg').hidden=true">閉じる</button></div></div><script src="pc-scale.js?v=20261113a"></script>
 </body></html>

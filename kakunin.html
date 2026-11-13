@@ -15,12 +15,8 @@ a.pay{display:block;text-align:center;margin-top:10px;padding:12px;border-radius
 canvas{border:1px solid #bbb;border-radius:8px;width:100%;height:150px;touch-action:none;background:#fff}.sub{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:6px 12px;font-size:14px;margin:4px 0}
 .note{color:#777;font-size:13px}.ok{color:#2e6b4f;font-weight:bold}.err{color:#c00}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
-<link rel="stylesheet" href="theme-retro.css?v=20261030px">
 </head><body><header>レオ　ご利用実績・実費の確認</header><main id="m"><p>読み込み中…</p></main>
-<script src="config.js"></script>
+<script src="config.js?v=20261113a"></script>
 <script>
 // 保護者向け：ログインなし。リンクのトークンで、その児童・その月の実績と実費だけを表示（ほかの児童の情報は出さない）
 // 実費は利用料（利用者負担額）・お昼代・おやつ代。合計は Square の支払いリンクの金額と同じ。一度の送信で実績と実費の両方を確認したことになる
@@ -109,5 +105,5 @@ async function send() {
   if (r.ok) document.querySelector('.card:last-of-type button:last-of-type').disabled = true;
 }
 load();
-</script><script src="pc-scale.js?v=20261112keep"></script>
+</script><script src="pc-scale.js?v=20261113a"></script>
 </body></html>

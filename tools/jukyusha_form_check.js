@@ -49,7 +49,7 @@ ok(mod(g => g.period_to = { era: '令和', y: 20, m: 3, d: 31 }).errors.period_t
 ok(mod(g => g.period_from = { era: '', y: '', m: '', d: '' }).errors.period_from, '期間 はじめ 空はエラー');
 ok(mod(g => g.child_birth = { era: '令和', y: 30, m: 1, d: 1 }).errors.child_birth, '生年月日 令和30年は先すぎる');
 ok(mod(g => g.child_birth = { era: '西暦', y: 2030, m: 1, d: 1 }).errors.child_birth, '生年月日 未来はエラー');
-eq(mod(g => g.child_birth = { era: '', y: '', m: '', d: '' }).errors, {}, '生年月日 空はよい（わかれば）');
+eq(mod(g => g.child_birth = { era: '', y: '', m: '', d: '' }).errors, {}, '生年月日 空はよい（任意）');
 eq(mod(g => g.issue_date = { era: '平成', y: 32, m: 1, d: 1 }).errors.issue_date ? 1 : 0, 1, '交付年月日 平成32年はエラー');
 eq(mod(g => g.cap_monthly = { sel: '0', other: '' }).vals.cap_monthly, '0', '負担上限 0円');
 eq(mod(g => g.cap_monthly = { sel: '37200', other: '' }).vals.cap_monthly, '37200', '負担上限 37,200円');
@@ -68,7 +68,7 @@ ok(mod(g => { g.other = '特記事項\r\n無償化対象児童'; }).vals.other =
 ok(mod(g => g.soudan_office = '㈱見本 相談支援').vals.soudan_office === '㈱見本 相談支援', '相談支援事業所名は書いたとおりに残る');
 ok(!('soudan_person' in mod(g => g.soudan_person = '').vals) && !('other' in mod(g => g.other = '  ').vals), '空欄は値に入らない');
 ok(!('amount_text' in J.toDb(mod(g => g.amount_text = 'x').vals)) && !('other' in J.toDb(mod(g => g.other = 'x').vals)) && !('soudan_office' in J.toDb(mod(g => g.soudan_office = 'x').vals)) && !('soudan_person' in J.toDb(mod(g => g.soudan_person = 'x').vals)), '新しい4項目は利用者情報の列に自動では対応しない（toDb に出ない）');
-eq(J.validate({}, T).errors && Object.keys(J.validate({}, T).errors).sort(), ['cap_monthly', 'child_name', 'contract_days', 'guardian_name', 'jukyusha_no', 'kind', 'period_from', 'period_to'], '空のとき「必ず」の項目だけがエラー');
+eq(J.validate({}, T).errors && Object.keys(J.validate({}, T).errors).sort(), ['cap_monthly', 'child_name', 'contract_days', 'guardian_name', 'jukyusha_no', 'kind', 'period_from', 'period_to'], '空のとき「必須」の項目だけがエラー');
 // --- 利用者情報の列への対応 ---
 eq(J.toDb(v0.vals), { jukyusha_no: '0123456789', guardian_name: '見本 花子', kind: '放デイ', contract_days: 20, contract_end: '2027-03-31', cap_monthly: 4600 }, '列への対応（無償化「分からない」は入れない・period_from は入れない）');
 eq(J.toDb({ ...v0.vals, mushouka: 'yes' }).mushouka, true, '無償化 はい→true'); eq(J.toDb({ ...v0.vals, mushouka: 'no' }).mushouka, false, '無償化 いいえ→false');

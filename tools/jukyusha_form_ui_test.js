@@ -63,7 +63,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(await g.$$eval('#fields input[type=text], #fields input[type=number], #fields select', a => a.filter(e => e.offsetParent).every(e => e.getBoundingClientRect().height >= 44)), '保護者：入力欄はどれも高さ44px以上（押しやすい）');
   await g.screenshot({ path: OUT + 'guardian_1_top.png' });
   await g.click('#agree'); await g.click('#review');
-  ok(await g.$$eval('.err:not(:empty)', a => a.length) >= 8, '保護者：空のまま進むと、必ずの項目に赤い説明が出る');
+  ok(await g.$$eval('.err:not(:empty)', a => a.length) >= 8, '保護者：空のまま進むと、必須の項目に赤い説明が出る');
   ok(await g.$eval('#pg_sum', e => e.hidden), '保護者：エラーのあいだは確認画面に進まない');
   await g.evaluate(() => scrollTo(0, 0)); await sleep(300);
   // 入力（全角・令和・西暦の混在）

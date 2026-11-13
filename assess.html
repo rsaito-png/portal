@@ -25,14 +25,10 @@ input:focus,select:focus,textarea:focus{border-color:#e8833a;outline:0}.bad inpu
 table.sm{width:100%;border-collapse:collapse;font-size:16px}table.sm td,table.sm th{border-top:1px solid #e5e5e5;padding:7px 4px;text-align:left;vertical-align:top}table.sm th{width:46%;color:#555;font-weight:normal}
 .photo{background:#fff8f0;border:1px solid #f0d2b4;border-radius:8px;padding:8px 10px;font-size:14px}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
-<link rel="stylesheet" href="theme-retro.css?v=20261030px">
 </head><body><header>レオ　アセスメントの入力</header><main id="m"><p>読み込み中…</p></main>
-<script src="config.js?v=20261030assess"></script>
-<script src="jukyusha_lib.js?v=202610281700"></script>
-<script src="assess_lib.js?v=20261030assess"></script>
+<script src="config.js?v=20261113a"></script>
+<script src="jukyusha_lib.js?v=20261113a"></script>
+<script src="assess_lib.js?v=20261113a"></script>
 <script>
 // 保護者向け（ログインなし）。児童ごとの専用リンク（assess.html?t=…）から、初回アセスメントを入力して送る。
 // 写真のアップロードはない。送った内容は、児発管・事務・管理者が確認して「確認して反映」を押すまで、アセスメントには入らない。
@@ -50,7 +46,7 @@ async function load() {
   if (d.expired) return bad('このリンクは期限が切れています。お手数ですがレオまでご連絡ください。');
   $m().innerHTML = `<div id="pg_form">
     <div class="card"><b>${esc(d.child)}</b> さんのアセスメント（初めての聞き取り）です。
-      <p class="note">支援の計画を立てるために、お子さんの様子・健康・ご家族の願いを伺います。<b>わかるところだけで大丈夫です。</b>写真の添付はありません。</p>
+      <p class="note">支援の計画を立てるために、お子さんの様子・健康・ご家族の願いを伺います。わからない所は、空欄のままで大丈夫です。<span class="req">必須</span> の所だけ入れてください。写真の添付はありません。</p>
       ${d.last && !d.prefill ? `<p class="ok">${dt(d.last.at)} に入力をいただいています。直したいときは、このまま入力して送ってください（新しい入力が優先されます）。</p>` : ''}</div>
     ${d.prefill ? `<div class="card" style="border:3px solid #2e6b4f"><b class="ok">前回の内容が入っています</b><p style="margin:6px 0">変わったところだけ直してください。このページには、お子さんのアセスメントが表示されます。リンクはほかの方に送らないでください。</p></div>` : ''}
     <div id="fields"></div>
@@ -99,7 +95,7 @@ function buildFields() {
     rows.forEach(([k, short, label, type]) => {
       const f = { k, short, label, type };
       const forId = type === 'date' ? `f_${k}_era` : type === 'yn' || type === 'ari' ? '' : `f_${k}`;
-      h += `<div class="f" id="w_${k}"><label class="t"${forId ? ` for="${forId}"` : ''}>${A.labelHtml(f)}${k === 'name_kana' ? '<span class="req">必ず</span>' : '<span class="opt">わかれば</span>'}</label>${inputHtml(f)}<div class="err" id="e_${k}" role="alert"></div></div>`;
+      h += `<div class="f" id="w_${k}"><label class="t"${forId ? ` for="${forId}"` : ''}>${A.labelHtml(f)}${k === 'name_kana' ? '<span class="req">必須</span>' : ''}</label>${inputHtml(f)}<div class="err" id="e_${k}" role="alert"></div></div>`;
     });
     h += '</div>';
   });
@@ -162,5 +158,5 @@ async function send() {
   }
 }
 load();
-</script><script src="pc-scale.js?v=20261112keep"></script>
+</script><script src="pc-scale.js?v=20261113a"></script>
 </body></html>
