@@ -172,14 +172,14 @@ function calAria(e, es) {
 }
 function calPills(e, es) {
   const t = calKid(es, e.child);
-  const bits = [`<span class="tm">${esc(e.start_time || '')}–${esc(e.end_time || '')}</span>`];
+  const bits = [];
   if (e.parent_drop) bits.push('<span class="calv-pill">保護者送</span>');
   else if (t.pick[0]) bits.push(`<span class="calv-pill${t.pick[0].staff ? '' : ' miss'}">☆${esc(calShort(t.pick[0].staff) || '未定')}</span>`);
   else bits.push('<span class="calv-pill miss">☆なし</span>');
   if (e.parent_pick) bits.push('<span class="calv-pill">保護者迎</span>');
   else if (t.drop[0]) bits.push(`<span class="calv-pill${t.drop[0].staff ? '' : ' miss'}">★${esc(calShort(t.drop[0].staff) || '未定')}</span>`);
   else bits.push('<span class="calv-pill miss">★なし</span>');
-  return bits.join('');
+  return `<span class="tm">${esc(e.start_time || '')}–${esc(e.end_time || '')}</span><span class="calv-whois">${bits.join('')}</span>`;
 }
 function calMore(key, html) { return `<div id="cm${key}" class="calv-more" hidden>${html}</div>`; }
 function calNow(win, day) {
@@ -196,7 +196,7 @@ function calRoster(d, es, care, win) {
     const when = e.start_time ? `<small class="when">${esc(e.start_time)}<br>${esc(e.end_time || '')}</small>` : '';
     return `<div class="calv-row">
       <div class="calv-name" style="box-shadow:inset 4px 0 0 ${color}"><button type="button" class="calv-nameb" data-cal="${key}" aria-expanded="false" aria-label="${calAria(e, es)}" onclick="calFlip('${key}')">${calNameHtml(e.child)}${when}${badges}</button></div>
-      <div class="calv-lane">${calNow(win, d)}<button type="button" class="calv-bar" data-cal="${key}" aria-expanded="false" aria-label="${calAria(e, es)}" onclick="calFlip('${key}')" style="left:${g.left}%;width:${g.width}%;background:${color};color:#fff">${calPills(e, es)}</button></div>
+      <div class="calv-lane">${calNow(win, d)}<button type="button" class="calv-bar" data-cal="${key}" aria-expanded="false" aria-label="${calAria(e, es)}" onclick="calFlip('${key}')" style="margin-left:${g.left}%;width:${g.width}%;max-width:calc(100% - ${g.left}%);background:${color};color:#fff">${calPills(e, es)}</button></div>
       ${calMore(key, calDetail(e, es, care))}</div>`;
   }).join('');
   const rest = bare.map((e, i) => {
@@ -273,27 +273,28 @@ function calCss() {
 .calv-date{font-size:18px;font-weight:800;margin:2px 0 8px;color:#333}
 .calv-count{margin:0 0 6px;font-weight:700;color:#555}
 .calv-empty{color:#888;margin:4px 0 8px}
-.calv-board{background:#fff;border:1px solid #eadfce;border-radius:12px;overflow:hidden}
-.calv-scale{display:grid;grid-template-columns:4.6rem 1fr;background:#fbf7f1;border-bottom:1px solid #eadfce}
+.calv-board{background:#fff;border:1px solid #eadfce;border-radius:12px;overflow:visible}
+.calv-scale{display:grid;grid-template-columns:7.2rem 1fr;background:#fbf7f1;border-bottom:1px solid #eadfce}
 .calv-nameh{font-size:11px;color:#8a7a66;font-weight:700;display:flex;align-items:center;padding-left:8px}
 .calv-hours{position:relative;height:22px}
 .calv-hours span{position:absolute;top:3px;font-size:11px;color:#8a7a66;font-weight:700}
 .calv-hours span.mid{transform:translateX(-50%)}
 .calv-hours span.end{transform:translateX(-100%)}
-.calv-row{display:grid;grid-template-columns:4.6rem 1fr;border-bottom:1px solid #f3ece3}
+.calv-row{display:grid;grid-template-columns:7.2rem 1fr;border-bottom:1px solid #f3ece3}
 .calv-row:last-child{border-bottom:0}
-.calv-name{position:sticky;left:0;background:#fff;z-index:2}
-.calv button.calv-nameb{width:100%;min-height:52px;padding:6px 6px 6px 8px;border-radius:0}
-.calv-name b{display:block;font-size:13px}
-.calv-name small{display:block;font-size:12px;color:#444;font-weight:600}
-.calv-name .when{display:block;font-size:11px;font-weight:800;color:#555;line-height:1.15;margin-top:1px}
+.calv-name{position:sticky;left:0;background:#fff;z-index:2;overflow:visible;min-width:0}
+.calv button.calv-nameb{width:100%;min-height:52px;height:auto;padding:6px 6px 6px 8px;border-radius:0;background:#fff;color:#222;overflow:visible;white-space:normal;word-break:break-word;overflow-wrap:anywhere;border:0;box-shadow:none}
+.calv-name b{display:block;font-size:13px;color:#222;white-space:normal;overflow:visible}
+.calv-name small{display:block;font-size:12px;color:#444;font-weight:600;white-space:normal;overflow:visible}
+.calv-name .when{display:block;font-size:11px;font-weight:800;color:#333;line-height:1.2;margin-top:1px;white-space:normal;overflow:visible}
 .calv-name .bdg{display:inline-block;font-style:normal;font-size:10px;font-weight:800;border-radius:4px;padding:0 3px;margin:2px 2px 0 0}
 .calv-name .bdg.note{background:#fff1d6;color:#8a5a12}
 .calv-name .bdg.warn{background:#fde2e1;color:#a12622}
-.calv-lane{position:relative;min-height:52px;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/var(--nh) - 1px),#f0e6d8 calc(100%/var(--nh) - 1px),#f0e6d8 calc(100%/var(--nh)))}
-.calv button.calv-bar{position:absolute;top:calc(50% - 18px);height:36px;min-width:0;border-radius:8px;display:flex;align-items:center;gap:3px;padding:0 6px;overflow:hidden;font-weight:700;box-shadow:0 1px 2px #0002;z-index:2}
-.calv button.calv-bar .tm{font-size:12px;white-space:nowrap}
-.calv-pill{background:rgba(0,0,0,.22);border-radius:6px;padding:1px 4px;font-size:11px;font-weight:800;white-space:nowrap}
+.calv-lane{position:relative;min-height:52px;overflow:visible;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/var(--nh) - 1px),#f0e6d8 calc(100%/var(--nh) - 1px),#f0e6d8 calc(100%/var(--nh)))}
+.calv button.calv-bar{position:relative;top:auto;height:auto;min-height:36px;min-width:0;margin:4px 0;border-radius:8px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:4px 6px;overflow:visible;white-space:normal;word-break:break-word;overflow-wrap:anywhere;font-size:12px;font-weight:700;line-height:1.25;box-shadow:0 1px 2px #0002;z-index:2;box-sizing:border-box;border:0}
+.calv button.calv-bar .tm{font-size:12px;white-space:normal;line-height:1.2;overflow:visible}
+.calv button.calv-bar .calv-whois{display:flex;flex-wrap:wrap;gap:3px;align-items:center;white-space:normal;overflow:visible}
+.calv-pill{background:rgba(0,0,0,.22);border-radius:6px;padding:1px 4px;font-size:11px;font-weight:800;white-space:normal;word-break:break-word;overflow-wrap:anywhere}
 .calv-pill.miss{background:#9d1c1c}
 .calv button.calv-bar[aria-expanded="true"],.calv button.calv-nameb[aria-expanded="true"]{outline:2px solid #222;outline-offset:1px}
 .calv-now{position:absolute;top:0;bottom:0;width:2px;background:#e23;z-index:1;pointer-events:none}

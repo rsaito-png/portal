@@ -64,9 +64,9 @@ html.th-planet body.ui-app ::placeholder{color:#7b857f;opacity:1}
 
 /* ボタン：主ボタンは緑・大きく丸く */
 html.th-planet body.ui-app button,html.th-planet body.ui-app .btn,html.th-planet body.ui-app a.btn{border-radius:16px!important;font-weight:700}
-html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button),
+html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):not(.calv button),
 html.th-planet body.ui-app #login button:not(.btn-ghost),html.th-planet body.ui-app #forgot button:not(.btn-ghost),html.th-planet body.ui-app #setpw button{background:var(--pl-g)!important;color:#fff!important;border:2px solid var(--pl-g)!important;box-shadow:0 6px 14px -10px rgba(36,92,64,.9)!important;background-image:none!important;min-height:48px}
-html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):hover{background:var(--pl-g2)!important}
+html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):not(.calv button):hover{background:var(--pl-g2)!important}
 html.th-planet body.ui-app main button:disabled{opacity:.55}
 html.th-planet body.ui-app .back,html.th-planet body.ui-app .btn-ghost,html.th-planet body.ui-app button.sub,html.th-planet body.ui-app button.sec,html.th-planet body.ui-app button.g,html.th-planet body.ui-app button.inl,html.th-planet body.ui-app a.btn.sub{background:#fff!important;color:var(--pl-g2)!important;border:2px solid var(--pl-g)!important;border-radius:16px!important;box-shadow:none!important;min-height:44px}
 html.th-planet body.ui-app .ptabs button{background:#fff!important;color:var(--pl-ink)!important;border:1.5px solid var(--pl-line)!important;border-radius:999px!important;box-shadow:none!important}

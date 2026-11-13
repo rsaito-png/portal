@@ -3272,8 +3272,8 @@ function leoViewsLive() {
     if (typeof leoHomeStatus === 'function') leoHomeStatus();
     return;
   }
-  // 送迎（#leo/sougei・#leo/sougeiall・#leo/day/…）は自動で読み込み直さない（齊藤さん指定 2026-11-13）
-  const view = hash.match(/^#leo\/(kids|cal)$/);
+  // 送迎（#leo/sougei・#leo/sougeiall・#leo/day/…）と児童の利用・送迎予定（#leo/cal）は自動で読み込み直さない（齊藤さん指定 2026-11-13）
+  const view = hash.match(/^#leo\/kids$/);
   if (view && typeof renderLeoView === 'function') renderLeoView(view[1]);
 }
 function leoCalWatch() {

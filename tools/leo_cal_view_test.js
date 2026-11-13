@@ -142,4 +142,22 @@ assert.ok(miss.includes('担当なし') && miss.includes('13:50') && miss.includ
 const preview = ['2026-11-02', '2026-11-04'].map(d => calDay(d, evs.filter(e => e.day === d).map(({ id, ...rest }) => rest), {})).join('');
 assert.ok(preview.includes('児童A') && !preview.includes('calEdit('));
 
+// 棒の文字が切れない（時刻行と担当行、折り返し、高さ自動）
+assert.ok(day.includes('class="calv-whois"') && day.includes('class="tm"'), '棒は時刻と担当の2行');
+assert.ok(day.includes('margin-left:') && day.includes('max-width:calc(100% - '), '棒はレーン内に収めつつ幅を確保');
+const css = String(calDay).length && sandbox.calCss();
+assert.ok(css.includes('overflow:visible') && css.includes('white-space:normal') && css.includes('word-break:break-word'), '棒・名前列は文字を切らない');
+assert.ok(css.includes('flex-direction:column') && css.includes('height:auto'), '棒の高さは中身に合わせる');
+assert.ok(css.includes('grid-template-columns:7.2rem') && css.includes('.calv-name .when') && css.includes('color:#333'), '名前列の時刻が見える幅と色');
+assert.ok(css.includes('background:#fff') && css.includes('color:#222'), '名前列は緑のボタン色で塗らない');
+
+const leo = fs.readFileSync(path.join(__dirname, '..', 'leo.js'), 'utf8');
+assert.ok(leo.includes('hash.match(/^#leo\\/kids$/)'), 'kidsの自動読み込みは残す');
+assert.ok(!leo.includes('hash.match(/^#leo\\/(kids|cal)$/)'), 'calは自動で読み込み直さない');
+assert.ok(leo.includes('児童の利用・送迎予定（#leo/cal）は自動で読み込み直さない（齊藤さん指定 2026-11-13）'));
+const scale = fs.readFileSync(path.join(__dirname, '..', 'pc-scale.js'), 'utf8');
+assert.ok(scale.includes(".jd,.sheet-scroll,.calv"), 'PC拡大はcalを対象外にする');
+const planet = fs.readFileSync(path.join(__dirname, '..', 'theme-planet.css'), 'utf8');
+assert.ok(planet.includes(':not(.calv button)'), 'テーマの緑ボタン指定からcalを外す');
+
 console.log('leo_cal_view_test ok');

@@ -166,9 +166,9 @@ assert.ok(office.who[0][1].includes('サービス提供実績記録'), 'ホー�
 assert.ok(office.who[0][1].indexOf('サービス提供実績記録') < office.who[0][1].indexOf('受給者証の入力（保護者から）'));
 assert.ok(office.who[1][1].includes('サービス提供実績記録表'), '事務担当の記録表はそのまま');
 assert.strictEqual(office.who[1][1].filter(n => n === 'サービス提供実績記録').length, 0, '事務担当には同名の入口を置かない');
-assert.ok(read('index.html').includes('leo.js?v=20261113kataday'));
+assert.ok(read('index.html').includes('leo.js?v=20261113calfix'));
 assert.ok(read('index.html').includes('leo_meal.js?v=20261112sheet'));
-assert.ok(read('index.html').includes('pc-scale.js?v=20261113kata'));
+assert.ok(read('index.html').includes('pc-scale.js?v=20261113cal'));
 assert.ok(read('index.html').includes('config.js?v=20261112rec'));
 assert.ok(leo.includes('>サービス提供実績記録</a>'), '実績記録の画面の上に入口');
 
