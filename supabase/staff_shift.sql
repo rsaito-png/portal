@@ -62,10 +62,10 @@ $$;
 revoke all on function public.staff_shift_name(uuid) from public, anon;
 
 -- 期間のシフトを1回で返す。staff=表に出る人（型か変更がある人）、pick=足せる人（レオ在籍。宮本は休職なので出さない）
--- punches は管理者・児発管・事務・会長だけ（打刻との照らし合わせ用。職員には返さない）
+-- punches は管理者と会長だけ（打刻との照らし合わせ用。児発管・事務・職員には返さない。2026-11-13 齊藤さん指定）
 create or replace function public.staff_shift_get(p_from date, p_to date) returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare can_edit boolean := public.staff_shift_can_edit();
-  see_punch boolean := coalesce(auth.role(), '') = 'service_role' or public.can_manage() or public.is_chair();
+  see_punch boolean := coalesce(auth.role(), '') = 'service_role' or coalesce(public.my_duty() = '管理者', false) or public.is_chair();
   res jsonb;
 begin
   if not public.staff_shift_can_read() then raise exception 'レオの職員だけが見られます'; end if;
