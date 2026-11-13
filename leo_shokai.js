@@ -1,8 +1,8 @@
 // レオ 初回利用（#leo/shokai）：新しい児童の手続きを、いまの登録・署名の実データで確認する
 // ①利用者情報 ②型表と予定 ③契約書・重要事項 ④公式LINE友だち追加
 // ⑤上限額管理先（leo_jogan_master の有無） ⑥アセスメント（リンク発行と回答済）
-// ⑦個別支援計画の保護者アンケート（既存の hogosha.html?k=mon / leo_mon_links）
-// ⑧個別支援計画（原案・本案・同意）
+// （保護者アンケートは見直し用なので初回利用には出さない。2026-11-13 齊藤さん指定）
+// ⑦個別支援計画（原案・本案・同意）
 // ③の署名済みは leo_doc_log。⑥⑦③の発行済みリンクは、案内文とURLを最初から出し、コピーして公式LINEで送る（ポータルは送信しない）。
 const SK_LINE_QR = 'img/leo-line-qr.png';
 // 友だち追加URLは齊藤さんから届いたQR（img/leo-line-qr.png）を読み取ったもの。
@@ -352,17 +352,17 @@ LEO_VIEWS.shokai = async function () {
     <p><a href="#leo/plan">個別支援計画（管理）を開く</a></p></div>`;
 
   const planHead = plan ? `第${plan.term_no}期` : 'まだ計画行がありません';
-  const step8 = `<div class="card"><h4>⑧ 個別支援計画（原案・本案・同意）</h4>
+  const step8 = `<div class="card"><h4>⑦ 個別支援計画（原案・本案・同意）</h4>
     <p>対象：${esc(planHead)}</p>
     <p>${skSt(hasGenan, '原案の本文あり', '原案はまだありません')}</p>
     <p>${skSt(hasHonan, '本案の本文あり', '本案はまだありません')}</p>
     <p>${skSt(planMade, '計画書作成＝済', '計画書作成はまだ未')}</p>
     <p>${skSt(genanOk, '原案の同意済み（' + skWhen(plan && plan.genan_consent_at) + '）', '原案の同意はまだです')}</p>
     <p>${skSt(honanOk, '本案の同意済み（' + skWhen(plan && plan.honan_consent_at) + '）', '本案の同意はまだです')}</p>
-    <p class="note">判定は leo_plans の本文（genan / honan）、plan_made、genan_consent_at / honan_consent_at です。同意リンクの発行は計画画面から行います。</p>
+    <p class="note">初回の計画は⑥アセスメント（保護者の願い6領域を含む）から作ります。保護者アンケートは2回目以降の見直し用なので、ここでは出しません。判定は leo_plans の本文（genan / honan）、plan_made、genan_consent_at / honan_consent_at です。同意リンクの発行は計画画面から行います。</p>
     <p><a href="#leo/plan">個別支援計画（管理）を開く</a></p></div>`;
 
   return `${back}<h3>🚪 初回利用</h3>${typeof demoNote === 'function' ? demoNote() : ''}
-    <p class="note">新しい児童の手続きを、この画面で順に確認します。各項目はいまの登録内容で判定します。⑥アセスメント・⑦保護者アンケート・③契約の署名リンクは、発行済みなら案内文とURLを最初から出します。コピーして公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。送ったら「LINEで送った」を押すと記録します。公式LINEの友だち追加は手でチェックします。</p>
-    ${pick}${sel ? step1 + step2 + step3 + step4 + step5 + step6 + step7 + step8 : ''}`;
+    <p class="note">新しい児童の手続きを、この画面で順に確認します。各項目はいまの登録内容で判定します。⑥アセスメント・③契約の署名リンクは、発行済みなら案内文とURLを最初から出します。コピーして公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。送ったら「LINEで送った」を押すと記録します。公式LINEの友だち追加は手でチェックします。</p>
+    ${pick}${sel ? step1 + step2 + step3 + step4 + step5 + step6 + step8 : ''}`;
 };
