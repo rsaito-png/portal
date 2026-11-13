@@ -263,7 +263,11 @@ function sgFace(e) {
     const names = (e.kids || []).map(sgGiven).filter(Boolean);
     return names.length ? names.map(n => mark + n).join('　') : mark;
   }
-  if (e.kind === '利用') return sgGiven(e.child);
+  if (e.kind === '利用') {
+    // 保護者が施設へ連れて来る（迎えなし）は「母の迎え」、保護者が迎えに来る（送りなし）は「母の送り」（2026-11-13 Reo）
+    const p = [e.parent_drop ? '母の迎え' : '', e.parent_pick ? '母の送り' : ''].filter(Boolean);
+    return sgGiven(e.child) + (p.length ? `（${p.join('・')}）` : '');
+  }
   return null;
 }
 function sgCss() {

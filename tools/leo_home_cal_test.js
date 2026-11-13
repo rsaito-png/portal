@@ -218,7 +218,7 @@ const parentUse = sgDayHtml('2026-10-26', [
   { day: '2026-10-26', kind: '利用', child: '加藤 湊', start_time: '10:00', end_time: '12:00', parent_drop: true, parent_pick: true },
 ], {}, { demo: false, today: '2026-10-27' });
 const parentFace = evFace(parentUse, ['利用', '加藤 湊']);
-assert.ok(parentFace && parentFace.inner === '湊', '保護者送迎の注記はブロックに出さない');
+assert.ok(parentFace && parentFace.inner === '湊（母の迎え・母の送り）', '保護者送迎はブロックに（母の迎え・母の送り）');
 assert.ok(parentFace.title.includes('保護者が送る') && parentFace.title.includes('保護者が迎える'), '保護者の注記は title に残す');
 
 const kinmuDay = [
