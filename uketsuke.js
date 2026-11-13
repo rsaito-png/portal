@@ -107,7 +107,7 @@ function ukSubjectOf(hash, state, root) {
   const byId = i => (doc && doc.getElementById ? doc.getElementById(i) : null);
 
   if (id === 'leo' && sub === 'userinfo' && S.UI && S.UI.sel) return { kind: '児童', name: ukOneLine(S.UI.sel) };
-  if (id === 'leo' && sub === 'cal') {
+  if (id === 'leo' && (sub === 'cal' || sub === 'sougei')) {
     const inp = byId('cf_child');
     if (inp && ukOneLine(inp.value)) return { kind: '児童', name: ukOneLine(inp.value) };
   }

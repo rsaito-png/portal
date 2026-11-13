@@ -125,7 +125,7 @@ async function ytCommit() {
   if (DEMO) { box.insertAdjacentHTML('beforeend', '<p>見本モードでは書き込みません。</p>'); return; }
   if (!confirm(YT_MONTH.slice(5, 7) + '月分の予定を作ります。よいですか？')) return;
   try { const r = await sb('rpc/leo_sched_commit', { method: 'POST', body: JSON.stringify({ p_month: YT_MONTH }) });
-    box.innerHTML = `<p style="color:#080;font-size:17px">✅ ${r.inserted}件の予定を作りました。<a href="#leo/cal">児童の利用・送迎予定</a>／<a href="#leo/sougeiall">みんなの送迎</a>で見られます。</p>`; }
+    box.innerHTML = `<p style="color:#080;font-size:17px">✅ ${r.inserted}件の予定を作りました。<a href="#leo/sougei">送迎</a>で見られます。</p>`; }
   catch (e) { box.innerHTML += `<p style="color:#c00">${esc(e.message)}</p>`; }
 }
 window.ytCopyAll = ytCopyAll; window.ytPlan = ytPlan; window.ytCommit = ytCommit;

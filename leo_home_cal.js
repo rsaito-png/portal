@@ -463,10 +463,13 @@ function sgDayHtml(day, evs, care, opt) {
   const todayArg = typeof today === 'function' ? today() : day;
   const addBtn = canEdit ? `<p class="sg-add"><button type="button" onclick="sgEditNew('${day}')">＋ 予定を追加</button></p>` : '';
   const slot = canEdit ? ` data-start="${start}" data-px="${PX}" onclick="sgEditSlot('${day}', event)"` : '';
-  return `<div class="sg-page">${sgCss()}<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${todayArg}')">今日</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" class="sg-mine${mineOn ? ' sg-on' : ''}" aria-pressed="${mineOn ? 'true' : 'false'}" onclick="sgToggleMine()">自分の担当</button></div>
+  const embed = !!(opt && opt.embed);
+  const top = embed ? '' : `<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${todayArg}')">今日</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" class="sg-mine${mineOn ? ' sg-on' : ''}" aria-pressed="${mineOn ? 'true' : 'false'}" onclick="sgToggleMine()">自分の担当</button></div>`;
+  const link = embed ? '' : `<p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>`;
+  return `<div class="sg-page">${sgCss()}${top}
     ${addBtn}${mineNote}<div class="sg-leg">${legend}</div>
     <div class="sg-cal">${chips ? `<div class="sg-all"><div class="g">終日</div><div class="sg-chips">${chips}</div></div>` : ''}<div class="sg-time"><div class="sg-gut" style="height:${hpx}px">${labels.join('')}</div><div class="sg-scroll"><div class="sg-canvas" style="height:${hpx}px"${slot}>${lines.join('')}${blocks}${nowEl}</div></div></div></div>
-    <p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>
+    ${link}
     <p class="sg-foot">利用児童は山吹色、送迎の色は担当ごとです。一覧に無い担当は赤です。☆は迎え、下線の★は送りです。</p></div>`;
 }
 async function sgLoad(a, b, mode, anchor) {
@@ -521,40 +524,51 @@ async function leoHomeCal() {
     el.innerHTML = sgMonthHtml(ym, evs, sgTodayJst());
   } catch (e) { el.innerHTML = `<p class="sgm-err">${sgEsc(e.message)}</p>`; }
 }
+async function sgDayBundle(day, opt) {
+  opt = opt || {};
+  const evs = await sgLoad(day, day, 'day', day);
+  let care = {};
+  if (!(typeof DEMO !== 'undefined' && DEMO)) {
+    try {
+      const cc = await sb('leo_child_care?select=child,note');
+      care = Object.fromEntries((cc || []).filter(x => x.note).map(x => [sgNk(x.child), x.note]));
+    } catch (e) { /* 配慮が読めなくても予定は出す */ }
+  }
+  const me = typeof myName === 'function' ? await myName().catch(() => '') : '';
+  const canEdit = sgCanEditCal(me);
+  if (!canEdit || (SG_EDIT && SG_EDIT.day !== day)) sgClearEdit();
+  let form = '';
+  if (canEdit && SG_EDIT && SG_EDIT.day === day && typeof calForm === 'function') {
+    const row = SG_EDIT.id === 'new'
+      ? { day, kind: '利用', kids: [], start_time: SG_EDIT.start || '' }
+      : (evs.find(x => String(x.id) === String(SG_EDIT.id)) || { day, kind: '利用', kids: [] });
+    if (typeof CAL !== 'undefined') { CAL.edit = SG_EDIT.id; CAL.d = day; CAL.row = row.id ? row : null; }
+    window.sgCalReturn = () => {
+      const backDay = (typeof CAL !== 'undefined' && CAL.d) || day;
+      sgClearEdit();
+      if (typeof sgHubJump === 'function') sgHubJump({ view: 'time', day: backDay });
+      else renderSgDay(backDay);
+    };
+    const names = evs.flatMap(e => [e.child, ...(e.kids || [])]).filter(Boolean);
+    const staffs = evs.map(e => e.staff).filter(Boolean);
+    const staffPick = [...new Set([...staffs, ...(typeof leoDriverNames === 'function' ? await leoDriverNames().catch(() => []) : [])])];
+    form = calForm(row, [...new Set(names)].sort(), typeof leoPickerNames === 'function' ? leoPickerNames(staffPick) : staffPick);
+  }
+  const mine = opt.mine != null ? opt.mine : SG_MINE;
+  const html = sgDayHtml(day, evs, care, { me: me || '', mine, canEdit, embed: !!opt.embed });
+  return { form, html, evs, me, canEdit };
+}
 async function renderSgDay(day) {
+  if (typeof sgHubJump === 'function' && !window._sgHubPainting) {
+    return sgHubJump({ view: 'time', day });
+  }
   SG_HOME_MONTH = sgYm(day);
   const back = `<button class="back" onclick="location.hash='leo'">← レオへ</button>`;
   $('view').innerHTML = back + '<p>読み込み中…</p>';
   try {
-    const evs = await sgLoad(day, day, 'day', day);
-    let care = {};
-    if (!(typeof DEMO !== 'undefined' && DEMO)) {
-      try {
-        const cc = await sb('leo_child_care?select=child,note');
-        care = Object.fromEntries((cc || []).filter(x => x.note).map(x => [sgNk(x.child), x.note]));
-      } catch (e) { /* 配慮が読めなくても予定は出す */ }
-    }
-    const me = typeof myName === 'function' ? await myName().catch(() => '') : '';
-    const canEdit = sgCanEditCal(me);
-    if (!canEdit || (SG_EDIT && SG_EDIT.day !== day)) sgClearEdit();
-    let form = '';
-    if (canEdit && SG_EDIT && SG_EDIT.day === day && typeof calForm === 'function') {
-      const row = SG_EDIT.id === 'new'
-        ? { day, kind: '利用', kids: [], start_time: SG_EDIT.start || '' }
-        : (evs.find(x => String(x.id) === String(SG_EDIT.id)) || { day, kind: '利用', kids: [] });
-      if (typeof CAL !== 'undefined') { CAL.edit = SG_EDIT.id; CAL.d = day; CAL.row = row.id ? row : null; }
-      window.sgCalReturn = () => {
-        const backDay = (typeof CAL !== 'undefined' && CAL.d) || day;
-        sgClearEdit();
-        renderSgDay(backDay);
-      };
-      const names = evs.flatMap(e => [e.child, ...(e.kids || [])]).filter(Boolean);
-      const staffs = evs.map(e => e.staff).filter(Boolean);
-      const staffPick = [...new Set([...staffs, ...(typeof leoDriverNames === 'function' ? await leoDriverNames().catch(() => []) : [])])];
-      form = calForm(row, [...new Set(names)].sort(), typeof leoPickerNames === 'function' ? leoPickerNames(staffPick) : staffPick);
-    }
-    $('view').innerHTML = back + form + sgDayHtml(day, evs, care, { me: me || '', mine: SG_MINE, canEdit });
-    if (form) { const box = document.querySelector('#cf_day'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'start' }); }
+    const b = await sgDayBundle(day, { mine: SG_MINE, embed: false });
+    $('view').innerHTML = back + b.form + b.html;
+    if (b.form) { const box = document.querySelector('#cf_day'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'start' }); }
     sgArmNow();
   } catch (e) { $('view').innerHTML = back + `<p>${sgEsc(e.message)}</p>`; }
 }
@@ -573,7 +587,12 @@ function sgPlaceNow() {
     el.style.top = ((now - start) * px / 60) + 'px';
   });
 }
-window.sgOpenDay = d => { if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return; SG_HOME_MONTH = sgYm(d); location.hash = 'leo/day/' + d; };
+window.sgOpenDay = d => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+  SG_HOME_MONTH = sgYm(d);
+  if (typeof sgHubJump === 'function') return sgHubJump({ view: 'time', day: d });
+  location.hash = 'leo/day/' + d;
+};
 window.sgOpenMonth = d => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return;
   SG_HOME_MONTH = sgYm(d);
@@ -589,7 +608,8 @@ window.sgThisMonth = () => { SG_HOME_MONTH = sgYm(sgTodayJst()); leoHomeCal(); }
 window.sgShiftDay = (d, n) => sgOpenDay(sgAdd(d, n));
 window.sgToggleMine = () => {
   SG_MINE = !SG_MINE;
-  const m = decodeURIComponent(location.hash || '').match(/leo\/day\/(\d{4}-\d{2}-\d{2})/);
+  if (typeof sgHubSetWho === 'function') return sgHubSetWho(SG_MINE ? 'mine' : 'all');
+  const m = decodeURIComponent(location.hash || '').match(/leo\/(?:day|sougei)\/(\d{4}-\d{2}-\d{2})/);
   if (m) renderSgDay(m[1]);
 };
 function sgCanEditCal(me) {
@@ -612,13 +632,15 @@ function sgClearEdit() {
 function sgStartEdit(day, id, start) {
   SG_EDIT = { day, id, start: start || '' };
   window.SG_EDIT = SG_EDIT;
+  if (typeof sgHubJump === 'function' && !window._sgHubPainting) return sgHubJump({ view: 'time', day });
   renderSgDay(day);
 }
 window.sgEditNew = day => { if (/^\d{4}-\d{2}-\d{2}$/.test(day)) sgStartEdit(day, 'new', ''); };
 window.sgEvOpen = id => {
-  const m = decodeURIComponent(location.hash || '').match(/leo\/day\/(\d{4}-\d{2}-\d{2})/);
-  if (!m || id == null || id === '') return;
-  sgStartEdit(m[1], id, '');
+  const m = decodeURIComponent(location.hash || '').match(/leo\/(?:day|sougei)\/(\d{4}-\d{2}-\d{2})/);
+  const day = (m && m[1]) || (typeof sgHubDay === 'function' ? sgHubDay() : '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || id == null || id === '') return;
+  sgStartEdit(day, id, '');
 };
 window.sgEditSlot = (day, ev) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
@@ -637,12 +659,14 @@ window.sgEditSlot = (day, ev) => {
 window.sgOpenCal = d => {
   sgClearEdit();
   if (typeof CAL !== 'undefined') { CAL.d = d; CAL.mode = 'day'; CAL.edit = null; CAL.row = null; }
+  if (typeof sgHubJump === 'function') return sgHubJump({ view: 'child', day: d });
   location.hash = 'leo/cal';
 };
 window.sgCanEditCal = sgCanEditCal;
 window.sgClearEdit = sgClearEdit;
 window.leoHomeCal = leoHomeCal;
 window.renderSgDay = renderSgDay;
+window.sgDayBundle = sgDayBundle;
 window.sgMonthHtml = sgMonthHtml;
 window.sgDayHtml = sgDayHtml;
 window.sgLayout = sgLayout;

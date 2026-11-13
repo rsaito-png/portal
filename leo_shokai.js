@@ -291,7 +291,7 @@ LEO_VIEWS.shokai = async function () {
     <p>${skSt(inKata, '型表に入っています（' + kataDays.join('・') + '）', '型表にまだ入っていません')}</p>
     <p>${skSt(hasYotei, '今日以降の利用予定が ' + evDays.length + ' 日あります（次は ' + evDays[0] + '）', '今日以降の利用予定はまだありません')}</p>
     <p class="note">型表を保存すると、今日以降の予定に反映します。</p>
-    <p><a href="#leo/kata">送迎 型表を開く</a>　<a href="#leo/cal">利用・送迎予定を開く</a></p></div>`;
+    <p><a href="#leo/kata">送迎 型表を開く</a>　<a href="#leo/sougei">送迎を開く</a></p></div>`;
 
   const docRows = docTypes.map(t => {
     const logsT = partyLogs.filter(l => l.doc_code === t.code);

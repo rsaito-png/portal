@@ -463,7 +463,7 @@ function leoChildWrite(kid, name) {
   o.first_date = o.first_date || null; o.kinyu_no = o.kinyu_no ? +o.kinyu_no : null; o.gensan = o.gensan ? [o.gensan] : []; o.guardian_kana = o.guardian_kana || null; o.kana = o.kana || null; o.mushouka = !!o.mushouka;
   return { row: o };
 }
-function leoSougeiMineHtml(me, rows, events, care) {
+function leoSougeiMineHtml(me, rows, events, care, opts) {
   const CARE = care || {};
   const logged = new Set((rows || []).map(r => r.day));
   const days = [...logged].sort();
@@ -480,9 +480,11 @@ function leoSougeiMineHtml(me, rows, events, care) {
   }).join('');
   const extra = (events || []).filter(e => !logged.has(e.day) && !leoCalHidden(e) && (e.kind === '迎え' || e.kind === '送り') && same(e.staff, me));
   const extraHtml = extra.length ? `<p class="note">${LEO_PLAN_NOTE}</p>${leoPlanTableHtml(extra, CARE)}` : '';
-  return `<h3>${PLABEL[PERIOD]}の送迎（${esc(me) || '名前未登録'} さんの担当）</h3>${periodTabs('sougei')}${demoNote()}${body}${extraHtml}<p class="note"><a href="#leo/sougeiall">みんなの送迎を見る</a></p>`;
+  const inner = `${body}${extraHtml}`;
+  if (opts && opts.embedded) return inner || '<p>担当はありません。</p>';
+  return `<h3>${PLABEL[PERIOD]}の送迎（${esc(me) || '名前未登録'} さんの担当）</h3>${periodTabs('sougei')}${demoNote()}${inner}<p class="note"><a href="#leo/sougeiall">みんなの送迎を見る</a></p>`;
 }
-function leoSougeiAllHtml(rows, events, care) {
+function leoSougeiAllHtml(rows, events, care, opts) {
   const CARE = care || {};
   const logged = new Set((rows || []).map(r => r.day));
   const plan = (events || []).filter(e => !logged.has(e.day) && !leoCalHidden(e));
@@ -505,6 +507,7 @@ function leoSougeiAllHtml(rows, events, care) {
   }).join('');
   const planHtml = plan.length ? `<p class="note">${LEO_PLAN_NOTE}</p>${leoPlanTableHtml(plan, CARE)}` : '';
   const body = (nikkiHtml || planHtml) ? `${nikkiHtml}${planHtml}` : noTab();
+  if (opts && opts.embedded) return body || '<p>この日の送迎はありません。</p>';
   return `<h3>${PLABEL[PERIOD]}の送迎（全員分）</h3>${periodTabs('sougeiall')}${demoNote()}<p><a href="#leo/sougei">自分の担当だけ見る</a>　<small>変更はカレンダー・日誌が正です。赤字は未確定（担当者か車が空）。</small></p>${body}`;
 }
 const ldNN = s => String(s || '').replace(/\s/g, '');
@@ -1637,6 +1640,7 @@ async function saveNikki() {
 }
 
 async function renderLeoView(name) {
+  if (typeof sgHubTakeView === 'function' && sgHubTakeView(name)) return;
   document.body.classList.toggle('wide-sheet', name === 'kata' || name === 'master' || name === 'kinmu' || name === 'monitoring');
   document.body.classList.toggle('jd-on', name === 'jidobetsu');
   $('view').innerHTML = '<p>読み込み中…</p>';
@@ -3259,7 +3263,8 @@ function leoEditing() {
   let hash = '';
   try { hash = decodeURIComponent((typeof location !== 'undefined' && location.hash) || ''); } catch (e) { hash = (typeof location !== 'undefined' && location.hash) || ''; }
   if (typeof window !== 'undefined' && window.SG_EDIT && /^#leo\/day\//.test(hash)) return true;
-  if (typeof CAL !== 'undefined' && CAL && CAL.edit && (hash === '#leo/cal' || /^#leo\/day\//.test(hash))) return true;
+  if (typeof CAL !== 'undefined' && CAL && CAL.edit && (hash === '#leo/cal' || hash === '#leo/sougei' || /^#leo\/(day|sougei)\//.test(hash))) return true;
+  if (typeof window !== 'undefined' && window.SG_EDIT && (hash === '#leo/sougei' || /^#leo\/sougei\//.test(hash))) return true;
   return false;
 }
 function leoViewsLive() {
@@ -3272,7 +3277,7 @@ function leoViewsLive() {
     if (typeof leoHomeStatus === 'function') leoHomeStatus();
     return;
   }
-  // 送迎（#leo/sougei・#leo/sougeiall・#leo/day/…）と児童の利用・送迎予定（#leo/cal）は自動で読み込み直さない（齊藤さん指定 2026-11-13）
+  // 送迎（#leo/sougei・#leo/sougeiall・#leo/day/…）と児童の利用・送迎予定（#leo/cal）は自動で読み込み直さない（齊藤さん指定 2026-11-13）。統合した送迎画面も同じ。
   const view = hash.match(/^#leo\/kids$/);
   if (view && typeof renderLeoView === 'function') renderLeoView(view[1]);
 }

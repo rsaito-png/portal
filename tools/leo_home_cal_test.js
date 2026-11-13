@@ -306,13 +306,13 @@ assert.strictEqual(sandbox.sgCanEditCal(''), false);
 const cfg = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
 assert.ok(!/'事務': \[[^\]]*児童の利用・送迎予定/.test(cfg), '事務の仕事から予定タイルを外す');
 assert.ok(!/中村友香担当', \[[^\]]*児童の利用・送迎予定/.test(cfg), '中村の欄から予定タイルを外す');
-assert.ok(cfg.includes("'#leo/cal'"), '予定の画面は残す');
+assert.ok(cfg.includes("'#leo/sougei'"), '送迎の画面は残す');
 const cfgWin = {};
 vm.runInNewContext(cfg, { window: cfgWin });
 const leo = cfgWin.PORTAL_CONFIG.offices.find(o => o.id === 'leo');
 assert.strictEqual(leo.groups.map(g => g[1]).join('|'), '現場|事務・計画');
-assert.strictEqual(leo.groups[0][2].join('|'), ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'].join('|'));
-assert.strictEqual(leo.groups[1][2].join('|'), ['アセスメント', '利用契約書・重要事項説明書', '個別支援計画（管理）', 'モニタリングシート（相談員へ渡す印刷）', '個別支援計画 管理表', '利用者情報（児童ごと）', '来月の利用予定（保護者に聞く）', '利用料実費請求', '国保連請求', '保護者の実績確認', 'サービス提供実績記録表', '勤務実績及び利用者の実績表', '直した所', '請求の印（欠席時対応・子育てサポート）', 'サービス提供実績記録', '実績記録（請求元）'].join('|'));
+assert.strictEqual(leo.groups[0][2].join('|'), '送迎');
+assert.strictEqual(leo.groups[1][2].join('|'), ['初回利用', 'アセスメント', '利用契約書・重要事項説明書', '個別支援計画（管理）', 'モニタリングシート（相談員へ渡す印刷）', '個別支援計画 管理表', '利用者情報（児童ごと）', '来月の利用予定（保護者に聞く）', '利用料実費請求', '国保連請求', '保護者の実績確認', 'サービス提供実績記録表', '勤務実績及び利用者の実績表', '直した所', '請求の印（欠席時対応・子育てサポート）', 'サービス提供実績記録', '実績記録（請求元）'].join('|'));
 assert.strictEqual(leo.mine['現場支援員'].join('|'), '');
 assert.strictEqual(leo.mine['児発管'].join('|'), '');
 assert.strictEqual(leo.mine['事務'].join('|'), '利用者情報（児童ごと）');
@@ -373,7 +373,7 @@ function renderLeoHome(role, duty, name) {
     assert.ok(body.includes(label) || daily.includes(label), role + '/' + duty + ' ' + label);
   });
   assert.ok(!daily.includes('#leo/monitoring') && !daily.includes('モニタリングシート'), role + '/' + duty + ' の毎日やるにモニタリングは置かない');
-  assert.ok(body.includes('送迎') && body.includes('href="#leo/kata"'), role + '/' + duty + ' に送迎を直置き');
+  assert.ok(body.includes('送迎') && body.includes('href="#leo/sougei"'), role + '/' + duty + ' に送迎を直置き');
 });
 const field = renderLeoHome('職員', '現場支援員');
 assert.ok(!field.includes('中村友香担当') && !field.includes('事務担当') && !field.includes('がする'), '現場職員に担当欄を出さない');
@@ -421,7 +421,7 @@ assert.ok(mgr.includes('中村友香担当') && mgr.includes('事務担当'), '�
   assert.ok(leo.who[1][1].includes('利用料実費請求'), '事務担当の欄には残す');
   assert.ok(leo.groups[1][2].includes('利用料実費請求'), '事務・計画にも残す');
   assert.ok(!leo.who[1][1].includes('配置表・型表・管理表・送迎の配慮の入力'), '事務担当の欄には置かない');
-  assert.ok(leo.groups[0][2].includes('送迎 型表'), '現場の型表はそのまま');
+  assert.ok(leo.groups[0][2].includes('送迎'), '現場の送迎はそのまま');
   const jim = renderLeoHome('事務', '管理者');
   const jsec = jim.slice(jim.indexOf('事務担当'));
   assert.ok(jsec.includes('上限額管理') && jsec.includes('href="#leo/jogan"'), '事務担当に上限額管理');
@@ -431,13 +431,13 @@ assert.ok(mgr.includes('中村友香担当') && mgr.includes('事務担当'), '�
 {
   const sbx = { DUTY: '現場支援員', ROLE: '職員', IS_CHAIR: false, MY_FULL_NAME: '', canManage: () => false, canLeoHomeTodo: () => false, leo };
   vm.runInNewContext(homeSrc + "\nthis.out = groupList(leo).find(g => g.label === '現場').tiles.map(t => t[1] + ' ' + t[2]).join('|');", sbx);
-  assert.ok(sbx.out.includes('送迎 型表 #leo/kata'), '現場に型表の編集');
+  assert.ok(sbx.out.includes('送迎 #leo/sougei'), '現場に送迎（型表は画面内のタブ）');
   assert.ok(!sbx.out.includes('日誌（見る・直す）'), '日誌は現場グループから外して毎日やるへ');
   assert.ok(!sbx.out.includes('#leo/master'), '児発管の入力は現場に出さない');
   assert.ok(!sbx.out.includes('gl:g4'), '元シートは現場に出さない');
 }
-assert.strictEqual(leo.tiles.find(t => t[1] === '送迎 型表')[2], '#leo/kata');
-assert.ok(!leo.tiles.find(t => t[1] === '送迎 型表')[3].includes('見るだけ'));
+assert.strictEqual(leo.tiles.find(t => t[1] === '送迎')[2], '#leo/sougei');
+assert.ok((leo.tiles.find(t => t[1] === '送迎')[3] || '').includes('型表'));
 assert.ok(leo.tiles.find(t => t[1] === '日誌（見る・直す）')[3].includes('ポータルで直す'));
 assert.ok(leo.tiles.find(t => t[2] === 'gl:g4')[1].includes('参考・旧'));
 

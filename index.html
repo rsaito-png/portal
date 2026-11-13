@@ -261,14 +261,14 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261113shokai"></script>
+<script src="config.js?v=20261113sougeihub"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261111staff"></script>
 <script src="leo_meal.js?v=20261112sheet"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261113calfix"></script>
+<script src="leo.js?v=20261113sougeihub"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261112sat"></script>
 <script src="kin_visit.js?v=20261112quota"></script>
@@ -291,14 +291,15 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="chair.js?v=20261110org"></script>
 <script src="contact_inbox.js?v=20261113eigyo"></script>
 <script src="mgr.js?v=202610161458"></script>
-<script src="leo_yotei.js?v=20261026calov"></script>
-<script src="leo_cal.js?v=20261113bar"></script>
-<script src="leo_home_cal.js?v=20261113mom2"></script>
+<script src="leo_yotei.js?v=20261113sougeihub"></script>
+<script src="leo_cal.js?v=20261113sougeihub"></script>
+<script src="leo_home_cal.js?v=20261113sougeihub"></script>
+<script src="leo_sougei_hub.js?v=20261113sougeihub"></script>
 <script src="leo_shift.js?v=20261111staff"></script>
 <script src="leo_jippi.js?v=20261103mealfee"></script>
 <script src="leo_jogan.js?v=20261106hand"></script>
 <script src="leo_jissekihyo.js?v=20261112rec"></script>
-<script src="uketsuke.js?v=20261110me2"></script>
+<script src="uketsuke.js?v=20261113sougeihub"></script>
 <script src="esign.js?v=20261030home1"></script>
 <script src="rydeen.js?v=20261102wage"></script>
 <script src="chamu.js?v=20261106manual"></script>
@@ -319,7 +320,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="leo_jukyusha.js?v=20261106edit"></script>
 <script src="leo_assess.js?v=20261106link"></script>
 <script src="leo_contract.js?v=20261111contract"></script>
-<script src="leo_shokai.js?v=20261113line"></script>
+<script src="leo_shokai.js?v=20261113sougeihub"></script>
 <script src="shogu_logic.js?v=20261030flow"></script>
 <script src="shogu.js?v=20261030proto"></script>
 <script>
@@ -442,7 +443,7 @@ function leoHomeBody(o) {
   const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`);
   // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。モニタリングシートは事務・計画（個別支援計画の隣）。
   // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
-  const sougeiNames = ['今日の送迎（自分の担当）', 'みんなの送迎', '児童の利用・送迎予定', '送迎 型表'];
+  const sougeiNames = ['送迎'];
   const sougei = sougeiNames.flatMap(n => vis.filter(t => t[1] === n));
   const sougeiRow = sougei.length ? `<h3 class="nx">送迎</h3><div class="grid">${sougei.map(tileBig).join('')}</div>` : '';
   // 実態のシフト（#leo/shift）。職員はみな見られる。直すのは管理者（画面の中で切り替え）。勤務実績表とは別
@@ -501,9 +502,11 @@ async function render() {
   if (typeof loadDuty === 'function') await loadDuty();
   if (typeof ncCleanup === 'function') ncCleanup();
   const route = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
-  if (!(route[0] === 'leo' && route[1] === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(route[2] || '')) && typeof sgClearEdit === 'function') sgClearEdit();
+  const hubDay = route[0] === 'leo' && ((route[1] === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(route[2] || '')) || route[1] === 'sougei' || route[1] === 'sougeiall' || route[1] === 'cal' || route[1] === 'kata');
+  if (!hubDay && typeof sgClearEdit === 'function') sgClearEdit();
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
-  if (!(id === 'leo' && (sub === 'kata' || sub === 'master' || sub === 'kinmu' || sub === 'monitoring')) && !(id === 'chamu' && sub === 'kinmu')) document.body.classList.remove('wide-sheet');
+  if (!(id === 'leo' && (sub === 'kata' || sub === 'master' || sub === 'kinmu' || sub === 'monitoring' || sub === 'sougei')) && !(id === 'chamu' && sub === 'kinmu')) document.body.classList.remove('wide-sheet');
+  if (id === 'leo' && typeof sgHubOpen === 'function' && (sub === 'sougei' || sub === 'sougeiall' || sub === 'cal' || sub === 'kata' || (sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '')))) return sgHubOpen(sub, sub2);
   if (id === 'leo' && sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '') && typeof renderSgDay === 'function') return renderSgDay(sub2);
   if (id === 'leo' && sub === 'contract' && typeof renderLeoContract === 'function') { LC.link = null; return renderLeoContract(); }
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);

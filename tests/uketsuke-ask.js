@@ -62,6 +62,8 @@ assert.deepStrictEqual(ukSubjectOf('#leo/userinfo', { UI: { sel: '児童A' } }, 
 assert.strictEqual(ukSubjectOf('#leo/userinfo', { UI: { sel: null } }, root({})), null);
 assert.deepStrictEqual(ukSubjectOf('#leo/cal', {}, root({ ids: { cf_child: { value: '児童C' } } })), { kind: '児童', name: '児童C' });
 assert.strictEqual(ukSubjectOf('#leo/cal', {}, root({})), null);
+assert.deepStrictEqual(ukSubjectOf('#leo/sougei', {}, root({ ids: { cf_child: { value: '児童C' } } })), { kind: '児童', name: '児童C' });
+assert.deepStrictEqual(ukSubjectOf('#leo/sougei/2026-11-16', {}, root({ ids: { cf_child: { value: '児童C' } } })), { kind: '児童', name: '児童C' });
 
 const editor = { querySelector: sel => sel === 'h3' ? h3('児童A　第2期') : null };
 assert.deepStrictEqual(ukSubjectOf('#leo/plan', {}, root({ ids: { plan_editor: editor } })), { kind: '児童', name: '児童A' });

@@ -522,15 +522,23 @@ LEO_VIEWS.cal = async function () {
   const [sa, sbb] = calRange();
   const shData = typeof shiftLoad === 'function' ? await shiftLoad(sa, sbb) : null;
   window.CAL_SHIFT = shData;
-  const evs = typeof shiftMergeEvents === 'function' ? shiftMergeEvents(filterEventsByLeft(shown, LEFT), shData, sa, sbb) : filterEventsByLeft(shown, LEFT);
+  let evs = typeof shiftMergeEvents === 'function' ? shiftMergeEvents(filterEventsByLeft(shown, LEFT), shData, sa, sbb) : filterEventsByLeft(shown, LEFT);
+  const embed = typeof window !== 'undefined' && window.SG_HUB_EMBED;
+  if (embed && typeof SG_HUB !== 'undefined' && SG_HUB.who === 'mine' && typeof sgHubFilterChildEvs === 'function') {
+    const me = typeof myName === 'function' ? await myName().catch(() => '') : '';
+    evs = sgHubFilterChildEvs(evs, me);
+  }
   const care = Object.fromEntries(cc.filter(x => x.note).map(x => [nk(x.child), x.note]));
   if (DEMO) care[nk('児童B')] = '（見本）車に乗るとき、抱っこが必要です。';
   const [a, b] = calRange(), btn = (m, l) => `<button onclick="calMode('${m}')"${CAL.mode === m ? ' style="font-weight:bold;background:#e8833a;color:#fff"' : ''}>${l}</button>`;
   const head = CAL.mode === 'day' ? calMd(a) : CAL.mode === 'week' ? `${calMd(a)}〜${calMd(b)}` : `${+CAL.d.slice(0, 4)}年${+CAL.d.slice(5, 7)}月`;
   const body = CAL.mode === 'day' ? calDay(a, evs, care) : CAL.mode === 'week' ? calWeek(evs, care) : calMonth(evs);
-  let h = `<h3>児童の利用・送迎予定</h3>${demoNote()}<p class="calbar"><style>.calbar button{width:auto !important;display:inline-block !important;padding:6px 12px !important;margin:2px !important}</style>${btn('day', '日')}${btn('week', '週')}${btn('month', '月')}
+  const add = canManage() ? ` <button onclick="calEdit('new')">＋追加</button>` : '';
+  let h = embed
+    ? `${demoNote()}<p class="calbar"><style>.calbar button{width:auto !important;display:inline-block !important;padding:6px 12px !important;margin:2px !important}</style>${btn('day', '日')}${btn('week', '週')}${btn('month', '月')}${add}</p>`
+    : `<h3>児童の利用・送迎予定</h3>${demoNote()}<p class="calbar"><style>.calbar button{width:auto !important;display:inline-block !important;padding:6px 12px !important;margin:2px !important}</style>${btn('day', '日')}${btn('week', '週')}${btn('month', '月')}
     <button onclick="calMove(-1)">◀</button><button onclick="CAL.d=today();renderLeoView('cal')">今日</button><button onclick="calMove(1)">▶</button>
-    ${canManage() ? ` <button onclick="calEdit('new')">＋追加</button>` : ''}</p>`;
+    ${add}</p>`;
   if (CAL.edit) {
     const e = CAL.edit === 'new' ? { day: CAL.d, kind: '利用', kids: [] } : evs.find(x => x.id === CAL.edit) || {};
     CAL.row = e.id ? e : null;
@@ -538,8 +546,9 @@ LEO_VIEWS.cal = async function () {
     h += calForm(e, [...new Set(ch.map(x => (typeof canonChildName === 'function' ? canonChildName(x.name) : x.name)).filter(Boolean))].sort(), typeof leoPickerNames === 'function' ? leoPickerNames(staffPick) : staffPick);
   }
   h += calWrap(`<p class="calv-date">${head}</p><p class="calv-hint">横軸は時刻、色の棒は児童の利用時間です。棒をタップすると、迎え（☆）・送り（★）の担当・時刻・場所と、保護者の備考が出ます。</p>${body}`);
-  h += `<p style="margin-top:12px;font-size:13px;line-height:1.5">関連：<a href="#leo/sougei">自分の送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/userinfo">利用者情報</a>' : ''}</p>
+  if (!embed) h += `<p style="margin-top:12px;font-size:13px;line-height:1.5">関連：<a href="#leo/sougei">送迎</a>・<a href="#leo/kata">送迎 型表</a>・<a href="#leo/haichi">職員配置表</a>${canManage() ? '・<a href="#leo/userinfo">利用者情報</a>' : ''}</p>
     <p style="font-size:13px;color:#666;line-height:1.5">退所日の翌日以降の児童は、この画面には出しません（予定の記録は消していません。型表の保存も不要です）。</p>
     <p style="font-size:13px;color:#666;line-height:1.5">11/1まではGoogleカレンダーの予定を毎時取り込んでいます（Google側は変えません）。ポータルで直した予定はそのまま残ります。</p>`;
+  else h += `<p style="font-size:13px;color:#666;line-height:1.5">退所日の翌日以降の児童は、この画面には出しません（予定の記録は消していません。型表の保存も不要です）。</p>`;
   return h;
 };
