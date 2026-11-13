@@ -3272,9 +3272,8 @@ function leoViewsLive() {
     if (typeof leoHomeStatus === 'function') leoHomeStatus();
     return;
   }
-  const day = hash.match(/^#leo\/day\/(\d{4}-\d{2}-\d{2})$/);
-  if (day) { if (typeof renderSgDay === 'function') renderSgDay(day[1]); return; }
-  const view = hash.match(/^#leo\/(sougei|sougeiall|kids|cal)$/);
+  // 送迎（#leo/sougei・#leo/sougeiall・#leo/day/…）は自動で読み込み直さない（齊藤さん指定 2026-11-13）
+  const view = hash.match(/^#leo\/(kids|cal)$/);
   if (view && typeof renderLeoView === 'function') renderLeoView(view[1]);
 }
 function leoCalWatch() {
