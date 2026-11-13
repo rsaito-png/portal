@@ -5,8 +5,8 @@
 // ⑧個別支援計画（原案・本案・同意）
 // ③の署名済みは leo_doc_log（保護者署名・紙で署名済み）。公式LINEの友だち追加は判定データが無いので手でチェック。
 const SK_LINE_QR = 'img/leo-line-qr.png';
-// 友だち追加URLは、齊藤さんから届いたQRを読めたときだけ入れる。推測では入れない。
-const SK_LINE_ADD_URL = '';
+// 友だち追加URLは齊藤さんから届いたQR（img/leo-line-qr.png）を読み取ったもの。
+const SK_LINE_ADD_URL = 'https://lin.ee/so8IzX4';
 const SK_LINE_KEY = 'leo_shokai_line';
 
 function skCompact(n) { return String(n || '').replace(/\s+/g, ''); }
