@@ -2900,7 +2900,7 @@ async function renderMasterEditor(view) {
       ${kids.map(k => `<label>${esc(k)}${leftDone(LEFT, k, tday) ? '（退所）' : leftOnOf(LEFT, k) ? '（退所予定）' : ''}<input class="care" data-c="${esc(k)}" value="${esc(C2[k] || '')}"></label>`).join('')}<button onclick="saveCare()">保存</button><div id="ms_msg"></div>`;
   }
   const own = DEMO ? [] : await sb(`leo_master?kind=eq.${MASTER_KIND}&order=row_no`), g = DEMO ? DEMO_DATA[MASTER_KIND] : (await sb(`leo_sheet?kind=eq.${MASTER_KIND}&order=row_no`)).map(r => r.data);
-  const rows = own.length ? own.map(r => r.data) : g;
+  const rows = kataSortRows(own.length ? own.map(r => r.data) : g, MASTER_KIND);
   let cols = [...new Set([...g, ...rows].flatMap(Object.keys))];
   if (MASTER_KIND === 'kata') cols = orderKataCols(cols);
   // 型表の迎え担当・送り担当はプルダウン（在籍のレオ職員＋保護者）。祥先生は「横田　祥」に統一（2026-11-10）
@@ -2986,8 +2986,14 @@ function addMasterRow() {
   t.parentNode.appendChild(row);
   fitMasterSheet();
 }
+// 型表は曜日（月→日）ごとにまとめる。同じ曜日の中は今の並びのまま。曜日が空・不明の行はうしろ（2026-11-13）
+function kataSortRows(rows, kind) {
+  if (kind !== 'kata') return rows;
+  const rank = r => { const d = String((r || {})['曜日'] || '').trim().charAt(0); const i = d ? '月火水木金土日'.indexOf(d) : -1; return i < 0 ? 9 : i; };
+  return rows.map((r, i) => [r, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(x => x[0]);
+}
 async function saveMaster() {
-  const rows = [...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input, select.kata-drv')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length);
+  const rows = kataSortRows([...document.querySelectorAll('tr.mrow')].map(tr => Object.fromEntries([...tr.querySelectorAll('input, select.kata-drv')].map(i => [i.dataset.c, i.value.trim()]).filter(([, v]) => v))).filter(o => Object.keys(o).length), MASTER_KIND);
   const m = $('ms_msg'); if (DEMO) { m.textContent = `見本モードなので保存しません（${rows.length}行）。`; return; }
   try { await sb(`leo_master?kind=eq.${MASTER_KIND}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     if (rows.length) await sb('leo_master', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows.map((d, i) => ({ kind: MASTER_KIND, row_no: i + 1, data: d }))) });
@@ -2998,11 +3004,17 @@ async function saveMaster() {
         if (r && Array.isArray(r.registered) && r.registered.length) bits.push('利用者情報へ登録：' + r.registered.map(x => x.name || x).join('、') + '。');
         if (r && Array.isArray(r.renamed) && r.renamed.length) bits.push('名前を揃えました：' + r.renamed.map(x => `${x.from}→${x.to}`).join('、') + '。');
         if (r && Array.isArray(r.unregistered) && r.unregistered.length) bits.push('まだ利用者情報にも契約にもいないため、予定に入れていません：' + r.unregistered.join('、') + '。先に利用者情報へ登録してください。');
-        m.textContent = bits.join('');
+        await kataRerender(bits.join(''));
         return;
       } catch (e) { /* トリガーでも追従する。失敗しても型表自体は保存済み */ }
     }
+    if (MASTER_KIND === 'kata') return kataRerender(`${rows.length}行を保存しました。`);
     m.textContent = `${rows.length}行を保存しました。`; } catch (e) { m.textContent = e.message; }
+}
+// 保存後に画面を描き直して、曜日ごとの並びを見せる（メッセージは残す）
+async function kataRerender(msg) {
+  try { if (typeof renderLeoView === 'function' && document.body.classList.contains('wide-sheet')) await renderLeoView(/kata/.test(location.hash) ? 'kata' : 'master'); } catch (e) {}
+  const m = $('ms_msg'); if (m) m.textContent = msg;
 }
 async function saveCare() {
   const rows = [...document.querySelectorAll('input.care')].map(i => ({ child: i.dataset.c, note: i.value.trim() || null })), m = $('ms_msg');
