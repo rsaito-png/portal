@@ -44,7 +44,8 @@ function contactCard(row, sales) {
     <p style="white-space:pre-wrap;margin:0">${esc(row.body || '')}</p>
     ${row.sales_reason ? `<p class="note" style="margin:8px 0 0">${esc(row.sales_reason)}</p>` : ''}
     <p style="margin:8px 0 0">${!row.read_at && id ? `<button type="button" class="back" onclick="contactMarkRead('${id}')">既読にする</button> ` : ''}
-    ${sales && id ? `<button type="button" onclick="contactRestore('${id}')">通常の受信に戻す</button>` : ''}</p>
+    ${sales && id ? `<button type="button" onclick="contactRestore('${id}')">通常の受信に戻す</button> ` : ''}
+    ${id ? `<button type="button" class="back" onclick="contactHide('${id}')">消す</button>` : ''}</p>
   </article>`;
 }
 
@@ -89,6 +90,14 @@ async function contactMarkRead(id) {
 async function contactRestore(id) {
   if (!contactSafeId(id)) return;
   await contactRpc('site_contact_restore', { p_id: id });
+  await contactInboxMount();
+  await contactBadge();
+}
+
+async function contactHide(id) {
+  if (!contactSafeId(id)) return;
+  if (!window.confirm('この問い合わせを一覧から消しますか？')) return;
+  await contactRpc('site_contact_hide', { p_id: id });
   await contactInboxMount();
   await contactBadge();
 }

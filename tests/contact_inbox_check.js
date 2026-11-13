@@ -17,6 +17,9 @@ assert.ok(src.includes('site_contact_unread_count'));
 assert.ok(src.includes("p_lane: 'normal'"));
 assert.ok(src.includes("p_lane: 'sales'"));
 assert.ok(src.includes('site_contact_restore'));
+assert.ok(src.includes('site_contact_hide'));
+assert.ok(src.includes('この問い合わせを一覧から消しますか？'));
+assert.ok(src.includes('>消す</button>'));
 assert.ok(!/method:\s*'DELETE'|DELETE/.test(src));
 assert.ok(!/resend|mailto:|uketsuke_submit/i.test(src));
 assert.ok(chair.includes("href=\"#chair/inquiries\""));
@@ -25,10 +28,10 @@ assert.ok(chair.includes('id="contact_inbox"'));
 assert.ok(chair.includes('contactInboxMount()'));
 assert.ok(chair.includes("/rest/v1/rpc/is_chair"));
 assert.ok(chair.includes('このページは会長だけが見られます。'));
-assert.ok(index.includes('contact_inbox.js?v=20261108inq'));
-assert.ok(index.includes('chair.js?v=20261110order'));
-assert.ok(index.indexOf('chair.js?v=20261110order') < index.indexOf('contact_inbox.js?v=20261108inq'));
-assert.ok(index.indexOf('contact_inbox.js?v=20261108inq') < index.indexOf('mgr.js?'));
+assert.ok(index.includes('contact_inbox.js?v=20261113hide'));
+assert.ok(index.includes('chair.js?v=20261110org'));
+assert.ok(index.indexOf('chair.js?v=20261110org') < index.indexOf('contact_inbox.js?v=20261113hide'));
+assert.ok(index.indexOf('contact_inbox.js?v=20261113hide') < index.indexOf('mgr.js?'));
 assert.ok(index.includes("if (id === 'chair') return renderChair();"));
 assert.ok(/askButton:\s*false/.test(config), '受付の有効化はここでは変えない');
 
@@ -85,6 +88,7 @@ global.localStorage = { getItem: () => JSON.stringify({ token: 'owner-token' }) 
 global.location = { hash: '#chair/inquiries' };
 global.esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 global.document = { getElementById: id => registry.get(id) || null };
+global.window = { confirm: () => false };
 global.fetch = async (url, opt) => {
   assert.strictEqual(opt.method, 'POST');
   assert.ok(String(url).startsWith('https://example.test/rest/v1/rpc/site_contact_'));
@@ -131,6 +135,9 @@ assert.ok(html.includes(`contactRestore('${salesId}')`));
 assert.ok(!html.includes(`contactRestore('${normalId}')`));
 assert.ok(html.includes(`contactMarkRead('${normalId}')`));
 assert.ok(!html.includes(`contactMarkRead('${referralId}')`));
+assert.ok(html.includes(`contactHide('${normalId}')`));
+assert.ok(html.includes(`contactHide('${referralId}')`));
+assert.ok(html.includes(`contactHide('${salesId}')`));
 assert.ok(html.includes('営業の隔離 （1件）'));
 assert.strictEqual(document.getElementById('contact_inbox_h').scrolled, true);
 assert.ok(!calls.some(c => c.url.endsWith('site_contact_restore') || c.url.endsWith('site_contact_mark_read')));
@@ -163,6 +170,7 @@ await contactInboxMount();
 await contactBadge();
 await contactMarkRead(salesId);
 await contactRestore(salesId);
+await contactHide(salesId);
 assert.strictEqual(calls.length, beforeAnon, 'トークンが無いときは送らない');
 assert.strictEqual(box.innerHTML, '');
 
@@ -170,12 +178,14 @@ DEMO = true;
 localStorage.getItem = () => JSON.stringify({ token: 'owner-token' });
 const beforeDemo = calls.length;
 await contactRestore(salesId);
+await contactHide(salesId);
 assert.strictEqual(calls.length, beforeDemo, '見本モードは送らない');
 
 DEMO = false;
 await contactMarkRead("');alert(1)");
 await contactRestore('not-a-uuid');
-assert.ok(!calls.some(c => c.url.endsWith('site_contact_mark_read') || c.url.endsWith('site_contact_restore')));
+await contactHide('not-a-uuid');
+assert.ok(!calls.some(c => c.url.endsWith('site_contact_mark_read') || c.url.endsWith('site_contact_restore') || c.url.endsWith('site_contact_hide')));
 
 queue.length = 0;
 queue.push({ data: true }, { data: true }, { data: normalRows }, { data: [] }, { data: true }, { data: 1 });
@@ -183,6 +193,35 @@ await contactRestore(salesId);
 const restore = calls.filter(c => c.url.endsWith('site_contact_restore'));
 assert.strictEqual(restore.length, 1);
 assert.deepStrictEqual(restore[0].body, { p_id: salesId });
+
+assert.ok(box.innerHTML.includes(`contactHide('${normalId}')`));
+assert.ok(box.innerHTML.includes(`contactHide('${salesId}')`) || box.innerHTML.includes('消す'));
+
+let confirmed = false;
+global.window = { confirm(msg) { confirmed = true; assert.strictEqual(msg, 'この問い合わせを一覧から消しますか？'); return false; } };
+const beforeCancel = calls.length;
+await contactHide(normalId);
+assert.strictEqual(confirmed, true);
+assert.strictEqual(calls.length, beforeCancel, 'キャンセルしたら送らない');
+
+confirmed = false;
+window.confirm = (msg) => { confirmed = true; assert.strictEqual(msg, 'この問い合わせを一覧から消しますか？'); return true; };
+queue.length = 0;
+queue.push({ data: { id: normalId } }, { data: true }, { data: [normalRows[1]] }, { data: salesRows }, { data: true }, { data: 0 });
+await contactHide(normalId);
+assert.strictEqual(confirmed, true);
+const hidden = calls.filter(c => c.url.endsWith('site_contact_hide'));
+assert.strictEqual(hidden.length, 1);
+assert.deepStrictEqual(hidden[0].body, { p_id: normalId });
+assert.ok(!box.innerHTML.includes('利用について相談したい'));
+assert.ok(box.innerHTML.includes('紹介連携の相談です'));
+
+const sql = fs.readFileSync(path.join(root, 'supabase/site_contact_hide.sql'), 'utf8');
+assert.ok(sql.includes('add column if not exists hidden_at timestamptz'));
+assert.ok(sql.includes('hidden_at is null'));
+assert.ok(sql.includes('function site_contact.hide'));
+assert.ok(sql.includes('function public.site_contact_hide'));
+assert.ok(!/delete from site_contact\.inquiries/i.test(sql));
 
 console.log('contact_inbox_check ok', calls.length, 'mocked rpc calls');
 })().catch((e) => { console.error(e); process.exit(1); });
