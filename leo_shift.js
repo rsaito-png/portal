@@ -18,6 +18,7 @@
   // 表示名：日誌の名前（全角空白）を半角空白にして出す。例「横田　祥」→「横田 祥」
   const showName = s => String(s ?? '').replace(/\u3000/g, ' ').trim();
 
+  const isHol = day => { const H = typeof JP_HOLIDAYS !== 'undefined' ? JP_HOLIDAYS : g.JP_HOLIDAYS; return !!(H && typeof H.has === 'function' && H.has(String(day).slice(0, 10))); };
   // その日の1人分。state: base=いつもの型（緑）／change=時間変更（黄）／off=休み（赤）／add=型なしの追加（黄）／none=入らない
   function shiftCell(data, day, uid) {
     const d = data || {};
@@ -28,6 +29,8 @@
     const adds = rows.filter(x => x.kind === '追加');
     const baseSlots = base.map(b => ({ start: b.start, end: b.end }));
     if (off) return { state: 'off', slots: [], base: baseSlots, note: off.note || '', rows };
+    // 祝日（カレンダーの赤い日）は、いつもの型では入らない。その日だけの時間変更・追加は出す（ゆか先生指定 2026-11-13）
+    if (isHol(day) && !chg && !adds.length) return { state: 'hol', slots: [], base: baseSlots, note: '', rows };
     let slots = chg ? [{ start: chg.start, end: chg.end }] : baseSlots.slice();
     adds.forEach(a => slots.push({ start: a.start, end: a.end, add: true, id: a.id }));
     slots.sort((a, b) => min(a.start) - min(b.start));
@@ -178,7 +181,7 @@
   .sh-t th.today{background:#e9b949;color:#2b2a33}
   .sh-t td.nm{text-align:left;font-weight:700;white-space:nowrap}
   .sh-c{display:block;border-radius:10px;padding:6px 4px;min-height:22px;line-height:1.35}
-  .sh-c.base{background:#e4f1e7;color:#1f4d33}.sh-c.change,.sh-c.add{background:#fdeebd;color:#5c4400}.sh-c.off{background:#f6d9d3;color:#a3281a;font-weight:700}.sh-c.none{color:#bbb}
+  .sh-c.base{background:#e4f1e7;color:#1f4d33}.sh-c.change,.sh-c.add{background:#fdeebd;color:#5c4400}.sh-c.off{background:#f6d9d3;color:#a3281a;font-weight:700}.sh-c.none{color:#bbb}.sh-c.hol{color:#d32f2f}
   .sh-c small{display:block;font-size:11px;opacity:.85}
   .sh-ed .sh-c,.sh-ed .sh-nmb{cursor:pointer}.sh-ed .sh-c:hover{outline:2px solid #e9b949}
   .sh-nmb{text-decoration:underline dotted;text-underline-offset:3px}
@@ -197,7 +200,7 @@
   @media (max-width:700px){.sh-wrap{display:none}.sh-cards{display:block}}
   </style>`;
   function cellHtml(c, day, uid, ed) {
-    const txt = c.state === 'off' ? '休み' : c.slots.length ? c.slots.map(span).join('<br>') : '—';
+    const txt = c.state === 'off' ? '休み' : c.state === 'hol' ? '祝日' : c.slots.length ? c.slots.map(span).join('<br>') : '—';
     const sub = c.state === 'off' ? (c.note ? `<small>${esc(c.note)}</small>` : '') : c.state === 'change' || c.state === 'add' ? `<small>${c.state === 'add' ? '追加' : '時間変更'}${c.note ? '・' + esc(c.note) : ''}</small>` : '';
     const on = ed ? ` role="button" tabindex="0" onclick="shOpenDay('${day}','${uid}')"` : '';
     return `<span class="sh-c ${c.state}"${on}>${txt}${sub}</span>`;
@@ -215,7 +218,7 @@
     if (!data) return `<h3>シフト</h3><p class="note">シフトを読み込めませんでした。少し待ってから開き直してください。</p>`;
     const ed = !!data.can_edit;
     let days = [0, 1, 2, 3, 4].map(i => addDays(a, i));
-    [5, 6].forEach(i => { const d = addDays(a, i); if (shiftDay(data, d).some(c => c.state !== 'none')) days.push(d); });
+    [5, 6].forEach(i => { const d = addDays(a, i); if (shiftDay(data, d).some(c => c.state !== 'none' && c.state !== 'hol')) days.push(d); });
     const staff = data.staff || [];
     const fumi = staff.some(s => nz(s.name) === '中村文');
     const head = `<h3>シフト</h3>
@@ -223,7 +226,7 @@
     const table = `<div class="sh-wrap${ed ? ' sh-ed' : ''}"><table class="sh-t"><tr><th>職員</th>${days.map(d => `<th class="${d === t ? 'today' : ''}">${DOWS[dowOf(d)]} ${+d.slice(8, 10)}</th>`).join('')}</tr>
       ${staff.map(s => `<tr><td class="nm">${nameHtml(s, ed)}</td>${days.map(d => `<td>${cellHtml(shiftCell(data, d, s.user_id), d, s.user_id, ed)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${days.length + 1}">まだ誰も入っていません。</td></tr>`}</table></div>`;
     const cards = `<div class="sh-cards${ed ? ' sh-ed' : ''}">${days.map(d => {
-      const cs = shiftDay(data, d).filter(c => c.state !== 'none' || ed);
+      const cs = shiftDay(data, d).filter(c => (c.state !== 'none' && c.state !== 'hol') || ed);
       return `<div class="sh-card${d === t ? ' today' : ''}"><h4>${md(d)}${d === t ? '　今日' : ''}</h4>${cs.map(c => `<div class="sh-row">${nameHtml(c, ed)}${cellHtml(c, d, c.user_id, ed)}</div>`).join('') || '<p class="note" style="margin:0">入る人はいません。</p>'}</div>`;
     }).join('')}</div>`;
     const legend = `<p class="sh-lg"><span><i style="background:#cfe6d6"></i>いつもの型</span><span><i style="background:#f7dc85"></i>その日だけ時間変更・追加</span><span><i style="background:#eeb3a8"></i>その日だけ休み</span></p>`;
