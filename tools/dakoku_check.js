@@ -151,6 +151,11 @@ ok(rsql.includes('revoke all on public.dakoku_requests from public, anon, authen
   ok(new RegExp('revoke all on function public\\.' + fn + '\\([^)]*\\) from public, anon').test(rsql) && new RegExp('grant execute on function public\\.' + fn + '\\([^)]*\\) to authenticated').test(rsql), fn + ' grants');
 });
 ok(rsql.includes('dakoku_admin_can()') && rsql.includes("'本人申告（打刻漏れ）／' || decider || '承認：'") && rsql.includes("'YYYY-MM-DD HH24:MI:SS'") && rsql.includes("at time zone 'Asia/Tokyo'"), 'decide inserts JST punch with memo');
+ok(rsql.includes('dakoku_todo_assignee') && rsql.includes("is_chair") && rsql.includes("'rsaito@psr-seishinkai.org'"), 'todo assignee is chair then rsaito@');
+ok(rsql.includes("insert into public.staff_todo") && rsql.includes("'dakoku:req:'") && rsql.includes("'#dakoku'"), 'submit creates staff_todo for chair');
+ok(rsql.includes("t.source_key = 'dakoku:req:' || r.id and t.status <> 'done'"), 'decide closes matching staff_todo');
+ok(!rsql.includes('notify_enqueue') && !rsql.includes('script.google.com'), 'request path still no chat/Google');
+
 ok(rsql.includes("'request', coalesce(memo,'') like '本人申告%'") && sql.includes("'request', coalesce(memo,'') like '本人申告%'"), 'month returns request flag (both sql files)');
 ok(!rsql.includes('script.google.com') && !rsql.includes('gasUrl') && !lib_has_google(), 'no Google in request path');
 function lib_has_google() { const lib = fs.readFileSync(path.join(root, 'dakoku-lib.js'), 'utf8'); return lib.includes('script.google.com') || lib.includes('gasUrl'); }

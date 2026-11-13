@@ -1,5 +1,6 @@
 -- 打刻忘れ申告（#dakoku）。Supabase のみ（Google／GAS／シートは使わない）。
 -- 本人が申告 → 管理者（dakoku_admin_can）が承認すると dakoku_punches に入る。
+-- 申告が入ったら会長（is_chair、いなければ rsaito@）の staff_todo へ出す。メールやChatは出さない。
 -- テーブルは直接読めない・書けない（RLS有効・ポリシーなし・権限なし）。RPC 経由だけ。
 create table if not exists public.dakoku_requests (
   id bigint generated always as identity primary key,
@@ -26,6 +27,22 @@ create unique index if not exists dakoku_requests_one_pending on public.dakoku_r
 alter table public.dakoku_requests enable row level security;
 revoke all on public.dakoku_requests from public, anon, authenticated;
 
+
+-- 打刻忘れ申告のお知らせ先。会長（is_chair）だけ。総務・事務には出さない。
+create or replace function public.dakoku_todo_assignee()
+returns uuid
+language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select p.user_id from public.staff_profiles p
+      where p.active and p.is_chair
+      order by p.user_id limit 1),
+    (select u.id from auth.users u
+      where lower(u.email) = 'rsaito@psr-seishinkai.org'
+      limit 1)
+  );
+$$;
+revoke all on function public.dakoku_todo_assignee() from public, anon, authenticated;
+
 -- 本人が申告（ログインメール＝名簿メールの職員だけ。他人の分は出せない）
 create or replace function public.dakoku_request_submit(p_staff_id text, p_date text, p_kind text, p_time text, p_reason text)
 returns jsonb
@@ -39,6 +56,9 @@ declare
   v_reason text := btrim(coalesce(p_reason,''));
   day_txt text;
   new_id bigint;
+  who uuid;
+  v_title text;
+  v_key text;
 begin
   if auth.uid() is null or v_email = '' then raise exception 'ログインが必要です'; end if;
   select * into s from public.dakoku_staff where id = btrim(coalesce(p_staff_id,'')) and enabled;
@@ -75,6 +95,17 @@ begin
   insert into public.dakoku_requests (staff_id, staff_name, office, target_date, kind, req_time, reason, requested_by_email, created_by)
   values (s.id, s.name, s.office, d, p_kind, t, left(v_reason, 200), v_email, auth.uid())
   returning id into new_id;
+  who := public.dakoku_todo_assignee();
+  if who is not null then
+    v_key := 'dakoku:req:' || new_id;
+    v_title := left('打刻忘れの申告：' || s.name || '（' || s.office || '）'
+      || to_char(d, 'FMMM/FMDD') || ' ' || p_kind || ' ' || to_char(t, 'FMHH24:MI')
+      || '（' || left(v_reason, 80) || '）', 300);
+    if not exists (select 1 from public.staff_todo t where t.source_key = v_key and t.status <> 'done') then
+      insert into public.staff_todo (assignee, title, link, office, source_key, created_by)
+      values (who, v_title, '#dakoku', s.office, v_key, auth.uid());
+    end if;
+  end if;
   return jsonb_build_object('ok', true, 'id', new_id);
 end;
 $$;
@@ -141,6 +172,8 @@ begin
   decider := replace(decider, ' ', ''); decider := replace(decider, '　', '');
   if not coalesce(p_approve, false) then
     update public.dakoku_requests set status = 'rejected', decided_by = decider, decided_at = now(), decide_note = left(note, 200) where id = r.id;
+    update public.staff_todo t set status = 'done', note = left(coalesce(t.note || '／','') || '却下', 1000)
+      where t.source_key = 'dakoku:req:' || r.id and t.status <> 'done';
     return jsonb_build_object('ok', true, 'status', 'rejected');
   end if;
   at_jst := to_char(r.target_date + r.req_time, 'YYYY-MM-DD HH24:MI:SS');
@@ -150,6 +183,8 @@ begin
   if found then
     update public.dakoku_requests set status = 'approved', decided_by = decider, decided_at = now(),
       decide_note = left(coalesce(note || '／', '') || '同じ日の' || r.kind || 'が既にあるため追加せず', 200) where id = r.id;
+    update public.staff_todo t set status = 'done', note = left(coalesce(t.note || '／','') || '承認（記録は既にあるため追加せず）', 1000)
+      where t.source_key = 'dakoku:req:' || r.id and t.status <> 'done';
     return jsonb_build_object('ok', true, 'status', 'approved', 'skipped', true, 'punchId', null);
   end if;
   insert into public.dakoku_punches (punched_at, punched_at_jst, office, staff_id, staff_name, kind, lunch, email, memo, created_by)
@@ -157,6 +192,8 @@ begin
     left('本人申告（打刻漏れ）／' || decider || '承認：' || r.reason, 200), auth.uid())
   returning id into pid;
   update public.dakoku_requests set status = 'approved', decided_by = decider, decided_at = now(), decide_note = left(note, 200), punch_id = pid where id = r.id;
+  update public.staff_todo t set status = 'done', note = left(coalesce(t.note || '／','') || '承認して記録', 1000)
+    where t.source_key = 'dakoku:req:' || r.id and t.status <> 'done';
   return jsonb_build_object('ok', true, 'status', 'approved', 'skipped', false, 'punchId', pid, 'at', at_jst);
 end;
 $$;
@@ -219,5 +256,21 @@ revoke all on function public.dakoku_request_decide(bigint,boolean,text) from pu
 grant execute on function public.dakoku_request_submit(text,text,text,text,text) to authenticated;
 grant execute on function public.dakoku_request_list() to authenticated;
 grant execute on function public.dakoku_request_decide(bigint,boolean,text) to authenticated;
+
+
+-- 承認待ちの申告で、まだお知らせが出ていない分を会長の staff_todo に載せる（何度実行しても同じ）
+insert into public.staff_todo (assignee, title, link, office, source_key, created_by)
+select public.dakoku_todo_assignee(),
+  left('打刻忘れの申告：' || r.staff_name || '（' || r.office || '）'
+    || to_char(r.target_date, 'FMMM/FMDD') || ' ' || r.kind || ' ' || to_char(r.req_time, 'FMHH24:MI')
+    || '（' || left(r.reason, 80) || '）', 300),
+  '#dakoku', r.office, 'dakoku:req:' || r.id, r.created_by
+from public.dakoku_requests r
+where r.status = 'pending'
+  and public.dakoku_todo_assignee() is not null
+  and not exists (
+    select 1 from public.staff_todo t
+    where t.source_key = 'dakoku:req:' || r.id and t.status <> 'done'
+  );
 
 notify pgrst, 'reload schema';
