@@ -168,7 +168,7 @@ assert.ok(office.who[1][1].includes('サービス提供実績記録表'), '事�
 assert.strictEqual(office.who[1][1].filter(n => n === 'サービス提供実績記録').length, 0, '事務担当には同名の入口を置かない');
 assert.ok(read('index.html').includes('leo.js?v=20261112dayred'));
 assert.ok(read('index.html').includes('leo_meal.js?v=20261112sheet'));
-assert.ok(read('index.html').includes('pc-scale.js?v=20261112sheet'));
+assert.ok(read('index.html').includes('pc-scale.js?v=20261113kata'));
 assert.ok(read('index.html').includes('config.js?v=20261112rec'));
 assert.ok(leo.includes('>サービス提供実績記録</a>'), '実績記録の画面の上に入口');
 
