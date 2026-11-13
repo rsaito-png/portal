@@ -64,12 +64,12 @@ async function contactInboxMount() {
     const held = sales.ok && Array.isArray(sales.data) ? sales.data : [];
     const unread = rows.filter((item) => !item.read_at).length;
     const heldHtml = sales.ok
-      ? (held.length ? held.map((item) => contactCard(item, true)).join('') : '<p class="note">隔離中の営業はありません。</p>')
-      : '<p>営業の隔離を表示できません。</p>';
+      ? (held.length ? held.map((item) => contactCard(item, true)).join('') : '<p class="note">自動でよけた営業メールはありません。</p>')
+      : '<p>営業メールを表示できません。</p>';
     el.innerHTML = `<h3 class="nx" id="contact_inbox_h">ウェブサイトからの問い合わせ${unread ? '（未読 ' + unread + '）' : ''}</h3>
-    <p class="note">営業と判断したものは下の隔離に分けてあり、上の未読とトップの印には入りません。戻すとその場で通常の受信に戻ります。</p>
+    <p class="note">売り込みと判断したものは下の「営業メール」に自動でよけてあり、上の未読とトップの印には入りません。戻すとその場で通常の受信に戻ります。</p>
     ${rows.length ? rows.map((item) => contactCard(item, false)).join('') : '<p class="note">まだありません。</p>'}
-    <h3 class="nx">営業の隔離 ${held.length ? '（' + held.length + '件）' : ''}</h3>
+    <h3 class="nx">営業メール（自動でよけた分） ${held.length ? '（' + held.length + '件）' : ''}</h3>
     ${heldHtml}`;
     if (String(location.hash || '').indexOf('inquiries') >= 0) {
       const heading = document.getElementById('contact_inbox_h');

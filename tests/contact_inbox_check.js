@@ -138,7 +138,7 @@ assert.ok(!html.includes(`contactMarkRead('${referralId}')`));
 assert.ok(html.includes(`contactHide('${normalId}')`));
 assert.ok(html.includes(`contactHide('${referralId}')`));
 assert.ok(html.includes(`contactHide('${salesId}')`));
-assert.ok(html.includes('営業の隔離 （1件）'));
+assert.ok(html.includes('営業メール（自動でよけた分） （1件）'));
 assert.strictEqual(document.getElementById('contact_inbox_h').scrolled, true);
 assert.ok(!calls.some(c => c.url.endsWith('site_contact_restore') || c.url.endsWith('site_contact_mark_read')));
 
@@ -147,13 +147,13 @@ queue.length = 0;
 queue.push({ data: true }, { data: normalRows }, { data: [] });
 await contactInboxMount();
 assert.strictEqual(document.getElementById('contact_inbox_h').scrolled, false);
-assert.ok(box.innerHTML.includes('隔離中の営業はありません。'));
+assert.ok(box.innerHTML.includes('自動でよけた営業メールはありません。'));
 
 queue.length = 0;
 queue.push({ data: true }, { data: normalRows }, { ok: false, status: 500, data: { message: 'no' } });
 await contactInboxMount();
-assert.ok(box.innerHTML.includes('営業の隔離を表示できません。'));
-assert.ok(!box.innerHTML.includes('隔離中の営業はありません。'));
+assert.ok(box.innerHTML.includes('営業メールを表示できません。'));
+assert.ok(!box.innerHTML.includes('自動でよけた営業メールはありません。'));
 assert.ok(box.innerHTML.includes('利用について相談したい'));
 
 queue.length = 0;
