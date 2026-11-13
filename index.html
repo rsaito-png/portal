@@ -327,7 +327,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261113hol';
+  var BUILD = '20261113jimu';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -439,16 +439,19 @@ function leoHomeBody(o) {
     return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid">${tiles.map(tileBig).join('')}</div>` : '';
   }).join('');
   const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
-  const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}${g}`;
+  // 事務・計画のフォルダは「事務」の段でシフトの横に置く（ゆか先生指定 2026-11-13）
+  const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}`;
   const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`);
   // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。モニタリングシートは事務・計画（個別支援計画の隣）。
   // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
   const sougeiNames = ['送迎'];
   const sougei = sougeiNames.flatMap(n => vis.filter(t => t[1] === n));
-  const sougeiRow = sougei.length ? `<h3 class="nx">送迎</h3><div class="grid">${sougei.map(tileBig).join('')}</div>` : '';
+  // 送迎は「毎日やる」の中（LINE報告を書くの下）に置く（ゆか先生指定 2026-11-13）
+  const sougeiTiles = sougei.map(tileBig).join('');
   // 実態のシフト（#leo/shift）。職員はみな見られる。直すのは管理者（画面の中で切り替え）。勤務実績表とは別
   const shiftT = vis.filter(t => t[1] === 'シフト');
-  const shiftRow = shiftT.length ? `<div class="grid">${shiftT.map(tileBig).join('')}</div>` : '';
+  const jimu = shiftT.map(tileBig).join('') + g;
+  const shiftRow = jimu ? `<h3 class="nx">事務</h3><div class="grid">${jimu}</div>` : '';
   // 今日やること（児発管）はここ1か所だけ（担当者名の欄には重ねない）
   const todoT = o.todoTop ? vis.filter(t => t[1] === o.todoTop) : [];
   const todoRow = todoT.length ? `<div class="grid">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
@@ -456,8 +459,8 @@ function leoHomeBody(o) {
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
-    ${big('#leo/nikki', '📔', '日誌', '', '')}</div>
-    ${sougeiRow}
+    ${big('#leo/nikki', '📔', '日誌', '', '')}
+    ${sougeiTiles}</div>
     ${shiftRow}
     ${duty}
     ${who}${rt}`;
