@@ -293,7 +293,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="mgr.js?v=202610161458"></script>
 <script src="leo_yotei.js?v=20261113sougeihub"></script>
 <script src="leo_cal.js?v=20261113sougeihub"></script>
-<script src="leo_home_cal.js?v=20261113sougeihub"></script>
+<script src="leo_home_cal.js?v=20261113oldday"></script>
 <script src="leo_sougei_hub.js?v=20261113sougeihub"></script>
 <script src="leo_shift.js?v=20261111staff"></script>
 <script src="leo_jippi.js?v=20261103mealfee"></script>
@@ -327,7 +327,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261113mom2';
+  var BUILD = '20261113oldday';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -506,7 +506,8 @@ async function render() {
   if (!hubDay && typeof sgClearEdit === 'function') sgClearEdit();
   const [id, sub, sub2] = decodeURIComponent(location.hash.slice(1)).split('?')[0].split('/');
   if (!(id === 'leo' && (sub === 'kata' || sub === 'master' || sub === 'kinmu' || sub === 'monitoring' || sub === 'sougei')) && !(id === 'chamu' && sub === 'kinmu')) document.body.classList.remove('wide-sheet');
-  if (id === 'leo' && typeof sgHubOpen === 'function' && (sub === 'sougei' || sub === 'sougeiall' || sub === 'cal' || sub === 'kata' || (sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '')))) return sgHubOpen(sub, sub2);
+  // #leo/day/日付 は前の「日の予定表」のまま開く（ゆか先生指定 2026-11-13）
+  if (id === 'leo' && typeof sgHubOpen === 'function' && (sub === 'sougei' || sub === 'sougeiall' || sub === 'cal' || sub === 'kata')) return sgHubOpen(sub, sub2);
   if (id === 'leo' && sub === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(sub2 || '') && typeof renderSgDay === 'function') return renderSgDay(sub2);
   if (id === 'leo' && sub === 'contract' && typeof renderLeoContract === 'function') { LC.link = null; return renderLeoContract(); }
   if (id === 'leo' && LEO_VIEWS[sub]) return renderLeoView(sub);

@@ -546,7 +546,7 @@ async function sgDayBundle(day, opt) {
     window.sgCalReturn = () => {
       const backDay = (typeof CAL !== 'undefined' && CAL.d) || day;
       sgClearEdit();
-      if (typeof sgHubJump === 'function') sgHubJump({ view: 'time', day: backDay });
+      if (sgInHub() && typeof sgHubJump === 'function') sgHubJump({ view: 'time', day: backDay });
       else renderSgDay(backDay);
     };
     const names = evs.flatMap(e => [e.child, ...(e.kids || [])]).filter(Boolean);
@@ -559,9 +559,6 @@ async function sgDayBundle(day, opt) {
   return { form, html, evs, me, canEdit };
 }
 async function renderSgDay(day) {
-  if (typeof sgHubJump === 'function' && !window._sgHubPainting) {
-    return sgHubJump({ view: 'time', day });
-  }
   SG_HOME_MONTH = sgYm(day);
   const back = `<button class="back" onclick="location.hash='leo'">← レオへ</button>`;
   $('view').innerHTML = back + '<p>読み込み中…</p>';
@@ -587,10 +584,12 @@ function sgPlaceNow() {
     el.style.top = ((now - start) * px / 60) + 'px';
   });
 }
+// 送迎の画面（#leo/sougei）の中にいるときだけ、その画面の中で動かす。ホームのカレンダーからは前の「日の予定表」（#leo/day/日付）を開く。
+function sgInHub() { return typeof location !== 'undefined' && /^#leo\/(sougei|kata)/.test(location.hash || ''); }
 window.sgOpenDay = d => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
   SG_HOME_MONTH = sgYm(d);
-  if (typeof sgHubJump === 'function') return sgHubJump({ view: 'time', day: d });
+  if (sgInHub() && typeof sgHubJump === 'function') return sgHubJump({ view: 'time', day: d });
   location.hash = 'leo/day/' + d;
 };
 window.sgOpenMonth = d => {
@@ -608,7 +607,7 @@ window.sgThisMonth = () => { SG_HOME_MONTH = sgYm(sgTodayJst()); leoHomeCal(); }
 window.sgShiftDay = (d, n) => sgOpenDay(sgAdd(d, n));
 window.sgToggleMine = () => {
   SG_MINE = !SG_MINE;
-  if (typeof sgHubSetWho === 'function') return sgHubSetWho(SG_MINE ? 'mine' : 'all');
+  if (sgInHub() && typeof sgHubSetWho === 'function') return sgHubSetWho(SG_MINE ? 'mine' : 'all');
   const m = decodeURIComponent(location.hash || '').match(/leo\/(?:day|sougei)\/(\d{4}-\d{2}-\d{2})/);
   if (m) renderSgDay(m[1]);
 };
@@ -632,7 +631,7 @@ function sgClearEdit() {
 function sgStartEdit(day, id, start) {
   SG_EDIT = { day, id, start: start || '' };
   window.SG_EDIT = SG_EDIT;
-  if (typeof sgHubJump === 'function' && !window._sgHubPainting) return sgHubJump({ view: 'time', day });
+  if (sgInHub() && typeof sgHubJump === 'function' && !window._sgHubPainting) return sgHubJump({ view: 'time', day });
   renderSgDay(day);
 }
 window.sgEditNew = day => { if (/^\d{4}-\d{2}-\d{2}$/.test(day)) sgStartEdit(day, 'new', ''); };
