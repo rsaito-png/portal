@@ -274,6 +274,16 @@ function dkReqAdminHtml() {
   const done = (R.done || []).length ? '<p class="rqh">最近の処理</p>' + R.done.map(r => `<div class="rq">${dkEsc(r.name)} ${dkEsc(r.date.slice(5).replace('-', '/'))} ${dkEsc(r.kind)} ${dkEsc(r.time)}<span class="st ${dkEsc(r.status)}">${dkEsc(Dakoku.reqStatusLabel(r.status))}</span>${r.note ? '<br><small>' + dkEsc(r.note) + '</small>' : ''}</div>`).join('') : '';
   return `<div class="card req" id="dk_req_admin"><h4>打刻忘れ申告の承認（管理者） <small>${pend.length}件</small></h4>${R.adminMsg ? `<div class="${R.adminBad ? 'ng' : 'okb'}">${dkEsc(R.adminMsg)}</div>` : ''}${rows}${done}</div>`;
 }
+function dkIsApprovePage() {
+  try {
+    const parts = decodeURIComponent((location.hash || '').slice(1)).split('?')[0].split('/');
+    return parts[0] === 'dakoku' && parts[1] === 'approve';
+  } catch (e) { return false; }
+}
+function dkRefresh() {
+  if (dkIsApprovePage()) dkPaintApprove();
+  else dkPaint();
+}
 async function dkLoadRequests() {
   if (DK.sess.demo) return;
   try {
@@ -281,7 +291,7 @@ async function dkLoadRequests() {
     DK.req.mine = j.mine || []; DK.req.admin = !!j.admin; DK.req.pending = j.pending || []; DK.req.done = j.recentDone || []; DK.req.err = '';
   } catch (e) { DK.req.err = e.message || '申告の一覧を読めませんでした'; }
   DK.req.loaded = true;
-  dkPaint();
+  dkRefresh();
 }
 function dkReqFill(day, kind) {
   DK.req.open = true; DK.req.msg = '';
@@ -316,7 +326,7 @@ async function dkReqDecide(id, approve) {
   let note = null;
   if (approve) { if (!window.confirm(label + ' を承認して記録に入れますか？')) return; }
   else { note = window.prompt(label + ' を却下します。理由（任意）', ''); if (note === null) return; }
-  DK.req.busy = true; DK.req.adminMsg = ''; dkPaint();
+  DK.req.busy = true; DK.req.adminMsg = ''; dkRefresh();
   try {
     const j = await dkRpc({ action: 'req-decide', id: id, approve: approve, note: note });
     DK.req.adminMsg = approve ? (j.skipped ? '承認しました（同じ日の同じ打刻が既にあるため追加はしていません）' : '承認して記録しました（' + (j.at || '') + '）') : '却下しました';
@@ -324,7 +334,7 @@ async function dkReqDecide(id, approve) {
   } catch (e) { DK.req.adminMsg = e.message || '処理できませんでした'; DK.req.adminBad = true; }
   DK.req.busy = false;
   await dkLoadRequests();
-  dkLoadMonth();
+  if (!dkIsApprovePage()) dkLoadMonth();
 }
 async function dkLocate() {
   const seq = ++DK_LOC_SEQ;
@@ -481,4 +491,51 @@ async function renderDakoku() {
   if (needGps) dkLocate();
   if (offices.length) dkLoadMonth();
   dkLoadRequests();
+}
+
+// 管理者向け：打刻忘れ申告の承認だけ（#dakoku/approve）。通常の打刻画面は出さない。
+function dkPaintApprove() {
+  const root = document.getElementById('dk_approve_root');
+  if (!root) return;
+  const R = DK.req;
+  const msg = R.adminMsg ? `<div class="${R.adminBad ? 'ng' : 'okb'}">${dkEsc(R.adminMsg)}</div>` : '';
+  if (DK.sess.demo) {
+    root.innerHTML = '<p>承認待ちはありません。</p>';
+    return;
+  }
+  if (!R.loaded) {
+    root.innerHTML = '<p>読み込み中…</p>';
+    return;
+  }
+  if (R.err && !R.admin) {
+    root.innerHTML = `<div class="ng">${dkEsc(R.err)}</div>`;
+    return;
+  }
+  if (!R.admin) {
+    root.innerHTML = '<div class="ng">承認できるのは管理者だけです。</div>';
+    return;
+  }
+  const pend = R.pending || [];
+  if (!pend.length) {
+    root.innerHTML = msg + '<p>承認待ちはありません。</p>';
+    return;
+  }
+  const rows = pend.map(r => `<div class="rq"><b>${dkEsc(r.name)}</b> ${dkEsc((r.date || '').slice(5).replace('-', '/'))} ${dkEsc(r.kind)} <b>${dkEsc(r.time)}</b><br><small>理由：${dkEsc(r.reason)}</small>
+    <div class="btns"><button type="button" data-dk="req-ok" data-id="${dkEsc(r.id)}"${R.busy ? ' disabled' : ''}>承認</button><button type="button" class="ng2" data-dk="req-ng" data-id="${dkEsc(r.id)}"${R.busy ? ' disabled' : ''}>却下</button></div></div>`).join('');
+  root.innerHTML = msg + rows;
+  root.onclick = e => {
+    const b = e.target.closest('[data-dk]');
+    if (!b || b.disabled) return;
+    const act = b.getAttribute('data-dk');
+    if (act === 'req-ok') dkReqDecide(b.getAttribute('data-id'), true);
+    else if (act === 'req-ng') dkReqDecide(b.getAttribute('data-id'), false);
+  };
+}
+async function renderDakokuApprove() {
+  const back = '<button class="back" type="button" onclick="location.hash=\'\'">← ポータルへ</button>';
+  $('view').innerHTML = back + '<div class="dk" id="dk_approve_root"><p>読み込み中…</p></div>';
+  DK.sess = dkSession();
+  DK.req = { loaded: false, admin: false, mine: [], pending: [], done: [], err: '', busy: false, open: false, msg: '', bad: false, adminMsg: '', adminBad: false, form: { date: '', kind: '退勤', time: '', reason: '' } };
+  if (DK.sess.demo) { dkPaintApprove(); return; }
+  await dkLoadRequests();
 }

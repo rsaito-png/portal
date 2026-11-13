@@ -94,7 +94,8 @@ ok(sql.includes('dakoku_bootstrap') && sql.includes('dakoku_punch') && sql.inclu
 ok(sql.includes('dakoku_month') && sql.includes('自分の打刻だけ見られます'), 'sql month rpc + recent lock');
 ok(!sql.includes('dakoku_ingest_gas'), 'sql has no gas ingest');
 ok(sql.includes("'金斗雲', 'KINTOUN', null, null, null"), 'kintoun seeded without GPS');
-ok(index.includes('portalBuild') && index.includes('20261110req') && index.includes('dakoku.js?v=20261110req') && index.includes('dakoku-lib.js?v=20261110req') && index.includes('Cache-Control'), 'index cache-bust');
+ok(index.includes('portalBuild') && index.includes('dakoku.js?v=20261113approve') && index.includes('dakoku-lib.js?v=20261110req') && index.includes('Cache-Control'), 'index cache-bust');
+ok(index.includes("sub === 'approve'") && index.includes('renderDakokuApprove'), 'index routes #dakoku/approve');
 
 ok(Dakoku.currentMonthJst(new Date('2026-11-09T06:00:00Z')) === '2026-11', 'currentMonthJst');
 eq(Dakoku.shiftMonth('2026-11', -1), '2026-10', 'shift prev');
@@ -141,6 +142,12 @@ ok(Dakoku.reqStatusLabel('pending').indexOf('承認待ち') === 0 && Dakoku.reqS
 ok(ui.includes('rpc/dakoku_request_submit') && ui.includes('rpc/dakoku_request_list') && ui.includes('rpc/dakoku_request_decide'), 'ui request RPCs');
 ok(ui.includes('打刻忘れを申告') && ui.includes('Informar registro esquecido') && ui.includes('req-fill') && ui.includes('申告 / Declarado'), 'ui request form + prefill + label');
 ok(ui.includes('dkReqAdminHtml') && ui.includes('承認') && ui.includes('却下'), 'ui admin approve/reject');
+ok(ui.includes('function renderDakokuApprove') && ui.includes('function dkPaintApprove') && ui.includes('dkIsApprovePage'), 'approve-only screen');
+const ap = (ui.match(/function dkPaintApprove\([\s\S]*?\nasync function renderDakokuApprove/) || [])[0] || '';
+ok(ap && ap.includes('承認待ちはありません') && ap.includes('req-ok') && ap.includes('req-ng') && ap.includes('理由：'), 'approve shows list + decide buttons + empty line');
+ok(ap && !ap.includes('data-dk="in"') && !ap.includes('月別一覧') && !ap.includes('dk_lunch') && !ap.includes('req-open') && !ap.includes('位置を取り直す'), 'approve has no punch/month/form/geo');
+ok(ui.includes('function renderDakoku()') && ui.includes('押し忘れたら、下の「打刻忘れを申告」') && ui.includes('Registrar entrada/saída'), 'regular #dakoku screen unchanged');
+
 ok(!ui.includes('押し忘れを直す画面は、まだありません'), 'old no-fix note removed');
 const rsql = fs.readFileSync(path.join(root, 'supabase/dakoku_requests.sql'), 'utf8');
 ok(rsql.includes('create table if not exists public.dakoku_requests') && rsql.includes('alter table public.dakoku_requests enable row level security'), 'requests table + RLS');
@@ -152,7 +159,8 @@ ok(rsql.includes('revoke all on public.dakoku_requests from public, anon, authen
 });
 ok(rsql.includes('dakoku_admin_can()') && rsql.includes("'本人申告（打刻漏れ）／' || decider || '承認：'") && rsql.includes("'YYYY-MM-DD HH24:MI:SS'") && rsql.includes("at time zone 'Asia/Tokyo'"), 'decide inserts JST punch with memo');
 ok(rsql.includes('dakoku_todo_assignee') && rsql.includes("is_chair") && rsql.includes("'rsaito@psr-seishinkai.org'"), 'todo assignee is chair then rsaito@');
-ok(rsql.includes("insert into public.staff_todo") && rsql.includes("'dakoku:req:'") && rsql.includes("'#dakoku'"), 'submit creates staff_todo for chair');
+ok(rsql.includes("insert into public.staff_todo") && rsql.includes("'dakoku:req:'") && rsql.includes("'#dakoku/approve'"), 'submit creates staff_todo for chair');
+ok(!/values \(who, v_title, '#dakoku',/.test(rsql) && rsql.includes("set link = '#dakoku/approve'"), 'todo link is approve page, existing rows updated');
 ok(rsql.includes("t.source_key = 'dakoku:req:' || r.id and t.status <> 'done'"), 'decide closes matching staff_todo');
 ok(!rsql.includes('notify_enqueue') && !rsql.includes('script.google.com'), 'request path still no chat/Google');
 

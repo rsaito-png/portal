@@ -306,7 +306,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="leo_kinmu_lib.js?v=20261102f1400"></script>
 <script src="leo_kinmu.js?v=20261102read"></script>
 <script src="dakoku-lib.js?v=20261110req"></script>
-<script src="dakoku.js?v=20261110req"></script>
+<script src="dakoku.js?v=20261113approve"></script>
 <script src="dakoku_admin.js?v=20261106dakoku"></script>
 <script src="soudan.js?v=20261111chair"></script>
 <script src="staff.js?v=20261106staff"></script>
@@ -326,7 +326,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261112login2';
+  var BUILD = '20261113approve';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -527,6 +527,7 @@ async function render() {
   if (id === 'me' && sub === 'list' && sub2 && typeof renderMeDetail === 'function') return renderMeDetail(sub2);
   if (id === 'me' && sub === 'list' && typeof renderMeList === 'function') return renderMeList();
   if (id === 'me' && typeof renderMe === 'function') return renderMe();
+  if (id === 'dakoku' && sub === 'approve' && typeof renderDakokuApprove === 'function') return renderDakokuApprove();
   if (id === 'dakoku' && typeof renderDakoku === 'function') return renderDakoku();
   if (id === 'dakoku-settings' && typeof renderDakokuSettings === 'function') return renderDakokuSettings();
   if (id === 'rydeen' && sub && typeof renderRydeen === 'function') return renderRydeen(sub);

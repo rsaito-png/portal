@@ -103,7 +103,7 @@ begin
       || '（' || left(v_reason, 80) || '）', 300);
     if not exists (select 1 from public.staff_todo t where t.source_key = v_key and t.status <> 'done') then
       insert into public.staff_todo (assignee, title, link, office, source_key, created_by)
-      values (who, v_title, '#dakoku', s.office, v_key, auth.uid());
+      values (who, v_title, '#dakoku/approve', s.office, v_key, auth.uid());
     end if;
   end if;
   return jsonb_build_object('ok', true, 'id', new_id);
@@ -264,7 +264,7 @@ select public.dakoku_todo_assignee(),
   left('打刻忘れの申告：' || r.staff_name || '（' || r.office || '）'
     || to_char(r.target_date, 'FMMM/FMDD') || ' ' || r.kind || ' ' || to_char(r.req_time, 'FMHH24:MI')
     || '（' || left(r.reason, 80) || '）', 300),
-  '#dakoku', r.office, 'dakoku:req:' || r.id, r.created_by
+  '#dakoku/approve', r.office, 'dakoku:req:' || r.id, r.created_by
 from public.dakoku_requests r
 where r.status = 'pending'
   and public.dakoku_todo_assignee() is not null
@@ -272,5 +272,12 @@ where r.status = 'pending'
     select 1 from public.staff_todo t
     where t.source_key = 'dakoku:req:' || r.id and t.status <> 'done'
   );
+
+
+-- 既存のお知らせのリンクを承認専用画面へ直す（何度実行しても同じ）
+update public.staff_todo
+   set link = '#dakoku/approve'
+ where source_key like 'dakoku:%'
+   and coalesce(link, '') is distinct from '#dakoku/approve';
 
 notify pgrst, 'reload schema';
