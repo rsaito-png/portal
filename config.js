@@ -96,7 +96,7 @@ window.PORTAL_CONFIG = {
       ['☀️', '支援記録', '#nicchu/log', '日ごとの支援日誌（金斗雲の訪問記録とは別）'],
       ['🖨️', '実績記録票（印刷）', '#nicchu/jisseki', '第８号様式。紙に印刷して市役所へ郵送'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f',
-      pt: { '業務日誌': 'Diário de trabalho', '職員配置表': 'Escala de funcionários', '勤務実績及び利用者の実績表': 'Registro de trabalho e de usuários', 'サービス提供実績記録票': 'Registro de serviços prestados', '利用者': 'Usuários', '献立報告': 'Relatório do cardápio', 'ヒヤリハット週報': 'Relatório semanal de quase-acidentes', '国保連CSV': 'CSV de cobrança (Kokuhoren)', '個別支援計画': 'Plano de apoio individual', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
+      pt: { '業務日誌': 'Diário de trabalho', '職員配置表': 'Escala de funcionários', '勤務実績及び利用者の実績表': 'Registro de trabalho e de usuários', 'サービス提供実績記録票': 'Registro de serviços prestados', '利用者': 'Usuários', '献立報告': 'Relatório do cardápio', 'ヒヤリハット': 'Quase-acidentes', '国保連CSV': 'CSV de cobrança (Kokuhoren)', '個別支援計画': 'Plano de apoio individual', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
       tiles: [
       ['📓', '業務日誌', '#chamu/journal', '職員が入力するのはここだけ（実績記録票に自動で転記）'],
       ['👥', '職員配置表', '#chamu/haichi', '曜日ごとの常勤・非常勤（事務・茶夢管理者は追加・直す・削除可）'],
@@ -104,14 +104,14 @@ window.PORTAL_CONFIG = {
       ['✅', 'サービス提供実績記録票', '#chamu/records', '日誌から自動転記。署名をもらうとCSV対象'],
       ['👤', '利用者', '#chamu/users', '登録・受給者証・障害支援区分・送迎・食事'],
       ['🍱', '献立報告', '#chamu/kondate', '月の献立と食事提供。栄養士へメール（氏名は記号）'],
-      ['⚠️', 'ヒヤリハット週報', 'gl:g9', 'Bot依頼で作成'],
+      ['⚠️', 'ヒヤリハット', '#chamu/hiyari', '全員で読む・報告はここから'],
       ['💴', '国保連CSV', '#chamu/billing', '署名済みの実績から請求CSVを作る（送信はしない）', '', null, '事務'],
       ['📝', '個別支援計画', '', '未整備'],
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'kintoun', logo: 'img/logo/kintoun.webp', name: '金斗雲', kind: '居宅介護', color: '#c9a227',
       pt: { '打刻': 'Ponto', '記録記入': 'Preencher registro', 'スケジュール表': 'Escala / agenda', '今月の記録': 'Registros deste mês', '利用者・契約': 'Usuários e contratos', '請求情報': 'Informações de cobrança', 'その他': 'Outros',
-        '土日スケジュール': 'Agenda de sábado e domingo', '支給量と土曜の予定': 'Cota mensal e visitas de sábado', '利用契約書・重要事項説明書': 'Contrato e explicação de itens importantes', '居宅介護計画の同意': 'Consentimento do plano de cuidados', 'サービス提供実績記録表': 'Registro de serviços prestados', '記録・署名チェック': 'Verificar registros e assinaturas', '台帳': 'Livro de registros', 'アセスメント・会議録': 'Avaliação e atas de reunião', 'ヒヤリハット週報': 'Relatório semanal de quase-acidentes', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
+        '土日スケジュール': 'Agenda de sábado e domingo', '支給量と土曜の予定': 'Cota mensal e visitas de sábado', '利用契約書・重要事項説明書': 'Contrato e explicação de itens importantes', '居宅介護計画の同意': 'Consentimento do plano de cuidados', 'サービス提供実績記録表': 'Registro de serviços prestados', '記録・署名チェック': 'Verificar registros e assinaturas', '台帳': 'Livro de registros', 'アセスメント・会議録': 'Avaliação e atas de reunião', 'ヒヤリハット': 'Quase-acidentes', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
       // GAS・印刷タイルは外し、ポータル記録中心。請求CSV専用画面(#kintoun/seikyu)は未作成→実績記録表に請求用JSONあり
       groups: [
         ['📝', '記録記入', ['記録記入']],
@@ -119,7 +119,7 @@ window.PORTAL_CONFIG = {
         ['📋', '今月の記録', ['今月の記録']],
         ['👤', '利用者・契約', ['利用契約書・重要事項説明書', '居宅介護計画の同意']],
         ['💴', '請求情報', ['サービス提供実績記録表', '記録・署名チェック', '台帳']],
-        ['⚠️', 'ヒヤリハット週報', ['ヒヤリハット週報']] ],
+        ['⚠️', 'ヒヤリハット', ['ヒヤリハット']] ],
       tiles: [
       ['📝', '記録記入', '#kintoun/write', 'サービス実施記録。通常・同じ建物で連続・まとめて署名', 'main'],
       ['📅', '土日スケジュール', 'gl:g23', '居宅介護・日中一時の土日。別タブで開く', 'main'],
@@ -131,7 +131,7 @@ window.PORTAL_CONFIG = {
       ['✅', '記録・署名チェック', '#kintoun/check', '署名待ち・職員名空・二重記録・記録漏れ／署名リンク発行'],
       ['📒', '台帳', '#kintoun/ledger', '利用者・支給と利用・事業所設定・書類履歴'],
       ['🔍', 'アセスメント・会議録', '', 'Bot下書き（依頼制）・要確認'],
-      ['⚠️', 'ヒヤリハット週報', 'gl:g13', 'Bot依頼で作成'],
+      ['⚠️', 'ヒヤリハット', '#kintoun/hiyari', '全員で読む・報告はここから'],
       ['📨', '受付', '#uketsuke', 'ポータルから送られた依頼・報告'],
       ['📁', '書類', '', '準備中'] ] },
     { id: 'rydeen', logo: 'img/logo/rydeen.webp', name: 'RYDEEN', kind: 'B型', color: '#3a7bd5', tiles: [

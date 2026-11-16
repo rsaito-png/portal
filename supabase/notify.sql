@@ -27,9 +27,10 @@ revoke all on function public.notify_enqueue(text, text, text, text, text) from 
 create or replace function public.trg_notify_hiyari() returns trigger language plpgsql security definer set search_path = public as $$
 begin
   perform notify_enqueue('all', 'ヒヤリハット',
-    '⚠️ ヒヤリハットの新しい報告があります（' || to_char(coalesce(new.occurred_at, now()) at time zone 'Asia/Tokyo', 'MM/DD') ||
+    '⚠️ ヒヤリハットの新しい報告があります（' || coalesce(new.office, 'レオ') || '・' || to_char(coalesce(new.occurred_at, now()) at time zone 'Asia/Tokyo', 'MM/DD') ||
     coalesce('・' || nullif(new.place, ''), '') || '）。ポータルで読んでください。',
-    'https://rsaito-png.github.io/portal/#leo/hiyari', coalesce(new.office, 'レオ'));
+    'https://rsaito-png.github.io/portal/#' || case new.office when '金斗雲' then 'kintoun' when '茶夢' then 'chamu' else 'leo' end || '/hiyari',
+    coalesce(new.office, 'レオ'));  -- 事業所ごとの画面（hiyari_offices.sql）
   return new;
 end $$;
 drop trigger if exists notify_hiyari on hiyari;

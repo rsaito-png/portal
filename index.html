@@ -261,14 +261,14 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
 </main>
-<script src="config.js?v=20261113monwho"></script>
+<script src="config.js?v=20261116hiyari"></script>
 <script src="gl.js?v=202610201000"></script>
 <script src="leo_name.js?v=20261028"></script>
 <script src="leo_left.js?v=202610211700"></script>
 <script src="leo_driver.js?v=20261111staff"></script>
 <script src="leo_meal.js?v=20261112sheet"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261113sougeihub"></script>
+<script src="leo.js?v=20261116hiyari"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261112sat"></script>
 <script src="kin_visit.js?v=20261112quota"></script>
@@ -496,7 +496,7 @@ function groupView(o, k) {
   const g = groupList(o).find(x => String(x.k) === k); if (!g) return false;
   $('view').innerHTML = `<button class="back" onclick="location.hash='${o.id}'">← ${o.name}へ</button>
     <h3 style="color:${o.color};font-size:20px">${g.icon} ${ptL(o, g.label)}</h3><div class="grid">${g.tiles.map(t => tl(t, ptL(o, t[1], shortName(o, t[1])), '', o.color)).join('')}</div>`;
-  if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
+  if (typeof HY_OFFICES !== 'undefined' && HY_OFFICES[o.id]) hiyariUnread(o.id).then(n => { const a = document.querySelector(`a[href="#${o.id}/hiyari"]`); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
   return true;
 }
 
@@ -519,6 +519,7 @@ async function render() {
   if (id === 'suishodama' && sub === 'contract') { SC.link = null; return renderSuiContract(); }
   if (id === 'suishodama' && sub === 'basic') return renderSuiBasic();
   if (id === 'suishodama' && sub === 'plan') { SUI.planId = null; return renderSuiPlan(); }
+  if ((id === 'kintoun' || id === 'chamu') && sub === 'hiyari' && typeof renderHiyari === 'function') return renderHiyari(id);
   if (id === 'kintoun' && sub === 'ledger') return renderKinLedger();
   if (id === 'kintoun' && sub === 'contract') return renderKinContract();
   if (id === 'kintoun' && sub === 'print') return renderKinPrint();
@@ -565,7 +566,7 @@ async function render() {
       <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
       ${officeBody(o)}`;
     if (o.id === 'suishodama' && typeof siMonthly === 'function') { $('view').insertAdjacentHTML('beforeend', '<div id="sui_month"></div>'); siMonthly(); }
-    if (o.id === 'leo') hiyariUnread().then(n => { const a = document.querySelector('a[href="#leo/hiyari"]'); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
+    if (typeof HY_OFFICES !== 'undefined' && HY_OFFICES[o.id]) hiyariUnread(o.id).then(n => { const a = document.querySelector(`a[href="#${o.id}/hiyari"]`); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
     if (typeof chairMsgShow === 'function') chairMsgShow();
     return;
   }

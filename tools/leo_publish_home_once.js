@@ -55,7 +55,7 @@ const trackToRow = leoTrackToRow || localTrackToRow;
     sb('leo_staff_mon').catch(() => []),
     sb('leo_link_sends?order=sent_at').catch(() => []),
     sb('leo_child_info?select=name,left_on&left_on=not.is.null').catch(() => []),
-    sb('hiyari?select=id,status,office&status=eq.未確認').catch(() => []),
+    sb('hiyari?select=id,status,office&status=eq.未確認&office=eq.レオ').catch(() => []),
     sb('leo_edits?status=eq.衝突&select=id').catch(() => []),
     sb(`leo_confirm_links?month=eq.${mo}&select=token`).catch(() => []),
     sb('leo_confirmations?select=token').catch(() => []),

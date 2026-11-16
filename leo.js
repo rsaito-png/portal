@@ -924,60 +924,88 @@ async function loadDuty() {
 }
 
 // ===== ヒヤリハット（その事業所の全職員が見る・新着は未読表示） =====
+// 事業所ごと（#leo/hiyari・#kintoun/hiyari・#chamu/hiyari）。表は hiyari 1つで office で分ける。見える範囲は RLS（所属・兼務の事業所と事務）
+const HY_OFFICES = {
+  leo: { office: 'レオ', back: 'レオ', services: ['放課後等デイサービス', '児童発達支援'], who: '関わった児童（イニシャルでも可）', place: '例：送迎車、公園、室内' },
+  kintoun: { office: '金斗雲', back: '金斗雲', services: ['居宅介護（身体介護）', '居宅介護（家事援助）', '居宅介護（通院等介助）', '日中一時支援'], who: '関わった利用者', place: '例：利用者宅の浴室、玄関、通院先' },
+  chamu: { office: '茶夢', back: '茶夢', services: ['生活介護'], who: '関わった利用者', place: '例：送迎車、作業室、食堂' } };
 const HY_KINDS = ['転倒・転落・つまづき', '誤嚥・誤飲', '誤与薬', '無断外出', '行方不明', '暴力行為', '事業所の事故（火災等）', '交通事故', '権利侵害', 'その他'];
 const HY_DEMO = [
   { id: 2, occurred_at: new Date().toISOString(), place: '送迎車', kind: '交通事故', child_label: '児童A', what: '（見本）発進時に児童がシートベルトを外していた', response: '停車して付け直した', prevention: '', status: '未確認', manager_comment: '' },
   { id: 1, occurred_at: new Date(Date.now() - 864e5).toISOString(), place: '公園', kind: '転倒・転落・つまづき', child_label: '児童B', what: '（見本）走っていて段差でつまづいた。けがなし', response: '様子を見た', prevention: '公園では段差の場所を先に伝える', status: '確認済', manager_comment: '全員に共有済み' } ];
 const myUid = () => { try { return JSON.parse(atob(JSON.parse(localStorage.getItem('sess') || '{}').token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { return null; } };
-const hySeenKey = () => 'hiyari_seen_' + (JSON.parse(localStorage.getItem('sess') || '{}').email || 'demo');
-async function hyRows() { return DEMO ? HY_DEMO : sb('hiyari?order=id.desc&limit=100'); }
+const hyOid = oid => HY_OFFICES[oid] ? oid : 'leo';
+const hySeenKey = (oid = 'leo') => 'hiyari_seen_' + (hyOid(oid) === 'leo' ? '' : hyOid(oid) + '_') + (JSON.parse(localStorage.getItem('sess') || '{}').email || 'demo');
+async function hyRows(oid = 'leo') { return DEMO ? HY_DEMO : sb(`hiyari?office=eq.${encodeURIComponent(HY_OFFICES[hyOid(oid)].office)}&order=id.desc&limit=100`); }
 async function myReads() { return DEMO ? [] : (await sb('hiyari_reads?select=hiyari_id,user_id')); }
-async function hiyariUnread() { try { const [r, rd] = await Promise.all([hyRows(), myReads()]); if (DEMO) { const seen = +localStorage.getItem(hySeenKey()) || 0; return r.filter(x => x.id > seen).length; }
+async function hiyariUnread(oid = 'leo') { try { const [r, rd] = await Promise.all([hyRows(oid), myReads()]); if (DEMO) { const seen = +localStorage.getItem(hySeenKey(oid)) || 0; return r.filter(x => x.id > seen).length; }
   const me = myUid(); const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); return r.filter(x => !mine.has(x.id)).length; } catch (e) { return 0; } }
-LEO_VIEWS.hiyari = async function () {
-  const rows = await hyRows(); let seen = +localStorage.getItem(hySeenKey()) || 0, unread = null, readers = {}, staff = [];
-  if (DEMO) { if (rows.length) localStorage.setItem(hySeenKey(), Math.max(...rows.map(r => r.id))); }
+async function hyView(oid = 'leo') {
+  oid = hyOid(oid); const H = HY_OFFICES[oid];
+  const rows = await hyRows(oid); let seen = +localStorage.getItem(hySeenKey(oid)) || 0, unread = null, readers = {}, staff = [];
+  if (DEMO) { if (rows.length) localStorage.setItem(hySeenKey(oid), Math.max(...rows.map(r => r.id))); }
   else { const me = myUid(), rd = await myReads();
     const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); unread = new Set(rows.filter(r => !mine.has(r.id)).map(r => r.id));
     rd.forEach(x => (readers[x.hiyari_id] ||= new Set()).add(x.user_id));
     if (unread.size) sb('hiyari_reads?on_conflict=hiyari_id,user_id', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify([...unread].map(id => ({ hiyari_id: id }))) }).catch(() => {});
     if (canManage()) try {
-      staff = await sb('staff_profiles?office=eq.レオ&select=user_id,nikki_name');
-      if (typeof leoListedStaff === 'function') staff = (staff || []).filter(p => leoListedStaff(p && p.nikki_name));
+      if (oid === 'leo') {
+        staff = await sb('staff_profiles?office=eq.レオ&select=user_id,nikki_name');
+        if (typeof leoListedStaff === 'function') staff = (staff || []).filter(p => leoListedStaff(p && p.nikki_name));
+      } else {
+        const of = encodeURIComponent(H.office);
+        staff = ((await sb(`staff_profiles?active=eq.true&or=(office.eq.${of},extra_offices.cs.%7B${of}%7D)&select=user_id,nikki_name,full_name`)) || []).map(p => ({ user_id: p.user_id, nikki_name: p.nikki_name || p.full_name || '' }));
+      }
     } catch (e) { } }
   const isNew = r => unread ? unread.has(r.id) : r.id > seen;
   const notRead = r => staff.filter(p => !(readers[r.id] || new Set()).has(p.user_id)).map(p => p.nikki_name);
   const dt = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return `<h3>ヒヤリハット</h3>${demoNote()}<p class="note">ヒヤッとしたこと・ハッとしたこと、けがや事故につながりそうだったこと、再発防止のため全員で共有したいことを書いてください。すぐ直せて問題にならなかった軽微なことは書かなくて大丈夫です。全員で読んで、同じことを起こさないための記録です（責める記録ではありません）。</p>
+  return `<h3>ヒヤリハット（${esc(H.office)}）</h3>${demoNote()}<p class="note">ヒヤッとしたこと・ハッとしたこと、けがや事故につながりそうだったこと、再発防止のため全員で共有したいことを書いてください。すぐ直せて問題にならなかった軽微なことは書かなくて大丈夫です。全員で読んで、同じことを起こさないための記録です（責める記録ではありません）。</p>
     <details class="card" ${/new=1|from=line/.test(location.hash + location.search) ? "open" : ""}><summary><b>＋ 報告する</b></summary>
       <div class="rec"><label>いつ<input type="datetime-local" id="hy_at"></label>
-      <label>どこで<input id="hy_place" placeholder="例：送迎車、公園、室内"></label>
+      <label>どこで<input id="hy_place" placeholder="${esc(H.place)}"></label>
+      <label>サービス<select id="hy_service">${H.services.map(k => `<option>${esc(k)}</option>`).join('')}</select></label>
       <label>種類<select id="hy_kind">${HY_KINDS.map(k => `<option>${k}</option>`).join('')}</select></label>
-      <label>関わった児童（イニシャルでも可）<input id="hy_child" maxlength="40"></label>
+      <label>${esc(H.who)}<input id="hy_child" maxlength="40"></label>
       <label>何があったか（具体的に）<textarea id="hy_what" rows="4" placeholder="けがや事故につながりそうだったことを具体的に（軽微なことは不要）"></textarea></label>
       <label>その場でしたこと<textarea id="hy_resp" rows="2"></textarea></label>
       <label>次に起こさないための工夫（思いつけば）<textarea id="hy_prev" rows="2"></textarea></label>
-      <button onclick="hySave()">送る</button><div id="hy_msg"></div></div></details>
+      <button onclick="hySave('${oid}')">送る</button><div id="hy_msg"></div></div></details>
     ${rows.map(r => `<div class="card rec" style="${r.status === '未確認' ? 'border-left:6px solid #d33' : ''}">
-      ${isNew(r) ? '<span class="badge">新着</span> ' : ''}<b>${esc(r.kind)}</b>　${dt(r.occurred_at)}　${esc(r.place || '')}${r.child_label ? '　' + esc(r.child_label) : ''}
+      ${isNew(r) ? '<span class="badge">新着</span> ' : ''}<b>${esc(r.kind)}</b>　${dt(r.occurred_at)}　${esc(r.place || '')}${r.child_label ? '　' + esc(r.child_label) : ''}${r.service ? `　<span class="note">${esc(r.service)}</span>` : ''}
       <p style="white-space:pre-wrap">${esc(r.what)}</p>${r.response ? `<p class="note">その場の対応：${esc(r.response)}</p>` : ''}
       ${r.prevention ? `<p><b>再発防止：</b>${esc(r.prevention)}</p>` : ''}${r.manager_comment ? `<p class="note">確認者より：${esc(r.manager_comment)}</p>` : ''}
       <p class="note">${r.source === 'LINE' ? 'LINEから・' : ''}${r.status}${staff.length > 1 ? (notRead(r).length ? '　まだ読んでいない人：' + notRead(r).map(esc).join('、') : '　全員読みました') : ''}</p>
       ${canManage() && r.status === '未確認' ? `<label>再発防止の改善策<textarea id="hp_${r.id}" rows="2">${esc(r.prevention || '')}</textarea></label>
-        <label>ひとこと（全員に見えます）<input id="hc_${r.id}"></label><button onclick="hyCheck(${r.id})">確認した</button>` : ''}</div>`).join('') || '<p>まだ報告はありません。</p>'}`;
-};
-async function hySave() {
-  const v = id => document.getElementById(id).value.trim(), m = document.getElementById('hy_msg');
+        <label>ひとこと（全員に見えます）<input id="hc_${r.id}"></label><button onclick="hyCheck(${r.id}, '${oid}')">確認した</button>` : ''}</div>`).join('') || '<p>まだ報告はありません。</p>'}`;
+}
+LEO_VIEWS.hiyari = () => hyView('leo');
+// 金斗雲・茶夢のヒヤリハット（#kintoun/hiyari・#chamu/hiyari）
+async function renderHiyari(oid) {
+  oid = hyOid(oid);
+  if (oid === 'leo') return renderLeoView('hiyari');
+  const o = C.offices.find(x => x.id === oid);
+  if (o && typeof canOpenOffice === 'function' && !canOpenOffice(o)) { location.hash = ''; return; }
+  const back = `<button class="back" onclick="location.hash='${oid}'">← ${esc(HY_OFFICES[oid].back)}へ</button>`;
+  $('view').innerHTML = back + '<p>読み込み中…</p>';
+  await loadDuty();
+  try { $('view').innerHTML = back + await hyView(oid); }
+  catch (e) { $('view').innerHTML = back + `<div class="card"><p>${esc(e.message || e)}</p></div>`; }
+}
+const hyReload = oid => hyOid(oid) === 'leo' ? renderLeoView('hiyari') : renderHiyari(oid);
+async function hySave(oid = 'leo') {
+  oid = hyOid(oid);
+  const v = id => (document.getElementById(id) || { value: '' }).value.trim(), m = document.getElementById('hy_msg');
   if (!v('hy_at') || !v('hy_what')) { m.textContent = '「いつ」と「何があったか」は必ず書いてください。'; return; }
   if (DEMO) { m.textContent = '見本モードなので保存しません。'; return; }
-  try { await sb('hiyari', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ occurred_at: new Date(v('hy_at')).toISOString(), place: v('hy_place'), kind: v('hy_kind'), child_label: v('hy_child'), what: v('hy_what'), response: v('hy_resp'), prevention: v('hy_prev'), service: '', source: /from=line/.test(location.hash + location.search) ? 'LINE' : 'ポータル' }) });
-    renderLeoView('hiyari'); } catch (e) { m.textContent = e.message; }
+  try { await sb('hiyari', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ office: HY_OFFICES[oid].office, occurred_at: new Date(v('hy_at')).toISOString(), place: v('hy_place'), kind: v('hy_kind'), child_label: v('hy_child'), what: v('hy_what'), response: v('hy_resp'), prevention: v('hy_prev'), service: v('hy_service'), source: /from=line/.test(location.hash + location.search) ? 'LINE' : 'ポータル' }) });
+    hyReload(oid); } catch (e) { m.textContent = e.message; }
 }
-async function hyCheck(id) {
+async function hyCheck(id, oid = 'leo') {
   if (DEMO) { alert('見本モードなので保存しません'); return; }
   const me = myUid();
   try { await sb(`hiyari?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: '確認済', prevention: document.getElementById('hp_' + id).value, manager_comment: document.getElementById('hc_' + id).value, checked_by: me, checked_at: new Date().toISOString() }) });
-    renderLeoView('hiyari'); } catch (e) { alert(e.message); }
+    hyReload(oid); } catch (e) { alert(e.message); }
 }
 
 // 今日やることの1行を、担当者別の依頼（staff_todo）の形にする。source_key で二重に出さない
