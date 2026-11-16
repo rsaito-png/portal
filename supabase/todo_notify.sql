@@ -11,10 +11,5 @@ begin
   perform notify_enqueue('all', '指示', '📌 ' || coalesce(nullif(n,''), 'ご担当') || 'さんに新しい指示があります。ポータルの「私への依頼」で確認してください。', 'https://rsaito-png.github.io/portal/#report', 'レオ');
   return new;
 end $$;
--- トリガーは既にあれば無効のままにする。DROP＋CREATE は再有効化になるのでしない。
-do $$
-begin
-  if exists (select 1 from pg_trigger where tgrelid = 'public.staff_todo'::regclass and tgname = 'notify_todo' and not tgisinternal) then
-    execute 'alter table public.staff_todo disable trigger notify_todo';
-  end if;
-end $$;
+-- 2026-11-16 齊藤さん指示「指示の通知も止めて」：トリガー自体を消す（誤って有効化されないように）。ポータルの「私への依頼」はそのまま
+drop trigger if exists notify_todo on public.staff_todo;

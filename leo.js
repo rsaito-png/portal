@@ -936,7 +936,9 @@ const HY_DEMO = [
 const myUid = () => { try { return JSON.parse(atob(JSON.parse(localStorage.getItem('sess') || '{}').token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { return null; } };
 const hyOid = oid => HY_OFFICES[oid] ? oid : 'leo';
 const hySeenKey = (oid = 'leo') => 'hiyari_seen_' + (hyOid(oid) === 'leo' ? '' : hyOid(oid) + '_') + (JSON.parse(localStorage.getItem('sess') || '{}').email || 'demo');
-async function hyRows(oid = 'leo') { return DEMO ? HY_DEMO : sb(`hiyari?office=eq.${encodeURIComponent(HY_OFFICES[hyOid(oid)].office)}&order=id.desc&limit=100`); }
+// 事業所の画面には、その事業所の分だけ（会長・事務は RLS では全事業所見えるので、問い合わせと受け取った行の両方で絞る）
+async function hyRows(oid = 'leo') { if (DEMO) return HY_DEMO; const of = HY_OFFICES[hyOid(oid)].office;
+  return ((await sb(`hiyari?office=eq.${encodeURIComponent(of)}&order=id.desc&limit=100`)) || []).filter(r => r.office === of); }
 async function myReads() { return DEMO ? [] : (await sb('hiyari_reads?select=hiyari_id,user_id')); }
 async function hiyariUnread(oid = 'leo') { try { const [r, rd] = await Promise.all([hyRows(oid), myReads()]); if (DEMO) { const seen = +localStorage.getItem(hySeenKey(oid)) || 0; return r.filter(x => x.id > seen).length; }
   const me = myUid(); const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); return r.filter(x => !mine.has(x.id)).length; } catch (e) { return 0; } }
