@@ -140,7 +140,7 @@ assert.ok(!row1.includes('送り場所') && !row1.includes('開始'));
 const bar = nikkiHtml.slice(barAt, firstCard);
 for (const name of ['児童A', '児童B', '児童C', '児童D']) assert.ok(bar.includes(name), name + ' のボタン');
 assert.ok(bar.includes('nk-kid abs') && bar.includes('欠席'), '欠席の子は赤い印');
-assert.ok(bar.includes('data-nk-fill') && bar.includes('●'), '記入済みの印');
+assert.ok(bar.includes('data-nk-fill') && !bar.includes('●'), '記入済みの●は出さない');
 assert.ok(bar.includes('data-nk-dirty'), '未保存の印の場所');
 const opens = [...nikkiHtml.matchAll(/<div class="nk-child"[^>]*>/g)].map(m => m[0]);
 assert.strictEqual(opens.length, 4, '利用3人と欠席1人の欄が全部ある');

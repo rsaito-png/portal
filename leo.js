@@ -1429,7 +1429,7 @@ function leoNikkiKidBar(kids) {
   const btns = kids.map((k, i) => {
     const on = i === 0;
     const abs = k.kind === '欠席';
-    const fill = `<span class="nk-mark" data-nk-fill title="記入あり"${k.filled ? '' : ' hidden'}>●</span>`;
+    const fill = `<span class="nk-mark" data-nk-fill title="記入あり" hidden></span>`; // ●は出さない（れおさん指定 2026-11-16）
     return `<button type="button" class="nk-kid${on ? ' on' : ''}${abs ? ' abs' : ''}" role="tab" aria-selected="${on ? 'true' : 'false'}" data-nk-i="${i}" onclick="nikkiShowChild(${i})">${esc(k.child)}${abs ? '<small>欠席</small>' : ''}${fill}<span class="nk-mark" data-nk-dirty hidden title="未保存の修正">＊</span></button>`;
   }).join('');
   return `<div class="nk-kids" role="tablist" aria-label="今日の児童">${btns}</div>`;
