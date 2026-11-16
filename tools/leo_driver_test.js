@@ -114,7 +114,7 @@ assert.ok(kept.includes('value="河合　尚美"') && kept.includes('selected'),
 assert.ok(between(cal, 'LEO_VIEWS.cal', 'return h;').includes('leoPickerNames'));
 assert.ok(read('leo_home_cal.js').includes('leoPickerNames') && read('leo_home_cal.js').includes('leoListedStaff'));
 assert.ok(read('leo_shift.js').includes('leoListedStaff') && read('leo_shift.js').includes('leoPickerNames'));
-assert.ok(between(leo, 'async function hyView', 'const isNew').includes('leoListedStaff'));
+assert.ok(between(leo, 'async function hyStaff', 'async function hyView').includes('leoListedStaff'));
 
 (async () => {
   function fakeSb(map) {

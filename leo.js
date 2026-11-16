@@ -942,6 +942,17 @@ async function hyRows(oid = 'leo') { if (DEMO) return HY_DEMO; const of = HY_OFF
 async function myReads() { return DEMO ? [] : (await sb('hiyari_reads?select=hiyari_id,user_id')); }
 async function hiyariUnread(oid = 'leo') { try { const [r, rd] = await Promise.all([hyRows(oid), myReads()]); if (DEMO) { const seen = +localStorage.getItem(hySeenKey(oid)) || 0; return r.filter(x => x.id > seen).length; }
   const me = myUid(); const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); return r.filter(x => !mine.has(x.id)).length; } catch (e) { return 0; } }
+// 「まだ読んでいない人」に出す職員：その事業所に所属か兼務（hy_in_office と同じ）で在籍中の現場の職員だけ。
+// 事務・会長、名前が空の人、共有アカウントは出さない。レオは leoListedStaff（レオの職員でない人を外す）も通す
+async function hyStaff(oid) {
+  const of = HY_OFFICES[hyOid(oid)].office, e = encodeURIComponent(of);
+  const rows = (await sb(`staff_profiles?active=eq.true&or=(office.eq.${e},extra_offices.cs.%7B${e}%7D)&select=user_id,nikki_name,full_name,office,extra_offices,role,is_chair`)) || [];
+  const seen = new Set();
+  return rows.filter(p => p && p.user_id && (p.office === of || (p.extra_offices || []).includes(of)) && !p.is_chair && p.role !== '事務')
+    .map(p => ({ user_id: p.user_id, nikki_name: String(p.nikki_name || p.full_name || '').trim() }))
+    .filter(p => p.nikki_name && !/共有/.test(p.nikki_name) && !(oid === 'leo' && typeof leoListedStaff === 'function' && !leoListedStaff(p.nikki_name)))
+    .filter(p => !seen.has(p.user_id) && seen.add(p.user_id));
+}
 async function hyView(oid = 'leo') {
   oid = hyOid(oid); const H = HY_OFFICES[oid];
   const rows = await hyRows(oid); let seen = +localStorage.getItem(hySeenKey(oid)) || 0, unread = null, readers = {}, staff = [];
@@ -950,15 +961,7 @@ async function hyView(oid = 'leo') {
     const mine = new Set(rd.filter(x => x.user_id === me).map(x => x.hiyari_id)); unread = new Set(rows.filter(r => !mine.has(r.id)).map(r => r.id));
     rd.forEach(x => (readers[x.hiyari_id] ||= new Set()).add(x.user_id));
     if (unread.size) sb('hiyari_reads?on_conflict=hiyari_id,user_id', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify([...unread].map(id => ({ hiyari_id: id }))) }).catch(() => {});
-    if (canManage()) try {
-      if (oid === 'leo') {
-        staff = await sb('staff_profiles?office=eq.レオ&select=user_id,nikki_name');
-        if (typeof leoListedStaff === 'function') staff = (staff || []).filter(p => leoListedStaff(p && p.nikki_name));
-      } else {
-        const of = encodeURIComponent(H.office);
-        staff = ((await sb(`staff_profiles?active=eq.true&or=(office.eq.${of},extra_offices.cs.%7B${of}%7D)&select=user_id,nikki_name,full_name`)) || []).map(p => ({ user_id: p.user_id, nikki_name: p.nikki_name || p.full_name || '' }));
-      }
-    } catch (e) { } }
+    if (canManage()) try { staff = await hyStaff(oid); } catch (e) { } }
   const isNew = r => unread ? unread.has(r.id) : r.id > seen;
   const notRead = r => staff.filter(p => !(readers[r.id] || new Set()).has(p.user_id)).map(p => p.nikki_name);
   const dt = d => new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -977,7 +980,7 @@ async function hyView(oid = 'leo') {
       ${isNew(r) ? '<span class="badge">新着</span> ' : ''}<b>${esc(r.kind)}</b>　${dt(r.occurred_at)}　${esc(r.place || '')}${r.child_label ? '　' + esc(r.child_label) : ''}${r.service ? `　<span class="note">${esc(r.service)}</span>` : ''}
       <p style="white-space:pre-wrap">${esc(r.what)}</p>${r.response ? `<p class="note">その場の対応：${esc(r.response)}</p>` : ''}
       ${r.prevention ? `<p><b>再発防止：</b>${esc(r.prevention)}</p>` : ''}${r.manager_comment ? `<p class="note">確認者より：${esc(r.manager_comment)}</p>` : ''}
-      <p class="note">${r.source === 'LINE' ? 'LINEから・' : ''}${r.status}${staff.length > 1 ? (notRead(r).length ? '　まだ読んでいない人：' + notRead(r).map(esc).join('、') : '　全員読みました') : ''}</p>
+      <p class="note">${r.source === 'LINE' ? 'LINEから・' : ''}${r.status}${staff.length ? (notRead(r).length ? '　まだ読んでいない人：' + notRead(r).map(esc).join('、') : '　全員読みました') : ''}</p>
       ${canManage() && r.status === '未確認' ? `<label>再発防止の改善策<textarea id="hp_${r.id}" rows="2">${esc(r.prevention || '')}</textarea></label>
         <label>ひとこと（全員に見えます）<input id="hc_${r.id}"></label><button onclick="hyCheck(${r.id}, '${oid}')">確認した</button>` : ''}</div>`).join('') || '<p>まだ報告はありません。</p>'}`;
 }
