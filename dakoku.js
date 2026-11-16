@@ -139,7 +139,7 @@ function dkView() {
       email: DK.sess.email, staff: DK.data.staff, office: office.name, chosenId: DK.staffId, allowPick: dkAllowPick(),
     });
   }
-  const judge = office ? Dakoku.judge(DK.locating ? null : DK.pos, office) : { ok: false, distance: null, reason: offices.length ? '事業所を選んでください / Escolha o local' : '打刻できる事業所がありません / Nenhum local disponível para registro' };
+  const judge = office ? Dakoku.judge(DK.locating ? null : DK.pos, office, resolved.staff) : { ok: false, distance: null, reason: offices.length ? '事業所を選んでください / Escolha o local' : '打刻できる事業所がありません / Nenhum local disponível para registro' };
   if (DK.locating && office) judge.reason = '位置を確認しています… / Verificando localização…';
   return { offices, office, staff: resolved.staff, mode: resolved.mode, list: resolved.list, judge };
 }
@@ -182,7 +182,7 @@ function dkPaint() {
   let officeHtml = '';
   if (v.mode === 'unregistered' || v.mode === 'noemail') officeHtml = '';
   else if (!v.offices.length) officeHtml = '<div class="wn">打刻できる事業所がありません。名簿の所属か事業所の有効設定を確認してください。</div>';
-  else if (v.offices.length === 1 && v.office) officeHtml = `<p><b>${dkEsc(v.office.name)}</b>` + (Dakoku.gpsRequired(v.office) ? ` <span class="meta">許可半径 ${Math.round(v.office.radius || 0)}m</span>` : ` <span class="meta">位置情報不要</span>`) + `</p>`;
+  else if (v.offices.length === 1 && v.office) officeHtml = `<p><b>${dkEsc(v.office.name)}</b>` + (Dakoku.gpsRequired(v.office, v.staff) ? ` <span class="meta">許可半径 ${Math.round(v.office.radius || 0)}m</span>` : ` <span class="meta">位置情報不要</span>`) + `</p>`;
   else if (v.offices.length > 1) officeHtml = `<label class="meta">事業所</label><select id="dk_office">${v.offices.map(o => `<option value="${dkEsc(o.name)}"${o.name === DK.office ? ' selected' : ''}>${dkEsc(o.name)}</option>`).join('')}</select>`;
   let staffHtml = '';
   if (v.mode === 'noemail') staffHtml = '<div class="ng">ログイン中のメールがありません。ポータルにログインし直してください。</div>';
@@ -195,10 +195,10 @@ function dkPaint() {
   } else if (v.office && dkAllowPick() && v.list.length) {
     staffHtml = `<div class="wn">見本モード：名前を選んでください。</div><label class="meta">職員</label><select id="dk_staff"><option value="">選んでください</option>${v.list.map(s => `<option value="${dkEsc(s.id)}"${s.id === (v.staff && v.staff.id) ? ' selected' : ''}>${dkEsc(s.name)}</option>`).join('')}</select>`;
   } else if (v.office && v.mode !== 'unregistered' && v.mode !== 'noemail') staffHtml = '<div class="ng">この事業所で打刻できる本人がいません。</div>';
-  const needGps = !!(v.office && Dakoku.gpsRequired(v.office));
+  const needGps = !!(v.office && Dakoku.gpsRequired(v.office, v.staff));
   let geo = '';
   if (v.office) {
-    if (!needGps) geo = `<div class="okb">この事業所は位置情報不要です。 / Sem localização. ${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}</div>`;
+    if (!needGps) geo = `<div class="okb">${Dakoku.gpsRequired(v.office) ? 'この職員は位置確認なしです。' : 'この事業所は位置情報不要です。'} / Sem localização. ${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}</div>`;
     else if (DK.locating) geo = '<div class="wn">位置を確認しています… / Verificando localização…</div>';
     else if (DK.posError) geo = `<div class="ng">${dkEsc(DK.posError)}</div>`;
     else if (v.judge.ok) geo = `<div class="okb">事業所まで / Distância ${Math.round(v.judge.distance)}m（許可 / permitido ${Math.round(v.office.radius)}m）。${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}${DK.pos && DK.pos.demo ? ' 見本の位置（事業所の中心）です。' : ''}${DK.pos && DK.pos.accuracy != null ? ' <span class="meta">精度 ±' + Math.round(DK.pos.accuracy) + 'm</span>' : ''}</div>`;
@@ -443,7 +443,7 @@ async function dkPunch(kind) {
   }
   DK.busy = true; DK.msg = ''; dkPaint();
   try {
-    const needGps = Dakoku.gpsRequired(v.office);
+    const needGps = Dakoku.gpsRequired(v.office, v.staff);
     const payload = {
       action: 'punch', office: v.office.name, staffId: v.staff.id, kind: kind,
       email: DK.sess.email, lunch: DK.lunch ? 'はい' : 'いいえ',
@@ -485,7 +485,7 @@ async function renderDakoku() {
   if (auto && auto.staff) DK.staffId = auto.staff.id;
   else if (!DK.staffId) DK.staffId = dkRecall(DK.office, DK.sess.email);
   const cur = offices.find(o => o.name === DK.office);
-  const needGps = !!(cur && Dakoku.gpsRequired(cur));
+  const needGps = !!(cur && Dakoku.gpsRequired(cur, auto && auto.staff));
   if (needGps) DK.locating = true;
   dkPaint();
   if (needGps) dkLocate();

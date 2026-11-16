@@ -306,8 +306,8 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="ryozan.js?v=20261104ryozan"></script>
 <script src="leo_kinmu_lib.js?v=20261102f1400"></script>
 <script src="leo_kinmu.js?v=20261102read"></script>
-<script src="dakoku-lib.js?v=20261110req"></script>
-<script src="dakoku.js?v=20261113approve"></script>
+<script src="dakoku-lib.js?v=20261116gps"></script>
+<script src="dakoku.js?v=20261116gps"></script>
 <script src="dakoku_admin.js?v=20261106dakoku"></script>
 <script src="soudan.js?v=20261111chair"></script>
 <script src="staff.js?v=20261106staff"></script>
@@ -327,7 +327,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261113monwho';
+  var BUILD = '20261116gps';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {

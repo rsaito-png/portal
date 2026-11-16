@@ -48,6 +48,7 @@
       email: String(pick(s, 'email', 'ログイン用メール') || '').trim(),
       role: String(pick(s, 'role', '役割(本人/責任者)') || '').trim(),
       enabled: on(pick(s, 'enabled', '有効')),
+      gpsExempt: on(pick(s, 'gpsExempt', '位置確認なし')),
     };
   }
   // 設定.有効が TRUE の事業所だけ。FALSE は出さない。
@@ -97,15 +98,17 @@
     return { staff: chosen || null, mode: hits.length > 1 ? 'ambiguous' : 'pick', list: pool };
   }
   // 緯度・経度・半径がそろっている事業所だけ位置情報を要する（金斗雲などは不要）。
-  function gpsRequired(office) {
+  // 職員に gpsExempt（位置確認なし）が付いていれば、その人は位置情報不要。
+  function gpsRequired(office, staff) {
     const o = officeView(office);
+    if (staff && staffView(staff).gpsExempt) return false;
     return o.lat != null && o.lng != null && o.radius > 0;
   }
   // 現在地が許可半径の中か。GPS不要の事業所は位置なしで打刻可。
-  function judge(pos, office) {
+  function judge(pos, office, staff) {
     const o = officeView(office);
     if (!o.enabled) return { ok: false, distance: null, reason: 'この事業所は打刻を停止しています', gps: false };
-    if (!gpsRequired(o)) return { ok: true, distance: null, reason: '', gps: false };
+    if (!gpsRequired(o, staff)) return { ok: true, distance: null, reason: '', gps: false };
     if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) return { ok: false, distance: null, reason: '位置情報がありません', gps: true };
     const distance = meters(pos.lat, pos.lng, o.lat, o.lng);
     if (distance > o.radius) return { ok: false, distance: distance, reason: '範囲外です（' + Math.round(distance) + 'm / 許可' + Math.round(o.radius) + 'm）', gps: true };

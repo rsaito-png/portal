@@ -281,3 +281,9 @@ grant execute on function public.dakoku_punch(text,text,text,double precision,do
 
 
 notify pgrst, 'reload schema';
+
+-- 2026-11-16 職員ごとの位置確認なし（横田祥 R003）
+alter table public.dakoku_staff add column if not exists gps_exempt boolean not null default false;
+update public.dakoku_staff set gps_exempt = true where id = 'R003';
+-- dakoku_punch: need_gps に "and not coalesce(s.gps_exempt,false)" を追加
+-- dakoku_bootstrap: staff に 'gpsExempt', s.gps_exempt を追加
