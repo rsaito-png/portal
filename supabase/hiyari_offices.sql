@@ -24,3 +24,6 @@ begin
     coalesce(new.office, 'レオ'));
   return new;
 end $$;
+
+-- 2026-11-16 齊藤さん指示「職員にgoogle chatで通知送るのやめて」：ヒヤリハットのChat通知を止める（ポータルの未読・既読表示はそのまま）
+drop trigger if exists notify_hiyari on public.hiyari;

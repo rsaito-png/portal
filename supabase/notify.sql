@@ -23,7 +23,7 @@ returns void language sql security definer set search_path = public as $$
 $$;
 revoke all on function public.notify_enqueue(text, text, text, text, text) from public, anon, authenticated;
 
--- ① ヒヤリハットの新規報告 → 職員全員
+-- ① ヒヤリハットの新規報告 → 職員全員（停止中。関数だけ残す）
 create or replace function public.trg_notify_hiyari() returns trigger language plpgsql security definer set search_path = public as $$
 begin
   perform notify_enqueue('all', 'ヒヤリハット',
@@ -33,8 +33,8 @@ begin
     coalesce(new.office, 'レオ'));  -- 事業所ごとの画面（hiyari_offices.sql）
   return new;
 end $$;
+-- 2026-11-16 齊藤さん指示「職員にgoogle chatで通知送るのやめて」：ヒヤリハットはChatへ送らない（ポータルの未読表示だけ）。トリガーは作らない
 drop trigger if exists notify_hiyari on hiyari;
-create trigger notify_hiyari after insert on hiyari for each row execute function trg_notify_hiyari();
 
 -- ② 保護者の回答 → 管理者・児発管（児童名まで。中身はリンク先で）
 create or replace function public.trg_notify_mon() returns trigger language plpgsql security definer set search_path = public as $$
