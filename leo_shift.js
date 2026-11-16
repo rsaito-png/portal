@@ -17,12 +17,32 @@
   const span = s => `${hm(s.start)}〜${hm(s.end)}`;
   // 表示名：日誌の名前（全角空白）を半角空白にして出す。例「横田　祥」→「横田 祥」
   const showName = s => String(s ?? '').replace(/\u3000/g, ' ').trim();
+  // 型の時間の「いつから」。DBの note に from:YYYY-MM-DD を入れる（他のメモは残す）。SQL は変えない。
+  const FROM_RE = /(?:^|\s)from:(\d{4}-\d{2}-\d{2})(?=\s|$)/;
+  const slotFrom = note => { const m = String(note || '').match(FROM_RE); return m ? m[1] : ''; };
+  const slotRest = note => String(note || '').replace(/(\s*)from:\d{4}-\d{2}-\d{2}(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+  const packNote = (from, rest) => {
+    const f = /^\d{4}-\d{2}-\d{2}$/.test(String(from || '').trim()) ? String(from).trim() : '';
+    const r = String(rest || '').trim();
+    if (f && r) return 'from:' + f + ' ' + r;
+    if (f) return 'from:' + f;
+    return r;
+  };
+  const slotOnDay = (b, day) => { const f = slotFrom(b && b.note); return !f || String(day).slice(0, 10) >= f; };
+  const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function shiftBaseSlotHtml(dw, s) {
+    const start = escHtml(String((s && s.start) || '').slice(0, 5));
+    const end = escHtml(String((s && s.end) || '').slice(0, 5));
+    const from = escHtml(slotFrom(s && s.note));
+    const rest = escHtml(slotRest(s && s.note));
+    return `<div class="sh-slot"><input type="time" data-dw="${+dw}" class="sh-bs" value="${start}"> 〜 <input type="time" data-dw="${+dw}" class="sh-be" value="${end}"> <label class="sh-from">いつから <input type="date" class="sh-bf" value="${from}" title="空欄は前からずっと"></label><input type="hidden" class="sh-bn" value="${rest}"> <button class="inl" onclick="this.parentNode.remove()">消す</button></div>`;
+  }
 
   const isHol = day => { const H = typeof JP_HOLIDAYS !== 'undefined' ? JP_HOLIDAYS : g.JP_HOLIDAYS; return !!(H && typeof H.has === 'function' && H.has(String(day).slice(0, 10))); };
   // その日の1人分。state: base=いつもの型（緑）／change=時間変更（黄）／off=休み（赤）／add=型なしの追加（黄）／none=入らない
   function shiftCell(data, day, uid) {
     const d = data || {};
-    const base = (d.base || []).filter(b => b.user_id === uid && +b.dow === dowOf(day)).sort((a, b) => min(a.start) - min(b.start));
+    const base = (d.base || []).filter(b => b.user_id === uid && +b.dow === dowOf(day) && slotOnDay(b, day)).sort((a, b) => min(a.start) - min(b.start));
     const rows = (d.days || []).filter(x => x.user_id === uid && String(x.day).slice(0, 10) === day);
     const off = rows.find(x => x.kind === '休み');
     const chg = rows.find(x => x.kind === '時間変更');
@@ -157,7 +177,7 @@
   }
   const shiftClear = () => cache.clear();
 
-  const api = { shiftCell, shiftDay, shiftOnDuty, shiftCandidates, shiftOptionsHtml, shiftEvents, shiftMergeEvents, shiftPunchGaps, shiftLoad, shiftClear, shiftMonday: mondayOf, shiftAddDays: addDays, shiftDow: dowOf, shiftSpan: span, shiftShowName: showName };
+  const api = { shiftCell, shiftDay, shiftOnDuty, shiftCandidates, shiftOptionsHtml, shiftEvents, shiftMergeEvents, shiftPunchGaps, shiftLoad, shiftClear, shiftMonday: mondayOf, shiftAddDays: addDays, shiftDow: dowOf, shiftSpan: span, shiftShowName: showName, shiftSlotFrom: slotFrom, shiftSlotRest: slotRest, shiftPackNote: packNote, shiftBaseSlotHtml };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   Object.assign(g, api);
 
@@ -194,9 +214,11 @@
   .sh-warn{background:#fff3d6;border-left:4px solid #e0a100;padding:8px 10px;margin:10px 0;font-size:13px;line-height:1.6;border-radius:6px}
   .sh-pop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:center;justify-content:center;padding:12px}
   .sh-box{background:#fff;border-radius:18px;padding:16px;max-width:440px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-  .sh-box h4{margin:0 0 8px}.sh-box label{display:block;margin:6px 0}.sh-box input[type=time]{width:8em}
+  .sh-box h4{margin:0 0 8px}.sh-box label{display:block;margin:6px 0}.sh-box input[type=time]{width:8em}.sh-box input[type=date]{width:10em;max-width:100%}
   .sh-box .sh-acts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
-  .sh-slot{display:flex;gap:6px;align-items:center;margin:4px 0}
+  .sh-box label.sh-from{display:inline-flex;align-items:center;gap:4px;margin:0;font-size:13px;font-weight:400}
+  .sh-slots{display:block}
+  .sh-slot{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:4px 0}
   @media (max-width:700px){.sh-wrap{display:none}.sh-cards{display:block}}
   </style>`;
   function cellHtml(c, day, uid, ed) {
@@ -266,17 +288,18 @@
     const base = ((SH.data && SH.data.base) || []).filter(b => b.user_id === uid);
     const rows = [1, 2, 3, 4, 5, 6, 0].map(dw => {
       const sl = base.filter(b => +b.dow === dw).sort((x, y) => min(x.start) - min(y.start));
-      const list = (sl.length ? sl : []).map(s => `<div class="sh-slot"><input type="time" data-dw="${dw}" class="sh-bs" value="${esc(String(s.start).slice(0, 5))}"> 〜 <input type="time" data-dw="${dw}" class="sh-be" value="${esc(String(s.end).slice(0, 5))}"> <button class="inl" onclick="this.parentNode.remove()">消す</button></div>`).join('');
-      return `<div data-day="${dw}" style="border-top:1px solid #eee;padding:6px 0"><b>${DOWS[dw]}</b> <span class="sh-slots">${list || '<small class="note">なし</small>'}</span> <button class="inl" onclick="shAddSlot(this,${dw})">＋ 時間</button></div>`;
+      const list = sl.map(s => shiftBaseSlotHtml(dw, s)).join('');
+      return `<div data-day="${dw}" style="border-top:1px solid #eee;padding:6px 0"><b>${DOWS[dw]}</b> <button class="inl" onclick="shAddSlot(this,${dw})">＋ 時間</button><span class="sh-slots">${list || '<small class="note">なし</small>'}</span></div>`;
     }).join('');
-    return `<h4>${esc(nameOfUid(uid))} さんのいつもの型</h4>${rows}
+    return `<h4>${esc(nameOfUid(uid))} さんのいつもの型</h4>
+      <p class="note" style="font-size:13px;margin:0 0 8px">「いつから」を空欄にすると、前からずっと入ります。</p>${rows}
       <div class="sh-acts"><button onclick="shSaveBase('${uid}')">保存する</button><button class="sub" onclick="shClose()">閉じる</button></div><p id="sh_msg" class="note"></p>`;
   }
   g.shOpenBase = uid => pop(baseForm(uid));
   g.shAddSlot = (btn, dw) => {
     const box = btn.parentNode.querySelector('.sh-slots');
     if (box.querySelector('small')) box.innerHTML = '';
-    box.insertAdjacentHTML('beforeend', `<div class="sh-slot"><input type="time" data-dw="${dw}" class="sh-bs"> 〜 <input type="time" data-dw="${dw}" class="sh-be"> <button class="inl" onclick="this.parentNode.remove()">消す</button></div>`);
+    box.insertAdjacentHTML('beforeend', shiftBaseSlotHtml(dw, { start: '', end: '', note: packNote(mondayOf(todayJ()), '') }));
   };
   g.shSaveBase = async uid => {
     if (typeof DEMO !== 'undefined' && DEMO) return alert('見本モードでは保存しません。');
@@ -286,7 +309,8 @@
       const s = row.querySelector('.sh-bs').value, e = row.querySelector('.sh-be').value, dw = +row.querySelector('.sh-bs').dataset.dw;
       if (!s && !e) continue;
       if (!s || !e || e <= s) return msg(`${DOWS[dw]}曜の時間を確かめてください（終わりは始まりより後）。`);
-      (per[dw] = per[dw] || []).push({ start: s, end: e });
+      const note = packNote((row.querySelector('.sh-bf') || {}).value, (row.querySelector('.sh-bn') || {}).value);
+      (per[dw] = per[dw] || []).push({ start: s, end: e, note });
     }
     const had = new Set(((SH.data && SH.data.base) || []).filter(b => b.user_id === uid).map(b => +b.dow));
     try {

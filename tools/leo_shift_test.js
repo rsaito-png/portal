@@ -78,6 +78,51 @@ assert.ok(gaps.some(g => /11\/20.*加藤.*出勤の打刻がありません/.tes
 assert.ok(!gaps.some(g => /11\/27/.test(g)));
 assert.deepStrictEqual(S.shiftPunchGaps(data, ['2026-11-20'], '2026-11-26'), []);
 
+// 型の「いつから」（note の from:YYYY-MM-DD。それより前の日は出さない。空欄は前からずっと）
+const dataFrom = {
+  staff: [{ user_id: Y, name: '横田　祥' }, { user_id: A, name: '安藤　尚子' }],
+  base: [
+    { user_id: Y, dow: 3, start: '10:30', end: '13:30', note: 'from:2026-11-18' },
+    { user_id: A, dow: 3, start: '10:30', end: '14:30' },
+    { user_id: A, dow: 3, start: '15:00', end: '16:00', note: 'from:2026-11-18 午後から' }],
+  days: []
+};
+c = S.shiftCell(dataFrom, '2026-11-11', Y);
+assert.strictEqual(c.state, 'none'); assert.strictEqual(c.slots.length, 0);
+c = S.shiftCell(dataFrom, '2026-11-18', Y);
+assert.strictEqual(c.state, 'base'); assert.deepStrictEqual(c.slots, [{ start: '10:30', end: '13:30' }]);
+c = S.shiftCell(dataFrom, '2026-11-11', A);
+assert.strictEqual(c.state, 'base'); assert.deepStrictEqual(c.slots, [{ start: '10:30', end: '14:30' }]);
+c = S.shiftCell(dataFrom, '2026-11-18', A);
+assert.strictEqual(c.state, 'base'); assert.strictEqual(c.slots.length, 2);
+assert.ok(!S.shiftEvents(dataFrom, '2026-11-11', '2026-11-11').some(e => e.staff === '横田　祥'));
+assert.ok(S.shiftEvents(dataFrom, '2026-11-18', '2026-11-18').some(e => e.kind === '勤務' && e.staff === '横田　祥' && e.title === '10:30〜13:30'));
+const kn = S.shiftCandidates(['横田　祥', '安藤　尚子', '齊藤連'], dataFrom, '2026-11-11', '11:00');
+assert.deepStrictEqual(kn.other, ['横田　祥']);
+assert.ok(kn.main.includes('安藤　尚子') && kn.main.includes('齊藤連'));
+const kn2 = S.shiftCandidates(['横田　祥', '安藤　尚子'], dataFrom, '2026-11-18', '11:00');
+assert.ok(kn2.main.includes('横田　祥') && kn2.main.includes('安藤　尚子'));
+// メモの読み書き（いつから＋残すメモ）。保存し直しても日付とメモが残る
+assert.strictEqual(S.shiftSlotFrom('from:2026-11-18'), '2026-11-18');
+assert.strictEqual(S.shiftSlotRest('from:2026-11-18'), '');
+assert.strictEqual(S.shiftSlotFrom('from:2026-11-18 午後から'), '2026-11-18');
+assert.strictEqual(S.shiftSlotRest('from:2026-11-18 午後から'), '午後から');
+assert.strictEqual(S.shiftSlotFrom('午後から'), '');
+assert.strictEqual(S.shiftSlotRest('午後から'), '午後から');
+assert.strictEqual(S.shiftSlotFrom(''), '');
+assert.strictEqual(S.shiftPackNote('2026-11-18', '午後から'), 'from:2026-11-18 午後から');
+assert.strictEqual(S.shiftPackNote('2026-11-18', ''), 'from:2026-11-18');
+assert.strictEqual(S.shiftPackNote('', '午後から'), '午後から');
+assert.strictEqual(S.shiftPackNote('', ''), '');
+assert.strictEqual(S.shiftPackNote(S.shiftSlotFrom('from:2026-11-18 午後から'), S.shiftSlotRest('from:2026-11-18 午後から')), 'from:2026-11-18 午後から');
+const slotH = S.shiftBaseSlotHtml(3, { start: '10:30', end: '13:30', note: 'from:2026-11-18 午後から' });
+assert.ok(slotH.includes('いつから') && slotH.includes('type="date"') && slotH.includes('value="2026-11-18"'));
+assert.ok(slotH.includes('value="10:30"') && slotH.includes('value="13:30"') && slotH.includes('value="午後から"'));
+const blankH = S.shiftBaseSlotHtml(3, { start: '10:30', end: '13:30', note: '' });
+assert.ok(blankH.includes('class="sh-bf" value=""'));
+const newH = S.shiftBaseSlotHtml(3, { start: '', end: '', note: S.shiftPackNote(S.shiftMonday('2026-11-18'), '') });
+assert.ok(newH.includes('value="2026-11-16"'));
+
 (async () => {
   const D = require('../leo_driver.js');
   global.leoListedStaff = D.leoListedStaff;
