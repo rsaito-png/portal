@@ -3,6 +3,8 @@
 # jippi-checkout と sct-checkout と chamu-translate と kin-translate はログイン JWT を検証する（節を足さない＝verify_jwt は true のまま）。
 # chamu-translate は関数の中で chamu_can() が true の人だけ通す。anon キーでは通せない。
 # kin-translate は関数の中で my_office()='金斗雲' または can_manage() の人だけ通す。anon キーでは通せない。
+# chamu-plan-draft は service_role の Bearer だけを関数内で通す（sui-draft と同じ。verify_jwt は既定の true）。
+# chamu-svcplan-read はログイン JWT を検証し、関数の中で chamu_can_plan() が true の人だけ通す。
 
 [functions.square-webhook]
 verify_jwt = false

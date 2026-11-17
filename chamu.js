@@ -5,7 +5,7 @@
 // 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表も献立シートも使わない。
 // 記入者が自分の名前と違う公式名になる人だけ、staff_profiles.chamu_record_name を使う。画面の記入者は本人のまま、保存する staff_name だけ公式名。実績の利用者署名と国保連CSVには載せない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
-const CM_NAV = [['journal', '業務日誌'], ['kondate', '献立報告'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者']];
+const CM_NAV = [['journal', '業務日誌'], ['kondate', '献立報告'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者'], ['plan', '個別支援計画']];
 const CM_SHIFT_Q = 'chamu_shift?select=id,dow,staff_name,employment,start_time,end_time,sort&order=dow.asc,sort.asc,staff_name.asc';
 
 /* cm-pure */
@@ -736,20 +736,30 @@ const cmInp = (id, label, val, type, extra) => `<div><label class="l">${label}</
 
 async function renderChamu(sub) {
   sub = sub || 'journal';
+  if (sub !== 'plan') {
+    const layer = document.getElementById('cm_sign');
+    if (layer) layer.remove();
+    if (document.body) document.body.style.overflow = '';
+  }
   if (sub === 'kinmu' && typeof kmOpen === 'function') {
     document.body.classList.add('wide-sheet');
     return kmOpen('chamu');
   }
-  if (typeof DEMO !== 'undefined' && DEMO) return cmShow(cmBack() + '<div class="card"><p>見本モードでは、茶夢の日誌は使えません。ログインしてお使いください。</p></div>');
+  if (typeof DEMO !== 'undefined' && DEMO) {
+    if (sub === 'plan') return cmPlanPage();
+    return cmShow(cmBack() + '<div class="card"><p>見本モードでは、茶夢の日誌は使えません。ログインしてお使いください。</p></div>');
+  }
   cmShow(cmBack() + '<p>読み込み中…</p>');
   try {
     CM.can = await cmRpc('chamu_can');
     CM.bill = await cmRpc('chamu_can_bill');
   } catch (e) { return cmShow(cmBack() + `<div class="card"><p>${cmEsc(e.message || e)}</p><p class="note">茶夢の表がまだないときは、supabase/chamu.sql を適用してください。</p></div>`); }
   if (CM.can !== true) return cmShow(cmBack() + '<div class="card"><p>茶夢の記録は、茶夢の職員と、事務・会長が使えます。</p><p class="note">茶夢の職員として使うには、管理者に所属（staff_profiles の office）か兼務（extra_offices）へ「茶夢」を入れてもらってください。</p></div>');
+  try { CM.canPlan = (await cmRpc('chamu_can_plan')) === true; }
+  catch (e) { CM.canPlan = false; }
   if (sub === 'billing' && CM.bill !== true) return cmFrame('billing', '<div class="card"><p>国保連CSVは、事務・茶夢の管理者・会長だけが作れます。</p></div>');
-  const page = { journal: cmJournal, kondate: cmKondate, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage }[sub] || cmJournal;
-  try { await page(); } catch (e) { cmFrame(sub, `<div class="ng">${cmEsc(e.message || e)}</div>`); }
+  const page = { journal: cmJournal, kondate: cmKondate, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage, plan: cmPlanPage }[sub] || cmJournal;
+  try { await page(); } catch (e) { cmFrame(sub, `<div class="ng">${cmEsc(e.message || e)}</div>${sub === 'plan' ? '<p class="note">supabase/chamu_plan.sql を適用してください。</p>' : ''}`); }
 }
 
 async function cmJournal() {
@@ -1335,5 +1345,509 @@ async function cmDeleteUser(id) {
   await cmGo(async () => {
     await cmRest('chamu_users?id=eq.' + id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     CM.st.edit = null; await cmUsersPage();
+  });
+}
+
+/* cm-plan-pure */
+var ChamuPlan = (() => {
+  const AUTHOR = '齊藤 連';
+  const DOCS = [['assessment', 'アセスメント'], ['monitoring', '前期の評価'], ['genan', '原案'], ['kaigi', '担当者会議録'], ['honan', '本案']];
+  const addDays = (iso, n) => {
+    const [y, m, d] = String(iso).split('-').map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d));
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  const addMonths = (iso, n) => {
+    const [y, m, d] = String(iso).split('-').map(Number);
+    const first = new Date(Date.UTC(y, m - 1 + n, 1));
+    const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d, last))).toISOString().slice(0, 10);
+  };
+  const periodEnd = start => addDays(addMonths(start, 6), -1);
+  const nextStart = end => addDays(end, 1);
+  const guides = start => ({ assess_on: addDays(start, -4), genan_on: addDays(start, -3), kaigi_on: addDays(start, -2), honan_on: addDays(start, -1) });
+  const statusLabel = p => {
+    if (!p) return '未作成';
+    if (p.honan_signed_at) return '本案署名済';
+    if (p.genan_signed_at) return '原案署名済';
+    if (p.status === '本案確定') return '本案確定';
+    if (p.status === '原案確定') return '原案確定';
+    return '下書き';
+  };
+  const urgency = (plan, today) => {
+    if (!plan) return 'none';
+    const end = String(plan.end_on || '');
+    const signed = !!plan.honan_signed_at;
+    if (end && end < today) return signed ? 'next' : 'over';
+    if (end && !signed && end <= addDays(today, 30)) return 'soon';
+    return signed ? 'ok' : 'work';
+  };
+  const needs = plan => {
+    const out = [];
+    DOCS.forEach(([k, label]) => {
+      String((plan && plan[k]) || '').split('\n').forEach((line, i) => {
+        if (line.includes('【要確認】')) out.push({ doc: label, key: k, line: i + 1, text: line.trim().slice(0, 180) });
+      });
+    });
+    return out;
+  };
+  const fieldLocked = (plan, key) => {
+    if (!plan) return false;
+    if (plan.status === '本案確定' || plan.honan_signed_at) return DOCS.some(([k]) => k === key) || key === 'start_on' || key === 'end_on';
+    if ((plan.status === '原案確定' || plan.genan_signed_at) && (key === 'genan' || key === 'start_on' || key === 'end_on')) return true;
+    return false;
+  };
+  const applyPlanPatch = (plan, body) => {
+    if ('genan_signed_at' in body || 'honan_signed_at' in body) throw new Error('署名日時は署名の操作からしか入りません');
+    if (('user_id' in body && body.user_id !== plan.user_id) || ('term_no' in body && body.term_no !== plan.term_no)) throw new Error('利用者と期は変えられません');
+    const next = { ...plan };
+    ['assessment', 'monitoring', 'genan', 'kaigi', 'honan', 'status', 'note', 'start_on', 'end_on', 'author', 'assess_on', 'genan_on', 'kaigi_on', 'honan_on'].forEach(k => { if (k in body) next[k] = body[k]; });
+    const changed = k => String(next[k] ?? '') !== String(plan[k] ?? '');
+    if (plan.status === '本案確定' || plan.honan_signed_at) {
+      if (['assessment', 'monitoring', 'genan', 'kaigi', 'honan', 'start_on', 'end_on'].some(changed)) throw new Error('本案確定または署名のあと、本文は変えられません');
+    } else if (plan.status === '原案確定' || plan.genan_signed_at) {
+      if (changed('genan') || changed('start_on') || changed('end_on')) throw new Error('原案確定または原案署名のあと、原案の本文は変えられません');
+    }
+    if (next.status !== plan.status) {
+      const ok = (plan.status === '下書き' && next.status === '原案確定') || (plan.status === '原案確定' && next.status === '本案確定');
+      if (!ok) throw new Error('状態は下書き→原案確定→本案確定の順です');
+      if (next.status === '原案確定' && !String(next.genan || '').trim()) throw new Error('原案の本文が空です');
+      if (next.status === '本案確定' && !String(next.honan || '').trim()) throw new Error('本案の本文が空です');
+    }
+    return next;
+  };
+  const applySign = (plan, doc) => {
+    if (doc === '原案') {
+      if (plan.status !== '原案確定' && plan.status !== '本案確定') throw new Error('原案を確定してから署名します');
+      if (plan.genan_signed_at) throw new Error('原案は署名済みです');
+      return { ...plan, genan_signed_at: new Date().toISOString() };
+    }
+    if (doc === '本案') {
+      if (plan.status !== '本案確定') throw new Error('本案を確定してから署名します');
+      if (!plan.genan_signed_at) throw new Error('原案の署名が先です');
+      if (plan.honan_signed_at) throw new Error('本案は署名済みです');
+      return { ...plan, honan_signed_at: new Date().toISOString() };
+    }
+    throw new Error('署名の対象は原案か本案です');
+  };
+  const skeleton = (plan, name) => {
+    const nm = name || '利用者';
+    const per = `${plan.start_on} 〜 ${plan.end_on}`;
+    const hours = '提供時間は10:30〜16:30。昼休憩は12:30〜13:30。';
+    return {
+      assessment: `#T アセスメントシート\n#R 利用者 ${nm}\n#R 作成者 見本 責任者\n\n【本人の意向】\n【要確認】\n\n【家族の状況】\n【要確認】\n`,
+      monitoring: `#T 前期の評価\n前期の計画は見本です。\n記録に無い様子は【要確認】。\n`,
+      genan: `#T 個別支援計画書（原案）\n#R 利用者 ${nm}\n#R 期間 ${per}\n#R 作成者 見本 責任者\n\n${hours}\n\n【総合的な援助の方針】\n【要確認】\n`,
+      kaigi: `#T 担当者会議録\n#R 利用者 ${nm}\n【出席者】【要確認】\n【開催日】【要確認】\n【会議の内容】【要確認】\n`,
+      honan: `#T 個別支援計画書（本案）\n#R 利用者 ${nm}\n#R 期間 ${per}\n#R 作成者 見本 責任者\n\n${hours}\n\n【総合的な援助の方針】\n【要確認】\n`,
+    };
+  };
+  return { AUTHOR, DOCS, addDays, addMonths, periodEnd, nextStart, guides, statusLabel, urgency, needs, fieldLocked, applyPlanPatch, applySign, skeleton };
+})();
+/* /cm-plan-pure */
+
+const CM_PLAN_DEMO = {
+  users: [
+    { id: 'demo-a', name: '利用者A', kana: 'リヨウシャエー', active: true, support_level: 4, sort: 1 },
+    { id: 'demo-b', name: '利用者B', kana: 'リヨウシャビー', active: true, support_level: 3, sort: 2 },
+  ],
+  plans: [
+    { id: 'da1', user_id: 'demo-a', term_no: 1, start_on: '2026-05-01', end_on: '2026-10-31', assess_on: '2026-04-27', genan_on: '2026-04-28', kaigi_on: '2026-04-29', honan_on: '2026-04-30', author: '見本 責任者', status: '本案確定', genan_signed_at: '2026-04-28T01:00:00+09:00', honan_signed_at: '2026-04-30T01:00:00+09:00', assessment: '#T アセスメントシート\n見本です。\n', monitoring: '#T 前期の評価\n見本です。\n', genan: '#T 個別支援計画書（原案）\n見本です。提供時間は10:30〜16:30。\n', kaigi: '#T 担当者会議録\n【出席者】【要確認】\n', honan: '#T 個別支援計画書（本案）\n見本です。提供時間は10:30〜16:30。昼休憩は12:30〜13:30。\n', note: '見本。紙の署名がある想定。' },
+    { id: 'db1', user_id: 'demo-b', term_no: 1, start_on: '2026-11-01', end_on: '2027-04-30', assess_on: '2026-10-28', genan_on: '2026-10-29', kaigi_on: '2026-10-30', honan_on: '2026-10-31', author: '見本 責任者', status: '下書き', genan_signed_at: null, honan_signed_at: null, ...(() => { const s = ChamuPlan.skeleton({ start_on: '2026-11-01', end_on: '2027-04-30' }, '利用者B'); return s; })(), note: '' },
+  ],
+  svc: [{ id: 'ds1', user_id: 'demo-b', kind: 'サービス等利用計画', office_name: '見本相談支援', author_name: '見本 相談員', created_on: '2026-10-01', consent_on: '', period_from: '2026-11-01', period_to: '2027-04-30', body_text: '（見本）日中は生活介護を使う。家族の状況は【要確認】。', storage_path: null }],
+  signs: [{ plan_id: 'da1', doc: '原案', method: 'ご家族', signer_name: '見本 花', signer_relation: '母', explainer_name: '見本 責任者', signed_on: '2026-04-28', signature: null }, { plan_id: 'da1', doc: '本案', method: '本人', explainer_name: '見本 責任者', signed_on: '2026-04-30', signature: null }],
+};
+(function () {
+  const st = document.createElement('style');
+  st.textContent = `.cm .cm-card{border-left:8px solid #c8bfb0}.cm .cm-card.over,.cm .cm-card.next{border-left-color:#d33;background:#fde8e8}.cm .cm-card.soon{border-left-color:#e6b800;background:#fff6d6}.cm .cm-card.ok{border-left-color:#2a7a2a}
+.cm mark.cm-need,.cm-plan-sign mark.cm-need{background:#ffe08a;color:#1c140c;padding:0 .15em}
+.cm-plan-sign{position:fixed;inset:0;z-index:140;background:#fffef8;color:#1c140c;display:flex;flex-direction:column;font-size:18px;line-height:1.5}
+.cm-plan-sign .doc{flex:1;overflow:auto;padding:16px 14px 8px;font-size:28px;line-height:1.65}
+.cm-plan-sign .bar{flex:0 0 auto;max-height:48vh;overflow:auto;border-top:4px solid #1a120c;background:#fff4dc;padding:10px 12px}
+.cm-plan-sign .pad{height:180px;touch-action:none}.cm-plan-sign .pad canvas{width:100%;height:100%;display:block;background:#fff;border:3px solid #1a120c;touch-action:none}
+.cm-plan-sign button,.cm-plan-sign select,.cm-plan-sign input{font-size:18px}
+@media (min-width:800px){.cm-plan-sign .doc{font-size:34px}.cm-plan-sign .pad{height:240px}}`;
+  document.head.appendChild(st);
+})();
+
+function cmPlanDemoOn() { return typeof DEMO !== 'undefined' && DEMO; }
+function cmPlanIdOk(id) { return /^[0-9A-Za-z-]+$/.test(String(id || '')); }
+function cmPlanMarkup(t) {
+  const html = typeof markupHtml === 'function'
+    ? markupHtml(t)
+    : cmEsc(t || '').split('\n').map(l => l.startsWith('#T ') ? `<h2 style="text-align:center">${cmEsc(l.slice(3))}</h2>` : l.startsWith('#R ') ? `<div style="text-align:right">${cmEsc(l.slice(3))}</div>` : `<div>${cmEsc(l) || '&nbsp;'}</div>`).join('');
+  return String(html).split('【要確認】').join('<mark class="cm-need">【要確認】</mark>');
+}
+async function cmPlanBundle() {
+  if (cmPlanDemoOn()) return { users: CM_PLAN_DEMO.users, plans: CM_PLAN_DEMO.plans, can: true };
+  const [users, plans] = await Promise.all([cmUsers(true), cmRest('chamu_plans?select=*&order=term_no.desc')]);
+  return { users: users || [], plans: plans || [], can: CM.canPlan === true };
+}
+function cmPlanLatest(plans, userId) {
+  return (plans || []).filter(p => p.user_id === userId).sort((a, b) => b.term_no - a.term_no)[0] || null;
+}
+async function cmPlanGet(id) {
+  if (!cmPlanIdOk(id)) throw new Error('計画がありません');
+  if (cmPlanDemoOn()) {
+    const p = CM_PLAN_DEMO.plans.find(x => String(x.id) === String(id));
+    if (!p) throw new Error('計画がありません');
+    return { ...p };
+  }
+  const rows = await cmRest('chamu_plans?id=eq.' + id + '&select=*') || [];
+  if (!rows[0]) throw new Error('計画がありません');
+  return rows[0];
+}
+async function cmPlanPatch(id, body) {
+  if (cmPlanDemoOn()) {
+    const i = CM_PLAN_DEMO.plans.findIndex(x => String(x.id) === String(id));
+    if (i < 0) throw new Error('計画がありません');
+    CM_PLAN_DEMO.plans[i] = ChamuPlan.applyPlanPatch(CM_PLAN_DEMO.plans[i], body);
+    return;
+  }
+  try {
+    await cmRest('chamu_plans?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+  } catch (e) {
+    const m = String(e.message || e);
+    if (/duplicate|unique/i.test(m)) throw new Error('この期の計画はすでにあります');
+    throw e;
+  }
+}
+async function cmPlanSigns(id) {
+  if (cmPlanDemoOn()) return CM_PLAN_DEMO.signs.filter(s => String(s.plan_id) === String(id));
+  return await cmRest('chamu_plan_sign_log?plan_id=eq.' + id + '&select=doc,method,signer_name,signer_relation,reason,explainer_name,signature,signed_on&order=signed_at.desc') || [];
+}
+function cmPlanOpen(id) { CM.st.planUser = id; CM.st.planId = null; CM.st.planSign = null; CM.st.svc = null; renderChamu('plan'); }
+function cmPlanEditOpen(id) { CM.st.planId = id; CM.st.planSign = null; renderChamu('plan'); }
+function cmPlanBackList() { CM.st.planUser = null; CM.st.planId = null; CM.st.planSign = null; renderChamu('plan'); }
+
+async function cmPlanPage() {
+  if (cmPlanDemoOn()) CM.canPlan = true;
+  if (CM.st.planSign) return cmPlanSign();
+  if (CM.st.planId) return cmPlanEdit();
+  if (CM.st.planUser) return cmPlanUser();
+  return cmPlanList();
+}
+async function cmPlanList() {
+  const b = await cmPlanBundle();
+  const today = cmToday();
+  const card = u => {
+    const p = cmPlanLatest(b.plans, u.id);
+    const urg = ChamuPlan.urgency(p, today);
+    const note = urg === 'over' ? '期間を過ぎています' : urg === 'next' ? '次の期がまだありません' : urg === 'soon' ? '期限が近いです' : urg === 'none' ? '計画がまだありません' : '';
+    return `<div class="card cm-card ${urg}"><b>${cmEsc(u.name)}</b>${u.active ? '' : '（停止）'}<br>${p ? `第${p.term_no}期　${cmEsc(p.start_on)} 〜 ${cmEsc(p.end_on)}` : '期間はまだありません'}<br>${p ? `次期開始 ${cmEsc(ChamuPlan.nextStart(p.end_on))}　` : ''}<b>${cmEsc(ChamuPlan.statusLabel(p))}</b>${note ? `<br><b>${cmEsc(note)}</b>` : ''}<p><button type="button" class="sec inl" onclick="cmPlanOpen('${cmEsc(u.id)}')">開く</button></p></div>`;
+  };
+  const rank = u => ({ over: 0, next: 0, soon: 1, none: 2, work: 3, ok: 4 }[ChamuPlan.urgency(cmPlanLatest(b.plans, u.id), today)] ?? 5);
+  const active = b.users.filter(u => u.active).sort((a, c) => rank(a) - rank(c) || (a.sort || 0) - (c.sort || 0));
+  const stopped = b.users.filter(u => !u.active);
+  cmFrame('plan', `<h3>個別支援計画</h3>${cmPlanDemoOn() ? '<p class="note">見本モードです。架空の利用者だけで動きます。保存も署名もこの画面の中だけです。</p>' : ''}
+    <p class="note">読むのは茶夢の職員です。下書き・確定・署名は、会長・事務・茶夢の管理者とサビ管です。保護者用のリンクは作りません。署名は事業所のタブレットで対面でもらいます。</p>
+    <p class="note">提供時間は10:30〜16:30、昼休憩は12:30〜13:30です。期限が近いカードは黄色、過ぎているカードは赤です。</p>
+    ${b.can ? '' : '<p class="note">このアカウントは閲覧です。作成と署名は、会長・事務・茶夢の管理者とサビ管が行います。</p>'}
+    ${active.map(card).join('') || '<div class="card"><p>利用者がまだいません。</p><p><a href="#chamu/users">利用者を追加</a></p></div>'}
+    ${stopped.length ? `<details><summary>停止中（${stopped.length}人）</summary>${stopped.map(card).join('')}</details>` : ''}
+    <p><a href="#chamu/users">利用者の登録・修正</a></p>`);
+}
+async function cmPlanUser() {
+  const b = await cmPlanBundle();
+  const u = b.users.find(x => x.id === CM.st.planUser);
+  if (!u) { CM.st.planUser = null; return cmPlanList(); }
+  const mine = b.plans.filter(p => p.user_id === u.id).sort((a, c) => c.term_no - a.term_no);
+  const prev = mine[0];
+  const start = prev ? ChamuPlan.nextStart(prev.end_on) : cmToday();
+  const end = ChamuPlan.periodEnd(start);
+  let svc = [];
+  if (cmPlanDemoOn()) svc = CM_PLAN_DEMO.svc.filter(s => s.user_id === u.id);
+  else svc = await cmRest('chamu_service_plans?user_id=eq.' + u.id + '&select=id,kind,office_name,author_name,created_on,period_from,period_to,body_text&order=updated_at.desc') || [];
+  const draft = CM.st.svc || {};
+  const can = b.can;
+  cmFrame('plan', `<button type="button" class="back noprint" onclick="cmPlanBackList()">← 一覧</button><h3>${cmEsc(u.name)}</h3>
+    <div class="card"><h4>計画の期</h4>
+      ${mine.map(p => `<p>第${p.term_no}期　${cmEsc(p.start_on)} 〜 ${cmEsc(p.end_on)}　<b>${cmEsc(ChamuPlan.statusLabel(p))}</b> <button type="button" class="sec inl" onclick="cmPlanEditOpen('${cmEsc(p.id)}')">開く</button></p>`).join('') || '<p>まだありません。</p>'}
+      ${can ? (prev
+        ? `<p>次の期は ${cmEsc(start)} 〜 ${cmEsc(end)}（6か月。開始は前期の翌日）です。</p><button type="button" onclick="cmPlanCreate('${cmEsc(u.id)}','')">第${(prev.term_no || 0) + 1}期を作る</button>`
+        : `<div class="row">${cmInp('np_start', '第1期の開始日', start, 'date', 'onchange="cmPlanPreviewEnd()"')}<div><label class="l">終了日（開始の6か月後の前日）</label><p id="np_end">${cmEsc(end)}</p></div></div><button type="button" onclick="cmPlanCreate('${cmEsc(u.id)}',cmV('np_start'))">第1期を作る</button>`) : ''}
+    </div>
+    <div class="card"><h4>サービス等利用計画</h4>
+      <p class="note">相談支援の計画、または介護保険の居宅サービス計画書です。読み取りは下書きです。確認してから保存します。</p>
+      ${svc.map(s => `<p><b>${cmEsc(s.kind)}</b> ${cmEsc(s.office_name || '')} ${cmEsc(s.author_name || '')}<br>${cmEsc(s.period_from || '')} 〜 ${cmEsc(s.period_to || '')}<br>${cmEsc(String(s.body_text || '').slice(0, 80))}</p>`).join('') || '<p>まだありません。</p>'}
+      ${can ? `<label class="l">PDF・JPEG・PNG</label><input id="sp_file" type="file" accept="application/pdf,image/jpeg,image/png">
+        <p><button type="button" class="sec" onclick="cmPlanReadSvc()">文字を読み取る</button></p>
+        <div class="row">${cmInp('sp_kind', '種別', draft.kind || 'サービス等利用計画')}${cmInp('sp_office', '事業所', draft.office_name || '')}${cmInp('sp_author', '作成者', draft.author_name || '')}</div>
+        <div class="row">${cmInp('sp_created', '作成日', draft.created_on || '', 'date')}${cmInp('sp_consent', '同意日', draft.consent_on || '', 'date')}${cmInp('sp_from', '期間開始', draft.period_from || '', 'date')}${cmInp('sp_to', '期間終了', draft.period_to || '', 'date')}</div>
+        <label class="l">本文（直してから保存）</label><textarea id="sp_body">${cmEsc(draft.body_text || '')}</textarea>
+        <button type="button" onclick="cmPlanSaveSvc('${cmEsc(u.id)}')">確認して保存</button>` : ''}
+    </div>`);
+}
+function cmPlanPreviewEnd() {
+  const s = cmV('np_start');
+  const el = document.getElementById('np_end');
+  if (el) el.textContent = /^\d{4}-\d{2}-\d{2}$/.test(s) ? ChamuPlan.periodEnd(s) : '';
+}
+async function cmPlanCreate(userId, start) {
+  await cmGo(async () => {
+    const b = await cmPlanBundle();
+    const mine = b.plans.filter(p => p.user_id === userId).sort((a, c) => c.term_no - a.term_no);
+    const prev = mine[0];
+    const startOn = prev ? ChamuPlan.nextStart(prev.end_on) : start;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startOn || '')) throw new Error('開始日を入れてください');
+    const row = { user_id: userId, term_no: prev ? prev.term_no + 1 : 1, start_on: startOn, end_on: ChamuPlan.periodEnd(startOn), ...ChamuPlan.guides(startOn), author: cmPlanDemoOn() ? '見本 責任者' : ChamuPlan.AUTHOR, status: '下書き' };
+    let id;
+    if (cmPlanDemoOn()) {
+      id = 'd' + Date.now();
+      CM_PLAN_DEMO.plans.push({ id, genan_signed_at: null, honan_signed_at: null, assessment: '', monitoring: '', genan: '', kaigi: '', honan: '', note: '', ...row });
+    } else {
+      const rows = await cmRest('chamu_plans', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      id = rows && rows[0] && rows[0].id;
+      if (!id) throw new Error('計画を作れませんでした');
+    }
+    CM.st.planUser = userId;
+    CM.st.planId = id;
+    await cmPlanEdit();
+    cmMsg('期を作りました。サービス等利用計画を登録してから、下書きを作れます。', true);
+  });
+}
+async function cmPlanEdit() {
+  const plan = await cmPlanGet(CM.st.planId);
+  const b = await cmPlanBundle();
+  const u = b.users.find(x => x.id === plan.user_id) || { name: '' };
+  const hits = ChamuPlan.needs(plan);
+  const can = b.can;
+  const lockedAll = plan.status === '本案確定' || !!plan.honan_signed_at;
+  const field = ([k, label]) => {
+    const locked = !can || ChamuPlan.fieldLocked(plan, k);
+    return `<label class="l">${cmEsc(label)}${locked ? '（固定）' : ''}</label><textarea id="pe_${k}" rows="10" ${locked ? 'readonly' : ''}>${cmEsc(plan[k] || '')}</textarea>`;
+  };
+  const needHtml = hits.length
+    ? `<div class="wn"><b>【要確認】${hits.length}件</b><ul>${hits.map(h => `<li>${cmEsc(h.doc)} ${h.line}行目: ${cmEsc(h.text)}</li>`).join('')}</ul></div>`
+    : '<div class="okb">【要確認】はありません。</div>';
+  cmFrame('plan', `<button type="button" class="back noprint" onclick="cmPlanOpen('${cmEsc(plan.user_id)}')">← ${cmEsc(u.name)}</button>
+    <h3>${cmEsc(u.name)}　第${plan.term_no}期</h3>
+    <p>${cmEsc(plan.start_on)} 〜 ${cmEsc(plan.end_on)}　作成者 ${cmEsc(plan.author || ChamuPlan.AUTHOR)}　<b>${cmEsc(ChamuPlan.statusLabel(plan))}</b></p>
+    <p class="note">目安: アセスメント ${cmEsc(plan.assess_on || '')} / 原案 ${cmEsc(plan.genan_on || '')} / 会議 ${cmEsc(plan.kaigi_on || '')} / 本案 ${cmEsc(plan.honan_on || '')}</p>
+    <p class="note">#T は中央の見出し、#R は右寄せです。原案を確定すると原案の文章は固定されます。会議録・前期の評価・本案は、本案を確定するまで直せます。本案の確定か署名のあと、5書類は固定されます。</p>
+    ${needHtml}
+    ${ChamuPlan.DOCS.map(field).join('')}
+    <label class="l">メモ</label><textarea id="pe_note" rows="3" ${can ? '' : 'readonly'}>${cmEsc(plan.note || '')}</textarea>
+    <p class="noprint">${can && !lockedAll ? '<button type="button" onclick="cmPlanSave()">保存</button>' : ''}
+      ${can && plan.status === '下書き' ? '<button type="button" class="sec" onclick="cmPlanDraft()">AIで下書きを作る</button>' : ''}
+      ${can && plan.status === '下書き' ? '<button type="button" class="sec" onclick="cmPlanConfirm(\'原案確定\')">原案確定</button>' : ''}
+      ${can && plan.status === '原案確定' ? '<button type="button" class="sec" onclick="cmPlanConfirm(\'本案確定\')">本案確定</button>' : ''}
+      ${can && !plan.genan_signed_at && (plan.status === '原案確定' || plan.status === '本案確定') ? '<button type="button" onclick="cmPlanSignOpen(\'原案\')">タブレットで原案に署名</button>' : ''}
+      ${can && plan.status === '本案確定' && plan.genan_signed_at && !plan.honan_signed_at ? '<button type="button" onclick="cmPlanSignOpen(\'本案\')">タブレットで本案に署名</button>' : ''}
+      <button type="button" class="sec" onclick="cmPlanPrint()">印刷／PDF</button></p>`);
+}
+async function cmPlanWrite() {
+  const plan = await cmPlanGet(CM.st.planId);
+  const body = { note: cmV('pe_note').trim() || null };
+  ChamuPlan.DOCS.forEach(([k]) => { if (!ChamuPlan.fieldLocked(plan, k)) body[k] = cmV('pe_' + k); });
+  await cmPlanPatch(plan.id, body);
+}
+async function cmPlanSave() {
+  await cmGo(async () => {
+    await cmPlanWrite();
+    await cmPlanEdit();
+    cmMsg('保存しました。', true);
+  });
+}
+async function cmPlanConfirm(status) {
+  await cmGo(async () => {
+    await cmPlanWrite();
+    await cmPlanPatch(CM.st.planId, { status });
+    await cmPlanEdit();
+    cmMsg(status + 'にしました。', true);
+  });
+}
+async function cmPlanDraft() {
+  if (CM.planBusy) return;
+  CM.planBusy = true;
+  try {
+    await cmGo(async () => {
+      const id = CM.st.planId;
+      if (cmPlanDemoOn()) {
+        const i = CM_PLAN_DEMO.plans.findIndex(p => String(p.id) === String(id));
+        if (i < 0) throw new Error('計画がありません');
+        const plan = CM_PLAN_DEMO.plans[i];
+        if (plan.status !== '下書き') throw new Error('下書きではないため書き戻しませんでした');
+        const u = CM_PLAN_DEMO.users.find(x => x.id === plan.user_id);
+        Object.assign(plan, ChamuPlan.skeleton(plan, u && u.name));
+        await cmPlanEdit();
+        cmMsg('見本の下書きを入れました。【要確認】を直してください。', true);
+        return;
+      }
+      const waiting = await cmRest('chamu_plan_requests?plan_id=eq.' + id + '&status=eq.待ち&select=id&order=created_at.desc&limit=1') || [];
+      let reqId = waiting[0] && waiting[0].id;
+      if (!reqId) {
+        let rows;
+        try {
+          rows = await cmRest('chamu_plan_requests', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ plan_id: Number(id), status: '待ち' }) });
+        } catch (e) {
+          if (/duplicate|unique|one_wait/i.test(String(e.message || e))) throw new Error('いま下書きを作っています。終わるまでお待ちください');
+          throw e;
+        }
+        reqId = rows && rows[0] && rows[0].id;
+      }
+      if (!reqId) throw new Error('依頼を作れませんでした');
+      cmMsg('下書きを作っています。この画面のままお待ちください。', true);
+      await cmPlanWait(reqId);
+      await cmPlanEdit();
+      cmMsg('下書きを入れました。【要確認】を直してください。', true);
+    });
+  } finally { CM.planBusy = false; }
+}
+async function cmPlanWait(reqId) {
+  for (let i = 0; i < 50; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const rows = await cmRest('chamu_plan_requests?id=eq.' + reqId + '&select=status,error') || [];
+    const row = rows[0];
+    if (!row) throw new Error('依頼が見つかりません');
+    if (row.status === '作成済み') return;
+    if (row.status === 'エラー') throw new Error(row.error || '下書きを作れませんでした');
+  }
+  throw new Error('まだ作成中です。しばらくしてから開き直してください。');
+}
+function cmPlanSignOpen(doc) { CM.st.planSign = doc; renderChamu('plan'); }
+async function cmPlanSign() {
+  const doc = CM.st.planSign;
+  const plan = await cmPlanGet(CM.st.planId);
+  const b = await cmPlanBundle();
+  const u = b.users.find(x => x.id === plan.user_id) || { name: '' };
+  const text = doc === '本案' ? plan.honan : plan.genan;
+  const ex = cmPlanDemoOn() ? '見本 責任者' : ChamuPlan.AUTHOR;
+  cmFrame('plan', '<p>署名の画面を開いています。</p>');
+  const old = document.getElementById('cm_sign');
+  if (old) old.remove();
+  const layer = document.createElement('div');
+  layer.id = 'cm_sign';
+  layer.className = 'cm-plan-sign';
+  layer.innerHTML = `<div class="doc" id="cm_sign_doc"></div><div class="bar">
+      <p><b>${cmEsc(u.name)}　${cmEsc(doc)}</b>　文字を一緒に確認してから、下に署名してください。</p>
+      <label class="l">署名する方法</label><select id="sg_method" onchange="cmPlanSignMethod()"><option>本人</option><option>ご家族</option><option>署名困難</option></select>
+      <div id="sg_family" style="display:none">${cmInp('sg_name', '署名する人の氏名', '')}${cmInp('sg_rel', '続柄', '')}</div>
+      <div id="sg_hard" style="display:none">${cmInp('sg_reason', '署名できない理由', '')}</div>
+      ${cmInp('sg_ex', '説明した職員', ex)}
+      <div id="sg_pad" class="pad"><canvas id="cm_sign_cv"></canvas></div>
+      <p><button type="button" class="sec inl" onclick="if(CM.pad)CM.pad.clear()">書き直す</button>
+        <button type="button" onclick="cmPlanSignSave()">署名を保存</button>
+        <button type="button" class="sec inl" onclick="cmPlanSignClose()">戻る</button></p>
+      <p id="sg_m"></p></div>`;
+  document.body.appendChild(layer);
+  document.body.style.overflow = 'hidden';
+  const docEl = document.getElementById('cm_sign_doc');
+  if (docEl) docEl.innerHTML = cmPlanMarkup(text || '本文がありません。');
+  setTimeout(() => { const cv = document.getElementById('cm_sign_cv'); if (cv && typeof createSignPad === 'function') CM.pad = createSignPad(cv); }, 40);
+}
+function cmPlanSignMethod() {
+  const m = cmV('sg_method');
+  const fam = document.getElementById('sg_family'), hard = document.getElementById('sg_hard'), pad = document.getElementById('sg_pad');
+  if (fam) fam.style.display = m === 'ご家族' ? '' : 'none';
+  if (hard) hard.style.display = m === '署名困難' ? '' : 'none';
+  if (pad) pad.style.display = m === '署名困難' ? 'none' : '';
+}
+function cmPlanSignClose() {
+  const layer = document.getElementById('cm_sign');
+  if (layer) layer.remove();
+  document.body.style.overflow = '';
+  CM.st.planSign = null;
+  CM.pad = null;
+  renderChamu('plan');
+}
+async function cmPlanSignSave() {
+  const m = document.getElementById('sg_m');
+  const say = t => { if (m) m.textContent = t; };
+  try {
+    const doc = CM.st.planSign, method = cmV('sg_method');
+    let sig = null;
+    if (method !== '署名困難') {
+      if (!CM.pad || !CM.pad.isDrawn()) throw new Error('署名してください');
+      sig = CM.pad.toDataURL();
+      if (!sig || sig.indexOf('data:image/png;base64,') !== 0) throw new Error('署名を読み取れませんでした');
+      if (sig.length > 300000) throw new Error('署名が大きすぎます。書き直してください');
+    }
+    const payload = { doc, method, signature: sig, name: cmV('sg_name').trim(), relation: cmV('sg_rel').trim(), reason: cmV('sg_reason').trim(), explainer: cmV('sg_ex').trim() };
+    if (method === 'ご家族' && (!payload.name || !payload.relation)) throw new Error('署名される方の氏名と続柄を入れてください');
+    if (method === '署名困難' && !payload.reason) throw new Error('理由を入れてください');
+    if (cmPlanDemoOn()) {
+      const i = CM_PLAN_DEMO.plans.findIndex(p => String(p.id) === String(CM.st.planId));
+      if (i < 0) throw new Error('計画がありません');
+      CM_PLAN_DEMO.plans[i] = ChamuPlan.applySign(CM_PLAN_DEMO.plans[i], doc);
+      CM_PLAN_DEMO.signs.unshift({ plan_id: CM.st.planId, doc, method, signer_name: payload.name, signer_relation: payload.relation, reason: payload.reason, explainer_name: payload.explainer || '見本 責任者', signed_on: cmToday(), signature: sig });
+    } else {
+      await cmRest('rpc/chamu_plan_sign_onsite', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ p_plan_id: Number(CM.st.planId), p_doc: doc, p_method: method, p_signature: sig, p_name: payload.name || null, p_relation: payload.relation || null, p_reason: payload.reason || null, p_explainer: payload.explainer || null }) });
+    }
+    cmPlanSignClose();
+    cmMsg(doc + 'の署名を保存しました。', true);
+  } catch (e) { say(e.message || String(e)); }
+}
+async function cmPlanPrint() {
+  const plan = await cmPlanGet(CM.st.planId);
+  const signs = await cmPlanSigns(plan.id);
+  const latest = {};
+  signs.forEach(s => { if (!latest[s.doc]) latest[s.doc] = s; });
+  const block = doc => {
+    const s = latest[doc];
+    if (!s) return '';
+    const img = s.signature && String(s.signature).indexOf('data:image/png;base64,') === 0 ? `<p><img alt="署名" src="${s.signature}" style="width:240px;background:#fff;border:1px solid #111"></p>` : '';
+    const who = s.method === 'ご家族' ? `${s.signer_name || ''}（${s.signer_relation || ''}）` : (s.method || '');
+    const why = s.method === '署名困難' ? `<p>理由: ${cmEsc(s.reason || '')}</p>` : '';
+    return `<div><p>署名日: ${cmEsc(s.signed_on || '')}　方法: ${cmEsc(who)}</p><p>説明者: ${cmEsc(s.explainer_name || '')}</p>${why}${img}</div>`;
+  };
+  const b = await cmPlanBundle();
+  const u = b.users.find(x => x.id === plan.user_id) || { name: '' };
+  const pages = ChamuPlan.DOCS.map(([k]) => `<section>${cmPlanMarkup(plan[k] || '')}${k === 'genan' ? block('原案') : k === 'honan' ? block('本案') : ''}</section>`);
+  const w = window.open('', '_blank');
+  if (!w) { alert('ポップアップを許可してください'); return; }
+  w.document.write('<!doctype html><meta charset="utf-8"><title>' + cmEsc(u.name) + ' 第' + plan.term_no + '期</title><style>body{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:12pt;line-height:1.75;margin:16mm}h2{font-size:16pt}section{page-break-after:always}mark{background:#ffe08a}</style>' + pages.join('') + '<script>setTimeout(function(){print()},300)<\/script>');
+  w.document.close();
+}
+async function cmPlanReadSvc() {
+  await cmGo(async () => {
+    const input = document.getElementById('sp_file');
+    const file = input && input.files && input.files[0];
+    if (!file) throw new Error('ファイルを選んでください');
+    if (file.size > 8 * 1024 * 1024) throw new Error('8MB以内のPDFか画像にしてください');
+    if (!/pdf|jpeg|png|jpg/i.test(file.type) && !/\.(pdf|jpe?g|png)$/i.test(file.name)) throw new Error('PDF、JPEG、PNGを選んでください');
+    if (cmPlanDemoOn()) {
+      CM.st.svc = { kind: 'サービス等利用計画', office_name: '見本相談支援', author_name: '見本 相談員', created_on: '2026-10-01', consent_on: '', period_from: '', period_to: '', body_text: '（見本）読み取りです。本人の意向は【要確認】。家族の状況は【要確認】。' };
+      CM.st.svcFile = null;
+      await cmPlanUser();
+      cmMsg('見本の読み取りを入れました。確認して保存してください。', true);
+      return;
+    }
+    const dataUrl = await new Promise((ok, ng) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result || '')); fr.onerror = () => ng(new Error('ファイルを読めませんでした')); fr.readAsDataURL(file); });
+    let s = {}; try { s = JSON.parse(localStorage.getItem('sess') || '{}'); } catch (e) { s = {}; }
+    const r = await fetch(C.supabaseUrl + '/functions/v1/chamu-svcplan-read', { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + (s.token || ''), 'Content-Type': 'application/json' }, body: JSON.stringify({ data_url: dataUrl }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j && j.error) || '読み取れませんでした');
+    CM.st.svc = j;
+    CM.st.svcFile = file;
+    await cmPlanUser();
+    cmMsg('読み取りました。直してから保存してください。', true);
+  });
+}
+async function cmPlanSaveSvc(userId) {
+  await cmGo(async () => {
+    const bodyText = cmV('sp_body').trim();
+    if (!bodyText) throw new Error('本文を入れてください');
+    const row = { user_id: userId, kind: cmV('sp_kind').trim() || 'サービス等利用計画', office_name: cmV('sp_office').trim() || null, author_name: cmV('sp_author').trim() || null, created_on: cmV('sp_created') || null, consent_on: cmV('sp_consent') || null, period_from: cmV('sp_from') || null, period_to: cmV('sp_to') || null, body_text: bodyText, storage_path: null };
+    if (cmPlanDemoOn()) {
+      CM_PLAN_DEMO.svc.unshift({ id: 'ds' + Date.now(), ...row });
+    } else {
+      const file = CM.st.svcFile;
+      if (file) {
+        const ext = (String(file.name || '').split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+        const path = userId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+        let s = {}; try { s = JSON.parse(localStorage.getItem('sess') || '{}'); } catch (e) { s = {}; }
+        const up = await fetch(C.supabaseUrl + '/storage/v1/object/chamu-docs/' + path.split('/').map(encodeURIComponent).join('/'), { method: 'POST', headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + (s.token || ''), 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file });
+        if (!up.ok) throw new Error('ファイルを保存できませんでした');
+        row.storage_path = path;
+      }
+      await cmRest('chamu_service_plans', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    }
+    CM.st.svc = null;
+    CM.st.svcFile = null;
+    await cmPlanUser();
+    cmMsg('サービス等利用計画を保存しました。', true);
   });
 }
