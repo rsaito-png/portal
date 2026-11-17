@@ -506,14 +506,14 @@ var ChamuLib = (() => {
   const recordId = id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''));
   const unsignedRecords = records => (records || []).filter(r => r && recordId(r.id) && !r.signed_at).slice()
     .sort((a, b) => String(a.service_date || '').localeCompare(String(b.service_date || '')) || String(a.id).localeCompare(String(b.id)));
-  // チェックした未署名だけ。署名済みは含めない（上書きしない）。
+  // 未署名の日すべて。署名済みは含めない（上書きしない）。
   const batchSignPlan = (records, pickedIds, signature) => {
     const sig = String(signature == null ? '' : signature);
     if (sig.indexOf('data:image/png;base64,') !== 0) return { error: '署名を読み取れませんでした' };
     if (sig.length > SIGN_MAX) return { error: '署名が大きすぎます。書き直してください' };
     const want = {};
     (pickedIds || []).forEach(id => { if (recordId(id)) want[String(id)] = true; });
-    if (!Object.keys(want).length) return { error: '署名する日にチェックを入れてください' };
+    if (!Object.keys(want).length) return { error: '未署名の日がありません' };
     const ids = [];
     (records || []).forEach(r => {
       if (!r || !want[String(r.id)] || r.signed_at) return;
@@ -1142,34 +1142,30 @@ async function cmBatchSign() {
   CM.st.batchRows = open;
   const days = open.map(r => {
     const dow = ChamuLib.dowOf(String(r.service_date || '').slice(0, 10));
-    return `<label class="cm-day"><input type="checkbox" id="bs_${r.id}" checked> <span><b>${cmEsc(String(r.service_date || '').slice(0, 10))}${dow ? '（' + dow + '）' : ''}</b>　${cmEsc(String(r.start_time || '').slice(0, 5))}–${cmEsc(String(r.end_time || '').slice(0, 5))}　送迎 ${cmEsc(r.transport || '')}　食事 ${cmEsc(r.meal || '')}</span></label>`;
+    return `<div class="cm-day"><span><b>${cmEsc(String(r.service_date || '').slice(0, 10))}${dow ? '（' + dow + '）' : ''}</b>　${cmEsc(String(r.start_time || '').slice(0, 5))}–${cmEsc(String(r.end_time || '').slice(0, 5))}　送迎 ${cmEsc(r.transport || '')}　食事 ${cmEsc(r.meal || '')}</span></div>`;
   }).join('');
   cmFrame('records', `<button class="back noprint" onclick="CM.st.batch=null;renderChamu('records')">← 実績の一覧</button>
     <div class="cm-sign"><h3>未署名をまとめて署名</h3>
-    <p class="note">${cmEsc(name)}さんに端末を渡して、下の枠に1回サインしてもらってください。チェックした日すべてに、同じ署名が付きます。署名済みの日は変わりません。1日だけもらうときは、一覧の「記録票・署名」です。</p>
+    <p class="note">${cmEsc(name)}さんに端末を渡して、下の枠に1回サインしてもらってください。下の未署名の日すべてに、同じ署名が付きます。署名済みの日は変わりません。1日だけもらうときは、一覧の「記録票・署名」です。</p>
     <div class="row noprint"><div><label class="l">利用者</label>${cmSel('bs_u', users.map(u => [u.id, u.name + (u.active ? '' : '（停止）')]), uid)}</div>
       <div style="align-self:end"><button type="button" class="sec inl" onclick="CM.st.user=cmV('bs_u');renderChamu('records')">表示</button></div></div>
-    <p><b>未署名 ${open.length}件</b>　はじめはすべてチェックが入っています。いらない日は外してください。</p>
-    ${open.length ? `<p class="noprint"><button type="button" class="sec inl" onclick="cmBatchCheck(true)">すべて選ぶ</button> <button type="button" class="sec inl" onclick="cmBatchCheck(false)">すべて外す</button></p>
-      <div class="card">${days}</div>
+    <p><b>未署名 ${open.length}件</b>（すべてに署名が付きます）</p>
+    ${open.length ? `<div class="card">${days}</div>
       <div class="card"><p><b>署名欄</b>（指で、大きく書いてください）</p>
         <div class="pad cm-pad"><canvas id="cm_cv"></canvas></div>
         <p class="noprint"><button class="sec inl" type="button" onclick="if(CM.pad)CM.pad.clear()">書き直す</button></p>
-        <button type="button" onclick="cmBatchSave()">チェックした日に署名を保存</button></div>` : '<div class="card"><p>未署名の実績はありません。</p></div>'}
+        <button type="button" onclick="cmBatchSave()">${open.length}件に署名を保存</button></div>` : '<div class="card"><p>未署名の実績はありません。</p></div>'}
     </div>`);
   setTimeout(() => { const cv = document.getElementById('cm_cv'); if (cv && typeof createSignPad === 'function') CM.pad = createSignPad(cv); }, 30);
-}
-function cmBatchCheck(on) {
-  (CM.st.batchRows || []).forEach(r => { const el = document.getElementById('bs_' + r.id); if (el) el.checked = !!on; });
 }
 async function cmBatchSave() {
   await cmGo(async () => {
     if (!CM.pad || !CM.pad.isDrawn()) throw new Error('署名してください');
-    const picked = (CM.st.batchRows || []).filter(r => cmC('bs_' + r.id)).map(r => r.id);
+    const picked = (CM.st.batchRows || []).map(r => r.id);
     const plan = ChamuLib.batchSignPlan(CM.st.batchRows, picked, CM.pad.toDataURL());
     if (plan.error) throw new Error(plan.error);
     const q = ChamuLib.batchSignQuery(plan.ids);
-    if (!q) throw new Error('署名する日にチェックを入れてください');
+    if (!q) throw new Error('未署名の日がありません');
     const saved = await cmRest(q, {
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ signature_data: plan.signature, signed_at: await cmNow() }),
