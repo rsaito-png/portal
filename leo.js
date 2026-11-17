@@ -2252,9 +2252,12 @@ async function planData() {
   if (DEMO) return { rows: PLAN_DEMO_ROWS, ...PLAN_DEMO_DB };
   const [rows, plans, links, ans, staff] = await Promise.all([trackRows(), sb('leo_plans?order=child,term_no'), sb('leo_mon_links?select=token,child,term').catch(() => []),
     sb('leo_mon_answers?order=submitted_at.desc').catch(() => []), sb('leo_staff_mon').catch(() => [])]);
-  const [sends, clinks] = await Promise.all([sb('leo_link_sends?order=sent_at').catch(() => []), sb('leo_plan_consent_links?select=token,plan_id,doc,used_at,expires_at&order=link_id').catch(() => [])]);
+  const [sends, clinks, afs, cas] = await Promise.all([sb('leo_link_sends?order=sent_at').catch(() => []), sb('leo_plan_consent_links?select=token,plan_id,doc,used_at,expires_at&order=link_id').catch(() => []),
+    sb('leo_af_subs?select=child,status,created_at&order=id.desc').catch(() => []), sb('leo_child_assess?select=name').catch(() => [])]);
   const L = Object.fromEntries(links.map(l => [l.token, l]));
-  return { rows, plans, links, sends, clinks, staff, mon: ans.map(a => ({ ...L[a.token], answers: a.answers, submitted_at: a.submitted_at })) };
+  // 初回（第1期）は保護者アンケートの代わりにアセスメントシート。保護者の送信（却下以外）か、反映済みのアセスメントがあれば回答あり
+  const assess = [...afs.filter(x => x && x.status !== 'rejected').map(x => ({ child: x.child, at: x.created_at })), ...cas.map(x => ({ child: x.name, at: '' }))];
+  return { rows, plans, links, sends, clinks, staff, assess, mon: ans.map(a => ({ ...L[a.token], answers: a.answers, submitted_at: a.submitted_at })) };
 }
 // 個別支援計画（管理）の児童1人分。カードの赤い行（act）と、開始月・期間の急ぎ（flags）はここだけ。画面のボタンや文面は変えない。
 function planChildStatus(r, D0, LEFT, tday, t) {
@@ -2265,7 +2268,8 @@ function planChildStatus(r, D0, LEFT, tday, t) {
   // カードの期は「いま作っている次の期」＝現在の期+1。次期開始月が過ぎても、ここでは期を足さない。
   const cur = parseInt(String(r['現在の期']).replace(/\D/g, '')) || 0, n = cur + 1, term = `第${n}期`;
   const p = D0.plans.find(x => N(x.child) === N(name) && x.term_no === n), now = D0.plans.find(x => N(x.child) === N(name) && x.term_no === cur);
-  const mon = planExactTerm(D0.mon, name, term);
+  const firstAssess = n === 1 ? (D0.assess || []).find(x => x && N(x.child) === N(name)) : null;
+  const mon = planExactTerm(D0.mon, name, term) || (firstAssess ? { child: name, term, submitted_at: firstAssess.at, via: 'アセスメントシート' } : null);
   const sm = planExactTerm(D0.staff, name, term);
   const ago = x => Math.floor((t - new Date(new Date(x).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) + 'T00:00:00+09:00')) / 864e5);
   const wait = [];
@@ -2347,7 +2351,7 @@ LEO_VIEWS.plan = async function () {
         
         ${d ? `<p><small>書類に入れる日付（作成者 ${gl('name:jihatsukan','【児発管氏名】')}）：アセスメント ${md(d.assess)}・原案 ${md(d.genan)}・担当者会議 ${md(d.kaigi)}・本案 ${md(d.honan)}</small></p>` : '<p class="note">管理表の「次期開始月」がありません。</p>'}
         <h4>今の計画（第${cur}期）</h4>${now ? `<p><small>${now.imported_from ? '取り込み元：' + esc(now.imported_from) : 'ポータルで作成'}${now.verified ? '　✅ 確認済' : '　<span class="badge">未確認</span>'}</small></p>${now.note ? `<p><small>${esc(now.note)}</small></p>` : ''}${btn('今の計画書を見る・印刷', `planPrint(${now.id})`)}` : '<p class="note">まだ取り込んでいません（未確認）。</p>'}
-        <h4>1. 保護者アンケート</h4>${mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
+        <h4>1. 保護者アンケート</h4>${mon && mon.via === 'アセスメントシート' ? `<p><small>初回なので、アセスメントシートの返事を保護者アンケートの回答としています${mon.submitted_at ? '（' + new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + '）' : ''}。<a href="#leo/assess">アセスメントを見る</a></small></p>` : mon ? `<p><small>回答 ${new Date(mon.submitted_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}：${esc(Object.entries(mon.answers).filter(([k, v]) => typeof v === 'string' && v).map(([k, v]) => v).join('／')).slice(0, 200)}</small></p>` : '<p class="note">まだ回答がありません。</p>'}
         ${mg ? btn('アンケートのリンクを作る（コピーしてLINEで送る）', `planLink('mon','${esc(name)}','${term}',0,'')`) : ''}
         <h4>2. 職員モニタリング</h4><p><a href="#leo/monitoring?child=${encodeURIComponent(name)}">モニタリングシートを開く</a></p>${sm ? `<details><summary>${esc(sm.source)}（タップで読む）</summary><p style="white-space:pre-wrap"><small>${esc(sm.text)}</small></p></details>` : '<p class="note">まだありません。</p>'}
         ${mg ? btn('活動記録から作る（今の計画期間）', `staffMon('${esc(name)}','${term}',${cur})`) : ''}
