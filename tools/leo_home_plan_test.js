@@ -31,7 +31,7 @@ sandbox.$ = () => ({ textContent: '', style: {}, value: '', innerHTML: '' });
 vm.createContext(sandbox);
 vm.runInContext(read('leo_left.js'), sandbox, { filename: 'leo_left.js' });
 vm.runInContext(read('gl.js'), sandbox, { filename: 'gl.js' });
-vm.runInContext(read('leo.js') + '\nthis.__leo = { LEO_VIEWS, planData, loadLeftIndex, today, planChildStatus, planHomeTodos, planUrgencyLabel, setDuty(v) { DUTY = v; } };', sandbox, { filename: 'leo.js' });
+vm.runInContext(read('leo.js') + '\nthis.__leo = { LEO_VIEWS, planData, loadLeftIndex, today, planChildStatus, planHomeTodos, planUrgencyLabel, planDocsFromAssess, planDatesFromStart, planSkeleton, setDuty(v) { DUTY = v; } };', sandbox, { filename: 'leo.js' });
 
 const plain = v => JSON.parse(JSON.stringify(v));
 const planChildStatus = sandbox.__leo.planChildStatus;
@@ -146,6 +146,81 @@ const docs = { genan: '原案', honan: '本案', assessment: 'アセス', kaigi:
   assert.strictEqual(todos[0][0], 1);
 }
 
+
+// 初回（term 0）：本案の同意まで済みなら、アンケートの依頼は出さない
+{
+  const row = { 児童名: '平山 悠翔', 現在の期: '0期', 次期開始月: '2026年11月', フォーム回答日: '', 本案署名: '済', _track: { term_no: 0, next_start: '2026-11-12', honan_consent_at: '2026-11-17T03:18:51.803922+00:00' } };
+  const D0 = pack([row], [{ id: 31, child: '平山 悠翔', term_no: 1, assessment: 'ア', genan: '原', kaigi: '会', honan: '本', plan_made: true, genan_consent_at: '2026-11-16T08:19:50+00:00', honan_consent_at: '2026-11-17T03:18:51+00:00' }]);
+  const s = planChildStatus(row, D0, {}, tday, t);
+  assert.strictEqual(s.firstPlan, true);
+  assert.strictEqual(s.st, 7);
+  assert.ok(s.act.startsWith('✅'));
+  assert.deepStrictEqual(plain(planHomeTodos(D0, {}, tday, t)), []);
+}
+
+// 初回（term 0）：アセスメントはあるが計画がまだ。アンケートは出さない
+{
+  const row = { 児童名: '児童Z', 現在の期: '0期', 次期開始月: '2026年11月', フォーム回答日: '', 本案署名: '未', _track: { term_no: 0, next_start: '2026-11-12', period_to: null } };
+  const D0 = pack([row]);
+  D0.assess = [{ child: '児童Z', at: '2026-11-01T00:00:00+09:00' }];
+  const s = planChildStatus(row, D0, {}, tday, t);
+  assert.strictEqual(s.firstPlan, true);
+  assert.notStrictEqual(s.act, '保護者アンケートのリンクを送る');
+  assert.strictEqual(s.act, 'アセスメントから計画書を作る');
+  assert.strictEqual(s.st, 2);
+  const todos = plain(planHomeTodos(D0, {}, tday, t));
+  assert.strictEqual(todos.length, 1);
+  assert.ok(todos[0][2].includes('アセスメントから計画書を作る'));
+  assert.ok(!todos[0][2].includes('保護者アンケート'));
+}
+
+// 初回：アセスメントも計画もない。アンケートではなくアセスメントのリンク
+{
+  const row = { 児童名: '児童Y', 現在の期: '0期', 次期開始月: '2026年11月', フォーム回答日: '', 本案署名: '未', _track: { term_no: 0, next_start: '2026-11-12' } };
+  const D0 = pack([row]);
+  const s = planChildStatus(row, D0, {}, tday, t);
+  assert.strictEqual(s.act, 'アセスメントのリンクを送る');
+  assert.ok(!plain(planHomeTodos(D0, {}, tday, t))[0][2].includes('保護者アンケート'));
+}
+
+// 本案を送ったあとは、アンケート未回答でもアンケート依頼を出さない
+{
+  const row = { 児童名: '児童X', 現在の期: '2期', 次期開始月: '2026年11月', フォーム回答日: '', 本案署名: '未', _track: { term_no: 2, period_to: '2026-10-31', next_start: '2026-11-01' } };
+  const D0 = pack([row], [{ id: 9, child: '児童X', term_no: 3, ...docs }], [],
+    [{ kind: 'doui', child: '児童X', term: '第3期', plan_id: 9, doc: '本案', sent_at: '2026-10-30T10:00:00+09:00', via: 'ポータル' }]);
+  const s = planChildStatus(row, D0, {}, tday, t);
+  assert.ok(s.st >= 6);
+  assert.ok(s.act.includes('本案の同意'));
+  assert.ok(!s.act.includes('保護者アンケート'));
+}
+
+// 見直し（第4期）は、更新月の1か月前より前ならアンケートを出さない
+{
+  const row = { 児童名: '西山 琴', 現在の期: '3期', 次期開始月: '2027年1月', フォーム回答日: '', 本案署名: '未', _track: { term_no: 3, period_from: '2026-07-01', period_to: '2026-12-31', next_start: '2027-01-01' } };
+  const day = '2026-11-18', now = new Date(day + 'T00:00:00+09:00');
+  const D0 = pack([row]);
+  const s = planChildStatus(row, D0, {}, day, now);
+  assert.strictEqual(s.firstPlan, false);
+  assert.strictEqual(s.st, 0);
+  assert.strictEqual(s.act, '保護者アンケートのリンクを送る');
+  assert.strictEqual(s.flags.urgent, false);
+  assert.deepStrictEqual(plain(planHomeTodos(D0, {}, day, now)), []);
+}
+
+// アセスメントから計画書の本文が埋まる
+{
+  const d = sandbox.__leo.planDatesFromStart('2026-11-12');
+  const docs = sandbox.__leo.planDocsFromAssess('平山 悠翔', 1, d, {
+    wish_life: 'ひとりでトイレに行く', wish_habit: '服を自分で着る', wish_motor: '外で体を動かす',
+    wish_cog: '落ち着いて遊ぶ', wish_lang: '気持ちを言葉で伝える', wish_human: '友だちと遊ぶ',
+    personality: '明るい', birth: '2018-04-29'
+  });
+  assert.ok(docs.genan.includes('ひとりでトイレに行く'));
+  assert.ok(docs.honan.includes('気持ちを言葉で伝える'));
+  assert.ok(docs.assessment.includes('2018-04-29'));
+  assert.ok(docs.kaigi.includes('アセスメント'));
+}
+
 // 見本データでも、管理画面の次の行動と今日やることが一致する。退所の児童B・児童Dは出さない。
 (async () => {
   const day = sandbox.__leo.today();
@@ -205,6 +280,6 @@ const docs = { genan: '原案', honan: '本案', assessment: 'アセス', kaigi:
   assert.ok(!homeFn.includes("sheetRows('keikaku')"));
   assert.ok(!homeFn.includes('#leo/keikaku'));
   assert.ok(homeFn.includes('planHomeTodos'));
-  assert.ok(read('index.html').includes('leo.js?v=20261113kataday'));
+  assert.ok(read('index.html').includes('leo.js?v=20261118first1'));
   console.log('leo_home_plan_test ok');
 })().catch(e => { console.error(e); process.exit(1); });

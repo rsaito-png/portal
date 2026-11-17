@@ -51,26 +51,28 @@ function skTermOf(sel, plans, monLinks) {
   }
   return '第1期';
 }
-function skLineMsg(kind, url) {
+function skLineMsg(kind, url, doc) {
   const u = String(url || '').trim();
   if (kind === 'assess') return `レオです。\n\nご利用前のアセスメントのご案内です。下のリンクを開いて、ご入力をお願いいたします。\n\n${u}`;
   if (kind === 'mon') return `レオです。\n\n個別支援計画のための保護者アンケートです。下のリンクを開いて、ご回答をお願いいたします。\n\n${u}`;
   if (kind === 'doc') return `レオです。\n\n利用契約書と重要事項説明書の署名用リンクです。下のリンクを開いて、ご確認とご署名をお願いいたします。\n\n${u}`;
+  if (kind === 'doui') return `レオです。\n\n個別支援計画（${doc || '本案'}）の同意のお願いです。下のリンクを開いて、ご確認と同意をお願いいたします。\n\n${u}`;
   return `レオです。\n\n下のリンクを開いてください。\n\n${u}`;
 }
 function skLastLineSend(sends, kind, child, pred) {
   const c = skCompact(child);
   return (sends || []).filter(s => s.kind === kind && skCompact(s.child) === c && s.via === '公式LINE' && (!pred || pred(s))).pop();
 }
-function skLineBox(id, kind, child, term, token, url, lastSend) {
+function skLineBox(id, kind, child, term, token, url, lastSend, doc) {
   if (!url) return '';
   const when = lastSend && lastSend.sent_at ? `${skWhen(lastSend.sent_at)}（Asia/Tokyo）` : 'まだありません';
+  const docArg = doc || '';
   return `<div class="sk-linebox" style="margin:10px 0;padding:10px;border:1px solid #cde;border-radius:8px;background:#f7fbf8">
     <p class="note">保護者への案内です。コピーして、公式LINEの1対1トークに貼って送ってください。ポータルからは送りません。</p>
-    <textarea id="${esc(id)}" readonly rows="7" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.6">${esc(skLineMsg(kind, url))}</textarea>
+    <textarea id="${esc(id)}" readonly rows="7" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.6">${esc(skLineMsg(kind, url, doc))}</textarea>
     <p style="margin:8px 0">
       <button type="button" onclick="skCopyMsg('${esc(id)}')">コピー</button>
-      <button type="button" onclick="skMarkSent('${esc(id)}','${esc(kind)}','${skArg(child)}','${skArg(term || '')}','${skArg(token || '')}','${skArg(url)}')">LINEで送った</button>
+      <button type="button" onclick="skMarkSent('${esc(id)}','${esc(kind)}','${skArg(child)}','${skArg(term || '')}','${skArg(token || '')}','${skArg(url)}','${skArg(docArg)}')">LINEで送った</button>
       <span id="${esc(id)}_msg" class="note"></span>
     </p>
     <p>公式LINEで送った日時：${esc(when)}</p>
@@ -97,15 +99,15 @@ window.skCopyMsg = async function (id) {
   if (!ok && el) { try { el.focus(); el.select(); } catch (e) {} }
   if (note) note.textContent = ok ? 'コピーしました。公式LINEの1対1トークに貼って送ってください。' : '自動でコピーできませんでした。案内の欄を長押し（または選択）してコピーしてください。';
 };
-window.skMarkSent = async function (id, kind, child, term, token, url) {
+window.skMarkSent = async function (id, kind, child, term, token, url, doc) {
   const note = typeof document !== 'undefined' && document.getElementById(id + '_msg');
   if (DEMO) {
-    SK_DEMO.sends.push({ kind, child, term, token, url, via: '公式LINE', sent_at: new Date().toISOString() });
+    SK_DEMO.sends.push({ kind, child, term, token, url, doc: doc || null, via: '公式LINE', sent_at: new Date().toISOString() });
     if (typeof renderLeoView === 'function') renderLeoView('shokai');
     return;
   }
   try {
-    await sb('leo_link_sends', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ kind, child, term: term || null, token: token || null, url: url || null, via: '公式LINE' }) });
+    await sb('leo_link_sends', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ kind, child, term: term || null, token: token || null, url: url || null, doc: doc || null, via: '公式LINE' }) });
     if (typeof renderLeoView === 'function') renderLeoView('shokai');
   } catch (e) {
     if (note) note.textContent = '記録できませんでした：' + (e && e.message ? e.message : e);
@@ -167,6 +169,38 @@ window.skDocLink = async function (child) {
   } catch (e) { alert(e.message); }
 };
 
+window.skPlanNew = async function (child, y, m) {
+  if (!child) return;
+  if (typeof planNew !== 'function') { location.hash = 'leo/plan'; return; }
+  await planNew(child, 1, y, m, { view: 'shokai' });
+};
+window.skPlanFill = async function (planId) {
+  if (!planId) return;
+  if (typeof planFillFromAssess !== 'function') { location.hash = 'leo/plan'; return; }
+  await planFillFromAssess(planId, { view: 'shokai' });
+};
+window.skPlanMade = async function (planId) {
+  if (!planId) return;
+  if (DEMO) { if (typeof renderLeoView === 'function') renderLeoView('shokai'); return; }
+  try {
+    await sb(`leo_plans?id=eq.${planId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ plan_made: true }) });
+    if (typeof renderLeoView === 'function') renderLeoView('shokai');
+  } catch (e) { alert(e.message); }
+};
+window.skDouiLink = async function (planId, doc, child) {
+  if (!planId || !doc) return;
+  if (DEMO) {
+    SK_DEMO.issued.doui = SK_DEMO.issued.doui || [];
+    SK_DEMO.issued.doui.push({ plan_id: planId, doc, child: child || '', token: (doc === '原案' ? 'd' : 'e').repeat(48) });
+    if (typeof renderLeoView === 'function') renderLeoView('shokai');
+    return;
+  }
+  try {
+    await sb('rpc/leo_make_token_link', { method: 'POST', body: JSON.stringify({ p_kind: 'doui', p_child: child || '', p_term: '', p_plan: planId, p_doc: doc }) });
+    if (typeof renderLeoView === 'function') renderLeoView('shokai');
+  } catch (e) { alert(e.message); }
+};
+
 LEO_VIEWS.shokai = async function () {
   const back = `<button class="back" onclick="location.hash='leo'">← レオへ</button>`;
   if (typeof canManage === 'function' && !canManage()) {
@@ -175,7 +209,7 @@ LEO_VIEWS.shokai = async function () {
   const todayJ = typeof today === 'function' ? today() : new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
   const now = Date.now();
   let kids = [], infos = [], parties = [], logs = [], types = [], kataRows = [], evs = [];
-  let jogan = [], afLinks = [], afSubs = [], assessRows = [], monLinks = [], monAns = [], plans = [], docLinks = [], sends = [];
+  let jogan = [], afLinks = [], afSubs = [], assessRows = [], monLinks = [], monAns = [], plans = [], docLinks = [], sends = [], clinks = [];
   if (DEMO) {
     kids = [{ name: '児童A', jukyusha_no: '0123456789', contract_start: '2026-11-12', contract_end: '2027-04-30' }];
     infos = [{ name: '児童A', guardian_name: '見本 花子' }];
@@ -190,7 +224,8 @@ LEO_VIEWS.shokai = async function () {
     assessRows = [];
     monLinks = [{ child: '児童A', term: '第1期', token: '1'.repeat(48) }];
     monAns = [];
-    plans = [{ child: '児童A', term_no: 1, genan: '', honan: '', assessment: '', plan_made: false, genan_consent_at: null, honan_consent_at: null }];
+    plans = [{ id: 101, child: '児童A', term_no: 1, start_on: '2026-11-12', end_on: '2027-04-30', genan: '', honan: '', assessment: '', kaigi: '', plan_made: false, genan_consent_at: null, honan_consent_at: null }];
+    clinks = (SK_DEMO.issued.doui || []).map(x => ({ token: x.token, plan_id: x.plan_id, doc: x.doc, used_at: null, expires_at: '2099-01-01T00:00:00+09:00' }));
     docLinks = [{ token: '2'.repeat(48), party_id: 1, used_at: null, expires_at: '2099-01-01T00:00:00+09:00' }];
     sends = SK_DEMO.sends.slice();
     if (SK_DEMO.issued.assess) afLinks = afLinks.concat([{ child: SK_DEMO.issued.assess.child, token: SK_DEMO.issued.assess.token }]);
@@ -198,7 +233,7 @@ LEO_VIEWS.shokai = async function () {
     if (SK_DEMO.issued.doc) docLinks = docLinks.concat([{ token: SK_DEMO.issued.doc.token, party_id: SK_DEMO.issued.doc.party_id || 1, used_at: null, expires_at: '2099-01-01T00:00:00+09:00' }]);
   } else {
     try {
-      [kids, infos, parties, logs, types, kataRows, evs, jogan, afLinks, afSubs, assessRows, monLinks, monAns, plans, docLinks, sends] = await Promise.all([
+      [kids, infos, parties, logs, types, kataRows, evs, jogan, afLinks, afSubs, assessRows, monLinks, monAns, plans, docLinks, sends, clinks] = await Promise.all([
         sb('leo_children?select=name,jukyusha_no,contract_start,contract_end,first_date&order=name').catch(() => []),
         sb('leo_child_info?select=name,guardian_name').catch(() => []),
         sb('leo_doc_party?select=id,child_name,guardian_name,guardian_relation,guardian_address,contract_start,contract_end&order=child_name').catch(() => []),
@@ -214,7 +249,8 @@ LEO_VIEWS.shokai = async function () {
         sb('leo_mon_answers?select=token,submitted_at&order=submitted_at.desc').catch(() => []),
         sb('leo_plans?select=id,child,term_no,assessment,genan,honan,kaigi,plan_made,genan_consent_at,honan_consent_at&order=term_no').catch(() => []),
         sb('leo_doc_links?select=token,party_id,docs,created_at,expires_at,used_at').catch(() => []),
-        sb('leo_link_sends?select=id,kind,child,term,token,url,via,sent_at,doc,plan_id&order=sent_at').catch(() => [])
+        sb('leo_link_sends?select=id,kind,child,term,token,url,via,sent_at,doc,plan_id&order=sent_at').catch(() => []),
+        sb('leo_plan_consent_links?select=token,plan_id,doc,used_at,expires_at,created_at&order=link_id').catch(() => [])
       ]);
     } catch (e) {
       return back + `<p>${esc(e.message)}</p>`;
@@ -272,6 +308,15 @@ LEO_VIEWS.shokai = async function () {
   const genanOk = !!(plan && plan.genan_consent_at);
   const honanOk = !!(plan && plan.honan_consent_at);
   const planMade = !!(plan && plan.plan_made);
+  const hasAssessDoc = !!(plan && String(plan.assessment || '').trim());
+  const hasKaigi = !!(plan && String(plan.kaigi || '').trim());
+  const planEmpty = !!(plan && !hasGenan && !hasHonan && !hasAssessDoc && !hasKaigi);
+  const liveC = (kindDoc) => (clinks || []).filter(l => plan && l.plan_id === plan.id && l.doc === kindDoc && !l.used_at && (!l.expires_at || new Date(l.expires_at).getTime() > now)).pop();
+  const genanLink = liveC('原案'), honanLink = liveC('本案');
+  const genanUrl = genanLink ? `${skPubUrl('hogosha.html')}?k=doui&t=${genanLink.token}` : '';
+  const honanUrl = honanLink ? `${skPubUrl('hogosha.html')}?k=doui&t=${honanLink.token}` : '';
+  const startIso = (kid && kid.first_date) || start || (plan && plan.start_on) || '';
+  const startY = startIso ? +String(startIso).slice(0, 4) : 0, startM = startIso ? +String(startIso).slice(5, 7) : 0;
   const liveDoc = (docLinks || []).filter(l => party && l.party_id === party.id && !l.used_at && l.expires_at && new Date(l.expires_at).getTime() > now).pop();
   const assessUrl = afLink ? `${skPubUrl('assess.html')}?t=${afLink.token}` : '';
   const monUrl = monLink ? `${skPubUrl('hogosha.html')}?k=mon&t=${monLink.token}` : '';
@@ -352,6 +397,22 @@ LEO_VIEWS.shokai = async function () {
     <p><a href="#leo/plan">個別支援計画（管理）を開く</a></p></div>`;
 
   const planHead = plan ? `第${plan.term_no}期` : 'まだ計画行がありません';
+  const planCreateBtn = !plan
+    ? (assessAnswered && startY && sel ? `<p><button type="button" onclick="skPlanNew('${skArg(sel)}',${startY},${startM})">アセスメントから第1期の計画書を作る</button></p>`
+      : '<p class="note">⑥のアセスメントの返事が届いてから、ここから計画書（原案・本案）を作れます。</p>')
+    : (planEmpty
+      ? (assessAnswered && plan.id ? `<p><button type="button" onclick="skPlanFill(${plan.id})">アセスメントから本文を入れる</button></p>`
+        : '<p class="note">⑥のアセスメントの返事が届いてから、ここから計画書の本文を入れられます。</p>')
+      : '');
+  const planEditBtns = plan && plan.id ? `<p><button type="button" onclick="typeof planEdit==='function'?planEdit(${plan.id}):(location.hash='leo/plan')">書類を開いて直す</button> <button type="button" onclick="typeof planPrint==='function'?planPrint(${plan.id}):null">印刷する</button></p>` : '';
+  const planMadeBtn = plan && plan.id && hasGenan && hasHonan && !planMade ? `<p><button type="button" onclick="skPlanMade(${plan.id})">確認した（計画書作成＝済）</button></p>` : '';
+  const genanBtn = plan && plan.id && planMade && !genanOk && !genanUrl ? `<p><button type="button" onclick="skDouiLink(${plan.id},'原案','${skArg(sel)}')">原案の同意リンクを発行</button></p>` : '';
+  const honanBtn = plan && plan.id && genanOk && !honanOk && !honanUrl ? `<p><button type="button" onclick="skDouiLink(${plan.id},'本案','${skArg(sel)}')">本案の同意リンクを発行</button></p>` : '';
+  const termLabel = plan ? `第${plan.term_no}期` : '第1期';
+  const genanBox = genanUrl ? skLineBox('sk_msg_genan', 'doui', sel, termLabel, genanLink.token, genanUrl, skLastLineSend(sends, 'doui', sel, s => s.doc === '原案' || s.token === genanLink.token), '原案') : '';
+  const honanBox = honanUrl ? skLineBox('sk_msg_honan', 'doui', sel, termLabel, honanLink.token, honanUrl, skLastLineSend(sends, 'doui', sel, s => s.doc === '本案' || s.token === honanLink.token), '本案') : '';
+  const copies = (honanOk && !DEMO && typeof dvCell === 'function' && dvCell('レオ', sel, sel))
+    ? `<p class="note">本案の同意が済んでいます。保護者は書類の控えページで、いつでも本案を見られます。</p>${dvCell('レオ', sel, sel)}` : '';
   const step8 = `<div class="card"><h4>⑦ 個別支援計画（原案・本案・同意）</h4>
     <p>対象：${esc(planHead)}</p>
     <p>${skSt(hasGenan, '原案の本文あり', '原案はまだありません')}</p>
@@ -359,10 +420,11 @@ LEO_VIEWS.shokai = async function () {
     <p>${skSt(planMade, '計画書作成＝済', '計画書作成はまだ未')}</p>
     <p>${skSt(genanOk, '原案の同意済み（' + skWhen(plan && plan.genan_consent_at) + '）', '原案の同意はまだです')}</p>
     <p>${skSt(honanOk, '本案の同意済み（' + skWhen(plan && plan.honan_consent_at) + '）', '本案の同意はまだです')}</p>
-    <p class="note">初回の計画は⑥アセスメント（保護者の願い6領域を含む）から作ります。保護者アンケートは2回目以降の見直し用なので、ここでは出しません。判定は leo_plans の本文（genan / honan）、plan_made、genan_consent_at / honan_consent_at です。同意リンクの発行は計画画面から行います。</p>
+    <p class="note">初回の計画は⑥アセスメント（保護者の願い6領域を含む）から、この画面で作ります。保護者アンケートは2回目以降の見直し用なので、ここでは出しません。作った書類は確認して「計画書作成＝済」にしたあと、同意リンクをコピーして公式LINEで送ってください（ポータルからは送りません）。判定は leo_plans の本文（genan / honan）、plan_made、genan_consent_at / honan_consent_at です。</p>
+    ${planCreateBtn}${planEditBtns}${planMadeBtn}${genanBtn}${genanBox}${honanBtn}${honanBox}${copies}
     <p><a href="#leo/plan">個別支援計画（管理）を開く</a></p></div>`;
 
   return `${back}<h3>🚪 初回利用</h3>${typeof demoNote === 'function' ? demoNote() : ''}
-    <p class="note">新しい児童の手続きを、この画面で順に確認します。各項目はいまの登録内容で判定します。⑥アセスメント・③契約の署名リンクは、発行済みなら案内文とURLを最初から出します。コピーして公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。送ったら「LINEで送った」を押すと記録します。公式LINEの友だち追加は手でチェックします。</p>
+    <p class="note">新しい児童の手続きを、この画面で順に確認します。各項目はいまの登録内容で判定します。⑥アセスメント・③契約の署名リンク・⑦の同意リンクは、発行済みなら案内文とURLを最初から出します。コピーして公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。送ったら「LINEで送った」を押すと記録します。公式LINEの友だち追加は手でチェックします。</p>
     ${pick}${sel ? step1 + step2 + step3 + step4 + step5 + step6 + step8 : ''}`;
 };
