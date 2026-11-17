@@ -120,9 +120,14 @@ async function send() {
   if (DEMO) { out.innerHTML = '<span class="ok">見本なので送信しません。</span>'; return; }
   $('go').disabled = true;
   let r; try { r = await rpc('leo_doc_submit', { p_token: T, p_docs: ids, p_method: m, p_signature: (m === '保護者' || m === 'ご家族') ? sigData : null, p_agent_name: m === 'ご家族' ? ag : null, p_agent_relation: m === 'ご家族' ? rel : null, p_reason: m === '署名困難' ? rs : null }); } catch (e) { r = { ok: false }; }
-  if (r.ok) { showDlg('送信しました', ''); $m().innerHTML = '<div class="card ok">' + (m === 'あとで署名' ? 'あとで署名として記録しました。このリンクは、期限までもう一度使えます。' : '署名を記録しました（' + ids.length + '書類）。ありがとうございました。このページは閉じて大丈夫です。') + '</div>'; }
+  if (r.ok) { showDlg('送信しました', ''); $m().innerHTML = '<div class="card ok">' + (m === 'あとで署名' ? 'あとで署名として記録しました。このリンクは、期限までもう一度使えます。' : '署名を記録しました（' + ids.length + '書類）。ありがとうございました。このページは閉じて大丈夫です。') + '</div>'; if (m !== 'あとで署名') dvNote(); }
   else { $('go').disabled = false; out.innerHTML = '<span class="err">送信できませんでした。リンクが使用済み・期限切れの可能性があります。レオまでご連絡ください。</span>'; }
 }
+// 署名のあと：この人の「書類の控え」リンク（閲覧専用・期限なし）があれば案内する。なければ何も出さない
+async function dvNote() { try { const r = await rpc('doc_view_from_sign', { p_kind: 'leo_doc', p_token: T }), v = r.ok ? await r.json() : null; if (typeof v !== 'string' || !/^[0-9a-f]{48}$/.test(v)) return;
+  const u = location.origin + location.pathname.replace(/[^/]*$/, '') + 'docs.html?t=' + v, d = document.createElement('div'); d.className = 'card';
+  d.innerHTML = '<b>書類の控えは、いつでも見られます</b><p class="note">署名・同意した書類は、下のページでいつでも見返せます（見るだけのページです）。このリンクを保存しておいてください。</p><a href="' + u + '" target="_blank" rel="noopener" style="display:block;text-align:center;background:#e8833a;color:#fff;border-radius:8px;padding:12px;text-decoration:none;font-size:17px">書類の控えを開く</a>';
+  $m().appendChild(d); } catch (e) { } }
 load();
 </script>
 <div id="dlg" hidden><div><b id="dlgt"></b><span id="dlgm"></span><button onclick="document.getElementById('dlg').hidden=true">閉じる</button></div></div><script src="pc-scale.js?v=20261113a"></script>

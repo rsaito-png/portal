@@ -85,9 +85,14 @@ async function send() {
   $('go').disabled = true;
   try { const r = await rpc('kin_consent_submit', { p_token: T, p_writer: m, p_proxy_name: m === '代理人' ? pn : null, p_proxy_relation: m === '代理人' ? pr : null, p_signature: sigData });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || '送信できませんでした');
-    $m().innerHTML = '<div class="card"><p class="ok" style="font-size:20px">✅ 同意を受け付けました。ありがとうございました。</p></div>';
+    $m().innerHTML = '<div class="card"><p class="ok" style="font-size:20px">✅ 同意を受け付けました。ありがとうございました。</p></div>'; dvNote();
   } catch (e) { $('go').disabled = false; out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
 }
+// 署名のあと：この人の「書類の控え」リンク（閲覧専用・期限なし）があれば案内する。なければ何も出さない
+async function dvNote() { try { const r = await rpc('doc_view_from_sign', { p_kind: 'kin_consent', p_token: T }), v = r.ok ? await r.json() : null; if (typeof v !== 'string' || !/^[0-9a-f]{48}$/.test(v)) return;
+  const u = location.origin + location.pathname.replace(/[^/]*$/, '') + 'docs.html?t=' + v, d = document.createElement('div'); d.className = 'card';
+  d.innerHTML = '<b>書類の控えは、いつでも見られます</b><p class="note">署名・同意した書類は、下のページでいつでも見返せます（見るだけのページです）。このリンクを保存しておいてください。</p><a href="' + u + '" target="_blank" rel="noopener" style="display:block;text-align:center;background:#2e6b4f;color:#fff;border-radius:8px;padding:12px;text-decoration:none;font-size:17px">書類の控えを開く</a>';
+  $m().appendChild(d); } catch (e) { } }
 </script>
 <div id="dlg" hidden><div><b id="dlgt"></b><span id="dlgm"></span><br><button onclick="$('dlg').hidden=true">OK</button></div></div>
 <script>load();</script><script src="pc-scale.js?v=20261113a"></script>

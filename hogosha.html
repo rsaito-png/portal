@@ -64,8 +64,13 @@ async function sendDoui() {
   if (!confirm('この計画に同意します。よろしいですか？')) return;
   document.getElementById('agb').disabled = true;
   const r = await rpc('leo_doui_submit', { p_token: T }); out.innerHTML = r.ok ? '<span class="ok">同意を受け付けました。ありがとうございました。</span>' : '<span class="err">送信できませんでした。すでに同意済みか、リンクの期限が切れている可能性があります。レオまでご連絡ください。</span>';
-  if (r.ok) document.getElementById('agb').style.display = 'none'; else document.getElementById('agb').disabled = false;
+  if (r.ok) { document.getElementById('agb').style.display = 'none'; dvNote(); } else document.getElementById('agb').disabled = false;
 }
+// 署名のあと：この人の「書類の控え」リンク（閲覧専用・期限なし）があれば案内する。なければ何も出さない
+async function dvNote() { try { const r = await rpc('doc_view_from_sign', { p_kind: 'leo_doui', p_token: T }), v = r.ok ? await r.json() : null; if (typeof v !== 'string' || !/^[0-9a-f]{48}$/.test(v)) return;
+  const u = location.origin + location.pathname.replace(/[^/]*$/, '') + 'docs.html?t=' + v, d = document.createElement('div'); d.className = 'card';
+  d.innerHTML = '<b>書類の控えは、いつでも見られます</b><p class="note">署名・同意した書類は、下のページでいつでも見返せます（見るだけのページです）。このリンクを保存しておいてください。</p><a href="' + u + '" target="_blank" rel="noopener" style="display:block;text-align:center;background:#e8833a;color:#fff;border-radius:8px;padding:12px;text-decoration:none;font-size:17px">書類の控えを開く</a>';
+  $m().appendChild(d); } catch (e) { } }
 load();
 </script><script src="pc-scale.js?v=20261113a"></script>
 </body></html>

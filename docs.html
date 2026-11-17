@@ -1,0 +1,133 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>書類の控え</title>
+<style>
+:root{--c:#e8833a;--d:#b4540f;--l:#fff4e8}
+body.kin{--c:#2e6b4f;--d:#24563f;--l:#eaf4ee}
+body{font-family:system-ui,"Hiragino Sans",sans-serif;margin:0;background:#f4f6f8;color:#222;font-size:17px;line-height:1.6;-webkit-text-size-adjust:100%}
+header{background:var(--c);color:#fff;padding:14px 16px;font-size:19px;font-weight:bold}
+main{max-width:640px;margin:auto;padding:12px 14px 48px}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px #0002;margin:14px 0}
+h2{font-size:18px;margin:0 0 6px;color:var(--d)}
+.sec{font-size:15px;color:#555;margin:22px 4px 0;font-weight:bold}
+.st{display:inline-block;font-size:13px;font-weight:bold;border-radius:20px;padding:2px 10px;margin-left:4px;vertical-align:middle}
+.st.ok{background:#e6f4ea;color:#1e6b3a}.st.wait{background:#fff3d6;color:#8a5a00}.st.old{background:#eee;color:#555}
+table.meta{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 0}table.meta th,table.meta td{border-top:1px solid #eee;padding:6px 4px;text-align:left;vertical-align:top}table.meta th{width:34%;color:#666;font-weight:normal}
+.sig{max-height:70px;max-width:220px;border:1px solid #ddd;border-radius:6px;background:#fff}
+button{font-size:16px;padding:10px 16px;border:2px solid var(--c);border-radius:10px;background:#fff;color:var(--d);margin:10px 8px 0 0;font-weight:bold;cursor:pointer}
+button.pr{background:var(--c);color:#fff}
+.body{margin-top:12px;border-top:2px solid var(--l);padding-top:10px}
+.lc-doc-body{font-size:15px;line-height:1.75}
+.lc-doc-body h1,.lc-doc-body h2,.lc-doc-body h3{text-align:center;margin:1em 0 .5em;font-size:17px;color:#222}
+.lc-doc{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}.lc-doc th,.lc-doc td{border:1px solid #888;padding:4px 6px;vertical-align:top;text-align:left}
+.plan{font-size:15px;line-height:1.75}.plan h3{text-align:center;font-size:17px;margin:.6em 0}
+.pages img{width:100%;display:block;border:1px solid #ddd;margin:6px 0}
+.note{color:#666;font-size:14px}.err{color:#c00}
+@media print{
+  body{background:#fff;font-size:12pt}header,.noprint,button{display:none!important}main{max-width:none;padding:0}
+  .card{box-shadow:none;border:1px solid #ccc;break-inside:auto;margin:0 0 10mm}
+  body.printone .card.doc:not(.printing){display:none}body.printone .sec,body.printone .intro{display:none}
+  .pages img{break-inside:avoid;border:0}
+}
+</style>
+</head><body><header id="hd">書類の控え</header><main id="m"><p>読み込み中…</p></main>
+<script src="config.js?v=20261117docs"></script>
+<script>
+// 本人・保護者向けの「書類の控え」：ログインなし・期限なしの閲覧専用リンク（docs.html?t=…）。見るだけ。ほかの人の書類は出ない。
+// 署名・同意済みの契約書・重要事項説明書・個別支援計画（レオ）／居宅介護計画（金斗雲）を表示。署名待ちは「署名待ち」とだけ出す。
+const C = window.PORTAL_CONFIG, q = new URLSearchParams(location.search), T = q.get('t') || '', DEMO = q.get('demo') === '1';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const $ = id => document.getElementById(id), $m = () => $('m');
+const jd = s => { if (!s) return ''; const x = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T00:00:00+09:00') : new Date(s); const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(x).map(o => [o.type, o.value])); return `${p.year}年${+p.month}月${+p.day}日`; };
+const lcInline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+function lcRender(src) { // レオの契約書・重要事項説明書（leo_contract_sign.html と同じ書式）
+  const lines = String(src || '').replace(/\r\n/g, '\n').split('\n'), out = []; let i = 0;
+  const isTable = l => /^\s*\|.*\|\s*$/.test(l), isSep = l => /^\s*\|[\s:|-]+\|\s*$/.test(l), isH = l => /^#{1,3}\s+/.test(l.trim());
+  while (i < lines.length) {
+    if (isTable(lines[i])) { const rows = []; while (i < lines.length && (isTable(lines[i]) || isSep(lines[i]))) { if (!isSep(lines[i])) rows.push(lines[i]); i++; }
+      if (rows.length) { const cells = rows.map(r => r.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim())), w = cells[0].length;
+        out.push('<table class="lc-doc"><thead><tr>' + cells[0].map(c => `<th>${lcInline(c)}</th>`).join('') + '</tr></thead><tbody>' + cells.slice(1).map(r => '<tr>' + r.concat(Array(Math.max(0, w - r.length)).fill('')).slice(0, w).map(c => `<td>${lcInline(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table>'); }
+      continue; }
+    const hm = lines[i].trim().match(/^(#{1,3})\s+(.*)$/); if (hm) { out.push(`<h${hm[1].length}>${lcInline(hm[2])}</h${hm[1].length}>`); i++; continue; }
+    if (lines[i].trim() === '') { i++; continue; }
+    const para = []; while (i < lines.length && lines[i].trim() !== '' && !isTable(lines[i]) && !isH(lines[i])) { para.push(lines[i]); i++; }
+    out.push(`<p>${para.map(lcInline).join('<br>')}</p>`);
+  }
+  return `<div class="lc-doc-body">${out.join('\n')}</div>`;
+}
+const planHtml = t => `<div class="plan">${esc(t || '').split('\n').map(l => l.startsWith('#T ') ? `<h3>${l.slice(3)}</h3>` : l.startsWith('#R ') ? `<div style="text-align:right">${l.slice(3)}</div>` : `<div>${l || '&nbsp;'}</div>`).join('')}</div>`;
+const DEMO_DATA = { office: 'レオ', name: '児童A（見本）', guardian: '保護者A（見本）', contract_start: '2026-11-01',
+  docs: [{ code: 'keiyaku', label: '利用契約書', status: 'signed', version: 'R8.11', signed_on: '2026-11-01', method: '保護者', signer: '保護者A（見本）', relation: '母', explainer: '職員A', body: '# 利用契約書\n（見本）この契約書は見本です。' },
+    { code: 'juyo', label: '重要事項説明書', status: 'pending', version: 'R8.11' }],
+  plans: [{ term_no: 2, title: '第2期 個別支援計画（本案）', start: '2026-11-01', end: '2027-04-30', status: 'pending', version: '第2期' },
+    { term_no: 1, title: '第1期 個別支援計画（本案）', start: '2026-05-01', end: '2026-10-31', status: 'signed', version: '第1期', consented_at: '2026-05-10T10:00:00+09:00', signer: '保護者A（見本）', via: 'リンクで同意', text: '#T 個別支援計画書（本案）\n（見本）【長期目標】友だちと一緒に遊びを楽しめる。' }] };
+let D = null; const OPEN = {};
+function bad() {
+  $m().innerHTML = `<div class="card"><h2>このリンクでは書類を表示できません</h2><p>リンクが正しくないか、新しいリンクに切り替わった可能性があります。</p><p class="note">お手数ですが、ご利用の事業所（レオ・金斗雲）までご連絡ください。新しいリンクをお送りします。</p></div>`;
+}
+async function load() {
+  if (DEMO) D = DEMO_DATA;
+  else { if (!/^[0-9a-f]{48}$/.test(T)) return bad(); try { const r = await rpc('doc_view_get', { p_token: T }); D = r.ok ? await r.json() : null; } catch (e) { D = null; } if (!D || !D.office) return bad(); }
+  const leo = D.office === 'レオ'; document.body.classList.toggle('kin', !leo);
+  $('hd').textContent = `${D.office}　書類の控え`; document.title = `書類の控え｜${D.office}`;
+  render();
+}
+const stBadge = (s, plan) => s === 'signed' ? `<span class="st ok">${plan ? '同意済み' : '署名済み'}</span>` : s === 'pending' ? '<span class="st wait">署名待ち</span>' : '<span class="st old">以前の計画</span>';
+function who(x) {
+  if (x.method === '紙で署名済み') return '紙の書類に署名（原本は事業所で保管しています）';
+  if (x.method === '署名困難') return '署名が難しいため署名なし' + (x.reason ? `（理由：${esc(x.reason)}）` : '');
+  return esc(x.signer || '') + (x.relation ? `（続柄：${esc(x.relation)}）` : '');
+}
+function docCard(d, i) {
+  const leo = D.office === 'レオ';
+  if (d.status !== 'signed') return `<div class="card doc"><h2>${esc(d.label)} ${stBadge('pending')}</h2><p class="note">署名が済むと、ここで内容を見られるようになります。</p></div>`;
+  const canBody = leo ? !!d.body : d.pages_n > 0;
+  return `<div class="card doc" id="d${i}"><h2>${esc(d.label)} ${stBadge('signed')}</h2>
+    <table class="meta"><tr><th>署名日</th><td>${esc(jd(d.signed_on))}</td></tr><tr><th>署名した方</th><td>${who(d)}</td></tr>${d.signature ? `<tr><th>署名</th><td><img class="sig" src="${esc(d.signature)}" alt="署名"></td></tr>` : ''}
+    ${d.explainer ? `<tr><th>説明した職員</th><td>${esc(d.explainer)}</td></tr>` : ''}<tr><th>版</th><td>${esc(d.version)}</td></tr></table>
+    ${canBody ? `<p class="noprint"><button class="pr" onclick="toggle(${i})" id="b${i}">内容を見る</button><button onclick="printDoc(${i})">この書類を印刷</button></p><div class="body" id="x${i}" hidden></div>`
+      : `<p class="note">この版（${esc(d.version)}）の本文はこのページでは表示できません。控えが必要なときは事業所までお声がけください。</p>`}</div>`;
+}
+function planCard(p, i) {
+  const leo = D.office === 'レオ', k = 'p' + i;
+  const period = leo ? (p.start ? `${jd(p.start)} 〜 ${jd(p.end)}` : '') : [p.term, p.period].filter(Boolean).join('　');
+  if (p.status === 'pending') return `<div class="card doc"><h2>${esc(p.title)} ${stBadge('pending', 1)}</h2>${period ? `<p class="note">${esc(period)}</p>` : ''}<p class="note">同意が済むと、ここで内容を見られるようになります。</p></div>`;
+  return `<div class="card doc" id="d${k}"><h2>${esc(p.title)} ${stBadge(p.status, 1)}</h2>
+    <table class="meta">${period ? `<tr><th>${leo ? '計画期間' : '作成'}</th><td>${esc(period)}</td></tr>` : ''}
+    ${p.status === 'signed' ? `<tr><th>同意日</th><td>${esc(jd(p.consented_at))}</td></tr><tr><th>同意した方</th><td>${esc(p.signer || '')}${p.relation ? `（続柄：${esc(p.relation)}）` : ''}</td></tr>${p.signature ? `<tr><th>署名</th><td><img class="sig" src="${esc(p.signature)}" alt="署名"></td></tr>` : ''}${p.explainer ? `<tr><th>説明した職員</th><td>${esc(p.explainer)}</td></tr>` : ''}`
+      : `<tr><th>同意</th><td>このページができる前の計画です（同意の記録は事業所で保管しています）</td></tr>`}
+    <tr><th>版</th><td>${esc(p.version)}</td></tr></table>
+    ${p.text ? `<p class="noprint"><button class="pr" onclick="toggle('${k}')" id="b${k}">内容を見る</button><button onclick="printDoc('${k}')">この計画を印刷</button></p><div class="body" id="x${k}" hidden></div>` : `<p class="note">本文はこのページでは表示できません。事業所までお声がけください。</p>`}</div>`;
+}
+function render() {
+  const leo = D.office === 'レオ', docs = D.docs || [], plans = D.plans || [];
+  $m().innerHTML = `<div class="card intro"><b>${esc(D.name)}</b> さん${leo && D.guardian ? `<br><span class="note">保護者：${esc(D.guardian)} さん</span>` : ''}
+    <p class="note" style="margin:8px 0 0">${leo ? 'レオ' : '金斗雲'}と取り交わした書類の控えです。署名・同意が済んだ書類は、いつでもこのページで見返せます（見るだけのページです）。このリンクは${leo ? 'ご家庭' : 'ご本人'}専用です。ほかの方には送らないでください。</p></div>
+    <div class="sec">契約の書類</div>${docs.length ? docs.map(docCard).join('') : '<div class="card"><p class="note">まだ署名した契約の書類はありません。</p></div>'}
+    <div class="sec">${leo ? '個別支援計画' : '居宅介護計画'}</div>${plans.length ? plans.map(planCard).join('') : '<div class="card"><p class="note">まだ同意した計画はありません。</p></div>'}
+    <p class="note noprint" style="margin-top:20px">わからないことがあれば、${leo ? 'レオ' : '金斗雲'}までお気軽にご連絡ください。</p>`;
+}
+async function fill(k) {
+  const x = $('x' + k); if (OPEN[k]) return x;
+  if (typeof k === 'string' && k[0] === 'p') { x.innerHTML = planHtml(D.plans[+k.slice(1)].text); }
+  else { const d = D.docs[k];
+    if (D.office === 'レオ') x.innerHTML = lcRender(d.body);
+    else { x.innerHTML = '<p class="note">読み込み中…</p>';
+      try { const r = await rpc('doc_view_pages', { p_token: T, p_code: d.code }), ps = r.ok ? await r.json() : [];
+        x.innerHTML = ps.length ? `<div class="pages">${ps.map(p => `<img src="${p.image}" alt="${esc(d.label)} ${p.n}ページ">`).join('')}</div>` : '<p class="note">本文を読み込めませんでした。時間をおいてもう一度お試しください。</p>';
+        if (!ps.length) return x;
+      } catch (e) { x.innerHTML = '<p class="err">本文を読み込めませんでした。時間をおいてもう一度お試しください。</p>'; return x; } } }
+  OPEN[k] = true; return x;
+}
+async function toggle(k) { const x = await fill(k), b = $('b' + k); if (b.dataset.open === '1' && !x.hidden) { x.hidden = true; b.textContent = '内容を見る'; b.dataset.open = ''; } else { x.hidden = false; b.textContent = '閉じる'; b.dataset.open = '1'; } }
+async function printDoc(k) {
+  const x = await fill(k); x.hidden = false; const b = $('b' + k); if (b) { b.textContent = '閉じる'; b.dataset.open = '1'; }
+  const card = $('d' + k); document.querySelectorAll('.card.printing').forEach(c => c.classList.remove('printing')); card.classList.add('printing'); document.body.classList.add('printone');
+  const imgs = [...x.querySelectorAll('img')]; await Promise.all(imgs.map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+  setTimeout(() => { print(); }, 100);
+}
+window.addEventListener('afterprint', () => { document.body.classList.remove('printone'); document.querySelectorAll('.card.printing').forEach(c => c.classList.remove('printing')); });
+load();
+</script>
+</body></html>

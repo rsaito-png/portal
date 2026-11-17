@@ -47,7 +47,8 @@ async function renderLeoContract() {
       sb('leo_doc_log?select=id,party_id,doc_code,method,agent_name,agent_relation,reason,signed_on,signed_at,signature,explainer_name,version&order=signed_at'),
       sb('leo_children?select=name,contract_start,contract_end&order=name').catch(() => []),
       sb('leo_child_info?select=name,guardian_name').catch(() => []),
-      (typeof loadLeftIndex === 'function' ? loadLeftIndex().catch(() => ({})) : {})
+      (typeof loadLeftIndex === 'function' ? loadLeftIndex().catch(() => ({})) : {}),
+      (typeof dvList === 'function' ? dvList('レオ') : null)
     ]);
     LC.types = types; LC.parties = parties; LC.logs = logs;
     const compact = n => String(n || '').replace(/\s+/g, '');
@@ -93,7 +94,7 @@ async function renderLeoContract() {
     </div>
     <div class="card">${rows.length ? `<table class="tbl"><tr><th>児童</th><th>保護者</th>${types.map(t => `<th>${esc(t.label.replace(/（.*/, ''))}</th>`).join('')}<th>契約期間</th><th></th></tr>
     ${rows.map(r => `<tr><td>${esc(r.child)}${r.registered ? '' : ' <span class="note">未登録</span>'}</td><td>${esc(r.guardian)}</td>${types.map(t => `<td>${r.party ? lcSt(logs.filter(l => l.party_id === r.party.id && l.doc_code === t.code)) : '未'}${r.party ? `<br><button class="back" onclick="lcPaper(${r.party.id},'${t.code}','${nm(r.child)}','${nm(t.label)}')">紙で署名済み</button> <button class="back" onclick="lcPrint(${r.party.id},'${t.code}')">印刷</button>` : ''}</td>`).join('')}<td>${period(r)}</td>
-      <td><button onclick="lcIssueChild('${nm(r.child)}')">署名リンク発行</button></td></tr>`).join('')}</table>` : '<p>利用者がまだいません。上の欄で見学者の名前を入れて発行できます。</p>'}</div>
+      <td><button onclick="lcIssueChild('${nm(r.child)}')">署名リンク発行</button>${typeof dvCell === 'function' ? dvCell('レオ', r.child, r.child) : ''}</td></tr>`).join('')}</table>` : '<p>利用者がまだいません。上の欄で見学者の名前を入れて発行できます。</p>'}</div>
     <div class="card"><h4>文面</h4><p>${types.map(t => `<button class="back" onclick="lcEdit('${t.code}')">${esc(t.label)} を見る・編集</button>`).join(' ')}</p><div id="lc_body"></div></div>`;
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }

@@ -8,7 +8,7 @@ async function renderKinContract() {
   if (DEMO) { $('view').innerHTML = back + '<p>見本モードでは表示しません（ログイン後に開きます）。</p>'; return; }
   $('view').innerHTML = '<p>読み込み中…</p>';
   try {
-    const [types, us, logs, cons, plans] = await Promise.all([sb('kin_doc_type?select=*&order=sort'), sb('kin_user?select=id,name,address_class,contract_start&order=name'), sb('kin_doc_log?select=id,user_id,doc_code,method,agent_name,agent_relation,reason,signed_on,signed_at&order=signed_at'), sb('kin_consent?select=user_name,version'), sb('kin_plan?select=user_name,version')]);
+    const [types, us, logs, cons, plans] = await Promise.all([sb('kin_doc_type?select=*&order=sort'), sb('kin_user?select=id,name,address_class,contract_start&order=name'), sb('kin_doc_log?select=id,user_id,doc_code,method,agent_name,agent_relation,reason,signed_on,signed_at&order=signed_at'), sb('kin_consent?select=user_name,version'), sb('kin_plan?select=user_name,version'), (typeof dvList === 'function' ? dvList('金斗雲') : null)]);
     const cur = {}; plans.forEach(p => { if (!cur[p.user_name] || cur[p.user_name] < p.version) cur[p.user_name] = p.version; });
     const planSt = n => !(n in cur) ? '計画なし' : cons.some(c => c.user_name === n && c.version === cur[n]) ? '<span style="color:#2e6b4f">✅ 同意済み</span>' : '未';
     const sp = types.filter(t => t.sign_in_portal), no = us.filter(u => !u.address_class);
@@ -20,7 +20,7 @@ async function renderKinContract() {
     <table class="tbl"><tr><th>利用者</th><th>住所区分</th><th>居宅介護計画書</th>${sp.map(t => `<th>${esc(t.label)}</th>`).join('')}<th>契約開始日</th><th></th></tr>
     ${us.map(u => `<tr><td>${esc(u.name)}</td><td><select onchange="kc2Cls(${u.id},this.value)"><option value="">未設定</option><option ${u.address_class === '59-4' ? 'selected' : ''}>59-4</option><option ${u.address_class === '715-5' ? 'selected' : ''}>715-5</option><option ${u.address_class === '自宅' ? 'selected' : ''}>自宅</option></select></td><td>${planSt(u.name)} <a href="#kintoun/consent">同意画面</a></td>
       ${sp.map(t => `<td>${kc2St(logs.filter(l => l.user_id === u.id && l.doc_code === t.code))}<br><button class="back" onclick="kc2Paper(${u.id},'${t.code}','${nm(u.name)}','${nm(t.label)}')">紙で署名済み</button></td>`).join('')}<td>${esc(u.contract_start || '')}</td>
-      <td>${u.address_class ? `<button onclick="kc2Issue(${u.id},'${nm(u.name)}')">署名リンク発行</button>` : '<span style="color:#c60">住所区分を設定</span>'}</td></tr>`).join('')}</table></div>
+      <td>${u.address_class ? `<button onclick="kc2Issue(${u.id},'${nm(u.name)}')">署名リンク発行</button>` : '<span style="color:#c60">住所区分を設定</span>'}${typeof dvCell === 'function' ? dvCell('金斗雲', u.id, u.name) : ''}</td></tr>`).join('')}</table></div>
     <div class="card"><h4>本文を見る</h4><p>${types.map(t => `<button class="back" onclick="kc2Body('${t.code}','${t.sign_in_portal ? '' : 'plan'}')">${esc(t.label)}</button>`).join(' ')} 住所区分 <select id="kc2_v"><option>59-4</option><option>715-5</option>${us.filter(u => u.address_class === '自宅').map(u => `<option value="u${u.id}">自宅（${esc(u.name)}）</option>`).join('')}</select></p><div id="kc2_body">${KC2.body || ''}</div></div>`;
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }
 }
