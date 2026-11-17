@@ -2242,7 +2242,8 @@ function planCardFlags({ st, start, periodTo, today, waiting, answered, active }
   const startPast = !!(on && start && start < today);
   const periodPast = !!(on && planPeriodPast(periodTo, today));
   const over = startPast || periodPast;
-  const soon = !!(on && start && !over && (start - today) / 864e5 <= 45);
+  // 急ぎに出すのは、更新月（次期の開始月）の1か月前の1日から。例：1月開始なら12/1から。
+  const soon = !!(on && start && !over && today >= new Date(start.getFullYear(), start.getMonth() - 1, 1));
   const urgent = !!(on && (over || soon || waiting || answered));
   return { startPast, periodPast, over, soon, urgent };
 }
@@ -2292,7 +2293,7 @@ function planChildStatus(r, D0, LEFT, tday, t) {
   else act = W ? `本案の同意の返事待ち（${W.days}日経過）` : '本案を保護者に送る';
   return { name, m, d, gone, ldate, nextIso, leavingBeforeNext, cur, n, term, p, now, mon, sm, wait, done, st, answered, flags, W, act, key: N(name) };
 }
-// 今日やることの計画欄。管理画面の急ぎ（開始月・期間・45日以内・返事待ち・回答あり）だけ。完了・退所・退所前に次期が始まる子は出さない。
+// 今日やることの計画欄。管理画面の急ぎ（開始月・期間・更新月の1か月前から・返事待ち・回答あり）だけ。完了・退所・退所前に次期が始まる子は出さない。
 function planUrgencyLabel(flags) {
   if (flags.startPast) return '開始月を過ぎています';
   if (flags.periodPast) return '今の計画期間を過ぎています';
