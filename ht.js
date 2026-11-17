@@ -330,18 +330,81 @@ async function htConfirm(tid) {
   try { await sb('ht_records?id=in.(' + ids.map(i => '"' + i + '"').join(',') + ')', { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ confirmed_at: new Date().toISOString(), confirmed_by: who }) }); await htRefresh(); } catch (e) { alert(e.message); }
 }
 // ---------- 委員会
+const htIsSample = l => /^SAMPLE-/.test(l.id || '');
 function htComm() {
   const D = HT.D, sc = htScope(), m = htNowM(), coms = D.com.filter(c => htAppliesScope(c));
-  const logsOf = id => D.cl.filter(l => htFixed(l) && l.committee_id === id && l.office_ids.some(x => sc.some(o => o.id === x)));
+  const inSc = l => l.office_ids.some(x => sc.some(o => o.id === x));
+  const logsOf = id => D.cl.filter(l => !htIsSample(l) && htFixed(l) && l.committee_id === id && inSc(l));
   const rows = coms.map(c => { const lg = logsOf(c.id), last = lg[0] ? lg[0].held_at : c.last_held, due = c.next_due;
     const pl = D.plan.filter(p => p.fy === HT.fy && p.committee_ids.includes(c.id));
     return `<tr><td><b>${esc(c.id)} ${esc(c.name)}</b><br><small>${c.interval_months}か月ごと${c.grp ? '・一体開催' + esc(c.grp) : ''}</small></td><td>${last ? htFmtD(last) : '未開催'}</td><td>${due ? esc(due) : '-'}</td><td>${pl.map(p => `<span class="chip ${p.month === m ? 'now' : ''}">${p.month}月${p.planned_on ? ' ' + esc(p.planned_on.slice(5)) : ''}</span>`).join('')}</td><td>${D.editOffs.length ? `<button class="htb" onclick="htCommForm('${c.id}')">開催を記録</button>` : ''}</td></tr>`; }).join('');
-  const logs = D.cl.filter(l => l.office_ids.some(x => sc.some(o => o.id === x))).map(l => { const c = D.com.find(x => x.id === l.committee_id) || {};
-    const fx = htFixed(l);
-    return `<tr><td>${fx ? '' : '<span class="chip now">下書き</span><br>'}${htFmtDT(l.held_at)}${fx ? '' : '<br><small>（予定）</small>'}</td><td>${esc(c.name || '')}</td><td>${esc(l.office_ids.map(htOffName).join('、'))}</td><td>${esc(l.decisions || '')}</td><td>${fx ? `<button class="htb g" onclick="htMinutes('${l.id}')">議事録PDF</button>` : `<button class="htb" onclick="htCommOpen('${l.id}')">開く</button>`}</td></tr>`; }).join('');
-  return `<div class="htw"><table class="htt"><tr><th>委員会</th><th>前回開催</th><th>次回期限</th><th>今年度の予定</th><th></th></tr>${rows}</table></div>
+  // 合同開催は joint_id ごとに1行にまとめる
+  const seen = new Set(), logs = D.cl.filter(l => !htIsSample(l) && inSc(l)).filter(l => !l.joint_id || (!seen.has(l.joint_id) && seen.add(l.joint_id))).map(l => {
+    const sib = l.joint_id ? D.cl.filter(x => x.joint_id === l.joint_id) : [l], names = sib.map(x => (D.com.find(c => c.id === x.committee_id) || {}).name || x.committee_id).join('・');
+    const fx = htFixed(l), open = l.joint_id ? `htJointForm('${esc(l.joint_id)}')` : `htCommOpen('${l.id}')`;
+    return `<tr><td>${fx ? '' : '<span class="chip now">下書き</span><br>'}${htFmtDT(l.held_at)}${fx ? '' : '<br><small>（予定）</small>'}</td><td>${l.joint_id ? '<span class="chip">合同</span> ' : ''}${esc(names)}</td><td>${esc(l.office_ids.map(htOffName).join('、'))}</td><td>${esc(l.decisions || '').slice(0, 80)}</td><td>${fx ? `<button class="htb g" onclick="htMinutes('${l.id}')">議事録PDF</button>` : `<button class="htb" onclick="${open}">開く</button>`}</td></tr>`; }).join('');
+  return `${htCommHow()}<h4>委員会ごとの状況</h4><div class="htw"><table class="htt"><tr><th>委員会</th><th>前回開催</th><th>次回期限</th><th>今年度の予定</th><th></th></tr>${rows}</table></div>
   <h4>開催記録（議事録）</h4><div class="htw"><table class="htt"><tr><th>日時</th><th>委員会</th><th>対象事業所</th><th>決定事項</th><th></th></tr>${logs || '<tr><td colspan=5>まだ開催記録がありません</td></tr>'}</table></div>${htLogList('cl')}
-  <p class="note">「下書き」は開催前の議題・議事録の案です。前回開催・期限・議事録PDFには数えません。当日に内容を直して「確定する」と開催記録になります。議事録は事業所ごとに分かれて保存されます。一体開催の場合は参加した事業所すべてにチェックを入れてください（事業所ごとの議事録PDFが出ます）。</p>`;
+  <p class="note">「下書き」は開催前の議題・議事録の案です。前回開催・期限・議事録PDFには数えません。「見本」も数えません。合同で開いた回は、選んだ委員会それぞれの開催記録として数えます。</p>`;
+}
+// 委員会のやり方（いちばん上・大きな文字）
+function htCommHow() {
+  const s = HT.D.cl.find(htIsSample), can = HT.D.editOffs.length;
+  const big = 'font-size:28px!important;padding:14px 18px!important;display:block!important;width:100%!important;margin:8px 0!important;text-align:center;box-sizing:border-box';
+  return `<div id="htcommhow" class="htmo now" style="font-size:26px;line-height:1.6"><b style="font-size:44px;display:block">委員会のやり方（3つだけ）</b>
+    <ol style="font-size:26px;margin:8px 0;padding-left:1.4em">
+    <li><b>日を決める</b>：法人合同で1回・30分。水曜以外。虐待防止・身体拘束・感染症・BCPを同じ回でまとめて行います。</li>
+    <li><b>当日は見本を読み上げる</b>：見本の議事録を上から読み、＿＿の空欄をその場で埋めます。</li>
+    <li><b>「確定する」を押す</b>：4つの委員会それぞれの開催記録になり、議事録PDFが出せます。</li></ol>
+    ${s ? `<button class="htb g" style="${big}" onclick="htSampleOpen()">📄 見本の議事録を見る</button>` : ''}${s && can ? `<button class="htb" style="${big}" onclick="htJointForm(null,true)">✏️ 見本から本番の議事録を作る</button>` : ''}
+    ${can ? `<button class="htb g" style="font-size:22px!important" onclick="htJointForm(null,false)">白紙から合同の議事録を作る</button>` : ''}</div>`;
+}
+function htSampleOpen() {
+  const l = HT.D.cl.find(htIsSample); if (!l) return;
+  const m = document.createElement('div'); m.className = 'htm';
+  const sec = (k, v) => `<h4 style="font-size:28px;margin:16px 0 4px;border-bottom:3px solid #1a120c">${k}</h4><div style="font-size:24px;line-height:1.7;white-space:pre-wrap">${esc(v || '')}</div>`;
+  m.innerHTML = `<div style="max-width:820px"><h3 style="margin-top:0;font-size:40px;color:#1c140c"><span class="chip now">見本</span> 合同委員会 議事録（虐待防止・身体拘束適正化・感染症対策・BCP見直し）</h3>
+    <p style="font-size:22px;color:#900">これは見本です。開催した記録には数えません。＿＿は当日その場で埋めます。</p>
+    ${sec('開催日', '〇月〇日（〇）〇時〇分〜（30分）※日が決まったら入れる。水曜以外')}${sec('場所', l.place)}${sec('対象事業所', l.office_ids.map(htOffName).join('、'))}${sec('出席者', l.attendees)}${sec('欠席者', l.absent)}
+    ${sec('議題', l.agenda)}${sec('話すこと（検討内容）', l.discussion)}${sec('決めたこと（決定事項）', l.decisions)}${sec('次回', l.next_plan)}${sec('職員への周知', l.notice_method)}${sec('メモ', l.note)}
+    ${HT.D.editOffs.length ? '<button id="htsmk" style="font-size:26px;margin-top:12px">✏️ この見本から本番の議事録を作る</button>' : ''}<button class="back" style="width:100%">閉じる</button></div>`;
+  document.body.appendChild(m);
+  m.querySelector('.back').onclick = () => m.remove();
+  const k = m.querySelector('#htsmk'); if (k) k.onclick = () => { m.remove(); htJointForm(null, true); };
+}
+// 合同の議事録：選んだ委員会ごとに同じ内容の開催記録を joint_id でまとめて保存
+function htJointForm(jid, fromSample) {
+  const D = HT.D, rows = jid ? D.cl.filter(x => x.joint_id === jid && !htIsSample(x)) : [], smp = fromSample ? D.cl.find(htIsSample) || {} : {}, r = rows[0] || smp;
+  const ofs = D.allOff.filter(o => D.editOffs.includes(o.id)), coms = D.com.filter(c => ofs.some(o => htApplies(c, o)));
+  const dt = rows[0] && rows[0].held_at ? new Date(new Date(rows[0].held_at).getTime() + 9 * 36e5).toISOString().slice(0, 16) : '';
+  const defCom = rows.length ? rows.map(x => x.committee_id) : ['C01', 'C02', 'C03', 'C04'].filter(id => coms.some(c => c.id === id));
+  const save = status => async o => {
+    if (!o.committee_ids.length) throw new Error('委員会を1つ以上選んでください');
+    if (!o.office_ids.length) throw new Error('対象事業所を選んでください');
+    if (!o.held) throw new Error('開催日時を入れてください（下書きは予定日時）');
+    if (new Date(o.held + ':00+09:00').getDay() === 3 && !confirm('水曜日です（齊藤さんは津の日）。この日でよろしいですか？')) return false;
+    if (status === '確定' && !confirm(`${o.committee_ids.length}つの委員会の開催記録として確定します。前回開催・議事録PDFに反映されます。よろしいですか？`)) return false;
+    const id = jid || 'J-' + new Date(Date.now() + 9 * 36e5).toISOString().replace(/\D/g, '').slice(0, 14);
+    const body = { held_at: o.held + ':00+09:00', place: o.place || null, office_ids: o.office_ids, attendees: o.attendees || null, absent: o.absent || null, agenda: o.agenda || null,
+      discussion: o.discussion || null, decisions: o.decisions || null, next_plan: o.next_plan || null, notice_method: o.notice_method || null, notice_on: o.notice_on || null, note: o.note || null, status, joint_id: id };
+    for (const cid of o.committee_ids) {
+      const ex = rows.find(x => x.committee_id === cid);
+      if (ex) { const res = await sb('ht_committee_logs?id=eq.' + encodeURIComponent(ex.id), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) }); if (!Array.isArray(res) || res.length !== 1) throw new Error('保存できませんでした。権限を確認してください。'); }
+      else await sb('ht_committee_logs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ...body, committee_id: cid }) });
+    }
+    for (const x of rows.filter(x => !o.committee_ids.includes(x.committee_id))) await sb('ht_committee_logs?id=eq.' + encodeURIComponent(x.id), { method: 'DELETE' });
+  };
+  const fx = rows.length && rows.every(htFixed);
+  htModal(`${fx ? '' : '<span class="chip now">下書き</span> '}合同委員会の議事録${fromSample ? '<br><small style="font-size:22px;font-weight:normal">見本を写しました。＿＿を埋め、合わないところを直してください。</small>' : ''}`, [
+    { k: 'held', label: '開催日時（決まったら入れる・水曜以外）', type: 'datetime-local', req: 1, val: dt },
+    { k: 'committee_ids', label: 'この回で行う委員会', type: 'checks', opts: coms.map(c => [c.id, c.name]), val: defCom },
+    { k: 'place', label: '場所/方法', val: r.place }, { k: 'office_ids', label: '対象事業所', type: 'checks', opts: ofs.map(o => [o.id, o.name]), val: r.office_ids || ofs.map(o => o.id) },
+    { k: 'attendees', label: '出席者', type: 'textarea', val: r.attendees }, { k: 'absent', label: '欠席者', val: r.absent }, { k: 'agenda', label: '議題', type: 'textarea', val: r.agenda },
+    { k: 'discussion', label: '話したこと（検討内容）', type: 'textarea', val: r.discussion }, { k: 'decisions', label: '決めたこと・次回までにやること', type: 'textarea', req: 1, val: r.decisions },
+    { k: 'next_plan', label: '次回予定', val: r.next_plan }, { k: 'notice_method', label: '職員への周知方法', val: r.notice_method }, { k: 'notice_on', label: '周知した日', type: 'date', val: r.notice_on },
+    { k: 'note', label: '備考', type: 'textarea', val: fromSample ? '' : r.note }],
+    save('確定'), '確定する', ['下書き保存', save('下書き')], 'joint:' + (jid || (fromSample ? 'sample' : 'new')));
+  document.querySelectorAll('.htm textarea').forEach(t => { t.rows = Math.min(14, Math.max(3, (t.value.match(/\n/g) || []).length + 1)); });
 }
 const htFixed = l => (l.status || '確定') === '確定';
 function htCommOpen(lid) {
@@ -426,8 +489,10 @@ function htCert(sid) {
 }
 function htMinutes(lid) {
   if (!htFixed(HT.D.cl.find(x => x.id === lid) || {})) return alert('下書きは議事録PDFになりません。「確定する」と出せます。');
-  const D = HT.D, l = D.cl.find(x => x.id === lid), c = D.com.find(x => x.id === l.committee_id) || {}, corp = D.set['法人名'] || '', ids = htScope().map(o => o.id);
-  const pages = l.office_ids.filter(x => ids.includes(x)).map(oid => `<div class="pg"><h1>${esc(c.name || '委員会')} 議事録</h1>${htKV([['法人名', esc(corp)], ['事業所', esc(htOffName(oid)) + (l.office_ids.length > 1 ? '（一体開催：' + esc(l.office_ids.map(htOffName).join('、')) + '）' : '')], ['開催日時', htFmtDT(l.held_at)], ['場所/方法', esc(l.place || '')], ['出席者', esc(l.attendees || '')], ['欠席者', esc(l.absent || '')], ['議題', esc(l.agenda || '')], ['検討内容', esc(l.discussion || '')], ['決定事項', esc(l.decisions || '')], ['次回予定', esc(l.next_plan || '')], ['周知', esc((l.notice_method || '') + ' ' + (l.notice_on || ''))]])}</div>`);
+  const D = HT.D, l = D.cl.find(x => x.id === lid), corp = D.set['法人名'] || '', ids = htScope().map(o => o.id);
+  if (htIsSample(l)) return alert('見本は議事録PDFになりません。');
+  const cname = (l.joint_id ? D.cl.filter(x => x.joint_id === l.joint_id) : [l]).map(x => (D.com.find(c => c.id === x.committee_id) || {}).name || '委員会').join('・') + (l.joint_id ? '（一体開催）' : '');
+  const pages = l.office_ids.filter(x => ids.includes(x)).map(oid => `<div class="pg"><h1>${esc(cname)} 議事録</h1>${htKV([['法人名', esc(corp)], ['事業所', esc(htOffName(oid)) + (l.office_ids.length > 1 ? '（一体開催：' + esc(l.office_ids.map(htOffName).join('、')) + '）' : '')], ['開催日時', htFmtDT(l.held_at)], ['場所/方法', esc(l.place || '')], ['出席者', esc(l.attendees || '')], ['欠席者', esc(l.absent || '')], ['議題', esc(l.agenda || '')], ['検討内容', esc(l.discussion || '')], ['決定事項', esc(l.decisions || '')], ['次回予定', esc(l.next_plan || '')], ['周知', esc((l.notice_method || '') + ' ' + (l.notice_on || ''))]])}</div>`);
   htPrint('議事録', pages);
 }
 
@@ -459,7 +524,7 @@ function htEditButtons(key, i) {
 }
 function htLogList(key) {
   const ids = htScope().map(o => o.id), cfg = HT_EDIT[key];
-  const rows = HT.D[key].map((r, i) => ({ r, i })).filter(({r}) => (key === 'rec' ? r.offices : key === 'cl' ? r.office_ids : [r.office_id]).some(id => ids.includes(id)));
+  const rows = HT.D[key].map((r, i) => ({ r, i })).filter(({r}) => !(key === 'cl' && htIsSample(r))).filter(({r}) => (key === 'rec' ? r.offices : key === 'cl' ? r.office_ids : [r.office_id]).some(id => ids.includes(id)));
   return `<h4>${cfg[0]}の編集</h4><div class="htw"><table class="htt"><tr><th>日付</th><th>内容</th><th>操作</th></tr>${rows.map(({r,i}) => `<tr><td>${key === 'cl' && !htFixed(r) ? '<span class="chip now">下書き</span><br>' : ''}${htFmtDT(r.taken_at || r.held_at || r.done_on)}</td><td>${esc(key === 'rec' ? r.staff_name + '／' + r.training_name : key === 'evl' ? (HT.D.ev.find(e => e.id === r.event_id) || {}).name || r.event_id : (HT.D.com.find(c => c.id === r.committee_id) || {}).name || r.committee_id)}<br>${esc(r.result || r.decisions || r.impression || '')}</td><td>${htEditButtons(key,i)}</td></tr>`).join('') || '<tr><td colspan="3">記録なし</td></tr>'}</table></div>`;
 }
 function htMasterLists() {
