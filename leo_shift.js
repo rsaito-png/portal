@@ -29,20 +29,29 @@
     return r;
   };
   const slotOnDay = (b, day) => { const f = slotFrom(b && b.note); return !f || String(day).slice(0, 10) >= f; };
+  // 同じ曜日に「いつから」違いの型があるときは、その日までで一番新しい「いつから」の組だけ使う。
+  // 例：月 9:00〜（空欄）と 月 10:00〜（from:11-17）→ 11/16までは9:00、11/17からは10:00（ゆか先生指定 2026-11-17）
+  const slotsOnDay = (list, day) => {
+    const d = String(day).slice(0, 10);
+    const ok = (list || []).filter(b => slotOnDay(b, d));
+    if (!ok.length) return [];
+    const v = ok.map(b => slotFrom(b.note)).sort().pop();
+    return ok.filter(b => slotFrom(b.note) === v);
+  };
   const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function shiftBaseSlotHtml(dw, s) {
     const start = escHtml(String((s && s.start) || '').slice(0, 5));
     const end = escHtml(String((s && s.end) || '').slice(0, 5));
     const from = escHtml(slotFrom(s && s.note));
     const rest = escHtml(slotRest(s && s.note));
-    return `<div class="sh-slot"><input type="time" data-dw="${+dw}" class="sh-bs" value="${start}"> 〜 <input type="time" data-dw="${+dw}" class="sh-be" value="${end}"> <label class="sh-from">いつから <input type="date" class="sh-bf" value="${from}" title="空欄は前からずっと"></label><input type="hidden" class="sh-bn" value="${rest}"> <button class="inl" onclick="this.parentNode.remove()">消す</button></div>`;
+    return `<div class="sh-slot"><input type="time" data-dw="${+dw}" class="sh-bs" value="${start}"> 〜 <input type="time" data-dw="${+dw}" class="sh-be" value="${end}"> <label class="sh-from">いつから <input type="date" class="sh-bf" value="${from}" data-was="${from}" data-saved="${start ? 1 : ''}" data-ws="${start}" data-we="${end}" onchange="shFromChanged(this)" title="空欄は前からずっと"></label><input type="hidden" class="sh-bn" value="${rest}"> <button class="inl" onclick="this.parentNode.remove()">消す</button></div>`;
   }
 
   const isHol = day => { const H = typeof JP_HOLIDAYS !== 'undefined' ? JP_HOLIDAYS : g.JP_HOLIDAYS; return !!(H && typeof H.has === 'function' && H.has(String(day).slice(0, 10))); };
   // その日の1人分。state: base=いつもの型（緑）／change=時間変更（黄）／off=休み（赤）／add=型なしの追加（黄）／none=入らない
   function shiftCell(data, day, uid) {
     const d = data || {};
-    const base = (d.base || []).filter(b => b.user_id === uid && +b.dow === dowOf(day) && slotOnDay(b, day)).sort((a, b) => min(a.start) - min(b.start));
+    const base = slotsOnDay((d.base || []).filter(b => b.user_id === uid && +b.dow === dowOf(day)), day).sort((a, b) => min(a.start) - min(b.start));
     const rows = (d.days || []).filter(x => x.user_id === uid && String(x.day).slice(0, 10) === day);
     const off = rows.find(x => x.kind === '休み');
     const chg = rows.find(x => x.kind === '時間変更');
@@ -287,15 +296,25 @@
   function baseForm(uid) {
     const base = ((SH.data && SH.data.base) || []).filter(b => b.user_id === uid);
     const rows = [1, 2, 3, 4, 5, 6, 0].map(dw => {
-      const sl = base.filter(b => +b.dow === dw).sort((x, y) => min(x.start) - min(y.start));
+      const sl = base.filter(b => +b.dow === dw).sort((x, y) => slotFrom(x.note).localeCompare(slotFrom(y.note)) || min(x.start) - min(y.start));
       const list = sl.map(s => shiftBaseSlotHtml(dw, s)).join('');
       return `<div data-day="${dw}" style="border-top:1px solid #eee;padding:6px 0"><b>${DOWS[dw]}</b> <button class="inl" onclick="shAddSlot(this,${dw})">＋ 時間</button><span class="sh-slots">${list || '<small class="note">なし</small>'}</span></div>`;
     }).join('');
     return `<h4>${esc(nameOfUid(uid))} さんのいつもの型</h4>
-      <p class="note" style="font-size:13px;margin:0 0 8px">「いつから」を空欄にすると、前からずっと入ります。</p>${rows}
+      <p class="note" style="font-size:13px;margin:0 0 8px">「いつから」を空欄にすると、前からずっと入ります。<br>「いつから」に日を入れると、その日からその時間に切り替わります。その前の日は今までの型のままです。</p>${rows}
       <div class="sh-acts"><button onclick="shSaveBase('${uid}')">保存する</button><button class="sub" onclick="shClose()">閉じる</button></div><p id="sh_msg" class="note"></p>`;
   }
   g.shOpenBase = uid => pop(baseForm(uid));
+  // 保存ずみの時間の「いつから」を後ろにずらしたら、前の型は消さずに残す（その日の前日までは今までのまま）
+  g.shFromChanged = inp => {
+    const was = inp.dataset.was || '', now = inp.value || '';
+    if (!inp.dataset.saved || inp.dataset.kept || !now || (was && now <= was)) return;
+    const row = inp.closest('.sh-slot'); const dw = +row.querySelector('.sh-bs').dataset.dw;
+    const rest = (row.querySelector('.sh-bn') || {}).value || '';
+    row.insertAdjacentHTML('beforebegin', shiftBaseSlotHtml(dw, { start: inp.dataset.ws, end: inp.dataset.we, note: packNote(was, rest) }));
+    inp.dataset.kept = '1';
+    const m = document.getElementById('sh_msg'); if (m) m.textContent = '前の型は上に残しました。下の時間を新しい時間に直して「保存する」を押してください。';
+  };
   g.shAddSlot = (btn, dw) => {
     const box = btn.parentNode.querySelector('.sh-slots');
     if (box.querySelector('small')) box.innerHTML = '';

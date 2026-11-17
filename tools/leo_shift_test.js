@@ -94,14 +94,15 @@ assert.strictEqual(c.state, 'base'); assert.deepStrictEqual(c.slots, [{ start: '
 c = S.shiftCell(dataFrom, '2026-11-11', A);
 assert.strictEqual(c.state, 'base'); assert.deepStrictEqual(c.slots, [{ start: '10:30', end: '14:30' }]);
 c = S.shiftCell(dataFrom, '2026-11-18', A);
-assert.strictEqual(c.state, 'base'); assert.strictEqual(c.slots.length, 2);
+// 「いつから」の型はその日から前の型と入れ替わる（前の日は前の型のまま）
+assert.strictEqual(c.state, 'base'); assert.deepStrictEqual(c.slots, [{ start: '15:00', end: '16:00' }]);
 assert.ok(!S.shiftEvents(dataFrom, '2026-11-11', '2026-11-11').some(e => e.staff === '横田　祥'));
 assert.ok(S.shiftEvents(dataFrom, '2026-11-18', '2026-11-18').some(e => e.kind === '勤務' && e.staff === '横田　祥' && e.title === '10:30〜13:30'));
 const kn = S.shiftCandidates(['横田　祥', '安藤　尚子', '齊藤連'], dataFrom, '2026-11-11', '11:00');
 assert.deepStrictEqual(kn.other, ['横田　祥']);
 assert.ok(kn.main.includes('安藤　尚子') && kn.main.includes('齊藤連'));
 const kn2 = S.shiftCandidates(['横田　祥', '安藤　尚子'], dataFrom, '2026-11-18', '11:00');
-assert.ok(kn2.main.includes('横田　祥') && kn2.main.includes('安藤　尚子'));
+assert.ok(kn2.main.includes('横田　祥') && !kn2.main.includes('安藤　尚子'));
 // メモの読み書き（いつから＋残すメモ）。保存し直しても日付とメモが残る
 assert.strictEqual(S.shiftSlotFrom('from:2026-11-18'), '2026-11-18');
 assert.strictEqual(S.shiftSlotRest('from:2026-11-18'), '');
