@@ -502,7 +502,33 @@ var ChamuLib = (() => {
     if (record && writesAsSelf(profile, name)) return record;
     return name;
   };
-  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, journalStaffField, journalStaffRecord, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail, USE_DAYS, useDaysOf, usesDay, journalRoster };
+  const SIGN_MAX = 300000;
+  const recordId = id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''));
+  const unsignedRecords = records => (records || []).filter(r => r && recordId(r.id) && !r.signed_at).slice()
+    .sort((a, b) => String(a.service_date || '').localeCompare(String(b.service_date || '')) || String(a.id).localeCompare(String(b.id)));
+  // チェックした未署名だけ。署名済みは含めない（上書きしない）。
+  const batchSignPlan = (records, pickedIds, signature) => {
+    const sig = String(signature == null ? '' : signature);
+    if (sig.indexOf('data:image/png;base64,') !== 0) return { error: '署名を読み取れませんでした' };
+    if (sig.length > SIGN_MAX) return { error: '署名が大きすぎます。書き直してください' };
+    const want = {};
+    (pickedIds || []).forEach(id => { if (recordId(id)) want[String(id)] = true; });
+    if (!Object.keys(want).length) return { error: '署名する日にチェックを入れてください' };
+    const ids = [];
+    (records || []).forEach(r => {
+      if (!r || !want[String(r.id)] || r.signed_at) return;
+      ids.push(String(r.id));
+    });
+    if (!ids.length) return { error: '署名済みの行は上書きしません' };
+    return { ids, signature: sig };
+  };
+  const batchSignQuery = ids => {
+    const clean = [];
+    (ids || []).forEach(id => { if (recordId(id) && clean.indexOf(String(id)) < 0) clean.push(String(id)); });
+    if (!clean.length) return '';
+    return 'chamu_service_records?id=in.(' + clean.join(',') + ')&signed_at=is.null';
+  };
+  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, journalStaffField, journalStaffRecord, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail, USE_DAYS, useDaysOf, usesDay, journalRoster, unsignedRecords, batchSignPlan, batchSignQuery };
 })();
 /* /cm-pure */
 
@@ -590,6 +616,17 @@ async function cmGo(fn, opt) {
 .cm .cm-rep td.menu{white-space:normal;min-width:16em}.cm pre.cm-mail{white-space:pre-wrap;background:#fffef8;border:3px solid #1a120c;padding:10px;font-size:15px;box-shadow:3px 3px 0 #1a120c}
 .cm a.btn{display:inline-block;background:#fff4dc;color:#1c140c;border:3px solid #1a120c;box-shadow:3px 3px 0 #1a120c;padding:8px 14px;margin:2px;text-decoration:none}
 .cm .pad{height:200px;touch-action:none}.cm .pad canvas{width:100%;height:100%;display:block;background:#fff;border:3px solid #1a120c;border-radius:0;touch-action:none}
+.cm .cm-sign .cm-day{display:flex;align-items:flex-start;gap:14px;padding:14px 2px;border-bottom:2px solid #1a120c;font-size:22px;line-height:1.45}
+.cm .cm-sign .cm-day input{width:36px;height:36px;transform:none;flex:0 0 auto;margin-top:2px}
+.cm .pad.cm-pad{height:340px}
+@media screen and (min-width:700px){
+.cm .cm-sign{font-size:28px}
+.cm .cm-sign h3{font-size:36px;line-height:1.3}
+.cm .cm-sign .cm-day{font-size:28px;padding:18px 4px}
+.cm .cm-sign .cm-day input{width:44px;height:44px}
+.cm .cm-sign button{font-size:26px}
+.cm .pad.cm-pad{height:460px}
+}
 @media screen and (min-width:900px){
 .cm{font-size:48px;line-height:1.45}
 .cm h3{font-size:60px;line-height:1.3}
@@ -626,6 +663,11 @@ async function cmGo(fn, opt) {
 .cm table.cm-shift th,.cm table.cm-shift td{font-size:48px;padding:14px 16px}
 .cm pre.cm-mail{font-size:45px;padding:22px;line-height:1.45}
 .cm .pad{height:480px}
+.cm .cm-sign{font-size:48px}
+.cm .cm-sign h3{font-size:60px}
+.cm .cm-sign .cm-day{font-size:48px;padding:22px 6px}
+.cm .cm-sign .cm-day input{width:52px;height:52px}
+.cm .pad.cm-pad{height:560px}
 }
 .cm .cm-staff-rec{display:none}
 .cm #cm_extra[hidden]{display:none}
@@ -1067,22 +1109,77 @@ function cmCopyMail() {
 }
 
 async function cmRecords() {
+  if (CM.st.batch) return cmBatchSign();
   if (CM.st.rec) return cmRecordOne(CM.st.rec);
   const month = CM.st.month || cmToday().slice(0, 7);
   const users = await cmUsers(true);
   const uid = CM.st.user || (users.find(u => u.active) || users[0] || {}).id || '';
   const last = ChamuLib.lastDay(month);
-  const recs = uid ? await cmRest(`chamu_service_records?user_id=eq.${uid}&service_date=gte.${month}-01&service_date=lte.${month}-${last}&select=*&order=service_date`) || [] : [];
-  const un = recs.filter(r => !r.signed_at).length, name = (users.find(u => u.id === uid) || {}).name || '';
+  const [recs, pending] = uid ? await Promise.all([
+    cmRest(`chamu_service_records?user_id=eq.${uid}&service_date=gte.${month}-01&service_date=lte.${month}-${last}&select=*&order=service_date`),
+    cmRest(`chamu_service_records?user_id=eq.${uid}&signed_at=is.null&select=id`),
+  ]) : [[], []];
+  const list = recs || [], open = pending || [];
+  const un = list.filter(r => !r.signed_at).length, name = (users.find(u => u.id === uid) || {}).name || '';
   cmFrame('records', `<h3>サービス提供実績記録票</h3><p class="note">日誌から自動で転記されます（職員の入力は不要）。利用者に署名をもらうと、国保連CSVの対象になります。未署名はCSVに入りません。</p>
     <div class="row noprint"><div><label class="l">利用者</label>${cmSel('r_u', users.map(u => [u.id, u.name + (u.active ? '' : '（停止）')]), uid)}</div>
       ${cmInp('r_m', '月', month, 'month')}<div style="align-self:end"><button class="sec inl" onclick="CM.st.user=cmV('r_u');CM.st.month=cmV('r_m');renderChamu('records')">表示</button></div></div>
-    <div class="card"><p><b>${cmEsc(name)}</b>　${cmEsc(month)}　${recs.length}日　未署名 ${un}日</p>
+    <div class="card"><p><b>${cmEsc(name)}</b>　${cmEsc(month)}　${list.length}日　未署名 ${un}日</p>
+      <p class="noprint"><button type="button" class="inl" onclick="CM.st.user=cmV('r_u')||CM.st.user;CM.st.batch=1;CM.st.rec=null;renderChamu('records')">未署名をまとめて署名（${open.length}件）</button></p>
       <table><tr><th>日付</th><th>時間</th><th>送迎</th><th>食事</th><th>支援</th><th>署名</th><th class="noprint"></th></tr>
-      ${recs.map(r => `<tr><td>${r.service_date}</td><td>${cmEsc((r.start_time || '').slice(0, 5))}–${cmEsc((r.end_time || '').slice(0, 5))}</td><td>${cmEsc(r.transport)}</td><td>${cmEsc(r.meal)}</td><td>${cmEsc((r.support_note || '').slice(0, 24))}</td><td>${r.signed_at ? '✔ 署名済' : '未署名'}</td><td class="noprint"><button class="inl sec" onclick="CM.st.rec='${r.id}';renderChamu('records')">記録票・署名</button></td></tr>`).join('')}
-      </table>${recs.length ? '' : '<p>この月の記録票はまだありません（業務日誌を入力してください）。</p>'}
-      ${recs.filter(r => r.signature_data && String(r.signature_data).indexOf('data:image/png;base64,') === 0).map(r => `<p><b>${r.service_date}</b><br><img class="cm-sg" src="${r.signature_data}" alt="署名"></p>`).join('')}
+      ${list.map(r => `<tr><td>${r.service_date}</td><td>${cmEsc((r.start_time || '').slice(0, 5))}–${cmEsc((r.end_time || '').slice(0, 5))}</td><td>${cmEsc(r.transport)}</td><td>${cmEsc(r.meal)}</td><td>${cmEsc((r.support_note || '').slice(0, 24))}</td><td>${r.signed_at ? '✔ 署名済' : '未署名'}</td><td class="noprint"><button class="inl sec" onclick="CM.st.rec='${r.id}';renderChamu('records')">記録票・署名</button></td></tr>`).join('')}
+      </table>${list.length ? '' : '<p>この月の記録票はまだありません（業務日誌を入力してください）。</p>'}
+      ${list.filter(r => r.signature_data && String(r.signature_data).indexOf('data:image/png;base64,') === 0).map(r => `<p><b>${r.service_date}</b><br><img class="cm-sg" src="${r.signature_data}" alt="署名"></p>`).join('')}
       <p class="noprint"><button class="sec inl" onclick="cmResync('${month}')">この月を日誌から転記し直す</button> <button class="sec inl" onclick="window.print()">印刷／PDFにする</button></p></div>`);
+}
+async function cmBatchSign() {
+  const users = await cmUsers(true);
+  const uid = CM.st.user || (users.find(u => u.active) || users[0] || {}).id || '';
+  CM.st.user = uid;
+  const name = (users.find(u => u.id === uid) || {}).name || '';
+  const rows = uid ? await cmRest(`chamu_service_records?user_id=eq.${uid}&signed_at=is.null&select=id,user_id,service_date,start_time,end_time,transport,meal,signed_at&order=service_date.asc`) || [] : [];
+  const open = ChamuLib.unsignedRecords(rows);
+  CM.st.batchRows = open;
+  const days = open.map(r => {
+    const dow = ChamuLib.dowOf(String(r.service_date || '').slice(0, 10));
+    return `<label class="cm-day"><input type="checkbox" id="bs_${r.id}" checked> <span><b>${cmEsc(String(r.service_date || '').slice(0, 10))}${dow ? '（' + dow + '）' : ''}</b>　${cmEsc(String(r.start_time || '').slice(0, 5))}–${cmEsc(String(r.end_time || '').slice(0, 5))}　送迎 ${cmEsc(r.transport || '')}　食事 ${cmEsc(r.meal || '')}</span></label>`;
+  }).join('');
+  cmFrame('records', `<button class="back noprint" onclick="CM.st.batch=null;renderChamu('records')">← 実績の一覧</button>
+    <div class="cm-sign"><h3>未署名をまとめて署名</h3>
+    <p class="note">${cmEsc(name)}さんに端末を渡して、下の枠に1回サインしてもらってください。チェックした日すべてに、同じ署名が付きます。署名済みの日は変わりません。1日だけもらうときは、一覧の「記録票・署名」です。</p>
+    <div class="row noprint"><div><label class="l">利用者</label>${cmSel('bs_u', users.map(u => [u.id, u.name + (u.active ? '' : '（停止）')]), uid)}</div>
+      <div style="align-self:end"><button type="button" class="sec inl" onclick="CM.st.user=cmV('bs_u');renderChamu('records')">表示</button></div></div>
+    <p><b>未署名 ${open.length}件</b>　はじめはすべてチェックが入っています。いらない日は外してください。</p>
+    ${open.length ? `<p class="noprint"><button type="button" class="sec inl" onclick="cmBatchCheck(true)">すべて選ぶ</button> <button type="button" class="sec inl" onclick="cmBatchCheck(false)">すべて外す</button></p>
+      <div class="card">${days}</div>
+      <div class="card"><p><b>署名欄</b>（指で、大きく書いてください）</p>
+        <div class="pad cm-pad"><canvas id="cm_cv"></canvas></div>
+        <p class="noprint"><button class="sec inl" type="button" onclick="if(CM.pad)CM.pad.clear()">書き直す</button></p>
+        <button type="button" onclick="cmBatchSave()">チェックした日に署名を保存</button></div>` : '<div class="card"><p>未署名の実績はありません。</p></div>'}
+    </div>`);
+  setTimeout(() => { const cv = document.getElementById('cm_cv'); if (cv && typeof createSignPad === 'function') CM.pad = createSignPad(cv); }, 30);
+}
+function cmBatchCheck(on) {
+  (CM.st.batchRows || []).forEach(r => { const el = document.getElementById('bs_' + r.id); if (el) el.checked = !!on; });
+}
+async function cmBatchSave() {
+  await cmGo(async () => {
+    if (!CM.pad || !CM.pad.isDrawn()) throw new Error('署名してください');
+    const picked = (CM.st.batchRows || []).filter(r => cmC('bs_' + r.id)).map(r => r.id);
+    const plan = ChamuLib.batchSignPlan(CM.st.batchRows, picked, CM.pad.toDataURL());
+    if (plan.error) throw new Error(plan.error);
+    const q = ChamuLib.batchSignQuery(plan.ids);
+    if (!q) throw new Error('署名する日にチェックを入れてください');
+    const saved = await cmRest(q, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ signature_data: plan.signature, signed_at: await cmNow() }),
+    });
+    const n = saved && saved.length;
+    if (!n) throw new Error('署名済みの行は上書きしません。一覧を開き直してください。');
+    CM.st.batch = null;
+    await cmRecords();
+    cmMsg(n + '件に署名を保存しました。国保連CSVの対象になります。', true);
+  });
 }
 async function cmResync(month) {
   await cmGo(async () => {

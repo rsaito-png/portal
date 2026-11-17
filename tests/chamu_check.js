@@ -423,7 +423,27 @@ assert.ok(!monPlan.upsert.some(r => r.user_id === 'm'), '予定外は欠席行�
 const satRoster = L.journalRoster(weekPeople, '2026-11-07', []);
 assert.strictEqual(satRoster.shown.length, 0);
 assert.strictEqual(satRoster.extra.length, 3);
-assert.ok(html.includes('chamu.js?v=20261117days'));
+assert.ok(html.includes('chamu.js?v=20261117sign'));
+const signPng = 'data:image/png;base64,aaaa';
+const signRows = [
+  { id: '11111111-1111-1111-1111-111111111111', service_date: '2026-11-18', start_time: '11:00', end_time: '14:00', transport: '往復', meal: 'あり', signed_at: null },
+  { id: '22222222-2222-2222-2222-222222222222', service_date: '2026-11-16', start_time: '11:00', end_time: '14:00', transport: '片道', meal: 'なし', signed_at: null },
+  { id: '33333333-3333-3333-3333-333333333333', service_date: '2026-11-13', start_time: '11:00', end_time: '14:00', transport: '往復', meal: 'あり', signed_at: '2026-11-13T00:00:00Z', signature_data: signPng },
+];
+assert.deepStrictEqual(L.unsignedRecords(signRows).map(r => r.service_date), ['2026-11-16', '2026-11-18']);
+const signAll = L.batchSignPlan(signRows, signRows.map(r => r.id), signPng);
+assert.deepStrictEqual(signAll.ids, ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222']);
+assert.strictEqual(signAll.signature, signPng);
+assert.ok(!signAll.ids.includes('33333333-3333-3333-3333-333333333333'));
+assert.deepStrictEqual(L.batchSignPlan(signRows, ['22222222-2222-2222-2222-222222222222'], signPng).ids, ['22222222-2222-2222-2222-222222222222']);
+assert.strictEqual(L.batchSignPlan(signRows, [], signPng).error, '署名する日にチェックを入れてください');
+assert.strictEqual(L.batchSignPlan(signRows, ['33333333-3333-3333-3333-333333333333'], signPng).error, '署名済みの行は上書きしません');
+assert.strictEqual(L.batchSignPlan(signRows, ['11111111-1111-1111-1111-111111111111'], 'nope').error, '署名を読み取れませんでした');
+assert.strictEqual(L.batchSignPlan(signRows, ['11111111-1111-1111-1111-111111111111'], signPng + 'x'.repeat(300000)).error, '署名が大きすぎます。書き直してください');
+assert.strictEqual(L.batchSignQuery(signAll.ids), 'chamu_service_records?id=in.(11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222)&signed_at=is.null');
+assert.strictEqual(L.batchSignQuery(['drop table']), '');
+assert.ok(src.includes('未署名をまとめて署名') && src.includes('cmBatchSave') && src.includes("onclick=\"cmSign('"));
+assert.ok(src.includes('signed_at=is.null') && src.includes('class="pad cm-pad"'));
 assert.ok(sql.includes("add column if not exists use_days text[] not null default '{月,火,水,木,金}'"));
 assert.ok(src.includes('CM.st.users = roster.shown.slice()'));
 assert.ok(src.includes('予定外の利用者を追加'));
