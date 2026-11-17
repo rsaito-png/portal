@@ -436,7 +436,7 @@ assert.deepStrictEqual(signAll.ids, ['11111111-1111-1111-1111-111111111111', '22
 assert.strictEqual(signAll.signature, signPng);
 assert.ok(!signAll.ids.includes('33333333-3333-3333-3333-333333333333'));
 assert.deepStrictEqual(L.batchSignPlan(signRows, ['22222222-2222-2222-2222-222222222222'], signPng).ids, ['22222222-2222-2222-2222-222222222222']);
-assert.strictEqual(L.batchSignPlan(signRows, [], signPng).error, '署名する日にチェックを入れてください');
+assert.strictEqual(L.batchSignPlan(signRows, [], signPng).error, '未署名の日がありません');
 assert.strictEqual(L.batchSignPlan(signRows, ['33333333-3333-3333-3333-333333333333'], signPng).error, '署名済みの行は上書きしません');
 assert.strictEqual(L.batchSignPlan(signRows, ['11111111-1111-1111-1111-111111111111'], 'nope').error, '署名を読み取れませんでした');
 assert.strictEqual(L.batchSignPlan(signRows, ['11111111-1111-1111-1111-111111111111'], signPng + 'x'.repeat(300000)).error, '署名が大きすぎます。書き直してください');
