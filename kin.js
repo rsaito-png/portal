@@ -11,12 +11,14 @@ async function renderKin() {
   $('view').innerHTML = '<p>読み込み中…</p>';
   const back = `<button class="back" onclick="location.hash='kintoun'">← 金斗雲へ</button>`;
   try {
-    const { plans, cons } = await kinData(), cur = kinCurrent(plans), names = Object.keys(cur);
-    if (KIN.name && cur[KIN.name]) return $('view').innerHTML = back + kinForm(cur[KIN.name], cons);
+    const [{ plans, cons }, kus] = await Promise.all([kinData(), DEMO ? [] : sb('kin_user?select=id,name').catch(() => []), (!DEMO && typeof dvList === 'function') ? dvList('金斗雲') : null]), cur = kinCurrent(plans), names = Object.keys(cur);
+    KIN.uid = Object.fromEntries((kus || []).map(u => [u.name, u.id]));
+    const dvc = n => KIN.uid && KIN.uid[n] && typeof dvCell === 'function' ? dvCell('金斗雲', KIN.uid[n], n) : '';
+    if (KIN.name && cur[KIN.name]) return $('view').innerHTML = back + kinForm(cur[KIN.name], cons) + (dvc(KIN.name) ? `<div class="card"><p>書類の控え（ご本人がいつでも見られるページ・見るだけ・期限なし）</p><p class="note">同意済みの居宅介護計画（過去の版も）と、署名済みの契約書・重要事項説明書を見られます。リンクは利用者ごとに1つです。</p>${dvc(KIN.name)}</div>` : '');
     const done = n => cons.find(c => c.user_name === n && c.version === cur[n].version);
     const rows = names.map(n => { const c = done(n);
       return `<tr><td>${esc(n)}</td><td>${c ? '✅ 同意済み' : '⬜ 未同意'}</td><td>${c ? esc(new Date(c.consented_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })) + '／' + esc(c.writer) + (c.proxy_name ? '（' + esc(c.proxy_name) + '・' + esc(c.proxy_relation) + '）' : '') + '／説明：' + esc(c.explained_by_name || '') : ''}</td>
-      <td><button onclick="KIN.name='${esc(n).replace(/'/g, '')}';renderKin()">${c ? '見る' : '同意をとる'}</button></td></tr>`; }).join('');
+      <td><button onclick="KIN.name='${esc(n).replace(/'/g, '')}';renderKin()">${c ? '見る' : '同意をとる'}</button>${dvc(n)}</td></tr>`; }).join('');
     $('view').innerHTML = back + `<h3>居宅介護計画の同意</h3>${demoNote()}<p class="note">利用者を選び、計画を見せて、iPadで同意をいただきます。</p>
       ${names.length ? `<table class="tbl"><tr><th>利用者</th><th>状態</th><th>記録</th><th></th></tr>${rows}</table><p>同意済み ${names.filter(done).length} ／ ${names.length}</p>` : '<p>計画がまだ登録されていません（準備中です）。</p>'}`;
   } catch (e) { $('view').innerHTML = back + `<p>${esc(e.message)}</p>`; }

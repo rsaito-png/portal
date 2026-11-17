@@ -2316,7 +2316,7 @@ function planHomeTodos(D0, LEFT, tday, t) {
   return out;
 }
 LEO_VIEWS.plan = async function () {
-  const [D0, LEFT] = await Promise.all([planData(), loadLeftIndex()]), rows = D0.rows.filter(r => r['児童名'] && !String(r['児童名']).startsWith('※')), tday = today(), t = new Date(tday + 'T00:00:00+09:00'), mg = canManage();
+  const [D0, LEFT] = await Promise.all([planData(), loadLeftIndex(), (!DEMO && canManage() && typeof dvList === 'function') ? dvList('レオ') : null]), rows = D0.rows.filter(r => r['児童名'] && !String(r['児童名']).startsWith('※')), tday = today(), t = new Date(tday + 'T00:00:00+09:00'), mg = canManage();
   const cards = rows.map(r => {
     const s = planChildStatus(r, D0, LEFT, tday, t);
     const name = s.name, d = s.d, gone = s.gone, leavingBeforeNext = s.leavingBeforeNext;
@@ -2363,6 +2363,7 @@ LEO_VIEWS.plan = async function () {
           <p><small>原案：${p.genan_consent_at ? '✅ ' + new Date(p.genan_consent_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'まだ'}／本案：${p.honan_consent_at ? '✅ ' + new Date(p.honan_consent_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'まだ'}</small></p>
           ${mg ? btn('原案の同意リンクを作る', `planLink('doui','','',${p.id},'原案')`, !p.plan_made) + btn('本案の同意リンクを作る（原案の同意と会議のあと）', `planLink('doui','','',${p.id},'本案')`, !p.genan_consent_at) : ''}`
           : (mg && d ? btn(`第${n}期の計画書を作る（ひな形）`, `planNew('${esc(name)}',${n},${d.start.getFullYear()},${d.start.getMonth() + 1})`) : '<p class="note">まだありません。</p>')}
+        ${mg && !DEMO && typeof dvCell === 'function' && dvCell('レオ', name, name) ? `<h4>5. 書類の控え（保護者がいつでも見られるページ）</h4><p><small>同意済みの個別支援計画（本案・過去の期も）と、署名済みの契約書・重要事項説明書を、保護者がいつでも見られます（見るだけ・期限なし）。リンクは児童ごとに1つです。</small></p>${dvCell('レオ', name, name)}` : ''}
         <div id="pm_${key}"></div></div>
       </details></div>` };
   }).sort((a, b) => (a.st >= 7) - (b.st >= 7) || b.over - a.over || (a.d?.start || 0) - (b.d?.start || 0));
