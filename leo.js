@@ -2958,8 +2958,8 @@ async function renderMasterEditor(view) {
     if (missing.length) kataWarn = `<p style="color:#c00">型表の「${missing.map(esc).join('、')}」は、まだ利用者情報に登録がありません。このままでは予定に入りません。保存すると、契約書があれば自動で登録して今日以降の予定に入れます。契約も無いときは、先に利用者情報へ登録してください。</p>`;
   }
   return `<h3>${title}</h3>${demoNote()}${tabs}
-    <p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>${kataWarn}
-    <div class="sheet-scroll"><table class="msheet"><tr>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow">${cols.map(c => `<td>${kataDrv && KATA_DRIVER_COLS[c] ? `<select class="kata-drv" data-c="${esc(c)}" style="min-width:9em">${driverOptionsHtml(kataDrv, r[c] ?? '')}</select>` : `<input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)">`}</td>`).join('')}</tr>`).join('')}</table></div>
+    ${MASTER_KIND === 'kata' ? '' : `<p class="note">${masterSheetNote(MASTER_KIND, own.length)}文字は切れずに全部出ます。窓が狭いときは表を横に滑らせてください。</p>`}${kataWarn}
+    <div class="sheet-scroll"><table class="msheet"><tr><th class="ms-drag-h" title="行の左の ⠿ をつかんで動かすと並べ替えできます">↕</th>${cols.map(c => `<th data-c="${esc(c)}">${esc(MASTER_KIND === 'kata' ? kataColLabel(c) : c)}</th>`).join('')}</tr>${[...rows, {}].map(r => `<tr class="mrow"><td class="ms-drag" onpointerdown="msDragStart(event)" title="つかんだまま上下に動かすと、好きな行の間に入れられます">⠿</td>${cols.map(c => `<td>${kataDrv && KATA_DRIVER_COLS[c] ? `<select class="kata-drv" data-c="${esc(c)}" style="min-width:9em">${driverOptionsHtml(kataDrv, r[c] ?? '')}</select>` : `<input data-c="${esc(c)}" value="${esc(r[c] ?? '')}" oninput="fitMasterInput(this)">`}</td>`).join('')}</tr>`).join('')}</table></div>
     <button onclick="renderLeoView('${view}').then(()=>{})" style="display:none"></button><button onclick="addMasterRow()">＋ 行を足す</button> <button onclick="saveMaster()">保存</button><div id="ms_msg"></div>`;
 }
 // 型表などの入力欄。短い列は中身（曜日は1文字、時刻は HH:MM）に合わせ、見出しは折り返す。保存する中身は変えない。
@@ -3027,6 +3027,33 @@ function addMasterRow() {
   row.querySelectorAll('input, select.kata-drv').forEach(i => { i.value = ''; });
   t.parentNode.appendChild(row);
   fitMasterSheet();
+}
+// 行の並べ替え（2026-11-17）：左の ⠿ をつかんだまま上下に動かすと、好きな行の間に入る。マウスでも指でも同じ。「保存」で残る。
+function msDragStart(ev) {
+  const h = ev.currentTarget, row = h.closest('tr.mrow');
+  if (!row || (ev.button != null && ev.button > 0)) return;
+  ev.preventDefault();
+  try { h.setPointerCapture(ev.pointerId); } catch (e) {}
+  row.classList.add('ms-dragging');
+  let moved = false, lastY = ev.clientY, timer = null;
+  const place = y => {
+    const rows = [...row.parentNode.querySelectorAll('tr.mrow')].filter(r => r !== row);
+    for (const r of rows) {
+      const b = r.getBoundingClientRect();
+      if (y < b.top + b.height / 2) { if (row.nextElementSibling !== r) { r.parentNode.insertBefore(row, r); moved = true; } return; }
+    }
+    const last = rows[rows.length - 1];
+    if (last && last.nextElementSibling !== row) { last.after(row); moved = true; }
+  };
+  const scroll = () => { const m = 60; if (lastY < m) window.scrollBy(0, -12); else if (lastY > innerHeight - m) window.scrollBy(0, 12); else return; place(lastY); };
+  const mv = e => { lastY = e.clientY; place(e.clientY); };
+  const up = () => {
+    document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+    clearInterval(timer); row.classList.remove('ms-dragging');
+    const m = $('ms_msg'); if (moved && m) m.textContent = '並べ替えました。「保存」を押すと残ります。' + (MASTER_KIND === 'kata' ? '（保存すると曜日ごとにまとまり、同じ曜日の中はこの順になります）' : '');
+  };
+  document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+  timer = setInterval(scroll, 30);
 }
 // 型表は曜日（月→日）ごとにまとめる。同じ曜日の中は今の並びのまま。曜日が空・不明の行はうしろ（2026-11-13）
 function kataSortRows(rows, kind) {

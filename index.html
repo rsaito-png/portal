@@ -27,6 +27,7 @@ table.msheet{width:max-content;font-size:16px}
 table.msheet th,table.msheet td{white-space:normal;vertical-align:middle;padding:2px}
 table.msheet th{font-size:12px;font-weight:700;line-height:1.2;word-break:break-all}
 table.msheet input{field-sizing:fixed;width:auto;min-width:0;max-width:none;margin:0;padding:3px 4px;font-size:16px;box-sizing:border-box;display:inline-block}
+table.msheet td.ms-drag{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;text-align:center;font-size:20px;color:#8a8a8a;width:22px;padding:0 2px}table.msheet th.ms-drag-h{width:22px;text-align:center}table.msheet tr.ms-dragging{opacity:.55;outline:2px dashed #2e7d4f}table.msheet tr.ms-dragging td.ms-drag{cursor:grabbing}
 table.kata-view{width:max-content;min-width:100%;font-size:18px}
 table.kata-view th,table.kata-view td{white-space:nowrap;vertical-align:top}
 table.sougei-view{width:max-content;min-width:100%;font-size:18px}
@@ -268,7 +269,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="leo_driver.js?v=20261111staff"></script>
 <script src="leo_meal.js?v=20261112sheet"></script>
 <script src="assess_lib.js?v=20261030assess"></script>
-<script src="leo.js?v=20261117firstas"></script>
+<script src="leo.js?v=20261117drag"></script>
 <script src="kin.js?v=202610221421"></script>
 <script src="kin_ledger.js?v=20261112sat"></script>
 <script src="kin_visit.js?v=20261112quota"></script>
@@ -327,7 +328,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261117firstas';
+  var BUILD = '20261117drag';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
