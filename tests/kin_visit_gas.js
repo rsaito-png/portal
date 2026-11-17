@@ -106,4 +106,30 @@ assert.ok(!byName['出退勤打刻']);
 assert.strictEqual(byName['土日スケジュール'], 'gl:g23');
 assert.ok(!office.tiles.some(t => t[1] === '訪問記録'));
 
+
+assert.deepStrictEqual(kvTranslateRequest('  olá  '), { body: { text: 'olá' } });
+assert.strictEqual(kvTranslateRequest('').error, '訳す文を入れてください');
+assert.strictEqual(kvTranslateRequest('   ').error, '訳す文を入れてください');
+assert.strictEqual(kvTranslateRequest('あ'.repeat(2000)).body.text.length, 2000);
+assert.strictEqual(kvTranslateRequest('あ'.repeat(2001)).error, '2000文字以内にしてください');
+assert.strictEqual(kvTranslateResult(200, { translated: ' こんにちは ' }).translated, 'こんにちは');
+assert.strictEqual(kvTranslateResult(200, { translated: '   ' }).error, '翻訳できませんでした');
+assert.strictEqual(kvTranslateResult(400, { error: '訳す文を入れてください' }).error, '訳す文を入れてください');
+assert.strictEqual(kvTranslateResult(403, {}).error, 'この操作の権限がありません');
+assert.strictEqual(kvTranslateResult(404, {}).error, '翻訳の機能がまだ有効になっていません');
+assert.strictEqual(kvTranslateResult(502, { error: 'xai-secretkeyvalue leak' }).error, '翻訳できませんでした');
+assert.strictEqual(kvLooksJapanese('O usuário tomou banho e jantou bem.'), false);
+assert.strictEqual(kvLooksJapanese('利用者は入浴し、夕食をよく食べた。'), true);
+assert.strictEqual(kvLooksJapanese(''), false);
+assert.ok(src.includes('日本語に翻訳') && src.includes('/functions/v1/kin-translate'));
+assert.ok(src.includes('data-translate="${id}-notes"') && src.includes("onclick=\"kvTranslateNote('kv_note')\""));
+assert.ok(src.includes('<summary>原文</summary>'));
+
+const toml = fs.readFileSync(path.join(root, 'supabase/config.toml'), 'utf8');
+assert.ok(toml.includes('kin-translate'));
+assert.ok(!/\[functions\.kin-translate\][^[]*verify_jwt\s*=\s*false/.test(toml));
+const fn = fs.readFileSync(path.join(root, 'supabase/functions/kin-translate/index.ts'), 'utf8');
+assert.ok(fn.includes('rpc/my_office') && fn.includes('rpc/can_manage') && fn.includes('XAI_API_KEY') && fn.includes('grok-4-fast-non-reasoning'));
+assert.ok(fs.readFileSync(path.join(root, 'index.html'), 'utf8').includes('kin_visit.js?v=20261117tr'));
+
 console.log('kin_visit gas ok');

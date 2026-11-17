@@ -312,6 +312,30 @@ function kvPendingSummary(rows, todayIso) {
   const users = o => Object.keys(o).map(k => o[k]).sort((a, b) => a.userName < b.userName ? -1 : 1);
   return { thisWeek: { weekStart: thisWs, users: users(buckets.thisWeek) }, lastWeek: { weekStart: lastWs, users: users(buckets.lastWeek) }, other: { users: users(buckets.other) } };
 }
+const KV_TRANSLATE_MAX = 2000;
+function kvTranslateRequest(raw) {
+  const text = String(raw == null ? '' : raw).trim();
+  if (!text) return { error: '訳す文を入れてください' };
+  if (text.length > KV_TRANSLATE_MAX) return { error: '2000文字以内にしてください' };
+  return { body: { text } };
+}
+function kvTranslateResult(status, json) {
+  const translated = json && typeof json.translated === 'string' ? json.translated.trim() : '';
+  if (status >= 200 && status < 300 && translated) return { translated };
+  const err = json && typeof json.error === 'string' ? json.error.trim() : '';
+  if (err && err.length <= 120 && !/xai-|bearer |api[_-]?key|sk-/i.test(err)) return { error: err };
+  if (status === 401 || status === 403) return { error: 'この操作の権限がありません' };
+  if (status === 404) return { error: '翻訳の機能がまだ有効になっていません' };
+  return { error: '翻訳できませんでした' };
+}
+function kvLooksJapanese(raw) {
+  const t = String(raw == null ? '' : raw).trim();
+  if (!t) return false;
+  const ja = (t.match(/[\u3040-\u30ff\u4e00-\u9fff]/gu) || []).length;
+  if (!ja) return false;
+  const latin = (t.match(/[A-Za-z\u00C0-\u024F]/g) || []).length;
+  return ja >= latin;
+}
 /* /kv-pure */
 function kvCss() {
   return `<style>
@@ -347,6 +371,16 @@ function kvCss() {
 .kv-prev .chg{font-weight:700;color:#9b1c1c}
 .kv-admin{margin-top:18px}
 .kv-admin .kv-instr button{width:auto;margin-top:8px}
+.kv-tr-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.kv-tr-row .kv-lab{margin:0;flex:1}
+.kv-tr-btn{flex:0 0 auto;font-size:.95em;padding:8px 14px;border:3px solid #1a120c;background:#fffef8;color:#1c140c;font-weight:700;cursor:pointer;white-space:nowrap}
+.kv-tr-btn:disabled{opacity:.6;cursor:wait}
+.kv-tr-out{margin:8px 0 0}
+.kv-tr-out .ng{color:#c62828;font-weight:700}
+.kv-tr-out .note{color:#6c757d;font-size:.9em}
+.kv-orig{margin:8px 0 0;font-size:.9em;color:#6c757d}
+.kv-orig summary{cursor:pointer;font-weight:700}
+.kv-orig pre{white-space:pre-wrap;word-break:break-word;background:#fffef8;border:2px solid #1a120c;padding:8px 10px;margin:6px 0 0;font-family:inherit;color:#1c140c}
 </style>`;
 }
 const kvIn = (id, v, t = 'text', ex = '') => `<input id="${id}" type="${t}" value="${esc(v ?? '')}" ${ex}>`;
@@ -491,7 +525,7 @@ async function kvForm(id) {
   <div class="kv-field">${kvLab('実時間（自動）', 'Duração')}<input value="${v.actual_minutes != null ? v.actual_minutes + '分' : '保存時に自動計算'}" disabled></div>
 
   <div class="kv-field">${kvLab('具体的な提供内容', 'Conteúdo do serviço', true)}<textarea id="kv_content" class="kv-ta" rows="5" placeholder="例: 整容・食事支援、入浴介助">${esc(v.content ?? '')}</textarea></div>
-  <div class="kv-field">${kvLab('特記事項・申し送り', 'Observações / encaminhamento')}<textarea id="kv_note" class="kv-ta" rows="3">${esc(v.note ?? '')}</textarea></div>
+  <div class="kv-field"><div class="kv-tr-row">${kvLab('特記事項・申し送り', 'Observações / encaminhamento')}<button type="button" class="kv-tr-btn" id="tr_btn_kv_note" data-translate="kv_note" title="Traduzir para japonês" onclick="kvTranslateNote('kv_note')">日本語に翻訳</button></div><textarea id="kv_note" class="kv-ta" rows="3">${esc(v.note ?? '')}</textarea><div id="kv_note-tr" class="kv-tr-out" hidden></div></div>
 
   <div class="kv-field"><div class="kv-lab">訪問後の報告（サ責へ）${kvPt('Relatório após a visita')}</div>
     <p class="kv-hint">変わりがなければ「変化なし」と書いてください。気づいたことがあれば具体的に。</p></div>
@@ -687,6 +721,16 @@ function kvGasCss() {
 .kv-gas .kv-instr{background:#fff;border-left:5px solid #fb8c00;border-radius:6px;padding:8px 10px;margin:0 0 6px}
 .kv-gas .kv-instr-body{font-size:17px;font-weight:700;white-space:pre-wrap;word-break:break-word}
 .kv-gas .kv-empty{background:#fff;border-radius:6px;padding:8px 10px}
+.kv-gas .gas-tr-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin:0 0 6px}
+.kv-gas .gas-tr-row .gas-lab{margin:0;flex:1}
+.kv-gas .gas-tr-btn{flex:0 0 auto;width:auto !important;margin:0 !important;background:#fff;color:#0d6efd;border:1px solid #0d6efd;padding:8px 10px;line-height:1.2;white-space:nowrap;font-weight:700}
+.kv-gas .gas-tr-btn:disabled{opacity:.6;cursor:wait}
+.kv-gas .gas-tr-out{margin:8px 0 0}
+.kv-gas .gas-tr-out .ng{color:#c62828;font-weight:700}
+.kv-gas .gas-tr-out .note{color:#6c757d;font-size:13px}
+.kv-gas .gas-orig{margin:8px 0 0;font-size:13px;color:#6c757d}
+.kv-gas .gas-orig summary{cursor:pointer;font-weight:700}
+.kv-gas .gas-orig pre{white-space:pre-wrap;word-break:break-word;background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:8px 10px;margin:6px 0 0;font-family:inherit;color:#212529}
 </style>`;
 }
 function kvGasPt(s) { return `<span class="gas-pt">${s}</span>`; }
@@ -707,7 +751,7 @@ function kvGasFields(id) {
   <div class="gas-row gas-field"><div><label class="gas-lab" for="${id}-startTime">開始時間<span class="gas-req">必須</span>${kvGasPt('Horário de início')}</label><input type="time" id="${id}-startTime" class="gas-in"><button type="button" class="gas-now" data-now="${id}-startTime">今を開始に${kvGasPt('Agora (início)')}</button></div>
   <div><label class="gas-lab" for="${id}-endTime">終了時間<span class="gas-req">必須</span>${kvGasPt('Horário de término')}</label><input type="time" id="${id}-endTime" class="gas-in"><button type="button" class="gas-now" data-now="${id}-endTime">今を終了に${kvGasPt('Agora (término)')}</button></div></div>
   <div class="gas-field"><label class="gas-lab" for="${id}-content">具体的な提供内容${kvGasReq()}${kvGasPt('Conteúdo do serviço')}</label><textarea id="${id}-content" class="gas-in" rows="3" placeholder="例: バイタル測定、清拭 / Ex.: sinais vitais, higiene"></textarea></div>
-  <div class="gas-field"><label class="gas-lab" for="${id}-notes">特記事項・申し送り${kvGasPt('Observações / encaminhamento')}</label><textarea id="${id}-notes" class="gas-in" rows="2" placeholder="状態変化や家族への伝達 / Mudanças de estado ou avisos à família"></textarea></div>
+  <div class="gas-field"><div class="gas-tr-row"><label class="gas-lab" for="${id}-notes">特記事項・申し送り${kvGasPt('Observações / encaminhamento')}</label><button type="button" class="gas-tr-btn" data-translate="${id}-notes" title="Traduzir para japonês">日本語に翻訳</button></div><textarea id="${id}-notes" class="gas-in" rows="2" placeholder="状態変化や家族への伝達 / Mudanças de estado ou avisos à família"></textarea><div id="${id}-notes-tr" class="gas-tr-out" hidden></div></div>
   <div class="rep" id="${id}-report"><div class="gas-lab">訪問後の報告（サ責へ）${kvGasPt('Relatório após a visita (para a responsável)')}</div><p class="gas-hint">変わりがなければ「変化なし」のままでOK。気づいたことがあれば書いてください。<br>Se nada mudou, deixe "Sem alteração". Se notou algo, escreva.</p>${reports}</div>
   <div class="signer gas-field"><div class="gas-lab">署名${kvGasPt('Assinatura')}</div>
     ${signer('あとで署名', 'あとで署名（まとめて署名で）', 'Assinar depois', true, true)}
@@ -1074,6 +1118,7 @@ function kvGasResetNormal() {
 }
 function kvGasResetRecord(id) {
   ['serviceType', 'startTime', 'endTime', 'content', 'notes', 'reason'].forEach(f => { const el = $(id + '-' + f); if (el) el.value = f === 'serviceType' ? '身体介護' : ''; });
+  const tr = $(id + '-notes-tr'); if (tr) { tr.hidden = true; tr.innerHTML = ''; }
   const later = $(id + '-sg-あとで署名');
   if (later) later.checked = true;
   KV_REPORT.forEach((r, i) => { const nc = $(id + '-rp-' + i + '-nc'), tx = $(id + '-rp-' + i + '-text'); if (nc) nc.checked = true; if (tx) tx.value = ''; });
@@ -1107,6 +1152,7 @@ async function kvGasSubmitTrio() {
       $(id + '-failBadge').hidden = true;
       if (KW.records[id].pad) KW.records[id].pad.clear();
       $(id + '-notes').value = '';
+      const trb = $(id + '-notes-tr'); if (trb) { trb.hidden = true; trb.innerHTML = ''; }
       KW.records[id].dirty = false;
     } catch (e) {
       fail++;
@@ -1266,6 +1312,57 @@ function kvGasOnInput(ev) {
   const id = (t.id || '').split('-')[0];
   if (KW.records[id]) KW.records[id].dirty = true;
 }
+
+async function kvTranslateNote(fieldId, retried) {
+  if (fieldId !== 'kv_note' && !/^[A-Za-z0-9]+-notes$/.test(fieldId)) return;
+  const src = $(fieldId), box = $(fieldId + '-tr');
+  const btn = document.querySelector('[data-translate="' + fieldId + '"]');
+  if (!src || !box) return;
+  const prep = kvTranslateRequest(src.value);
+  if (prep.error) { box.hidden = false; box.innerHTML = '<div class="ng">' + esc(prep.error) + '</div>'; return; }
+  const sent = prep.body.text;
+  if (kvLooksJapanese(sent)) {
+    box.hidden = false;
+    box.innerHTML = '<div class="note">すでに日本語のため、そのままにしています</div>';
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '翻訳中…'; }
+  box.hidden = false;
+  box.innerHTML = '<div class="note">翻訳中…</div>';
+  try {
+    let s = {}; try { s = JSON.parse(localStorage.getItem('sess') || '{}'); } catch (e) { s = {}; }
+    if (s.exp && s.exp < Date.now() + 30000 && !retried && typeof refreshSess === 'function') {
+      if (await refreshSess()) { try { s = JSON.parse(localStorage.getItem('sess') || '{}'); } catch (e) { s = {}; } }
+    }
+    let r;
+    try {
+      r = await fetch(C.supabaseUrl + '/functions/v1/kin-translate', {
+        method: 'POST',
+        headers: { apikey: C.supabaseKey, Authorization: 'Bearer ' + (s.token || ''), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sent })
+      });
+    } catch (e) { throw new Error('翻訳に接続できませんでした'); }
+    if (r.status === 401 && !retried && typeof refreshSess === 'function' && await refreshSess()) return await kvTranslateNote(fieldId, true);
+    const body = await r.json().catch(() => ({}));
+    const shown = kvTranslateResult(r.status, body);
+    if (shown.error) { box.innerHTML = '<div class="ng">' + esc(shown.error) + '</div>'; return; }
+    const unchanged = src.value.trim() === sent;
+    if (unchanged) {
+      src.value = shown.translated;
+      const recId = fieldId === 'kv_note' ? '' : fieldId.replace(/-notes$/, '');
+      if (recId && typeof KW !== 'undefined' && KW.records && KW.records[recId]) KW.records[recId].dirty = true;
+    }
+    const orig = '<details class="kv-orig gas-orig" open><summary>原文</summary><pre>' + esc(sent) + '</pre></details>';
+    const hint = unchanged
+      ? '<p class="note">訳文は上の欄に入れました。保存前に直せます。</p>'
+      : '<p class="note">入力が変わっています。必要ならもう一度押してください。</p>';
+    box.innerHTML = orig + hint;
+  } catch (e) {
+    box.innerHTML = '<div class="ng">' + esc(e.message || '翻訳に接続できませんでした') + '</div>';
+  } finally {
+    if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = '日本語に翻訳'; }
+  }
+}
 function kvGasOnClick(ev) {
   const t = ev.target && ev.target.closest ? ev.target.closest('button') : null;
   if (!t) return;
@@ -1277,6 +1374,8 @@ function kvGasOnClick(ev) {
   if (t.id === 'l-next' && !t.disabled) { KW.laterWeek = kvAddDays(KW.laterWeek, 7); kvGasLaterWeek(); kvGasRenderLater(); }
   const now = t.getAttribute('data-now');
   if (now) { const el = $(now); if (el) { el.value = kvNowHHMM(); const id = now.split('-')[0]; if (KW.records[id]) KW.records[id].dirty = true; } }
+  const tr = t.getAttribute('data-translate');
+  if (tr) kvTranslateNote(tr);
   const clear = t.getAttribute('data-clear');
   if (clear && KW.records[clear] && KW.records[clear].pad) KW.records[clear].pad.clear();
   const reload = t.getAttribute('data-ctx-reload');
