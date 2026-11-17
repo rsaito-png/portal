@@ -91,6 +91,9 @@ create table if not exists public.chamu_users (
   updated_at timestamptz not null default now()
 );
 
+-- 利用曜日。日誌はこの曜日の人だけ出す。臨時は画面から追加する。予定外の欠席行は作らない。
+alter table public.chamu_users add column if not exists use_days text[] not null default '{月,火,水,木,金}';
+
 create table if not exists public.chamu_journal (
   id uuid primary key default gen_random_uuid(),
   journal_date date not null unique,

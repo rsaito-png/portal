@@ -441,6 +441,40 @@ var ChamuLib = (() => {
       csv: menuReportCsv(src, true), filename: 'chamu-kondate-' + (src.ym || 'month') + '.csv', mailto: used.mailto, gmail: used.gmail,
     };
   };
+  const USE_DAYS = ['月', '火', '水', '木', '金'];
+  // 未設定は月〜金（列の既定と同じ）。空の配列は、どの曜日も予定に入らない。
+  const useDaysOf = user => {
+    const raw = user ? user.use_days : undefined;
+    if (raw == null || raw === '') return USE_DAYS.slice();
+    let list = [];
+    if (Array.isArray(raw)) list = raw;
+    else if (typeof raw === 'string') {
+      const s = raw.trim();
+      const body = s.startsWith('{') && s.endsWith('}') ? s.slice(1, -1) : s;
+      list = body ? body.split(/[、,]/) : [];
+    } else return USE_DAYS.slice();
+    const days = [];
+    USE_DAYS.forEach(d => {
+      if (list.some(x => String(x == null ? '' : x).trim().replace(/^"|"$/g, '') === d)) days.push(d);
+    });
+    return days;
+  };
+  const usesDay = (user, dow) => useDaysOf(user).indexOf(dow) >= 0;
+  // 日誌に出す人。予定の曜日か、その日の行が既にある人。予定外は欠席行を作らず、追加用に分ける。
+  const journalRoster = (users, ymd, lines) => {
+    const dow = dowOf(ymd);
+    const lined = {};
+    (lines || []).forEach(l => {
+      if (l && l.user_id != null && String(l.user_id) !== '') lined[String(l.user_id)] = true;
+    });
+    const shown = [], extra = [];
+    (users || []).forEach(u => {
+      if (!u || u.id == null || String(u.id) === '') return;
+      if (lined[String(u.id)] || usesDay(u, dow)) shown.push(u);
+      else extra.push(u);
+    });
+    return { dow, shown, extra };
+  };
   const nameKey = s => textOf(s).replace(/[\s\u3000]/g, '');
   // 自分の名前、または公式名（いま現場が書いている「安藤」のような、公式名の先頭2文字以上も含む）。
   const writesAsSelf = (profile, typed) => {
@@ -468,7 +502,7 @@ var ChamuLib = (() => {
     if (record && writesAsSelf(profile, name)) return record;
     return name;
   };
-  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, journalStaffField, journalStaffRecord, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail };
+  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, journalStaffField, journalStaffRecord, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail, USE_DAYS, useDaysOf, usesDay, journalRoster };
 })();
 /* /cm-pure */
 
@@ -594,6 +628,8 @@ async function cmGo(fn, opt) {
 .cm .pad{height:480px}
 }
 .cm .cm-staff-rec{display:none}
+.cm #cm_extra[hidden]{display:none}
+.cm #cm_extra summary{cursor:pointer;font-weight:700}
 @media print{header,.back,.cm-nav,.noprint,#help,#out,.cm-dlg{display:none!important}.cm .cm-staff-live{display:none!important}.cm .cm-staff-rec{display:block!important;border:3px solid #1a120c;padding:10px;margin:4px 0;background:#fff}body{background:#fff}main{max-width:none;padding:0}}`;
   document.head.appendChild(st);
 })();
@@ -612,7 +648,7 @@ async function cmRest(path, opt, retried) {
     let msg = '保存できませんでした（' + r.status + '）';
     try { const j = await r.json(); if (j.message) msg = j.message; } catch (e) { /* 本文なし */ }
     if (r.status === 401 || r.status === 403 || /row-level security|permission denied/i.test(msg)) msg = 'この操作の権限がありません。';
-    if (/intake|rice_portion|egg_count|tofu_g|meat_note|fish_g|dairy_note/.test(msg)) msg += ' supabase/chamu.sql を適用してください。';
+    if (/intake|rice_portion|egg_count|tofu_g|meat_note|fish_g|dairy_note|use_days/.test(msg)) msg += ' supabase/chamu.sql を適用してください。';
     throw new Error(msg);
   }
   if (r.status === 204) return null;
@@ -686,19 +722,11 @@ async function cmJournal() {
   const lines = (day && day.chamu_journal_line) || [];
   const dfl = ChamuLib.settingsOf(settings);
   const by = {}; lines.forEach(l => { by[l.user_id] = l; });
+  const roster = ChamuLib.journalRoster(users, date, lines);
   CM.st.date = date;
-  const card = u => {
-    const l = by[u.id] || {}, chosen = l.user_id ? (l.present ? '出席' : '欠席') : '', k = u.id;
-    const meal = l.meal || 'あり', intake = l.intake || (meal === 'あり' ? ChamuLib.INTAKE_DEFAULT : '');
-    return `<div class="jr"><div class="row" style="align-items:end"><div class="cm-who"><b>${cmEsc(u.name)}</b></div><div><label class="l">出欠 / Presença</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
-      <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始 / Início', (l.start_time || dfl.default_start || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了 / Fim', (l.end_time || dfl.default_end || '').slice(0, 5), 'time')}
-        <div><label class="l">送迎 / Transporte</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
-        <div><label class="l">食事 / Refeição</label>${cmSel('m_' + k, ChamuLib.MEAL, meal)}</div>
-        <div id="eat_${k}" style="flex:1 1 100%;${meal === 'あり' ? '' : 'display:none'}"><label class="l">摂食 / Quanto comeu</label>${cmSel('i_' + k, ChamuLib.INTAKE, intake, '未記入')}
-          <p class="note">ざっくりで大丈夫です。初期は100%です（80%・50%・その他も選べます）。<br>Pode ser aproximado. O padrão é 100%.</p>
-          <div id="eatn_${k}" style="${l.intake === 'その他' ? '' : 'display:none'}">${cmInp('in_' + k, 'その他の目安（任意） / Outro (opcional)', l.intake_note || '', 'text', 'maxlength="80" placeholder="例: 半分も残した"')}</div></div>
-        <div style="flex:1 1 100%">${cmNoteField('n_' + k, '支援内容・ご様子 / Apoio e estado da pessoa', l.support_note || '')}</div></div></div>`;
-  };
+  CM.st.users = roster.shown.slice();
+  CM.st.extra = roster.extra.slice();
+  CM.st.defaults = dfl;
   cmFrame('journal', `<h3>業務日誌 / Diário de trabalho　${cmEsc(date)}</h3><p class="note">職員が入力するのはここだけです。保存すると、出席した日は実績記録票に自動で転記されます。<br>Os funcionários só preenchem aqui. Ao salvar, os dias de presença vão automaticamente para o registro de serviços.</p>
     <p class="noprint"><button class="sec inl" onclick="CM.st.date='${cmShift(date, -1)}';renderChamu('journal')">＜ 前日 / Dia anterior</button>
     <button class="sec inl" onclick="CM.st.date='${cmToday()}';renderChamu('journal')">今日 / Hoje</button>
@@ -716,17 +744,73 @@ async function cmJournal() {
         ${cmInp('j_fish', '魚（1人分） / Peixe (por pessoa)', (day && day.fish_g) || '', 'text', 'maxlength="80" placeholder="例: 80g"')}
         ${cmInp('j_dairy', '牛乳・乳製品 / Leite e laticínios', (day && day.dairy_note) || '', 'text', 'maxlength="80" placeholder="例: 200g（なければ空欄）"')}</div>
       ${cmNoteField('j_note', '全体申し送り / Recado geral', (day && day.note) || '')}</div>
+    <p class="note">この曜日（${cmEsc(roster.dow || '—')}）の利用予定の人だけ出しています。予定外の人は欠席にしません。臨時の人は下から追加できます。<br>Só aparecem as pessoas previstas para este dia. Quem está fora do plano não fica como falta.</p>
     <p class="noprint"><button class="sec inl" onclick="cmBulk()">予定どおり全員を一括入力 / Preencher todos conforme o plano</button></p>
-    ${users.map(card).join('') || '<div class="card">利用者がまだいません。<a href="#chamu/users">利用者</a>から登録してください。</div>'}
+    <div id="cm_cards">${roster.shown.map(u => cmJournalCard(u, by[u.id], dfl, roster.dow)).join('')}</div>
+    ${roster.shown.length ? '' : (roster.extra.length ? '<div class="card" id="cm_none">この曜日の利用予定の人はいません。臨時の人は下から追加できます。</div>' : '<div class="card">利用者がまだいません。<a href="#chamu/users">利用者</a>から登録してください。</div>')}
+    <details class="card noprint" id="cm_extra" ${roster.extra.length ? '' : 'hidden'}><summary id="cm_extra_sum">予定外の利用者を追加（${roster.extra.length}人） / Fora do plano</summary>
+      <p class="note">この曜日の利用予定に入っていない人です。臨時で来たときだけ追加してください。出欠を選んで保存するまで、記録には残りません。</p>
+      <div id="cm_extra_btns">${roster.extra.map(u => `<button type="button" class="sec inl" id="cm_add_${u.id}" onclick="cmAddExtra('${u.id}')">${cmEsc(u.name)}</button>`).join('')}</div></details>
     <button type="button" data-cm-save onclick="cmSaveJournal()">保存して記録票に転記</button><p class="note">↑ Salvar e passar para o registro de serviços</p>`);
-  users.forEach(u => {
-    const p = document.getElementById('p_' + u.id), m = document.getElementById('m_' + u.id), i = document.getElementById('i_' + u.id);
-    if (p) p.onchange = () => cmToggle(u.id);
-    if (m) m.onchange = () => cmMealToggle(u.id);
-    if (i) i.onchange = () => cmMealToggle(u.id);
-  });
-  CM.st.users = users;
-  CM.st.defaults = ChamuLib.settingsOf(settings);
+  roster.shown.forEach(u => cmWireUser(u.id));
+}
+function cmJournalCard(u, line, dfl, dow) {
+  const l = line || {};
+  const chosen = l.user_id ? (l.present ? '出席' : '欠席') : '';
+  const k = u.id;
+  const meal = l.meal || 'あり';
+  const intake = l.intake || (meal === 'あり' ? ChamuLib.INTAKE_DEFAULT : '');
+  const off = !ChamuLib.usesDay(u, dow);
+  const defs = dfl || ChamuLib.DEFAULTS;
+  return `<div class="jr" id="jr_${k}"><div class="row" style="align-items:end"><div class="cm-who"><b>${cmEsc(u.name)}${u.active === false ? '（停止）' : ''}</b>${off ? '<p class="note">予定外</p>' : ''}</div><div><label class="l">出欠 / Presença</label>${cmSel('p_' + k, ['出席', '欠席'], chosen, '選択')}</div></div>
+      <div id="det_${k}" class="row" style="${chosen === '出席' ? '' : 'display:none'}">${cmInp('s_' + k, '開始 / Início', (l.start_time || defs.default_start || '').slice(0, 5), 'time')}${cmInp('e_' + k, '終了 / Fim', (l.end_time || defs.default_end || '').slice(0, 5), 'time')}
+        <div><label class="l">送迎 / Transporte</label>${cmSel('t_' + k, ChamuLib.TRANSPORT, l.transport || '往復')}</div>
+        <div><label class="l">食事 / Refeição</label>${cmSel('m_' + k, ChamuLib.MEAL, meal)}</div>
+        <div id="eat_${k}" style="flex:1 1 100%;${meal === 'あり' ? '' : 'display:none'}"><label class="l">摂食 / Quanto comeu</label>${cmSel('i_' + k, ChamuLib.INTAKE, intake, '未記入')}
+          <p class="note">ざっくりで大丈夫です。初期は100%です（80%・50%・その他も選べます）。<br>Pode ser aproximado. O padrão é 100%.</p>
+          <div id="eatn_${k}" style="${l.intake === 'その他' ? '' : 'display:none'}">${cmInp('in_' + k, 'その他の目安（任意） / Outro (opcional)', l.intake_note || '', 'text', 'maxlength="80" placeholder="例: 半分も残した"')}</div></div>
+        <div style="flex:1 1 100%">${cmNoteField('n_' + k, '支援内容・ご様子 / Apoio e estado da pessoa', l.support_note || '')}</div></div>
+      ${off && !l.user_id ? `<p class="noprint"><button type="button" class="sec inl" onclick="cmRemoveExtra('${k}')">追加をやめる</button></p>` : ''}</div>`;
+}
+function cmWireUser(id) {
+  const p = document.getElementById('p_' + id), m = document.getElementById('m_' + id), i = document.getElementById('i_' + id);
+  if (p) p.onchange = () => cmToggle(id);
+  if (m) m.onchange = () => cmMealToggle(id);
+  if (i) i.onchange = () => cmMealToggle(id);
+}
+function cmRefreshExtra() {
+  const n = (CM.st.extra || []).length;
+  const box = document.getElementById('cm_extra');
+  const sum = document.getElementById('cm_extra_sum');
+  if (box) box.hidden = !n;
+  if (sum) sum.textContent = '予定外の利用者を追加（' + n + '人） / Fora do plano';
+}
+function cmAddExtra(id) {
+  const list = CM.st.extra || [];
+  const i = list.findIndex(u => String(u.id) === String(id));
+  if (i < 0) return;
+  const u = list.splice(i, 1)[0];
+  CM.st.users = (CM.st.users || []).concat([u]);
+  const host = document.getElementById('cm_cards');
+  const none = document.getElementById('cm_none');
+  if (none) none.remove();
+  if (host) host.insertAdjacentHTML('beforeend', cmJournalCard(u, {}, CM.st.defaults, ChamuLib.dowOf(CM.st.date)));
+  cmWireUser(u.id);
+  const btn = document.getElementById('cm_add_' + id);
+  if (btn) btn.remove();
+  cmRefreshExtra();
+}
+function cmRemoveExtra(id) {
+  const users = CM.st.users || [];
+  const i = users.findIndex(u => String(u.id) === String(id));
+  if (i < 0) return;
+  const u = users.splice(i, 1)[0];
+  CM.st.extra = (CM.st.extra || []).concat([u]);
+  const card = document.getElementById('jr_' + id);
+  if (card) card.remove();
+  const box = document.getElementById('cm_extra_btns');
+  if (box) box.insertAdjacentHTML('beforeend', `<button type="button" class="sec inl" id="cm_add_${u.id}" onclick="cmAddExtra('${u.id}')">${cmEsc(u.name)}</button>`);
+  cmRefreshExtra();
 }
 function cmHaichiCanEdit() {
   if (typeof DEMO !== 'undefined' && DEMO) return false;
@@ -865,7 +949,9 @@ async function cmTranslate(id, retried) {
 }
 function cmBulk() {
   const d = CM.st.defaults || ChamuLib.DEFAULTS;
+  const dow = ChamuLib.dowOf(CM.st.date);
   (CM.st.users || []).forEach(u => {
+    if (!ChamuLib.usesDay(u, dow)) return;
     const p = document.getElementById('p_' + u.id), s = document.getElementById('s_' + u.id), e = document.getElementById('e_' + u.id), t = document.getElementById('t_' + u.id), m = document.getElementById('m_' + u.id);
     if (p) p.value = '出席'; if (s && !s.value) s.value = d.default_start; if (e && !e.value) e.value = d.default_end; if (t) t.value = '往復'; if (m) m.value = 'あり'; cmToggle(u.id);
   });
@@ -936,7 +1022,7 @@ async function cmKondate() {
   let users = [], days = [], err = '';
   try {
     [users, days] = await Promise.all([
-      cmRest('chamu_users?select=id,sort,active&order=sort.asc,id.asc'),
+      cmRest('chamu_users?select=id,sort,active,use_days&order=sort.asc,id.asc'),
       cmRest(`chamu_journal?journal_date=gte.${month}-01&journal_date=lte.${month}-${last}&select=journal_date,menu,rice_portion,egg_count,tofu_g,meat_note,fish_g,dairy_note,chamu_journal_line(user_id,present,meal,intake,intake_note)&order=journal_date.asc`),
     ]);
   } catch (e) { err = String((e && e.message) || e); }
@@ -1005,9 +1091,10 @@ async function cmResync(month) {
     const days = await cmRest(`chamu_journal?journal_date=gte.${month}-01&journal_date=lte.${month}-${last}&select=journal_date,chamu_journal_line(*)`) || [];
     let notes = [];
     for (const j of days) {
-      const prepared = users.map(u => {
-        const line = (j.chamu_journal_line || []).find(x => x.user_id === u.id) || { present: false };
-        return { user_id: u.id, name: u.name, ...ChamuLib.prepareLine({ ...line, name: u.name }, defaults) };
+      const prepared = (j.chamu_journal_line || []).filter(line => line && line.user_id).map(line => {
+        const u = users.find(x => x.id === line.user_id) || {};
+        const name = u.name || '利用者';
+        return { user_id: line.user_id, name, ...ChamuLib.prepareLine({ ...line, name }, defaults) };
       });
       notes = notes.concat(await cmApplySync(j.journal_date, prepared, defaults));
     }
@@ -1106,18 +1193,21 @@ async function cmUsersPage() {
   const users = await cmUsers(true);
   cmFrame('users', `<h3>利用者</h3><p class="note">日誌と請求に使う項目です。受給者証・障害支援区分・決定サービスコード（221000）・食事提供・送迎加算を入れてください。いまシートにいる3人は、管理者が supabase/chamu_seed.sql を実行するか、ここから登録します。</p>
     <p><button class="inl" onclick="CM.st.edit='new';renderChamu('users')">利用者を追加</button></p>
-    <div class="card"><table><tr><th>氏名</th><th>区分</th><th>食事</th><th>送迎</th><th></th></tr>
-      ${users.map(u => `<tr><td>${cmEsc(u.name)}${u.active ? '' : '（停止）'}</td><td>${u.support_level ?? ''}</td><td>${u.meal_addon ? '対象' : '非対象'}</td><td>${cmEsc(u.transport_class)}</td><td><button class="inl sec" onclick="CM.st.edit='${u.id}';renderChamu('users')">編集</button></td></tr>`).join('')}
+    <div class="card"><table><tr><th>氏名</th><th>利用曜日</th><th>区分</th><th>食事</th><th>送迎</th><th></th></tr>
+      ${users.map(u => `<tr><td>${cmEsc(u.name)}${u.active ? '' : '（停止）'}</td><td>${cmEsc(ChamuLib.useDaysOf(u).join('・') || 'なし')}</td><td>${u.support_level ?? ''}</td><td>${u.meal_addon ? '対象' : '非対象'}</td><td>${cmEsc(u.transport_class)}</td><td><button class="inl sec" onclick="CM.st.edit='${u.id}';renderChamu('users')">編集</button></td></tr>`).join('')}
     </table>${users.length ? '' : '<p>まだ登録がありません。</p>'}</div>`);
 }
 async function cmUserForm(id) {
-  const row = id === 'new' ? { name: '', kana: '', sort: 0, active: true, recipient_no: '', city_no: '', support_level: '', cap_management: '無', cap_amount: 0, cap_office_no: '', decision_code: '221000', contract_days: '原則', contract_start: '', contract_end: '', service_start: '', provider_entry_no: '1', meal_addon: true, transport_class: '2' }
+  const row = id === 'new' ? { name: '', kana: '', sort: 0, active: true, use_days: ChamuLib.USE_DAYS.slice(), recipient_no: '', city_no: '', support_level: '', cap_management: '無', cap_amount: 0, cap_office_no: '', decision_code: '221000', contract_days: '原則', contract_start: '', contract_end: '', service_start: '', provider_entry_no: '1', meal_addon: true, transport_class: '2' }
     : ((await cmRest('chamu_users?id=eq.' + id + '&select=*')) || [])[0];
   if (!row) { CM.st.edit = null; return cmUsersPage(); }
   const d = v => v ? String(v).slice(0, 10) : '';
   cmFrame('users', `<button class="back" onclick="CM.st.edit=null;renderChamu('users')">← 一覧</button><h3>${id === 'new' ? '利用者を追加' : cmEsc(row.name)}</h3>
     <div class="card"><div class="row">${cmInp('u_name', '氏名', row.name)}${cmInp('u_kana', '氏名カナ', row.kana)}${cmInp('u_sort', '並び', row.sort, 'number')}</div>
       <label><input type="checkbox" id="u_active" ${row.active ? 'checked' : ''}> 利用中</label>
+      <div><span class="l">利用曜日</span>
+        <p class="note">日誌に出す曜日です。入っていない日は、業務日誌の「予定外の利用者を追加」から出せます。</p>
+        <p>${ChamuLib.USE_DAYS.map(d => `<label><input type="checkbox" id="u_day_${d}" ${ChamuLib.useDaysOf(row).indexOf(d) >= 0 ? 'checked' : ''}> ${d}</label>`).join(' ')}</p></div>
       <div class="row">${cmInp('u_rec', '受給者証番号', row.recipient_no)}${cmInp('u_city', '支給決定市町村番号', row.city_no)}
         <div><label class="l">障害支援区分</label>${cmSel('u_lv', [['', '未設定'], '1', '2', '3', '4', '5', '6'], row.support_level ?? '')}</div></div>
       <div class="row"><div><label class="l">上限管理</label>${cmSel('u_cap', ['無', '有'], row.cap_management || '無')}</div>${cmInp('u_capamt', '上限月額', row.cap_amount, 'number')}${cmInp('u_capoff', '上限額管理事業所番号', row.cap_office_no)}</div>
@@ -1135,6 +1225,7 @@ async function cmSaveUser(id) {
     if (!name) throw new Error('氏名を入れてください');
     const body = {
       name, kana: cmNull(cmV('u_kana')), sort: Number(cmV('u_sort')) || 0, active: cmC('u_active'),
+      use_days: ChamuLib.USE_DAYS.filter(d => cmC('u_day_' + d)),
       recipient_no: cmNull(cmV('u_rec')), city_no: cmNull(cmV('u_city')), support_level: cmV('u_lv') === '' ? null : Number(cmV('u_lv')),
       cap_management: cmV('u_cap') || '無', cap_amount: Number(cmV('u_capamt')) || 0, cap_office_no: cmNull(cmV('u_capoff')),
       decision_code: cmV('u_dec').trim() || '221000', contract_days: cmV('u_qty').trim() || '原則', provider_entry_no: cmV('u_ent').trim() || '1',

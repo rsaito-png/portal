@@ -352,7 +352,7 @@ assert.ok(mail.csv.includes('日付,献立,A,A摂食,B,B摂食,C,C摂食,提供�
 assert.ok(mail.csv.includes('あり,80%'));
 const shown = mail.body + mail.csv + mail.gmail + mail.mailto + L.menuReportHtml(diet);
 ['秘密太郎', '非表示花子', 'もう一人', '0000000001', '受給者証', '時給'].forEach(s => assert.ok(!shown.includes(s), s));
-assert.ok(src.includes('chamu_users?select=id,sort,active'));
+assert.ok(src.includes('chamu_users?select=id,sort,active,use_days'));
 assert.ok(src.includes('makinakahigashi@gmail.com') && src.includes("view: 'cm'") && src.includes('https://mail.google.com/mail/?'));
 assert.ok(src.includes('ここから直接は送りません') && src.includes('Gmailで下書きを開く'));
 assert.ok(!src.includes('https://mail.google.com/mail/send'));
@@ -385,6 +385,52 @@ assert.strictEqual(L.journalStaffRecord(saito, '齊藤連'), '齊藤連');
 assert.strictEqual(L.journalStaffField({}, '職員'), '職員');
 assert.strictEqual(L.journalStaffRecord({}, ''), '');
 assert.ok(src.includes('journalStaffRecord(CM.st.profile, form.staff_name)'));
+
+const weekPeople = [
+  { id: 'h', name: '日置広大', use_days: ['月', '火', '水', '木', '金'] },
+  { id: 't', name: '柘山周磨', use_days: ['月', '火', '水', '木', '金'] },
+  { id: 'm', name: '森井辰生', use_days: ['水', '金'] },
+];
+assert.deepStrictEqual(L.useDaysOf({ use_days: ['金', '水', '水', '土', '月'] }), ['月', '水', '金']);
+assert.deepStrictEqual(L.useDaysOf({ use_days: '{水,金}' }), ['水', '金']);
+assert.deepStrictEqual(L.useDaysOf({}), ['月', '火', '水', '木', '金']);
+assert.deepStrictEqual(L.useDaysOf({ use_days: [] }), []);
+assert.strictEqual(L.usesDay(weekPeople[2], '水'), true);
+assert.strictEqual(L.usesDay(weekPeople[2], '月'), false);
+assert.strictEqual(L.usesDay(weekPeople[2], '土'), false);
+const monRoster = L.journalRoster(weekPeople, '2026-11-02', []);
+assert.strictEqual(monRoster.dow, '月');
+assert.deepStrictEqual(monRoster.shown.map(u => u.name), ['日置広大', '柘山周磨']);
+assert.deepStrictEqual(monRoster.extra.map(u => u.name), ['森井辰生']);
+const wedRoster = L.journalRoster(weekPeople, '2026-11-04', []);
+assert.strictEqual(wedRoster.dow, '水');
+assert.deepStrictEqual(wedRoster.shown.map(u => u.name), ['日置広大', '柘山周磨', '森井辰生']);
+assert.deepStrictEqual(wedRoster.extra, []);
+const friRoster = L.journalRoster(weekPeople, '2026-11-06', []);
+assert.ok(friRoster.shown.some(u => u.name === '森井辰生'));
+const tueRoster = L.journalRoster(weekPeople, '2026-11-03', []);
+assert.ok(!tueRoster.shown.some(u => u.id === 'm') && tueRoster.extra.some(u => u.id === 'm'));
+const keptRoster = L.journalRoster(weekPeople, '2026-11-02', [{ user_id: 'm', present: false }]);
+assert.deepStrictEqual(keptRoster.shown.map(u => u.id), ['h', 't', 'm']);
+assert.deepStrictEqual(keptRoster.extra, []);
+const keptPresent = L.journalRoster(weekPeople, '2026-11-03', [{ user_id: 'm', present: true }]);
+assert.ok(keptPresent.shown.some(u => u.id === 'm'));
+const monLines = monRoster.shown.map(u => baseUser({ user_id: u.id, name: u.name }));
+const monPlan = L.syncPlan(monLines, [], defaults);
+assert.deepStrictEqual(monPlan.upsert.map(r => r.user_id), ['h', 't']);
+assert.deepStrictEqual(monPlan.del, []);
+assert.ok(!monPlan.upsert.some(r => r.user_id === 'm'), '予定外は欠席行も実績も作らない');
+const satRoster = L.journalRoster(weekPeople, '2026-11-07', []);
+assert.strictEqual(satRoster.shown.length, 0);
+assert.strictEqual(satRoster.extra.length, 3);
+assert.ok(html.includes('chamu.js?v=20261117days'));
+assert.ok(sql.includes("add column if not exists use_days text[] not null default '{月,火,水,木,金}'"));
+assert.ok(src.includes('CM.st.users = roster.shown.slice()'));
+assert.ok(src.includes('予定外の利用者を追加'));
+assert.ok(src.includes('use_days: ChamuLib.USE_DAYS.filter'));
+assert.ok(src.includes('id="u_day_') && src.includes('利用曜日'));
+assert.ok(!src.includes('|| { present: false }'));
+assert.ok(src.includes("const mealOn = u.meal_addon !== false && r.meal === 'あり'"));
 assert.ok(src.includes('cm-staff-rec') && src.includes('nikki_name,chamu_record_name'));
 assert.ok(src.includes('leoMyProfileQ'));
 
