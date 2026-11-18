@@ -3319,7 +3319,7 @@ LEO_VIEWS.diary = async function () {
       if (r.kind === '欠席') return leoAbsCardHtml(k, leoAbsFlag(flags, k), true, DIA_DAY, absStaff);
       const d = D[k], id = idOf(k), a = A[ldNN(k)], actText = (a && a.text) || r.activity, actSrc = a ? a.source : (r.activity ? '日誌から' : '');
       const mealRec = meals[leoMealNorm(k)];
-      return `<details class="card" open style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／食事 ${esc((mealRec && mealRec.meal) || '未記入')}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
+      return `<details class="card" style="padding:0"><summary style="padding:14px;font-size:17px;cursor:pointer"><b>■${esc(k)}</b>　<small>${esc(r.kind)}${r.start_time ? ' ' + esc(r.start_time) + '〜' + esc(r.end_time || '') : ''}／食事 ${esc((mealRec && mealRec.meal) || '未記入')}／${d ? '✏️ 下書きあり' : '⬜ 下書きなし'}${actSrc ? '／活動 ' + esc(actSrc) : ''}</small></summary>
         <div style="padding:0 14px 14px"><p class="note">迎え：${esc(filingDriverName(r.pick_driver, DIA_DAY) || '-')}　送り：${esc(filingDriverName(r.drop_driver, DIA_DAY) || '-')}</p>
         ${actText ? `<p style="white-space:pre-wrap"><b>日誌の活動記録${actSrc ? '（' + esc(actSrc) + '）' : ''}</b><br>${esc(actText)}</p>` : '<p class="note">日誌の活動記録は、まだありません。</p>'}
         <div id="${id}_meal">${leoMealBox(k, meals[leoMealNorm(k)], r, false)}</div>
