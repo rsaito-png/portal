@@ -740,6 +740,20 @@ async function leoLoadJissekiMonth(month, demoPack) {
   if (!DEMO && a <= cap) {
     try { await sb('rpc/leo_record_span', { method: 'POST', body: JSON.stringify({ p_from: a, p_to: b < cap ? b : cap }) }); } catch (e) { }
   }
+  // 明日から先の日：日誌の行がもうある日だけ、カレンダーの変更（休み・キャンセルなど）を日誌と実績に入れ直す（ゆか先生指定 2026-11-18）
+  if (!DEMO && b > cap) {
+    try {
+      const from = a > cap ? a : addDays(cap, 1);
+      const rows = await sb(`leo_nikki?day=gte.${from}&day=lte.${b}&select=day`) || [];
+      const days = [...new Set(rows.map(r => String(r.day).slice(0, 10)))];
+      await Promise.all(days.map(async d => {
+        try {
+          await sb('rpc/leo_nikki_from_events', { method: 'POST', body: JSON.stringify({ p_day: d }) });
+          await sb('rpc/leo_jisseki_from_nikki', { method: 'POST', body: JSON.stringify({ p_day: d }) });
+        } catch (e) { }
+      }));
+    } catch (e) { }
+  }
   if (DEMO) {
     if (demoPack) return demoPack;
     const demo = leoDemoJisseki(month);
