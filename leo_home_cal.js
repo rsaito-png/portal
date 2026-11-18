@@ -466,10 +466,12 @@ function sgDayHtml(day, evs, care, opt) {
   const nowEl = isToday ? `<div class="sg-now" hidden data-sg-now data-day="${day}" data-start="${start}" data-end="${end}" data-px="${PX}"><i></i></div>` : '';
   const [, mm, dd] = day.split('-');
   const todayArg = typeof today === 'function' ? today() : day;
-  const addBtn = canEdit ? `<p class="sg-add"><button type="button" onclick="sgEditNew('${day}')">＋ 予定を追加</button></p>` : '';
   const slot = canEdit ? ` data-start="${start}" data-px="${PX}" onclick="sgEditSlot('${day}', event)"` : '';
   const embed = !!(opt && opt.embed);
-  const top = embed ? '' : `<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${todayArg}')">今日</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" class="sg-mine${mineOn ? ' sg-on' : ''}" aria-pressed="${mineOn ? 'true' : 'false'}" onclick="sgToggleMine()">自分の担当</button></div>`;
+  // 「予定を追加」は上の行（自分の担当の横）に並べる。埋め込み（上の行なし）のときだけ別の行。
+  const addInTop = canEdit ? `<button type="button" class="sg-addb" onclick="sgEditNew('${day}')">＋ 予定を追加</button>` : '';
+  const addBtn = canEdit && embed ? `<p class="sg-add"><button type="button" onclick="sgEditNew('${day}')">＋ 予定を追加</button></p>` : '';
+  const top = embed ? '' : `<div class="sg-top"><button type="button" onclick="sgShiftDay('${day}',-1)" aria-label="前の日">◀</button><b>${+mm}/${+dd}（${sgDow(day)}）</b><button type="button" onclick="sgShiftDay('${day}',1)" aria-label="次の日">▶</button><button type="button" onclick="sgOpenDay('${todayArg}')">今日</button><button type="button" onclick="sgOpenMonth('${day}')" aria-label="この日の月">月</button><button type="button" class="sg-mine${mineOn ? ' sg-on' : ''}" aria-pressed="${mineOn ? 'true' : 'false'}" onclick="sgToggleMine()">自分の担当</button>${addInTop}</div>`;
   const link = embed ? '' : `<p class="sg-link"><a href="#leo/cal" onclick="sgOpenCal('${day}')">この日を児童の利用・送迎予定で開く</a></p>`;
   return `<div class="sg-page">${sgCss()}${top}
     ${addBtn}${mineNote}<div class="sg-leg">${legend}</div>

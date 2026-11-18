@@ -285,8 +285,8 @@ const edit = sgDayHtml('2026-10-26', editableEvs, {}, { demo: true, today: '2026
 assert.ok(edit.includes('予定を追加') && edit.includes('sgEditNew(') && edit.includes('sgEvOpen(') && edit.includes('sgEditSlot('));
 assert.ok(edit.includes('min-height:44px'));
 const top = edit.slice(edit.indexOf('class="sg-top"'), edit.indexOf('</div>'));
-assert.ok(!top.includes('予定を追加'), '追加ボタンは日付の行の外');
-assert.ok(edit.indexOf('予定を追加') > edit.indexOf('</div>'));
+assert.ok(top.includes('予定を追加') && top.indexOf('予定を追加') > top.indexOf('自分の担当'), '追加ボタンは自分の担当の横（1行）');
+assert.strictEqual(edit.split('予定を追加').length - 1, 1, '追加ボタンは1つだけ');
 
 sandbox.ROLE = '職員'; sandbox.DUTY = '児発管';
 assert.strictEqual(sandbox.sgCanEditCal('職員X'), true);
