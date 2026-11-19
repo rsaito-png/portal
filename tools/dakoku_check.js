@@ -94,7 +94,7 @@ ok(sql.includes('dakoku_bootstrap') && sql.includes('dakoku_punch') && sql.inclu
 ok(sql.includes('dakoku_month') && sql.includes('自分の打刻だけ見られます'), 'sql month rpc + recent lock');
 ok(!sql.includes('dakoku_ingest_gas'), 'sql has no gas ingest');
 ok(sql.includes("'金斗雲', 'KINTOUN', null, null, null"), 'kintoun seeded without GPS');
-ok(index.includes('portalBuild') && index.includes('dakoku.js?v=20261113approve') && index.includes('dakoku-lib.js?v=20261110req') && index.includes('Cache-Control'), 'index cache-bust');
+ok(index.includes('portalBuild') && index.includes('dakoku.js?v=20261119tidy') && index.includes('dakoku-lib.js?v=20261110req') && index.includes('Cache-Control'), 'index cache-bust');
 ok(index.includes("sub === 'approve'") && index.includes('renderDakokuApprove'), 'index routes #dakoku/approve');
 
 ok(Dakoku.currentMonthJst(new Date('2026-11-09T06:00:00Z')) === '2026-11', 'currentMonthJst');

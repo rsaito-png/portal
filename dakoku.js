@@ -178,11 +178,11 @@ function dkPaint() {
   const root = document.getElementById('dk_root');
   if (!root || !DK.data) return;
   const v = dkView();
-  const who = DK.sess.demo ? '見本モードです。シートには書きません。 / Modo de demonstração: nada é gravado.' : (DK.sess.email ? 'ログイン中 / Conectado: ' + DK.sess.email : 'ログイン中のメールがありません。 / Sem e-mail de login.');
+  const who = DK.sess.demo ? '見本モードです。シートには書きません。 / Modo de demonstração: nada é gravado.' : (DK.sess.email ? '' : 'ログイン中のメールがありません。 / Sem e-mail de login.');
   let officeHtml = '';
   if (v.mode === 'unregistered' || v.mode === 'noemail') officeHtml = '';
   else if (!v.offices.length) officeHtml = '<div class="wn">打刻できる事業所がありません。名簿の所属か事業所の有効設定を確認してください。</div>';
-  else if (v.offices.length === 1 && v.office) officeHtml = `<p><b>${dkEsc(v.office.name)}</b>` + (Dakoku.gpsRequired(v.office, v.staff) ? ` <span class="meta">許可半径 ${Math.round(v.office.radius || 0)}m</span>` : ` <span class="meta">位置情報不要</span>`) + `</p>`;
+  else if (v.offices.length === 1 && v.office) officeHtml = ''; // 事業所が1つなら名前・許可半径の行は出さない（下の本人の行に事業所名あり）
   else if (v.offices.length > 1) officeHtml = `<label class="meta">事業所</label><select id="dk_office">${v.offices.map(o => `<option value="${dkEsc(o.name)}"${o.name === DK.office ? ' selected' : ''}>${dkEsc(o.name)}</option>`).join('')}</select>`;
   let staffHtml = '';
   if (v.mode === 'noemail') staffHtml = '<div class="ng">ログイン中のメールがありません。ポータルにログインし直してください。</div>';
@@ -211,7 +211,7 @@ function dkPaint() {
   const locBtn = needGps ? '<button type="button" class="loc" data-dk="loc">位置を取り直す / Atualizar localização</button>' : '';
   const showPunch = !!(v.office && v.mode !== 'unregistered' && v.mode !== 'noemail');
   const monthHtml = showPunch ? dkMonthHtml(v) : '';
-  root.innerHTML = `<h3>出退勤打刻 <small>Registrar entrada/saída</small></h3><p class="meta">${dkEsc(who)}</p>${msg}${officeHtml}${staffHtml}${showPunch ? geo : ''}
+  root.innerHTML = `<h3>出退勤打刻 <small>Registrar entrada/saída</small></h3>${who ? `<p class="meta">${dkEsc(who)}</p>` : ''}${msg}${officeHtml}${staffHtml}${showPunch ? geo : ''}
     ${showPunch ? `<label class="dk-lunch" style="display:flex;align-items:center;gap:.5em;margin:.6em 0;font-size:1.05em"><input type="checkbox" id="dk_lunch" style="width:1.4em;height:1.4em"${DK.lunch ? ' checked' : ''}> 昼食提供を受けた / Recebeu refeição (almoço)</label>
     <button type="button" class="go" data-dk="in"${dis}>出勤<br><small>Entrada</small></button>
     <button type="button" class="go out" data-dk="out"${dis}>退勤<br><small>Saída</small></button>
