@@ -228,7 +228,8 @@ function dkMonthHtml(v) {
   if (DK.monthErr) return `<div class="card"><h4>月別一覧 / Registro mensal</h4>${nav}<div class="ng">${dkEsc(DK.monthErr)}</div></div>`;
   const packed = Dakoku.pairMonth(DK.monthRows || []);
   if (!packed.pairs.length) return `<div class="card"><h4>月別一覧 / Registro mensal</h4>${nav}<p class="meta">この月の打刻はまだありません。 / Nenhum registro neste mês.</p></div>`;
-  const rows = packed.pairs.map(pr => {
+  // 新しい日を上に（表示だけ逆順。合計は変わらない）
+  const rows = packed.pairs.slice().sort((a, b) => String(b.day).localeCompare(String(a.day))).map(pr => {
     const dayLabel = pr.day.slice(5).replace('-', '/');
     const proxy = pr.proxy ? '<span class="proxy">代理 / Proxy</span>' : '';
     const reqTag = '<span class="proxy">申告 / Declarado</span>';
