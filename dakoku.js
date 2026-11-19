@@ -201,7 +201,7 @@ function dkPaint() {
     if (!needGps) geo = `<div class="okb">${Dakoku.gpsRequired(v.office) ? 'この職員は位置確認なしです。' : 'この事業所は位置情報不要です。'} / Sem localização. ${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}</div>`;
     else if (DK.locating) geo = '<div class="wn">位置を確認しています… / Verificando localização…</div>';
     else if (DK.posError) geo = `<div class="ng">${dkEsc(DK.posError)}</div>`;
-    else if (v.judge.ok) geo = `<div class="okb">事業所まで / Distância ${Math.round(v.judge.distance)}m（許可 / permitido ${Math.round(v.office.radius)}m）。${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}${DK.pos && DK.pos.demo ? ' 見本の位置（事業所の中心）です。' : ''}${DK.pos && DK.pos.accuracy != null ? ' <span class="meta">精度 ±' + Math.round(DK.pos.accuracy) + 'm</span>' : ''}</div>`;
+    else if (v.judge.ok) geo = `<div class="okb">事業所まで / Distância ${Math.round(v.judge.distance)}m。${v.staff ? '打刻できます。 / Pode registrar.' : '職員を選ぶとボタンが押せます。 / Escolha o funcionário para liberar os botões.'}${DK.pos && DK.pos.demo ? ' 見本の位置（事業所の中心）です。' : ''}</div>`;
     else geo = `<div class="ng">${dkEsc(v.judge.reason || '打刻できません / Não é possível registrar')}</div>`;
   }
   const can = !!(v.judge.ok && v.staff && !DK.busy && !(needGps && DK.locating));
