@@ -329,7 +329,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261119hitop';
+  var BUILD = '20261119hitop2';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -770,7 +770,7 @@ function show() {
   $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
   $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
   // ログイン中のメールは上の帯（星心会 職員ポータルの横）に出す。見本モードの説明は今までどおり下に。
-  if (!DEMO) { $('hi_top').textContent = s.email + ' でログイン中'; $('hi_top').title = s.email; $('hi_top').hidden = false; $('hi').hidden = true; }
+  if (!DEMO) { $('hi_top').textContent = s.email + ' でログイン中'; $('hi_top').title = s.email; $('hi_top').hidden = false; $('hi').hidden = true; $('hi').style.setProperty('display', 'none', 'important'); }
   if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
   ROLE = s.role || C.defaultRole;
   if (typeof ukInstallAsk === 'function') ukInstallAsk();
