@@ -14,8 +14,8 @@ main{max-width:640px;margin:auto;padding:16px}
 input,button{font-size:17px;width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #bbb}
 button{background:var(--main);color:#fff;border:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-/* レオのホームのボタンは横3個（ゆか先生指定 2026-11-19） */
-.grid.leo3{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.leo3 .tile{overflow-wrap:anywhere}@media (max-width:480px){.grid.leo3{gap:8px}.grid.leo3 .tile.big{padding:20px 4px;font-size:15px}}
+/* レオのホームのボタンは横4個・字は小さめ（スマホだけ3個。ゆか先生指定 2026-11-19） */
+.grid.leo3{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.grid.leo3 .tile{overflow-wrap:anywhere}.grid.leo3 .tile.big{padding:18px 6px;font-size:16px}.grid.leo3 .tile span{font-size:34px}@media (min-width:900px){.grid.leo3{gap:16px}.grid.leo3 .tile.big{padding:26px 10px;font-size:24px}.grid.leo3 .tile span{font-size:52px}}@media (max-width:480px){.grid.leo3{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.grid.leo3 .tile.big{padding:16px 4px;font-size:14px}.grid.leo3 .tile span{font-size:30px}}
 .tile{background:#fff;border-radius:12px;padding:22px 10px;text-align:center;text-decoration:none;color:#222;box-shadow:0 1px 3px #0002;font-size:18px}
 .office{border-left:6px solid var(--c);text-align:left;padding:18px 14px}
 .office small{display:inline;margin-left:6px}
@@ -331,7 +331,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261119leo3';
+  var BUILD = '20261119leo4';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
