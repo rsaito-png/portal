@@ -14,6 +14,8 @@ main{max-width:640px;margin:auto;padding:16px}
 input,button{font-size:17px;width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #bbb}
 button{background:var(--main);color:#fff;border:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* レオのホームのボタンは横3個（ゆか先生指定 2026-11-19） */
+.grid.leo3{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.leo3 .tile{overflow-wrap:anywhere}@media (max-width:480px){.grid.leo3{gap:8px}.grid.leo3 .tile.big{padding:20px 4px;font-size:15px}}
 .tile{background:#fff;border-radius:12px;padding:22px 10px;text-align:center;text-decoration:none;color:#222;box-shadow:0 1px 3px #0002;font-size:18px}
 .office{border-left:6px solid var(--c);text-align:left;padding:18px 14px}
 .office small{display:inline;margin-left:6px}
@@ -329,7 +331,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261119hitop2';
+  var BUILD = '20261119leo3';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -434,16 +436,16 @@ function leoHomeBody(o) {
   const g = groupList(o).filter(x => x.label !== '現場' && (x.label !== '事務・計画' || (typeof canManage === 'function' && canManage()) || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR))).map(gbtn).join('');
   const tileBig = t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${shortName(o, t[1])}${t[2] ? '' : '<small>準備中</small>'}</a>`;
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
-  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid">${rtv.map(tileBig).join('')}</div>` : '';
+  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid leo3">${rtv.map(tileBig).join('')}</div>` : '';
   const who = (o.who || []).map(([title, names]) => {
     if (typeof whoVisible === 'function' && !whoVisible(title)) return '';
     const tiles = (names || []).flatMap(n => vis.filter(t => t[1] === n));
-    return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid">${tiles.map(tileBig).join('')}</div>` : '';
+    return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid leo3">${tiles.map(tileBig).join('')}</div>` : '';
   }).join('');
   const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
   // 事務・計画のフォルダは「事務」の段でシフトの横に置く（ゆか先生指定 2026-11-13）
   const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}`;
-  const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid">${dutyInner}</div>`);
+  const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid leo3">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid leo3">${dutyInner}</div>`);
   // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。モニタリングシートは事務・計画（個別支援計画の隣）。
   // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
   const sougeiNames = ['送迎'];
@@ -453,11 +455,11 @@ function leoHomeBody(o) {
   // 実態のシフト（#leo/shift）。職員はみな見られる。直すのは管理者（画面の中で切り替え）。勤務実績表とは別
   const shiftT = vis.filter(t => t[1] === 'シフト');
   const jimu = shiftT.map(tileBig).join('') + g;
-  const shiftRow = jimu ? `<h3 class="nx">事務</h3><div class="grid">${jimu}</div>` : '';
+  const shiftRow = jimu ? `<h3 class="nx">事務</h3><div class="grid leo3">${jimu}</div>` : '';
   // 今日やること（児発管）はここ1か所だけ（担当者名の欄には重ねない）
   const todoT = o.todoTop ? vis.filter(t => t[1] === o.todoTop) : [];
-  const todoRow = todoT.length ? `<div class="grid">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
-  return `${todoRow}<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid">
+  const todoRow = todoT.length ? `<div class="grid leo3">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
+  return `${todoRow}<div id="leo_home_cal"></div><h3 class="nx">毎日やる</h3><div class="grid leo3">
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
