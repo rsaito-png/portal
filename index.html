@@ -244,7 +244,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 </style>
 <style>.home-todo{margin:0 0 var(--sp-3);border-left:6px solid var(--primary,#E8833A)}.home-todo .ht-h{margin:0 0 var(--sp-3);font-size:var(--fs-xl)}.home-todo .ui-list-row{border-radius:0;padding:var(--sp-2) var(--sp-3)}.home-todo .ht-t{flex:1;min-width:0}.home-todo .ht-t b{display:block;overflow-wrap:anywhere}.home-todo .ht-t small,.ht-sub{color:var(--text-sub);font-size:var(--fs-sm)}.ht-over{color:var(--danger);font-weight:bold}.ht-jump{text-align:right;margin:0 0 var(--sp-4);font-size:var(--fs-sm)}.home-todo .ui-empty b{display:block;color:var(--text);margin-bottom:var(--sp-1)}#home_todo[hidden],#ht_jump[hidden]{display:none!important}</style>
 </head><body class="portal ui-app">
-<header class="ui-topbar"><span id="ttl"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
+<header class="ui-topbar"><span id="ttl"></span><span id="hi_top" hidden style="flex:1 1 auto;min-width:0;margin:0 10px 0 14px;font-size:13px;font-weight:500;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit;letter-spacing:0"></span><button id="out" hidden onclick="logout()">ログアウト</button></header>
 <main>
 <div id="login" class="card"><p>メールアドレスとパスワードでログインしてください。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
@@ -329,7 +329,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261119desc';
+  var BUILD = '20261119hitop';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -769,6 +769,8 @@ function show() {
   show._tried = false;
   $('login').hidden = true; $('home').hidden = false; $('out').hidden = false;
   $('hi').textContent = DEMO ? '見本モードです（ログインしていません）' : s.email + ' でログイン中';
+  // ログイン中のメールは上の帯（星心会 職員ポータルの横）に出す。見本モードの説明は今までどおり下に。
+  if (!DEMO) { $('hi_top').textContent = s.email + ' でログイン中'; $('hi_top').title = s.email; $('hi_top').hidden = false; $('hi').hidden = true; }
   if (DEMO) { $('out').textContent = '見本を閉じる'; $('out').onclick = () => location.href = location.pathname; }
   ROLE = s.role || C.defaultRole;
   if (typeof ukInstallAsk === 'function') ukInstallAsk();
