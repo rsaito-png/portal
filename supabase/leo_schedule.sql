@@ -53,7 +53,7 @@ create table if not exists public.leo_schedule_weekday (
 create table if not exists public.leo_schedule_exception (
   id bigint generated always as identity primary key,
   child text not null, month date not null, day date,               -- day は「要確認」（備考）のときだけ空でよい
-  kind text not null check (kind in ('休み','母の送り','母の迎え','追加利用','時刻変更','送り場所変更','要確認')),
+  kind text not null check (kind in ('休み','母の送り','母の迎え','追加利用','時刻変更','送り場所変更','要確認','連絡')),
   time text check (time ~ '^\d{2}:\d{2}$'),                         -- 母の迎え＝施設に来る時刻／時刻変更・追加利用＝学校お迎え時刻
   place text check (char_length(place) <= 100), memo text check (char_length(memo) <= 500),
   source text not null default '保護者' check (source in ('保護者','職員')),
