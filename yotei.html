@@ -28,6 +28,8 @@ const fmtDL = s => { const x = new Date(s); return x.toLocaleString('ja-JP', { t
 const hm = s => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : ''; };
 function monthDays() { const [y, m] = D.month.split('-').map(Number), n = new Date(y, m, 0).getDate(), out = [];
   for (let d = 1; d <= n; d++) { const w = new Date(y, m - 1, d).getDay(); if (w === 0) continue; out.push({ iso: `${D.month}-${String(d).padStart(2, '0')}`, d, w: DOW[w] }); } return out; }
+// 型表の保護者送迎が「○」「保護者送迎」「母の送迎」など＝行きも帰りも保護者（2026-11-20 大智くん）
+const leoBoth = p => { const t = String(p || '').trim(); return t !== '' && t !== '母の送り' && t !== '母の迎え'; };
 const KINDS = [['休み', 'お休み'], ['母の送り', '保護者が施設まで送る'], ['母の迎え', '保護者が施設へ迎えに来る'], ['時刻変更', '学校（園）のお迎え時刻が違う'], ['送り場所変更', '祖父母宅などへ送る']];
 async function load() {
   if (DEMO) D = { child: '児童A（見本）', month: q.get('m') || '2026-12', expired: false, deadline: '2026-11-25T00:00:00Z', answered_at: null, closed: ['2026-12-29', '2026-12-30', '2026-12-31'],
@@ -54,9 +56,9 @@ function render() {
   M.innerHTML = `${DEMO ? '<div class="card err">見本です（架空のデータ。送信されません）</div>' : ''}
   <div class="card"><b style="font-size:18px">${esc(D.child)}</b> さん　${mm(D)}月のご利用予定<p class="note">回答期限：${dl} まで（期限までは何度でも送り直せます。いちばん新しい回答が使われます）。いつもどおりなら、確認して「送信する」だけで大丈夫です。</p>${D.left_on ? `<p class="note">退所日は ${esc(D.left_on)} です。この日の翌日以降は予定に入りません。</p>` : ''}${done}</div>
   <div class="card"><h3>① いつもの曜日</h3><p class="note">ご利用する曜日にチェックして、学校（園）へのお迎え時刻（いつもの下校・降園時刻）を入れてください。</p>
-  ${wds.map(w => { const s = S.wd[w], pd = s.parent === '母の送り';
+  ${wds.map(w => { const s = S.wd[w], both = leoBoth(s.parent), pd = s.parent === '母の送り' || both;
     return `<div class="wd"><b>${w}</b><label><input type="checkbox" ${s.use ? 'checked' : ''} onchange="S.wd['${w}'].use=this.checked;renderDays()"> 利用する</label>${s.irregular ? '<span class="note">（不定期）</span>' : ''}
-      ${pd ? '<span class="note">いつも保護者の方が施設まで送ってくださる曜日です</span>' : `<span>学校（園）お迎え時刻 <input type="time" value="${esc(s.school_time)}" oninput="S.wd['${w}'].school_time=this.value"></span>`}
+      ${pd ? `<span class="note">${both ? 'いつも保護者の方が送り迎えしてくださる曜日です' : 'いつも保護者の方が施設まで送ってくださる曜日です'}</span>` : `<span>学校（園）お迎え時刻 <input type="time" value="${esc(s.school_time)}" oninput="S.wd['${w}'].school_time=this.value"></span>`}
       ${pd ? '' : `<details style="width:100%"><summary class="note">お迎え・送りの場所を変える</summary><div class="sub">お迎え場所 <input class="pl" type="text" maxlength="100" value="${esc(s.pick_place)}" oninput="S.wd['${w}'].pick_place=this.value"> 　送り場所 <input class="pl" type="text" maxlength="100" value="${esc(s.drop_place)}" oninput="S.wd['${w}'].drop_place=this.value"></div></details>`}</div>`; }).join('')}
   <p class="note">上にない曜日に来たい日は、下の「追加利用」から日を選んでください。</p></div>
   <div class="card"><h3>② 日ごとの連絡</h3><p class="note">いつもと違う日だけ、ボタンを押してください。ない日は何も押さなくて大丈夫です。（日曜・事業所のお休みの日は出ていません）</p><div id="days"></div></div>
@@ -80,7 +82,7 @@ function renderDays() {
 function tog(iso, k) { const e = S.days[iso] = S.days[iso] || {}; if (e[k]) delete e[k]; else { if (k === '休み') for (const z of Object.keys(e)) delete e[z]; else delete e['休み']; e[k] = { time: '', place: '' }; } if (!Object.keys(e).length) delete S.days[iso]; renderDays(); }
 function build() {
   const weekdays = {}, days = [];
-  for (const [w, s] of Object.entries(S.wd)) weekdays[w] = { use: s.use, school_time: s.use && s.parent !== '母の送り' ? s.school_time : '', pick_place: s.pick_place, drop_place: s.drop_place };
+  for (const [w, s] of Object.entries(S.wd)) weekdays[w] = { use: s.use, school_time: s.use && s.parent !== '母の送り' && !leoBoth(s.parent) ? s.school_time : '', pick_place: s.pick_place, drop_place: s.drop_place };
   // 備考はその日の行に付ける（同じ日に複数あるときは最初の1件だけ）。連絡が備考だけの日は kind='連絡'
   for (const x of monthDays()) { if (D.left_on && x.iso > D.left_on) continue; const e = S.days[x.iso] || {}, memo = String(S.memo[x.iso] || '').trim(); let first = true;
     for (const [k, v] of Object.entries(e)) { days.push({ day: x.iso, kind: k, time: v.time || '', place: v.place || '', memo: first ? memo : '' }); first = false; }
@@ -88,7 +90,7 @@ function build() {
   return { weekdays, days, note: S.note.trim() };
 }
 function check(a) {
-  for (const [w, s] of Object.entries(S.wd)) if (s.use && s.parent !== '母の送り' && !s.school_time) return `${w}曜日の学校（園）お迎え時刻を入れてください。`;
+  for (const [w, s] of Object.entries(S.wd)) if (s.use && s.parent !== '母の送り' && !leoBoth(s.parent) && !s.school_time) return `${w}曜日の学校（園）お迎え時刻を入れてください。`;
   for (const d of a.days) { const n = +d.day.slice(8);
     if ((d.kind === '母の迎え' || d.kind === '時刻変更') && !d.time) return `${mm(D)}/${n}日（${d.kind === '母の迎え' ? '施設へ来る時刻' : '学校（園）お迎え時刻'}）を入れてください。`;
     if (d.kind === '追加利用' && !d.time) return `${mm(D)}/${n}日（追加利用）の学校（園）お迎え時刻を入れてください。`;
