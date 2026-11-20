@@ -2740,20 +2740,25 @@ function monPrintHtml(v) {
   const body = rows.map(r => `<tr><td>${esc(r.goal)}</td><td>${esc(r.trend)}</td><td class="rate">${esc(r.rating)}</td><td>${esc(r.issues)}</td></tr>`).join('');
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>モニタリング ${esc(v.child || '')}</title>
 <style>
-@page { size: A4 landscape; margin: 12mm; }
-body { font-family: "Hiragino Mincho ProN", "Yu Mincho", "Hiragino Sans", "Noto Sans JP", serif; font-size: 11pt; line-height: 1.6; color: #111; margin: 0; padding: 12mm; }
-h1 { text-align: center; font-size: 16pt; letter-spacing: 0.45em; margin: 0 0 8mm; }
-.meta p { margin: 0.5mm 0; }
-table { width: 100%; border-collapse: collapse; margin-top: 4mm; }
-th, td { border: 1px solid #222; padding: 3mm 2mm; vertical-align: top; text-align: left; }
-th { background: #f6f1e6; font-size: 11pt; }
+@page { size: A4 landscape; margin: 8mm; }
+html, body { margin: 0; }
+body { font-family: "Hiragino Mincho ProN", "Yu Mincho", "Hiragino Sans", "Noto Sans JP", serif; font-size: 9pt; line-height: 1.45; color: #111; }
+#mon_page { width: 281mm; box-sizing: border-box; transform-origin: top left; }
+h1 { text-align: center; font-size: 14pt; letter-spacing: 0.45em; margin: 0 0 3mm; }
+.meta { display: flex; flex-wrap: wrap; gap: 0 8mm; }
+.meta p { margin: 0.3mm 0; }
+table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+th, td { border: 1px solid #222; padding: 1.5mm 1.8mm; vertical-align: top; text-align: left; }
+th { background: #f6f1e6; font-size: 9pt; }
+th:first-child { width: 22%; } th:nth-child(2) { width: 38%; } tr { break-inside: avoid; }
 td { white-space: pre-wrap; }
 .rate { text-align: center; width: 18mm; }
-.foot { margin-top: 10mm; }
-.foot p { margin: 8mm 0; }
+.foot { margin-top: 4mm; display: flex; gap: 12mm; align-items: flex-end; }
+.foot p { margin: 0; }
 .ul { display: inline-block; width: 60mm; border-bottom: 1px solid #111; margin-left: 6mm; height: 1.1em; vertical-align: bottom; }
-@media print { body { padding: 0; } }
+@media screen { body { padding: 8mm; } }
 </style></head><body>
+<div id="mon_page">
 <h1>モニタリング</h1>
 <div class="meta">
 <p>事業所名：${esc(off.name)}</p>
@@ -2766,7 +2771,8 @@ td { white-space: pre-wrap; }
 <p>相談支援専門員　御中</p>
 <p>作成者（児発管）<span class="ul"></span></p>
 </div>
-<script>setTimeout(function(){print()},300)<\/script>
+</div>
+<script>setTimeout(function(){var p=document.getElementById('mon_page');var H=194*96/25.4;var h=p.scrollHeight;if(h>H){var k=H/h;p.style.transform='scale('+k+')';document.body.style.height=(h*k)+'px';document.body.style.overflow='hidden';}print()},300)<\/script>
 </body></html>`;
 }
 function monDiaryLines(rows, child) {
