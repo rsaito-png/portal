@@ -3285,7 +3285,7 @@ LEO_VIEWS.line = async function () {
         <p class="note">最後の行に名前（${esc(me || '自分の名前')}）を入れてください。</p>
         <button onclick="saveLine('${esc(k)}','${id}',${d ? d.id : 'null'})">保存</button>
         <button onclick="copyLine('${id}','${esc(k)}',${d ? d.id : 'null'})">LINE用にコピー（送った印をつける）</button>
-        ${a ? `<details style="margin-top:8px"><summary>日誌の活動記録（${esc(a.source)}）</summary><p style="white-space:pre-wrap">${esc(a.text)}</p></details>` : ''}<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><div id="${id}_m" style="flex:1 1 auto;min-width:0"></div><button type="button" onclick="leoLineFold(this)" style="flex:0 0 auto;margin:0;white-space:nowrap">▲ とじる</button></div></div></details>`; }).join('')}`;
+        ${a ? `<details style="margin-top:8px"><summary>日誌の活動記録（${esc(a.source)}）</summary><p style="white-space:pre-wrap">${esc(a.text)}</p></details>` : ''}<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><div id="${id}_m" style="flex:1 1 0;min-width:8em"></div><button type="button" onclick="leoLineFold(this)" style="flex:0 0 auto;width:auto;max-width:40%;margin:0;padding:6px 14px;white-space:nowrap">▲ とじる</button></div></div></details>`; }).join('')}`;
 };
 function leoLineFold(btn) {
   const d = btn.closest('details'); if (!d) return; d.open = false;
