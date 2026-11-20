@@ -2740,10 +2740,10 @@ function monPrintHtml(v) {
   const body = rows.map(r => `<tr><td>${esc(r.goal)}</td><td>${esc(r.trend)}</td><td class="rate">${esc(r.rating)}</td><td>${esc(r.issues)}</td></tr>`).join('');
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>モニタリング ${esc(v.child || '')}</title>
 <style>
-@page { size: A4 landscape; margin: 8mm; }
+@page { size: A4 landscape; margin: 0; }
 html, body { margin: 0; }
 body { font-family: "Hiragino Mincho ProN", "Yu Mincho", "Hiragino Sans", "Noto Sans JP", serif; font-size: 9pt; line-height: 1.45; color: #111; }
-#mon_page { width: 281mm; box-sizing: border-box; transform-origin: top left; }
+#mon_page { width: 297mm; padding: 14mm 15mm 12mm 16mm; box-sizing: border-box; transform-origin: top left; }
 h1 { text-align: center; font-size: 14pt; letter-spacing: 0.45em; margin: 0 0 3mm; }
 .meta { display: flex; flex-wrap: wrap; gap: 0 8mm; }
 .meta p { margin: 0.3mm 0; }
@@ -2756,7 +2756,6 @@ td { white-space: pre-wrap; }
 .foot { margin-top: 4mm; display: flex; gap: 12mm; align-items: flex-end; }
 .foot p { margin: 0; }
 .ul { display: inline-block; width: 60mm; border-bottom: 1px solid #111; margin-left: 6mm; height: 1.1em; vertical-align: bottom; }
-@media screen { body { padding: 8mm; } }
 </style></head><body>
 <div id="mon_page">
 <h1>モニタリング</h1>
@@ -2772,7 +2771,7 @@ td { white-space: pre-wrap; }
 <p>作成者（児発管）<span class="ul"></span></p>
 </div>
 </div>
-<script>setTimeout(function(){var p=document.getElementById('mon_page');var H=194*96/25.4;var h=p.scrollHeight;if(h>H){var k=H/h;p.style.transform='scale('+k+')';document.body.style.height=(h*k)+'px';document.body.style.overflow='hidden';}print()},300)<\/script>
+<script>setTimeout(function(){var p=document.getElementById('mon_page');var H=204*96/25.4;var h=p.scrollHeight;if(h>H){var k=H/h;p.style.transform='scale('+k+')';document.documentElement.style.height=document.body.style.height=(h*k)+'px';document.documentElement.style.overflow=document.body.style.overflow='hidden';}print()},300)<\/script>
 </body></html>`;
 }
 function monDiaryLines(rows, child) {
