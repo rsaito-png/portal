@@ -13,17 +13,11 @@ as $$
     and (
       case
         when (
-          substr(p,1,1)::int*2 + substr(p,2,1)::int*3 + substr(p,3,1)::int*4 +
-          substr(p,4,1)::int*5 + substr(p,5,1)::int*6 + substr(p,6,1)::int*7 +
-          substr(p,7,1)::int*2 + substr(p,8,1)::int*3 + substr(p,9,1)::int*4 +
-          substr(p,10,1)::int*5 + substr(p,11,1)::int*6
+          substr(p,1,1)::int*6 + substr(p,2,1)::int*5 + substr(p,3,1)::int*4 + substr(p,4,1)::int*3 + substr(p,5,1)::int*2 + substr(p,6,1)::int*7 + substr(p,7,1)::int*6 + substr(p,8,1)::int*5 + substr(p,9,1)::int*4 + substr(p,10,1)::int*3 + substr(p,11,1)::int*2
         ) % 11 <= 1 then 0
         else 11 - (
           (
-            substr(p,1,1)::int*2 + substr(p,2,1)::int*3 + substr(p,3,1)::int*4 +
-            substr(p,4,1)::int*5 + substr(p,5,1)::int*6 + substr(p,6,1)::int*7 +
-            substr(p,7,1)::int*2 + substr(p,8,1)::int*3 + substr(p,9,1)::int*4 +
-            substr(p,10,1)::int*5 + substr(p,11,1)::int*6
+            substr(p,1,1)::int*6 + substr(p,2,1)::int*5 + substr(p,3,1)::int*4 + substr(p,4,1)::int*3 + substr(p,5,1)::int*2 + substr(p,6,1)::int*7 + substr(p,7,1)::int*6 + substr(p,8,1)::int*5 + substr(p,9,1)::int*4 + substr(p,10,1)::int*3 + substr(p,11,1)::int*2
           ) % 11
         )
       end

@@ -36,7 +36,8 @@
     const s = String(p || '').replace(/\D/g, '');
     if (!/^\d{12}$/.test(s)) return false;
     let sum = 0;
-    for (let i = 0; i < 11; i++) sum += (+s[i]) * (i < 6 ? i + 2 : i - 4);
+    // 下から n 桁目（n=1..11）に重み n+1（n≤6）／n-5（n≥7）。左から 6,5,4,3,2,7,6,5,4,3,2
+    for (let n = 1; n <= 11; n++) sum += (+s[11 - n]) * (n <= 6 ? n + 1 : n - 5);
     const r = sum % 11, cd = r <= 1 ? 0 : 11 - r;
     return cd === +s[11];
   }
@@ -100,7 +101,7 @@
     if (typeof DEMO !== 'undefined' && DEMO) {
       ME.name = '見本 花子'; ME.office = 'レオ';
       ME.bank = { bank_name: '三重銀行', branch_name: '四日市', account_type: '普通', account_number: '1234567', account_holder_kana: 'ミホン　ハナコ' };
-      ME.mine = '123456789016';
+      ME.mine = '123456789018';
       ME.ack = true;
       return;
     }
