@@ -152,7 +152,7 @@ function sgUsePaint() {
   return { id: null, hex: SG_USE_HEX, ink: sgInk(SG_USE_HEX), mapped: true, name: 'Yamabuki', role: 'use' };
 }
 function sgEventPaint(e, opt) {
-  if (e && e.kind === '利用') return sgUsePaint();
+  if (e && (e.kind === '利用' || e.kind === '休み')) return sgUsePaint();   // 終日の休み・欠席・キャンセルも利用児童と同じ山吹色
   if (e && e.kind === 'その他') return sgPaintFrom(SG_OTHER_HEX, false);   // その他（研修・見学など）は担当に関係なく常に赤 #d50000
   if (!e || !e.staff) return null;
   return sgStaffPaint(e.staff, opt);

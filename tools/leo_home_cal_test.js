@@ -146,6 +146,27 @@ assert.ok(day.includes('height:auto !important'), '狭い画面では文字の�
 assert.ok(day.includes('data-sg-now'), '今日は現在時刻の線');
 assert.ok(day.includes('終日'));
 assert.ok(day.includes('児童D'));
+const yasuChip = day.match(/<span class="sg-chip[^"]*"[^>]*>休み 児童D<\/span>/);
+assert.ok(yasuChip && yasuChip[0].includes('background:#f8b500') && yasuChip[0].includes('color:#222') && !yasuChip[0].includes('neutral'), '終日の休みの子は利用児童と同じ山吹色');
+
+const absDay = sgDayHtml('2026-11-26', [
+  { day: '2026-11-26', kind: '休み', child: '児童G', title: 'キャンセル' },
+  { day: '2026-11-26', kind: '休み', child: '児童E', title: '欠席（欠席時対応加算）' },
+  { day: '2026-11-26', kind: '勤務', staff: '中村 文', title: '14:30' },
+  { day: '2026-11-26', kind: '不在', staff: '加藤', title: '休み（年末年始のお休み）' },
+  { day: '2026-11-26', kind: '休所', title: '年末年始のお休み' },
+  { day: '2026-11-26', kind: '利用', child: '児童F', start_time: '10:00', end_time: '16:00' },
+], {}, { demo: false, today: '2026-11-27' });
+const cancelChip = absDay.match(/<span class="sg-chip[^"]*"[^>]*>休み 児童G　キャンセル<\/span>/);
+assert.ok(cancelChip && cancelChip[0].includes('background:#f8b500') && cancelChip[0].includes('color:#222') && !cancelChip[0].includes('neutral'), 'キャンセルの休みチップも山吹色（文言はそのまま）');
+const kesseki = absDay.match(/<span class="sg-chip[^"]*"[^>]*>休み 児童E　欠席（欠席時対応加算）<\/span>/);
+assert.ok(kesseki && kesseki[0].includes('background:#f8b500') && !kesseki[0].includes('neutral'), '欠席時対応の休みチップも山吹色');
+assert.ok(/<span class="sg-chip" style="background:#8e24aa;color:#fff">勤務 文先生 14:30<\/span>/.test(absDay), '職員の勤務チップの色は変えない');
+assert.ok(/<span class="sg-chip" style="background:#4fc3f7;color:#222">不在 加藤 休み（年末年始のお休み）<\/span>/.test(absDay), '職員の不在チップの色は変えない');
+const closedChip = absDay.match(/<span class="sg-chip[^"]*"[^>]*>休所 年末年始のお休み<\/span>/);
+assert.ok(closedChip && closedChip[0].includes('neutral') && !closedChip[0].includes('#f8b500'), '休所のチップは休みの子の色にしない');
+const useBlockAbs = absDay.match(/<div class="sg-ev[^"]*" style="[^"]*background:(#[0-9a-f]{6});color:(#[0-9a-f]{3,6})/);
+assert.ok(useBlockAbs && useBlockAbs[1] === '#f8b500' && useBlockAbs[2] === '#222', '利用ブロックの山吹色はそのまま');
 assert.ok(day.includes('class="sg-ev drop"') || day.includes('sg-ev drop'), '送りは下線で区別');
 function evFace(html, titleBits) {
   const re = /<div class="sg-ev[^"]*"[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/g;
