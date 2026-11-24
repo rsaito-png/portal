@@ -31,7 +31,7 @@ sandbox.$ = () => ({ textContent: '', style: {}, value: '', innerHTML: '' });
 vm.createContext(sandbox);
 vm.runInContext(read('leo_left.js'), sandbox, { filename: 'leo_left.js' });
 vm.runInContext(read('gl.js'), sandbox, { filename: 'gl.js' });
-vm.runInContext(read('leo.js') + '\nthis.__leo = { LEO_VIEWS, planData, loadLeftIndex, today, planChildStatus, planHomeTodos, planUrgencyLabel, planDocsFromAssess, planDatesFromStart, planSkeleton, setDuty(v) { DUTY = v; } };', sandbox, { filename: 'leo.js' });
+vm.runInContext(read('leo.js') + '\nthis.__leo = { LEO_VIEWS, planData, loadLeftIndex, today, planChildStatus, planHomeTodos, planUrgencyLabel, planDocsFromAssess, planDatesFromStart, planSkeleton, leoYmShift, leoKakuninHomeItems, leoTodoItem, setDuty(v) { DUTY = v; } };', sandbox, { filename: 'leo.js' });
 
 const plain = v => JSON.parse(JSON.stringify(v));
 const planChildStatus = sandbox.__leo.planChildStatus;
@@ -261,6 +261,8 @@ const docs = { genan: '原案', honan: '本案', assessment: 'アセス', kaigi:
   assert.ok(home.includes('#leo/hiyari'));
   assert.ok(home.includes('保護者の実績確認がまだ 1家庭（見本）'));
   assert.ok(home.includes('#leo/kakunin'));
+  assert.ok(home.includes('保護者の実績確認は齊藤さんへ'));
+  assert.ok(!home.includes('事務（宮本）'));
   assert.ok(home.includes('日誌の直しが反映できなかったもの'));
   assert.ok(home.includes('#leo/edits'));
   const overdue = todos.find(x => x[0] === 0);
@@ -280,6 +282,29 @@ const docs = { genan: '原案', honan: '本案', assessment: 'アセス', kaigi:
   assert.ok(!homeFn.includes("sheetRows('keikaku')"));
   assert.ok(!homeFn.includes('#leo/keikaku'));
   assert.ok(homeFn.includes('planHomeTodos'));
-  assert.ok(read('index.html').includes('leo.js?v=20261118first1'));
+  assert.ok(read('index.html').includes('leo.js?v=20261124kakunin'));
+  const { leoYmShift, leoKakuninHomeItems, leoTodoItem } = sandbox.__leo;
+  assert.strictEqual(leoYmShift('2026-11', -1), '2026-10');
+  assert.strictEqual(leoYmShift('2026-01', -1), '2025-12');
+  const prevItems = leoKakuninHomeItems('2026-11-24', {
+    '2026-10': { links: [{ token: 'a' }, { token: 'b' }, { token: 'c' }], confs: [{ token: 'a' }] },
+    '2026-11': { links: [], confs: [] }
+  }, false);
+  assert.strictEqual(prevItems.length, 1);
+  assert.strictEqual(prevItems[0][2], '保護者の実績確認がまだ 2家庭（2026年10月分）');
+  assert.strictEqual(leoTodoItem(prevItems[0]).key, 'leo:kakunin:2026-10');
+  const both = leoKakuninHomeItems('2026-11-24', {
+    '2026-10': { links: [{ token: 'a' }], confs: [] },
+    '2026-11': { links: [{ token: 'b' }, { token: 'c' }], confs: [{ token: 'b' }] }
+  }, false);
+  assert.strictEqual(both.length, 2);
+  assert.strictEqual(both[0][2], '保護者の実績確認がまだ 1家庭（2026年10月分）');
+  assert.strictEqual(both[1][2], '保護者の実績確認がまだ 1家庭（2026年11月分）');
+  assert.strictEqual(leoKakuninHomeItems('2026-11-24', { '2026-10': { links: [], confs: [] }, '2026-11': { links: [], confs: [] } }, false).length, 0);
+  const sql = read('supabase/staff_todo_banto.sql');
+  assert.ok(sql.includes("p.active and p.is_chair"));
+  assert.ok(sql.includes('rsaito@psr-seishinkai.org'));
+  assert.ok(!sql.includes("like '宮本%'"));
+
   console.log('leo_home_plan_test ok');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -1040,6 +1040,29 @@ function leoTodoItem(x) {
   else if (kind === 'edits') key = 'leo:edits:衝突';
   return { kind, key, title, link: href };
 }
+// 実績確認は翌月はじめに前月分を送る。今日やることでは前月と、すでにリンクがある当月の未確認を出す
+function leoYmShift(ym, d) {
+  const [y, m] = String(ym || '').split('-').map(Number);
+  const n = new Date(y, m - 1 + d, 1);
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+}
+function leoKakuninOpenCount(links, confs) {
+  const done = new Set((confs || []).map(c => c && c.token).filter(Boolean));
+  return (links || []).filter(l => l && l.token && !done.has(l.token)).length;
+}
+function leoKakuninHomeItems(tday, byMonth, demo) {
+  if (demo) return [[1, '🖊️', '保護者の実績確認がまだ 1家庭（見本）', '#leo/kakunin', '公式LINEでリンクを送ったか確認']];
+  const cur = String(tday || '').slice(0, 7);
+  const items = [];
+  for (const mo of [leoYmShift(cur, -1), cur]) {
+    const pack = (byMonth && byMonth[mo]) || {};
+    const n = leoKakuninOpenCount(pack.links, pack.confs);
+    if (n <= 0) continue;
+    const [yy, mm] = mo.split('-').map(Number);
+    items.push([1, '🖊️', `保護者の実績確認がまだ ${n}家庭（${yy}年${mm}月分）`, '#leo/kakunin', '公式LINEでリンクを送ったか確認', { key: 'leo:kakunin:' + mo }]);
+  }
+  return items;
+}
 async function leoPublishTodos() {
   const m = document.getElementById('lt_pub');
   if (DEMO) { if (m) m.textContent = '見本モードなので出しません。'; return; }
@@ -1155,18 +1178,25 @@ LEO_VIEWS.home = async function () {
   } catch (e) { }
   // 2. ヒヤリハット：確認がまだのもの
   try { const h = (await hyRows()).filter(r => r.status === '未確認'); if (h.length) todo.push([0, '⚠️', `ヒヤリハットの確認 ${h.length}件`, '#leo/hiyari', '読んで、再発防止の工夫を書いて「確認した」を押す']); } catch (e) { }
-  // 3. 保護者の実績確認：未確認の家庭
-  try { if (!DEMO) { const mo = today().slice(0, 7); const l = await sb(`leo_confirm_links?month=eq.${mo}&select=token`);
-      const c = l.length ? await sb(`leo_confirmations?select=token&token=in.(${l.map(x => x.token).join(',')})`) : []; const n = l.length - new Set(c.map(x => x.token)).size;
-      if (n > 0) todo.push([1, '🖊️', `保護者の実績確認がまだ ${n}家庭`, '#leo/kakunin', '公式LINEでリンクを送ったか確認']); }
-    else todo.push([1, '🖊️', '保護者の実績確認がまだ 1家庭（見本）', '#leo/kakunin', '公式LINEでリンクを送ったか確認']); } catch (e) { }
+  // 3. 保護者の実績確認：前月と、リンクがある当月の未確認
+  try {
+    if (!DEMO) {
+      const tday = today(), cur = tday.slice(0, 7), prev = leoYmShift(cur, -1), byMonth = {};
+      for (const mo of [prev, cur]) {
+        const l = await sb(`leo_confirm_links?month=eq.${mo}&select=token`);
+        const c = l.length ? await sb(`leo_confirmations?select=token&token=in.(${l.map(x => x.token).join(',')})`) : [];
+        byMonth[mo] = { links: l, confs: c };
+      }
+      leoKakuninHomeItems(tday, byMonth, false).forEach(item => todo.push(item));
+    } else leoKakuninHomeItems(today(), {}, true).forEach(item => todo.push(item));
+  } catch (e) { }
   // 4. 直した所の衝突（日誌に反映できなかったもの）
   try { if (canLeoHomeTodo()) { const e = DEMO ? DEMO_DATA.edits : await sb('leo_edits?status=eq.衝突&select=id'); const n = e.filter(x => !x.status || x.status === '衝突').length; if (n) todo.push([1, '🔧', `日誌の直しが反映できなかったもの ${n}件`, '#leo/edits', '日誌を見て、必要ならもう一度直す']); } } catch (e) { }
   todo.sort((a, b) => a[0] - b[0]);
   LEO_HOME_TODO = todo.map(leoTodoItem);
   let sent = {};
   try { if (!DEMO && canLeoHomeTodo()) (await sb('rpc/leo_home_todo_status', { method: 'POST', body: '{}' })).forEach(r => { sent[r.source_key] = r.name; }); } catch (e) { }
-  const pub = canLeoHomeTodo() && todo.length ? `<p><button onclick="leoPublishTodos()" ${DEMO ? 'disabled title="見本モードでは出しません"' : ''}>📌 担当者別の依頼にする</button> <span id="lt_pub" class="note">児発管の分は児発管へ、保護者の実績確認は事務（宮本）へ「私への依頼」として出します。同じものは二重に出しません。</span></p>` : '';
+  const pub = canLeoHomeTodo() && todo.length ? `<p><button onclick="leoPublishTodos()" ${DEMO ? 'disabled title="見本モードでは出しません"' : ''}>📌 担当者別の依頼にする</button> <span id="lt_pub" class="note">児発管の分は児発管へ、保護者の実績確認は齊藤さんへ「私への依頼」として出します。同じものは二重に出しません。</span></p>` : '';
   return `<h3>今日やること（児発管）</h3>${demoNote()}<p class="note">上から順に片づければ大丈夫です。終わったものは自動で消えます。</p>${pub}` +
     (todo.length ? todo.map(([p, i, t, href, sub], k) => { const who = sent[LEO_HOME_TODO[k].key]; const edge = p === 0 ? 'border-left:6px solid #d33' : 'border-left:6px solid #e6b800';
       const head = `<span style="font-size:22px">${i}</span> <b>${t}</b>${who ? `　<small class="badge">依頼済：${esc(who)}</small>` : ''}<br><small>${sub}</small>`;

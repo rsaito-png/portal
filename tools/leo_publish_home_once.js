@@ -33,9 +33,9 @@ sandbox.$ = () => ({ textContent: '', style: {}, value: '', innerHTML: '' });
 vm.createContext(sandbox);
 vm.runInContext(read('leo_left.js'), sandbox, { filename: 'leo_left.js' });
 vm.runInContext(read('gl.js'), sandbox, { filename: 'gl.js' });
-vm.runInContext(read('leo.js') + '\nthis.__leo = { planHomeTodos, leoTodoItem, today, leftIndex, planDates, trackToRow: typeof trackToRow !== "undefined" ? trackToRow : null, canLeoHomeTodo: () => true };', sandbox, { filename: 'leo.js' });
+vm.runInContext(read('leo.js') + '\nthis.__leo = { planHomeTodos, leoTodoItem, leoYmShift, leoKakuninHomeItems, today, leftIndex, planDates, trackToRow: typeof trackToRow !== "undefined" ? trackToRow : null, canLeoHomeTodo: () => true };', sandbox, { filename: 'leo.js' });
 
-const { planHomeTodos, leoTodoItem, today, leftIndex, trackToRow: leoTrackToRow } = sandbox.__leo;
+const { planHomeTodos, leoTodoItem, leoYmShift, leoKakuninHomeItems, today, leftIndex, trackToRow: leoTrackToRow } = sandbox.__leo;
 const ymj = d => { const [y, m] = String(d).split('-'); return `${y}年${+m}月`; };
 const slashD = d => d ? String(d).replace(/-/g, '/') : '';
 const localTrackToRow = t => ({ 児童名: t.child, 現在の期: `${t.term_no}期`, 現在の計画期間: t.period_from && t.period_to ? `${ymj(t.period_from)}〜${ymj(t.period_to)}` : '', 次期開始月: t.next_start ? ymj(t.next_start) : '',
@@ -47,6 +47,7 @@ const trackToRow = leoTrackToRow || localTrackToRow;
   const tday = today();
   const t = new Date(tday + 'T00:00:00+09:00');
   const mo = tday.slice(0, 7);
+  const prev = leoYmShift(mo, -1);
   const [tracks, plans, links, ans, staff, sends, leftRows, hiyari, edits, clinks, confs] = await Promise.all([
     sb('leo_plan_track?order=next_start,child'),
     sb('leo_plans?order=child,term_no'),
@@ -57,7 +58,7 @@ const trackToRow = leoTrackToRow || localTrackToRow;
     sb('leo_child_info?select=name,left_on&left_on=not.is.null').catch(() => []),
     sb('hiyari?select=id,status,office&status=eq.未確認&office=eq.レオ').catch(() => []),
     sb('leo_edits?status=eq.衝突&select=id').catch(() => []),
-    sb(`leo_confirm_links?month=eq.${mo}&select=token`).catch(() => []),
+    sb(`leo_confirm_links?or=(month.eq.${prev},month.eq.${mo})&select=token,month`).catch(() => []),
     sb('leo_confirmations?select=token').catch(() => []),
   ]);
   const L = Object.fromEntries((links || []).map(l => [l.token, l]));
@@ -75,9 +76,20 @@ const trackToRow = leoTrackToRow || localTrackToRow;
   planHomeTodos(D0, LEFT, tday, t).forEach(x => todo.push(x));
   const hy = (hiyari || []).filter(r => r.status === '未確認');
   if (hy.length) todo.push([0, '⚠️', `ヒヤリハットの確認 ${hy.length}件`, '#leo/hiyari', '読んで、再発防止の工夫を書いて「確認した」を押す']);
-  const confSet = new Set((confs || []).map(x => x.token));
-  const nKak = (clinks || []).filter(l => !confSet.has(l.token)).length;
-  if (nKak > 0) todo.push([1, '🖊️', `保護者の実績確認がまだ ${nKak}家庭`, '#leo/kakunin', '公式LINEでリンクを送ったか確認']);
+  const byMonth = {};
+  for (const moKey of [prev, mo]) byMonth[moKey] = { links: [], confs: [] };
+  (clinks || []).forEach(l => {
+    if (!l || !l.month) return;
+    if (!byMonth[l.month]) byMonth[l.month] = { links: [], confs: [] };
+    byMonth[l.month].links.push(l);
+  });
+  const tokenMonth = {};
+  (clinks || []).forEach(l => { if (l && l.token) tokenMonth[l.token] = l.month; });
+  (confs || []).forEach(c => {
+    const m = c && tokenMonth[c.token];
+    if (m && byMonth[m]) byMonth[m].confs.push(c);
+  });
+  leoKakuninHomeItems(tday, byMonth, false).forEach(item => todo.push(item));
   if ((edits || []).length) todo.push([1, '🔧', `日誌の直しが反映できなかったもの ${edits.length}件`, '#leo/edits', '日誌を見て、必要ならもう一度直す']);
   todo.sort((a, b) => a[0] - b[0]);
   const items = todo.map(leoTodoItem);
