@@ -48,6 +48,10 @@
   }
 
   const isHol = day => { const H = typeof JP_HOLIDAYS !== 'undefined' ? JP_HOLIDAYS : g.JP_HOLIDAYS; return !!(H && typeof H.has === 'function' && H.has(String(day).slice(0, 10))); };
+  const isClosedDay = (data, day) => {
+    const iso = String(day).slice(0, 10);
+    return ((data && data.closed) || []).some(x => String(x).slice(0, 10) === iso);
+  };
   // その日の1人分。state: base=いつもの型（緑）／change=時間変更（黄）／off=休み（赤）／add=型なしの追加（黄）／none=入らない
   function shiftCell(data, day, uid) {
     const d = data || {};
@@ -58,8 +62,9 @@
     const adds = rows.filter(x => x.kind === '追加');
     const baseSlots = base.map(b => ({ start: b.start, end: b.end }));
     if (off) return { state: 'off', slots: [], base: baseSlots, note: off.note || '', rows };
-    // 祝日（カレンダーの赤い日）は、いつもの型では入らない。その日だけの時間変更・追加は出す（ゆか先生指定 2026-11-13）
-    if (isHol(day) && !chg && !adds.length) return { state: 'hol', slots: [], base: baseSlots, note: '', rows };
+    // 祝日・休所は、いつもの型では入らない。その日だけの時間変更・追加は出す（祝日はゆか先生指定 2026-11-13）
+    const closed = isClosedDay(d, day);
+    if ((isHol(day) || closed) && !chg && !adds.length) return { state: 'hol', slots: [], base: baseSlots, note: '', rows, closed };
     let slots = chg ? [{ start: chg.start, end: chg.end }] : baseSlots.slice();
     adds.forEach(a => slots.push({ start: a.start, end: a.end, add: true, id: a.id }));
     slots.sort((a, b) => min(a.start) - min(b.start));
@@ -157,12 +162,26 @@
   const DEMO_SHIFT = () => ({ can_edit: true,
     staff: [{ user_id: 'a', name: '職員　A' }, { user_id: 'b', name: '職員　B' }],
     base: [{ user_id: 'a', dow: 1, start: '10:30', end: '14:30' }, { user_id: 'a', dow: 5, start: '10:30', end: '14:30' }, { user_id: 'b', dow: 2, start: '14:00', end: '17:00' }],
-    days: [], pick: [], punches: null });
+    days: [], pick: [], punches: null, closed: [] });
   async function shiftLoad(from, to) {
     if (typeof DEMO !== 'undefined' && DEMO) return DEMO_SHIFT();
     if (typeof sb !== 'function') return null;
     const k = from + '|' + to;
-    if (!cache.has(k)) cache.set(k, sb('rpc/staff_shift_get', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to }) }).catch(() => null));
+    if (!cache.has(k)) {
+      cache.set(k, (async () => {
+        const data = await sb('rpc/staff_shift_get', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to }) }).catch(() => null);
+        if (!data) return null;
+        let closed = [];
+        try {
+          const rows = await sb(`leo_events?kind=eq.休所&select=day&day=gte.${from}&day=lte.${to}`);
+          if (Array.isArray(rows)) {
+            closed = [...new Set(rows.map(r => String(r && r.day).slice(0, 10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))];
+          }
+        } catch (e) { }
+        data.closed = closed;
+        return data;
+      })());
+    }
     const data = await cache.get(k);
     return shiftWithoutHidden(data);
   }
@@ -231,7 +250,7 @@
   @media (max-width:700px){.sh-wrap{display:none}.sh-cards{display:block}}
   </style>`;
   function cellHtml(c, day, uid, ed) {
-    const txt = c.state === 'off' ? '休み' : c.state === 'hol' ? '祝日' : c.slots.length ? c.slots.map(span).join('<br>') : '—';
+    const txt = c.state === 'off' ? '休み' : c.state === 'hol' ? (c.closed ? '休所' : '祝日') : c.slots.length ? c.slots.map(span).join('<br>') : '—';
     const sub = c.state === 'off' ? (c.note ? `<small>${esc(c.note)}</small>` : '') : c.state === 'change' || c.state === 'add' ? `<small>${c.state === 'add' ? '追加' : '時間変更'}${c.note ? '・' + esc(c.note) : ''}</small>` : '';
     const on = ed ? ` role="button" tabindex="0" onclick="shOpenDay('${day}','${uid}')"` : '';
     return `<span class="sh-c ${c.state}"${on}>${txt}${sub}</span>`;

@@ -113,7 +113,7 @@ assert.ok(month.includes('>26</b>'), '今日の日付');
 assert.ok(month.includes('3人'), '利用人数');
 assert.ok(month.includes('sub use'), '利用人数は山吹色');
 assert.ok(month.includes('background:#f8b500') && month.includes('.sub.use{color:#222'), '人数は黄地に黒文字');
-assert.ok(month.includes('class="sub off">休'), '休所');
+assert.ok(month.includes('class="sub off">土曜日'), '休所はタイトルを赤で出す');
 assert.ok(month.includes('class="today"'), '今日の印');
 assert.strictEqual((month.match(/class="sg-tday">今日/g) || []).length, 1, '今日のラベルは1日だけ');
 assert.ok(month.includes('html.th-yamen body.portal .sgm td button.today'), '官吏テーマの赤いボタンより今日を優先する');
@@ -513,4 +513,19 @@ sandbox.leoListedStaff = n => String(n).replace(/[\s\u3000]/g, '') !== '河合�
   assert.ok(h.includes('連先生'));
 }
 delete sandbox.leoListedStaff;
+
+sandbox.JP_HOLIDAYS = new Set(['2027-01-01']);
+const nenshi = sgMonthHtml('2026-12', [
+  { day: '2026-12-30', kind: '休所', title: '年末年始のお休み' },
+  { day: '2026-12-31', kind: '休所', title: '年末年始のお休み' },
+], '2026-12-24');
+assert.ok(nenshi.includes('class="sub off">年末年始のお休み'), '年末年始はタイトルを赤で出す');
+assert.ok(!nenshi.includes('>休<'), 'タイトルがある休所は「休」だけにしない');
+const jan = sgMonthHtml('2027-01', [
+  { day: '2027-01-01', kind: '休所', title: '年末年始のお休み' },
+], '2026-12-24');
+assert.ok(jan.includes('class="sub off">年末年始のお休み'), '1/1は祝日より休所の名前を出す');
+assert.ok(!jan.includes('>祝日<'), '休所がある日は祝日ラベルを重ねない');
+delete sandbox.JP_HOLIDAYS;
+
 console.log('leo_home_cal_test ok');

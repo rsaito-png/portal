@@ -124,6 +124,19 @@ assert.ok(blankH.includes('class="sh-bf" value=""'));
 const newH = S.shiftBaseSlotHtml(3, { start: '', end: '', note: S.shiftPackNote(S.shiftMonday('2026-11-18'), '') });
 assert.ok(newH.includes('value="2026-11-16"'));
 
+// 休所の日は、いつもの型を出さない（祝日と同じ。その日だけの行は消さない）
+const closedData = { ...data, closed: ['2026-12-30', '2026-12-31', '2027-01-01'] };
+assert.strictEqual(S.shiftCell(data, '2026-12-31', F).state, 'base', '休所を渡さないときは型どおり');
+c = S.shiftCell(closedData, '2026-12-31', F);
+assert.strictEqual(c.state, 'hol');
+assert.strictEqual(c.closed, true);
+assert.strictEqual(c.slots.length, 0);
+assert.ok(!S.shiftEvents(closedData, '2026-12-31', '2026-12-31').some(e => e.kind === '勤務'), '休所の日はカレンダーに勤務を足さない');
+assert.strictEqual(S.shiftCell(closedData, '2027-01-01', K).state, 'hol');
+assert.strictEqual(S.shiftCell(closedData, '2026-12-30', Y).state, 'hol', '型の無い人でも休所の日は休所');
+const closedAdd = { ...closedData, days: data.days.concat([{ id: 9, day: '2026-12-31', user_id: F, kind: '追加', start: '10:00', end: '12:00' }]) };
+assert.ok(S.shiftCell(closedAdd, '2026-12-31', F).slots.length, '休所でもその日だけの追加は出す');
+
 (async () => {
   const D = require('../leo_driver.js');
   global.leoListedStaff = D.leoListedStaff;

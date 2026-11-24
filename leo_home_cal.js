@@ -286,9 +286,10 @@ function sgCss() {
 .sgm td button b{font-size:13px;line-height:1.1}
 .sgm td button .sub{font-size:9px;color:#2e6b4f;font-weight:700;line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden}
 .sgm td button .sub.use{color:#222;background:#f8b500;border-radius:3px;padding:0 3px}
-.sgm td button .sub.off{color:#b33}
+.sgm td button .sub.off{color:#b33;white-space:normal;overflow:hidden;line-height:1.15}
 .sgm td button .sub.hol{color:#d32f2f}
-.sgm td button:has(.sub.hol + .sub){height:auto;min-height:32px}
+.sgm td button:has(.sub.hol + .sub),
+.sgm td button:has(.sub.off){height:auto;min-height:32px}
 .sgm td button.today,
 html.th-yamen body.portal .sgm td button.today{background:#fff6d0;color:#1c140c;border:3px solid #c9a227;box-shadow:none;height:auto;min-height:44px;overflow:visible}
 .sgm td button.today b,
@@ -371,18 +372,22 @@ function sgMonthHtml(ym, evs, todayStr) {
   for (let d = g.start, cell = 0; d <= g.end; d = sgAdd(d, 1), cell++) {
     if (cell % 7 === 0) rows += '<tr>';
     const es = (evs || []).filter(e => e.day === d);
-    const closed = es.some(e => e.kind === '休所');
+    const closedEv = es.find(e => e.kind === '休所');
+    const closed = !!closedEv;
+    const closedLabel = closed ? (String(closedEv.title || closedEv.note || '休').trim() || '休') : '';
     // 同じ児童の「利用」が二重に入っていても1人と数える（今日の利用児童と同じ数え方）
     const n = new Set(es.filter(e => e.kind === '利用' && e.child).map(e => String(e.child).replace(/\s/g, ''))).size;
     const trips = es.filter(e => e.kind === '迎え' || e.kind === '送り').length;
     // 祝日（カレンダーの赤い日）は人数の所に赤で「祝日」（ゆか先生指定 2026-11-13）。利用がある日は人数も出す
+    // 休所（年末年始など）がある日は、祝日より休所の名前を赤で出す
     const hol = typeof JP_HOLIDAYS !== 'undefined' && JP_HOLIDAYS && typeof JP_HOLIDAYS.has === 'function' && JP_HOLIDAYS.has(d);
-    const sub0 = closed ? '<span class="sub off">休</span>' : n ? `<span class="sub use">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
-    const sub = hol ? `<span class="sub hol">祝日</span>${n ? `<span class="sub use">${n}人</span>` : ''}` : sub0;
+    const sub0 = closed ? `<span class="sub off">${sgEsc(closedLabel)}</span>` : n ? `<span class="sub use">${n}人</span>` : trips ? `<span class="sub">☆${trips}</span>` : '<span class="sub"></span>';
+    const sub = closed ? sub0 : (hol ? `<span class="sub hol">祝日</span>${n ? `<span class="sub use">${n}人</span>` : ''}` : sub0);
     const isToday = d === todayStr;
     const cls = isToday ? 'today' : '';
     const mark = isToday ? '<span class="sg-tday">今日</span>' : '';
-    rows += `<td class="${sgYm(d) !== ym ? 'dim' : ''}"><button type="button" class="${cls}" onclick="sgOpenDay('${d}')" aria-label="${+d.slice(5, 7)}/${+d.slice(8)}${isToday ? ' 今日' : ''} ${closed ? '休所' : '利用' + n + '人'}"><b>${+d.slice(8)}</b>${sub}${mark}</button></td>`;
+    const ariaClosed = closed ? sgEsc(closedLabel) : ('利用' + n + '人');
+    rows += `<td class="${sgYm(d) !== ym ? 'dim' : ''}"><button type="button" class="${cls}" onclick="sgOpenDay('${d}')" aria-label="${+d.slice(5, 7)}/${+d.slice(8)}${isToday ? ' 今日' : ''} ${ariaClosed}"><b>${+d.slice(8)}</b>${sub}${mark}</button></td>`;
     if (cell % 7 === 6) rows += '</tr>';
   }
   return `<div class="sgm">${sgCss()}<div class="sgm-h"><button type="button" onclick="sgShiftMonth(-1)" aria-label="前の月">◀</button><b>${y}年${m}月</b><button type="button" onclick="sgShiftMonth(1)" aria-label="次の月">▶</button><button type="button" class="sg-today" onclick="sgThisMonth()">今月</button></div><table>${rows}</table></div>`;
