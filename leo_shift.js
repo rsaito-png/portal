@@ -122,6 +122,7 @@
     const out = [];
     if (!data || !(data.staff || []).length) return out;
     for (let d = from; d <= to; d = addDays(d, 1)) {
+      if (isClosedDay(data, d)) continue;  // 休所の日は勤務・不在をカレンダーに出さない（終日の休所だけ）
       shiftDay(data, d).forEach(c => {
         if (c.state === 'off') out.push({ day: d, kind: '不在', staff: c.name, title: '休み' + (c.note ? '（' + c.note + '）' : ''), start_time: null, end_time: null, source: 'shift', _shift: true });
         else if (c.slots.length) out.push({ day: d, kind: '勤務', staff: c.name, title: c.slots.map(span).join('・') + (c.state !== 'base' ? '（その日だけ）' : ''), start_time: null, end_time: null, source: 'shift', _shift: true });
@@ -173,7 +174,7 @@
         if (!data) return null;
         let closed = [];
         try {
-          const rows = await sb(`leo_events?kind=eq.休所&select=day&day=gte.${from}&day=lte.${to}`);
+          const rows = await sb('leo_events?kind=eq.' + encodeURIComponent('休所') + '&select=day&day=gte.' + from + '&day=lte.' + to);
           if (Array.isArray(rows)) {
             closed = [...new Set(rows.map(r => String(r && r.day).slice(0, 10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))];
           }

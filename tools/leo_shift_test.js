@@ -137,6 +137,17 @@ assert.strictEqual(S.shiftCell(closedData, '2026-12-30', Y).state, 'hol', '型�
 const closedAdd = { ...closedData, days: data.days.concat([{ id: 9, day: '2026-12-31', user_id: F, kind: '追加', start: '10:00', end: '12:00' }]) };
 assert.ok(S.shiftCell(closedAdd, '2026-12-31', F).slots.length, '休所でもその日だけの追加は出す');
 
+// その日だけの「休み」は、新しいJSを読まなくても型を消す（ゆか先生 12/30 さち・12/31 あや）
+const offData = { ...data, days: data.days.concat([
+  { id: 10, day: '2026-12-30', user_id: Y, kind: '休み', note: '年末年始のお休み' },
+  { id: 11, day: '2026-12-31', user_id: F, kind: '休み', note: '年末年始のお休み' },
+]) };
+assert.strictEqual(S.shiftCell(offData, '2026-12-30', Y).state, 'off');
+assert.strictEqual(S.shiftCell(offData, '2026-12-31', F).state, 'off');
+assert.ok(!S.shiftEvents(offData, '2026-12-30', '2026-12-31').some(e => e.kind === '勤務'), '休みの日は勤務を出さない');
+const offClosed = { ...offData, closed: ['2026-12-30', '2026-12-31'] };
+assert.ok(!S.shiftEvents(offClosed, '2026-12-30', '2026-12-31').length, '休所の日はカレンダーに勤務も不在も出さない');
+
 (async () => {
   const D = require('../leo_driver.js');
   global.leoListedStaff = D.leoListedStaff;
