@@ -235,6 +235,9 @@ begin
     where public.leo_left_on(x->>'child') is null or nullif(x->>'day', '') is null or (x->>'day')::date <= public.leo_left_on(x->>'child');
   update _lsv set parent_drop = true, ps = null, pst = null where par = '母の送り' and not parent_drop;
   update _lsv set parent_pick = true, pe = null, dst = null where par = '母の迎え' and not parent_pick;
+  -- 保護者フォームの leoBoth と同じ：型表の「母の送迎」「保護者送迎」「○」は行きも帰りも保護者（迎え・送りの行は作らない）
+  update _lsv set parent_drop = true, parent_pick = true, ps = null, pst = null, pe = null, dst = null
+    where btrim(par) in ('母の送迎', '保護者送迎', '○');
   -- 2026-11-10：保護者の備考は、その日の予定にだけ付ける。日ごとの備考（exception.day あり）はその日、
   -- まとめ欄の備考（要確認・day なし）は本文の日付（leo_memo_days）の日だけ。日付のない備考は予定に貼らず、確認の一覧にだけ出す。
   for v in
@@ -250,7 +253,7 @@ begin
            else '日付なし・予定には付けていません' end || '）：' || coalesce(v.memo, '')));
   end loop;
   select ev || coalesce(jsonb_agg(jsonb_build_object('day', day, 'kind', '利用', 'child', child, 'start_time', ks, 'end_time', ke, 'parent_drop', parent_drop, 'parent_pick', parent_pick,
-      'title', child || case when parent_drop then '（母の送り）' when parent_pick then '（母の迎え）' else '' end,
+      'title', child || case when parent_drop and parent_pick then '（母の送迎）' when parent_drop then '（母の送り）' when parent_pick then '（母の迎え）' else '' end,
       'note', (select '⚠ 保護者の備考：' || string_agg(distinct btrim(e.memo), ' / ') from leo_schedule_exception e join _nres r on r.kind = 'link' and r.answer = e.child and r.kata = _lsv.child
         where e.month = p_month and nullif(btrim(e.memo), '') is not null
           and ((e.day is not null and e.day = _lsv.day) or (e.day is null and e.kind = '要確認' and _lsv.day = any(public.leo_memo_days(p_month, e.memo)))))) order by day, ks), '[]') into ev from _lsv;
