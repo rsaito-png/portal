@@ -80,6 +80,7 @@ declare
   d_driver text; d_time text; d_place text; d_src text; kata_drop text;
   kid_drop text; d_end text; d_start text; dow text;
   m_pick text; m_drop text; m_parent text;
+  nk_kind text;
 begin
   if not public.leo_record_allowed() then raise exception 'レオ職員のみ'; end if;
   if p_day is null then raise exception '日付'; end if;
@@ -234,12 +235,15 @@ begin
     select c.kind into svc from leo_children c where public.leo_norm(c.name) = public.leo_norm(r.child) limit 1;
 
     if exists (select 1 from leo_nikki n where n.day = p_day and public.leo_norm(n.child) = public.leo_norm(r.child)) then
+      select case when n.seed = 'events' and coalesce(n.activity_via, '') <> '手入力' then r.kind else n.kind end
+        into nk_kind
+        from leo_nikki n where n.day = p_day and public.leo_norm(n.child) = public.leo_norm(r.child);
       update leo_nikki n set
-        kind = case when n.seed = 'events' and coalesce(n.activity_via, '') <> '手入力' then r.kind else n.kind end,
+        kind = nk_kind,
         -- 種別が分かっていれば、日誌に先に入っていた「放課後等デイサービス」などで上書きする。不明なときは今の文字を残す。
         service = case when svc in ('児発', '放デイ') then svc else coalesce(nullif(btrim(n.service), ''), svc) end,
-        start_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false),
-        end_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
+        start_time = case when nk_kind = '欠席' then null else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false) end,
+        end_time = case when nk_kind = '欠席' then null else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false) end,
         pick_driver = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
         pick_time = public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_time', n.pick_time, p_time, public.leo_kata_prev(n.day, n.child, 'pick_time'), false),
         -- 場所は職員保存・過去日でも型表を入れる（活動など他欄は従来どおり）
@@ -258,8 +262,8 @@ begin
           else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'drop_place', n.drop_place, d_place, public.leo_kata_prev(n.day, n.child, 'drop_place'), false)
         end,
         auto_fill = case when n.day >= public.leo_sync_start() and n.staff_saved_at is null and n.day >= (timezone('Asia/Tokyo', now()))::date then jsonb_build_object(
-          'start_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false),
-          'end_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false),
+          'start_time', case when nk_kind = '欠席' then null else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'start_time', n.start_time, case when r.kind = '利用' then nullif(btrim(r.start_time), '') end, public.leo_kata_prev(n.day, n.child, 'start_time'), false) end,
+          'end_time', case when nk_kind = '欠席' then null else public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'end_time', n.end_time, case when r.kind = '利用' then nullif(btrim(r.end_time), '') end, public.leo_kata_prev(n.day, n.child, 'end_time'), false) end,
           'pick_driver', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_driver', n.pick_driver, p_driver, public.leo_kata_prev(n.day, n.child, 'pick_driver'), false),
           'pick_time', public.leo_auto_field(n.staff_saved_at, n.day, n.auto_fill, 'pick_time', n.pick_time, p_time, public.leo_kata_prev(n.day, n.child, 'pick_time'), false),
           'pick_place', case
@@ -302,6 +306,7 @@ begin
     d_driver := null; d_time := null; d_place := null; d_src := null; kata_drop := null;
     kid_drop := null; d_end := null; d_start := null;
     m_pick := null; m_drop := null; m_parent := null;
+    nk_kind := null;
     svc := null;
   end loop;
   return n;

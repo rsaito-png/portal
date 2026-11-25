@@ -40,6 +40,9 @@ begin
     elsif k = 'drop_place' then update leo_nikki set drop_place = v where day = p_day and row_no = row_n;
     end if;
   end loop;
+  -- 欠席の行は予定から入った開始・終了を残さない（ゆか先生 2026-11-25）
+  update leo_nikki set start_time = null, end_time = null
+   where day = p_day and row_no = row_n and kind = '欠席';
   update leo_nikki set staff_saved_at = coalesce(staff_saved_at, now()) where day = p_day and row_no = row_n and p_day >= public.leo_sync_start();
   if touched_activity then
     select nk.child into v_child from leo_nikki nk where nk.day = p_day and nk.row_no = row_n;

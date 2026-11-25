@@ -106,6 +106,7 @@ assert.ok(sync.includes('p_day < greatest((timezone(\'Asia/Tokyo\', now()))::dat
 assert.ok(sync.includes('greatest(coalesce(p_from, (timezone(\'Asia/Tokyo\', now()))::date), (timezone(\'Asia/Tokyo\', now()))::date, public.leo_sync_start())'), '再作成の開始も同じ下限');
 assert.ok(!sync.includes("date '2026-11-05'"), '11/05 を個別に直す案内は置かない');
 assert.ok(fnBody(sql).includes('greatest((timezone(\'Asia/Tokyo\', now()))::date, public.leo_sync_start())'), '日誌を開いても開始日より前は予定を作り直さない');
+assert.ok(fnBody(sql).includes("when nk_kind = '欠席' then null"), '欠席の日誌は開始終了を空にし、予定の再生成でも戻さない');
 assert.ok(!/create policy|enable row level security|\bgrant\b/i.test(arrival), '送り時刻のSQLは権限を変えない');
 assert.ok(arrival.includes('/*') && arrival.includes('-- update leo_nikki'), '11月の直しはコメントのまま');
 assert.ok(between(leo, 'async function saveDiary', 'let LD_DAY').includes('rpc/leo_activity_from_drafts'));
