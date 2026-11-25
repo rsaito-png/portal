@@ -61,6 +61,8 @@
     const chg = rows.find(x => x.kind === '時間変更');
     const adds = rows.filter(x => x.kind === '追加');
     const baseSlots = base.map(b => ({ start: b.start, end: b.end }));
+    // 休みのメモが「シフトなし」なら、こちらの都合で入らない日として「—」で出す（ゆか先生指定 2026-11-25）
+    if (off && String(off.note || '').trim() === 'シフトなし') return { state: 'none', slots: [], base: baseSlots, note: '', rows };
     if (off) return { state: 'off', slots: [], base: baseSlots, note: off.note || '', rows };
     // 祝日・休所は、いつもの型では入らない。その日だけの時間変更・追加は出す（祝日はゆか先生指定 2026-11-13）
     const closed = isClosedDay(d, day);
