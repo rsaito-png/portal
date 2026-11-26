@@ -251,7 +251,7 @@ function sgLines(e) {
   return [`${e.staff ? sgStaffShow(e.staff) : ''} ${e.title || e.note || ''}`.trim()];
 }
 // 日の時刻軸ブロックの表面。姓は出さない（半角・全角スペースの後ろを名とする。スペースが無ければそのまま）。
-// 迎えは「☆名」、送りは「★名」、利用は名だけ。時刻・場所・担当・保護者の注記は title と編集画面に残す。
+// 迎えは「☆名」、送りは「★名」、利用は名だけ。迎えが自宅のときだけ「☆名　自宅」を付ける（いつもと違うため）。ほかの時刻・場所・担当は title と編集画面に残す。
 function sgGiven(name) {
   const p = sgName(name).split(/[\s\u3000]+/).filter(Boolean);
   return p.length >= 2 ? p.slice(1).join('') : (p[0] || '');
@@ -260,8 +260,15 @@ function sgFace(e) {
   if (!e) return '';
   if (e.kind === '迎え' || e.kind === '送り') {
     const mark = e.kind === '迎え' ? '☆' : '★';
-    const names = (e.kids || []).map(sgGiven).filter(Boolean);
-    return names.length ? names.map(n => mark + n).join('　') : mark;
+    const kids = e.kids || [];
+    const names = kids.map(k => {
+      const given = sgGiven(k);
+      if (!given) return '';
+      const pl = String(sgKid(e.kid_places, k) || (!e.kid_places && e.place) || '').trim();
+      // 送りの自宅は通常なので出さない。迎えの自宅だけ「☆名　自宅」
+      return (e.kind === '迎え' && pl === '自宅') ? mark + given + '　自宅' : mark + given;
+    }).filter(Boolean);
+    return names.length ? names.join('　') : mark;
   }
   if (e.kind === '利用') {
     // 保護者が施設へ連れて来る（parent_drop）は「母の送り」、保護者が迎えに来る（parent_pick）は「母の迎え」（2026-11-13 Reo）

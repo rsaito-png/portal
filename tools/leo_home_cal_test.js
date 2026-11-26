@@ -23,6 +23,11 @@ assert.strictEqual(sgFace({ kind: '迎え', kids: ['加藤 湊'] }), '☆湊');
 assert.strictEqual(sgFace({ kind: '送り', kids: ['山根\u3000一輝'] }), '★一輝');
 assert.strictEqual(sgFace({ kind: '利用', child: '加藤 湊' }), '湊');
 assert.strictEqual(sgFace({ kind: '迎え', kids: ['加藤 湊', '山根 一輝'] }), '☆湊　☆一輝');
+assert.strictEqual(sgFace({ kind: '迎え', kids: ['見本 太郎'], kid_places: { '見本 太郎': '自宅' } }), '☆太郎　自宅');
+assert.strictEqual(sgFace({ kind: '迎え', kids: ['見本 太郎'], place: '自宅' }), '☆太郎　自宅');
+assert.strictEqual(sgFace({ kind: '迎え', kids: ['見本 太郎'], kid_places: { '見本 太郎': '神前こども園' } }), '☆太郎');
+assert.strictEqual(sgFace({ kind: '送り', kids: ['見本 太郎'], kid_places: { '見本 太郎': '自宅' } }), '★太郎');
+assert.strictEqual(sgFace({ kind: '迎え', kids: ['見本 太郎', '見本 花子'], kid_places: { '見本 太郎': '自宅', '見本 花子': '神前こども園' } }), '☆太郎　自宅　☆花子');
 assert.strictEqual(sgFace({ kind: '勤務', staff: '加藤' }), null);
 
 const g = sgGrid('2026-10');
