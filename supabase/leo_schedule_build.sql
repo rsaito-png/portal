@@ -301,7 +301,7 @@ end $$;
 -- 手直し（source='portal'）と Google 取込（source='google'）も消さない。他の月も触らない。
 create or replace function public.leo_sched_commit(p_month date, p_force boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
 declare p jsonb; n int := 0; last_day date := (p_month + interval '1 month - 1 day')::date;
-  evj jsonb; kids_left text[];
+  evj jsonb; kids_left text[]; first_commit_at timestamptz;
 begin
   if not public.can_manage() then raise exception '児発管・管理者・事務のみ'; end if;
   if extract(day from p_month) <> 1 then raise exception '月の1日を指定してください'; end if;
@@ -319,6 +319,19 @@ begin
   ) s
   where public.leo_name_canon(c) <> ''
   on conflict do nothing;
+  first_commit_at := (
+    select min(e.updated_at) from leo_events e
+    where e.source = 'kata' and e.day >= p_month and e.day <= last_day
+  );
+  delete from leo_events e
+  where e.source = 'portal'
+    and (coalesce(e.title, '') = 'カレンダーで削除' or coalesce(e.note, '') = 'カレンダーで削除')
+    and e.day >= p_month and e.day <= last_day
+    and (first_commit_at is null or e.updated_at < first_commit_at)
+    and (
+      public.leo_name_canon(e.child) in (select child from _regen)
+      or exists (select 1 from unnest(coalesce(e.kids, '{}')) k where public.leo_name_canon(k) in (select child from _regen))
+    );
   delete from leo_events e
   where e.source = 'kata' and e.day >= p_month and e.day <= last_day and e.kind in ('利用','休み')
     and public.leo_name_canon(e.child) in (select child from _regen);
@@ -335,7 +348,8 @@ begin
       where not exists (
         select 1 from leo_events e
         where e.source = 'kata' and e.kind = evj->>'kind' and e.day = (evj->>'day')::date
-          and public.leo_name_canon(t.k) in (select public.leo_name_canon(u) from unnest(e.kids) u));
+          and public.leo_name_canon(t.k) in (select public.leo_name_canon(u) from unnest(e.kids) u))
+        and not public.leo_portal_covers((evj->>'day')::date, evj->>'kind', t.k);
       if coalesce(cardinality(kids_left), 0) = 0 then continue; end if;
       insert into leo_events (day, kind, child, kids, staff, start_time, end_time, parent_drop, parent_pick, place, note, title, source, kid_places, kid_times)
       values ((evj->>'day')::date, evj->>'kind', null, kids_left, evj->>'staff', evj->>'start_time', evj->>'end_time', false, false,
@@ -347,6 +361,9 @@ begin
         (select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) from jsonb_each(coalesce(evj->'kid_times', '{}'::jsonb)) e
           where public.leo_name_canon(e.key) in (select public.leo_name_canon(u) from unnest(kids_left) u)));
     else
+      if evj->>'kind' = '利用' and public.leo_portal_covers((evj->>'day')::date, '利用', evj->>'child') then
+        continue;
+      end if;
       insert into leo_events (day, kind, child, kids, staff, start_time, end_time, parent_drop, parent_pick, place, note, title, source, kid_places, kid_times)
       values ((evj->>'day')::date, evj->>'kind', evj->>'child', coalesce(array(select jsonb_array_elements_text(evj->'kids')), '{}'), evj->>'staff', evj->>'start_time', evj->>'end_time',
         coalesce((evj->>'parent_drop')::bool, false), coalesce((evj->>'parent_pick')::bool, false), evj->>'place', evj->>'note', evj->>'title', 'kata', evj->'kid_places', evj->'kid_times');

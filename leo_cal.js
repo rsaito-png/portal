@@ -505,7 +505,7 @@ window.calDel = async () => {
   if (DEMO) return alert('見本モードでは削除しません。');
   const row = CAL.row;
   await sb('leo_events?id=eq.' + CAL.edit, { method: 'DELETE' });
-  if (row && (row.kind === '利用' || row.kind === '迎え' || row.kind === '送り')) {
+  if (row && row.source !== 'google' && (row.kind === '利用' || row.kind === '迎え' || row.kind === '送り')) {
     const tomb = { day: row.day, kind: row.kind, child: row.child || null, kids: row.kids || [], staff: row.staff || null,
       start_time: null, end_time: null, parent_drop: false, parent_pick: false, place: null, note: 'カレンダーで削除', title: 'カレンダーで削除',
       source: 'portal', updated_at: new Date().toISOString() };
