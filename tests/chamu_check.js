@@ -423,7 +423,56 @@ assert.ok(!monPlan.upsert.some(r => r.user_id === 'm'), '予定外は欠席行�
 const satRoster = L.journalRoster(weekPeople, '2026-11-07', []);
 assert.strictEqual(satRoster.shown.length, 0);
 assert.strictEqual(satRoster.extra.length, 3);
-assert.ok(html.includes('chamu.js?v=20261117sign'));
+assert.ok(html.includes('chamu.js?v=20261127logs'));
+
+const logUsers = [
+  { id: 'h', name: '日置広大', use_days: ['月', '火', '水', '木', '金'], active: true },
+  { id: 't', name: '柘山周磨', use_days: ['月', '火', '水', '木', '金'], active: true },
+  { id: 'm', name: '森井辰生', use_days: ['水', '金'], active: true, service_start: '2026-11-04' },
+  { id: 'x', name: '停止', use_days: ['月', '火', '水', '木', '金'], active: false },
+  { id: 'z', name: '曜日なし', use_days: [], active: true },
+];
+const logJ = [{
+  journal_date: '2026-11-04',
+  staff_name: '安藤',
+  weather: '晴れ',
+  menu: 'カレー',
+  chamu_journal_line: [
+    { user_id: 'h', present: true, start_time: '11:00', end_time: '14:00', meal: 'あり', support_note: '穏やか' },
+  ],
+}];
+const logR = [{ user_id: 'h', service_date: '2026-11-04' }, { user_id: 'm', service_date: '2026-11-02' }];
+const logToday = '2026-11-27';
+const monthLog = L.journalMonthLog(logUsers, '2026-11', logJ, logR, logToday, '');
+assert.ok(monthLog.days.length, '利用日が出ること');
+assert.ok(monthLog.days[0].date >= monthLog.days[monthLog.days.length - 1].date, '新しい日が上');
+const wedLog = monthLog.days.find(d => d.date === '2026-11-04');
+assert.ok(wedLog && wedLog.hasJournal);
+assert.strictEqual(wedLog.people.find(p => p.user_id === 'h').present, true);
+assert.strictEqual(wedLog.people.find(p => p.user_id === 't').missing, true);
+assert.strictEqual(wedLog.people.find(p => p.user_id === 'm').missing, true, '利用開始日は未記録');
+assert.ok(!wedLog.people.some(p => p.user_id === 'x' && p.missing), '停止中は未記録にしない');
+const monLog = monthLog.days.find(d => d.date === '2026-11-02');
+assert.ok(monLog && !monLog.hasJournal);
+assert.ok(monLog.people.find(p => p.user_id === 'h').missing);
+assert.ok(monLog.people.find(p => p.user_id === 't').missing);
+assert.ok(monLog.people.find(p => p.user_id === 'm').missing && monLog.people.find(p => p.user_id === 'm').hasRecord, '実績だけある予定外も未記録');
+assert.ok(!monLog.people.some(p => p.user_id === 'm' && p.expected), '開始前は利用予定にしない');
+assert.ok(!monthLog.days.some(d => d.date === '2026-11-07'), '土日で記録がなければ出さない');
+assert.ok(!monthLog.days.some(d => d.date === '2026-11-30'), '未来の日は出さない');
+assert.ok(!monthLog.days.some(d => d.people.some(p => p.user_id === 'z' && p.missing)), '利用曜日が空なら未記録にしない');
+assert.ok(monthLog.missingCount > 0);
+const onlyT = L.journalMonthLog(logUsers, '2026-11', logJ, logR, logToday, 't');
+assert.ok(onlyT.days.every(d => d.people.every(p => p.user_id === 't')));
+assert.ok(onlyT.missingCount > 0);
+assert.ok(onlyT.days.some(d => d.date === '2026-11-04' && d.people[0].missing));
+assert.deepStrictEqual(L.journalMonthLog(logUsers, '', [], [], logToday).days, []);
+const ended = L.journalMonthLog([{ id: 'e', name: '終了', use_days: ['月'], active: true, contract_end: '2026-11-02' }], '2026-11', [], [], logToday, '');
+assert.ok(ended.days.some(d => d.date === '2026-11-02' && d.people[0].missing));
+assert.ok(!ended.days.some(d => d.date === '2026-11-09'));
+assert.ok(src.includes("['logs', '日誌一覧']") && src.includes('function cmLogs') && src.includes('function cmOpenJournal') && src.includes('cmSaveJournal()'));
+assert.ok(src.includes('journalMonthLog') && src.includes('cmBackLogs') && src.includes('この日を読む') && src.includes('記録漏れ'));
+assert.ok(cfg.includes('#chamu/logs') && cfg.includes('日誌一覧') && cfg.includes('Lista de diários'));
 const signPng = 'data:image/png;base64,aaaa';
 const signRows = [
   { id: '11111111-1111-1111-1111-111111111111', service_date: '2026-11-18', start_time: '11:00', end_time: '14:00', transport: '往復', meal: 'あり', signed_at: null },

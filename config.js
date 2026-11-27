@@ -96,9 +96,10 @@ window.PORTAL_CONFIG = {
       ['☀️', '支援記録', '#nicchu/log', '日ごとの支援日誌（金斗雲の訪問記録とは別）'],
       ['🖨️', '実績記録票（印刷）', '#nicchu/jisseki', '第８号様式。紙に印刷して市役所へ郵送'] ] },
     { id: 'chamu', name: '茶夢', kind: '生活介護', color: '#8a6a4f',
-      pt: { '業務日誌': 'Diário de trabalho', '職員配置表': 'Escala de funcionários', '勤務実績及び利用者の実績表': 'Registro de trabalho e de usuários', 'サービス提供実績記録票': 'Registro de serviços prestados', '利用者': 'Usuários', '献立報告': 'Relatório do cardápio', 'ヒヤリハット': 'Quase-acidentes', '国保連CSV': 'CSV de cobrança (Kokuhoren)', '個別支援計画': 'Plano de apoio individual', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
+      pt: { '業務日誌': 'Diário de trabalho', '日誌一覧': 'Lista de diários', '職員配置表': 'Escala de funcionários', '勤務実績及び利用者の実績表': 'Registro de trabalho e de usuários', 'サービス提供実績記録票': 'Registro de serviços prestados', '利用者': 'Usuários', '献立報告': 'Relatório do cardápio', 'ヒヤリハット': 'Quase-acidentes', '国保連CSV': 'CSV de cobrança (Kokuhoren)', '個別支援計画': 'Plano de apoio individual', '受付': 'Recepção (pedidos/relatos)', '書類': 'Documentos' },
       tiles: [
       ['📓', '業務日誌', '#chamu/journal', '職員が入力するのはここだけ（実績記録票に自動で転記）'],
+      ['📖', '日誌一覧', '#chamu/logs', '過去の日誌を読む・直す。記録漏れの日を書く'],
       ['👥', '職員配置表', '#chamu/haichi', '曜日ごとの常勤・非常勤（事務・茶夢管理者は追加・直す・削除可）'],
       ['🗓️', '勤務実績及び利用者の実績表', '#chamu/kinmu', '三重県の様式。配置はレオと共通、利用者数は生活介護'],
       ['✅', 'サービス提供実績記録票', '#chamu/records', '日誌から自動転記。署名をもらうとCSV対象'],

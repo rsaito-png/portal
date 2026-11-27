@@ -5,7 +5,7 @@
 // 曜日の職員配置は chamu_shift（見るだけ）。Google の配置表も献立シートも使わない。
 // 記入者が自分の名前と違う公式名になる人だけ、staff_profiles.chamu_record_name を使う。画面の記入者は本人のまま、保存する staff_name だけ公式名。実績の利用者署名と国保連CSVには載せない。
 const CM = { st: {}, files: null, can: false, bill: false, pad: null, loaded: {} };
-const CM_NAV = [['journal', '業務日誌'], ['kondate', '献立報告'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者'], ['plan', '個別支援計画']];
+const CM_NAV = [['journal', '業務日誌'], ['logs', '日誌一覧'], ['kondate', '献立報告'], ['haichi', '職員配置'], ['kinmu', '勤務実績'], ['records', '実績記録票'], ['billing', '国保連CSV'], ['users', '利用者'], ['plan', '個別支援計画']];
 const CM_SHIFT_Q = 'chamu_shift?select=id,dow,staff_name,employment,start_time,end_time,sort&order=dow.asc,sort.asc,staff_name.asc';
 
 /* cm-pure */
@@ -528,7 +528,74 @@ var ChamuLib = (() => {
     if (!clean.length) return '';
     return 'chamu_service_records?id=in.(' + clean.join(',') + ')&signed_at=is.null';
   };
-  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, journalStaffField, journalStaffRecord, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail, USE_DAYS, useDaysOf, usesDay, journalRoster, unsignedRecords, batchSignPlan, batchSignQuery };
+  // 利用曜日・実績があるのに日誌の行がない人を、未記録（記録漏れ）とする。未来の日は未記録にしない。
+  const inService = (user, date) => {
+    const start = ymd(user && (user.service_start || user.contract_start));
+    const end = ymd(user && user.contract_end);
+    if (start && date < start) return false;
+    if (end && date > end) return false;
+    return true;
+  };
+  const expectedOn = (user, date, dow) => !!(user && user.active !== false && usesDay(user, dow) && inService(user, date));
+  const journalMonthLog = (users, ym, journals, records, today, filterUserId) => {
+    const month = /^\d{4}-\d{2}$/.test(String(ym || '')) ? String(ym) : '';
+    const todayYmd = ymd(today);
+    if (!month || !todayYmd) return { ym: month, today: todayYmd, days: [], missingCount: 0, recordedDays: 0, filterUserId: '' };
+    const journalBy = {};
+    (journals || []).forEach(j => {
+      const d = ymd(j && j.journal_date);
+      if (d) journalBy[d] = j;
+    });
+    const recBy = {};
+    (records || []).forEach(r => {
+      const d = ymd(r && r.service_date);
+      const id = r && r.user_id != null ? String(r.user_id) : '';
+      if (!d || !id) return;
+      if (!recBy[d]) recBy[d] = {};
+      recBy[d][id] = true;
+    });
+    const filter = filterUserId != null && String(filterUserId) !== '' ? String(filterUserId) : '';
+    const last = +lastDay(month);
+    const days = [];
+    let missingCount = 0;
+    for (let i = last; i >= 1; i--) {
+      const date = month + '-' + String(i).padStart(2, '0');
+      const dow = dowOf(date);
+      const journal = journalBy[date] || null;
+      const lines = (journal && (journal.chamu_journal_line || journal.lines)) || [];
+      const lineBy = {};
+      lines.forEach(l => {
+        if (l && l.user_id != null && String(l.user_id) !== '') lineBy[String(l.user_id)] = l;
+      });
+      const recIds = recBy[date] || {};
+      const seen = {}, people = [];
+      const add = u => {
+        if (!u || u.id == null || String(u.id) === '') return;
+        const id = String(u.id);
+        if (seen[id]) return;
+        seen[id] = true;
+        const line = lineBy[id] || null;
+        const recorded = !!line;
+        const expected = expectedOn(u, date, dow);
+        const hasRecord = !!recIds[id];
+        const missing = !recorded && (expected || hasRecord) && date <= todayYmd;
+        if (!recorded && !expected && !hasRecord) return;
+        people.push({ user_id: id, name: u.name || '', expected, recorded, present: recorded ? !!line.present : null, missing, hasRecord, line });
+      };
+      (users || []).forEach(add);
+      Object.keys(lineBy).concat(Object.keys(recIds)).forEach(id => {
+        if (!seen[id]) add({ id, name: '（不明）', active: false, use_days: [] });
+      });
+      const shown = filter ? people.filter(p => p.user_id === filter) : people;
+      if (!journal && !shown.length) continue;
+      if (date > todayYmd && !journal && !shown.some(p => p.recorded || p.hasRecord)) continue;
+      const miss = shown.filter(p => p.missing);
+      missingCount += miss.length;
+      days.push({ date, dow, journal, hasJournal: !!journal, future: date > todayYmd, people: shown, missing: miss, missingCount: miss.length });
+    }
+    return { ym: month, today: todayYmd, days, missingCount, recordedDays: days.filter(d => d.hasJournal).length, filterUserId: filter };
+  };
+  return { WEATHER, TRANSPORT, MEAL, INTAKE, INTAKE_DEFAULT, RICE_DEFAULT, PORTION_FIELDS, BANDS, DEFAULTS, time, bandOf, settingsOf, lastDay, prepareLine, prepareHead, validateJournal, syncPlan, buildBillingInput, translateRequest, translateResult, journalSavedNotice, journalStaffField, journalStaffRecord, dowOf, dayShift, weekShift, dayShiftHtml, weekShiftHtml, shiftIssues, userSymbol, menuText, menuReport, menuReportCsv, menuReportHtml, menuMail, USE_DAYS, useDaysOf, usesDay, journalRoster, journalMonthLog, unsignedRecords, batchSignPlan, batchSignQuery };
 })();
 /* /cm-pure */
 
@@ -539,7 +606,11 @@ const cmV = id => { const e = document.getElementById(id); return e ? e.value : 
 const cmC = id => { const e = document.getElementById(id); return !!(e && e.checked); };
 const cmShow = html => { const v = document.getElementById('view'); if (v) v.innerHTML = html; };
 const cmBack = () => '<button class="back noprint" onclick="location.hash=\'chamu\'">← 茶夢へ</button>';
-const cmNav = cur => `<div class="cm-nav noprint">${CM_NAV.filter(([k]) => k !== 'billing' || CM.bill).map(([k, l]) => `<a href="#chamu/${k}" class="${k === cur ? 'on' : ''}">${l}</a>`).join('')}</div>`;
+const cmNav = cur => `<div class="cm-nav noprint">${CM_NAV.filter(([k]) => k !== 'billing' || CM.bill).map(([k, l]) => {
+  const on = k === cur && !(k === 'logs' && CM.st.logDate) ? 'on' : '';
+  const click = k === 'logs' ? ' onclick="if(CM.st.logDate){CM.st.logDate=null;if(location.hash===\'#chamu/logs\'){renderChamu(\'logs\');event.preventDefault();}}"' : '';
+  return `<a href="#chamu/${k}" class="${on}"${click}>${l}</a>`;
+}).join('')}</div>`;
 const cmFrame = (cur, html) => cmShow(`<div class="cm">${cmBack()}${cmNav(cur)}<div id="cm_m"></div>${html}</div>`);
 const cmMsg = (text, ok) => { const m = document.getElementById('cm_m'); if (m) m.innerHTML = `<div class="${ok ? 'okb' : 'ng'}">${cmEsc(text).replace(/\n/g, '<br>')}</div>`; };
 // 保存ボタンは日誌の一番下。上の緑枠だけだと、スクロールしたまま気づかない。
@@ -618,6 +689,13 @@ async function cmGo(fn, opt) {
 .cm .pad{height:200px;touch-action:none}.cm .pad canvas{width:100%;height:100%;display:block;background:#fff;border:3px solid #1a120c;border-radius:0;touch-action:none}
 .cm .cm-sign .cm-day{display:flex;align-items:flex-start;gap:14px;padding:14px 2px;border-bottom:2px solid #1a120c;font-size:22px;line-height:1.45}
 .cm .cm-sign .cm-day input{width:36px;height:36px;transform:none;flex:0 0 auto;margin-top:2px}
+.cm .cm-log-day{border:3px solid #1a120c;border-radius:0;padding:12px;margin:10px 0;background:#fff4dc;box-shadow:3px 3px 0 #1a120c;color:#1c140c}
+.cm .cm-log-day.cm-miss-day{background:#fde8e8;border-color:#8e1b1b;box-shadow:3px 3px 0 #8e1b1b}
+.cm .cm-log-people{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.cm .cm-tag{display:inline-block;border:3px solid #1a120c;padding:4px 10px;background:#fffef8;margin:0;color:#1c140c}
+.cm .cm-tag.cm-miss{background:#fde8e8;border-color:#8e1b1b;color:#8e1b1b;font-weight:700}
+.cm .jr.cm-focus{outline:6px solid #c60;background:#fff0d0}
+.cm .cm-read dd{margin:0 0 8px;white-space:pre-wrap}
 .cm .pad.cm-pad{height:340px}
 @media screen and (min-width:700px){
 .cm .cm-sign{font-size:28px}
@@ -668,6 +746,9 @@ async function cmGo(fn, opt) {
 .cm .cm-sign .cm-day{font-size:48px;padding:22px 6px}
 .cm .cm-sign .cm-day input{width:52px;height:52px}
 .cm .pad.cm-pad{height:560px}
+.cm .cm-log-day{padding:26px;margin:22px 0}
+.cm .cm-tag{font-size:46px;padding:10px 18px}
+.cm .cm-read dd{font-size:51px;line-height:1.45}
 }
 .cm .cm-staff-rec{display:none}
 .cm #cm_extra[hidden]{display:none}
@@ -758,7 +839,7 @@ async function renderChamu(sub) {
   try { CM.canPlan = (await cmRpc('chamu_can_plan')) === true; }
   catch (e) { CM.canPlan = false; }
   if (sub === 'billing' && CM.bill !== true) return cmFrame('billing', '<div class="card"><p>国保連CSVは、事務・茶夢の管理者・会長だけが作れます。</p></div>');
-  const page = { journal: cmJournal, kondate: cmKondate, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage, plan: cmPlanPage }[sub] || cmJournal;
+  const page = { journal: cmJournal, logs: cmLogs, kondate: cmKondate, haichi: cmHaichi, records: cmRecords, billing: cmBilling, users: cmUsersPage, plan: cmPlanPage }[sub] || cmJournal;
   try { await page(); } catch (e) { cmFrame(sub, `<div class="ng">${cmEsc(e.message || e)}</div>${sub === 'plan' ? '<p class="note">supabase/chamu_plan.sql を適用してください。</p>' : ''}`); }
 }
 
@@ -779,7 +860,10 @@ async function cmJournal() {
   CM.st.users = roster.shown.slice();
   CM.st.extra = roster.extra.slice();
   CM.st.defaults = dfl;
+  const past = date !== cmToday();
   cmFrame('journal', `<h3>業務日誌 / Diário de trabalho　${cmEsc(date)}</h3><p class="note">職員が入力するのはここだけです。保存すると、出席した日は実績記録票に自動で転記されます。<br>Os funcionários só preenchem aqui. Ao salvar, os dias de presença vão automaticamente para o registro de serviços.</p>
+    <p class="noprint"><button type="button" class="sec inl" onclick="cmBackLogs()">日誌一覧（読む・記録漏れを書く） / Ver diários</button></p>
+    ${past ? `<div class="wn noprint">${cmEsc(date)}（${cmEsc(roster.dow || '—')}）の日誌です。記録漏れの追加も、内容の修正も、保存すると実績記録票へ転記されます。</div>` : ''}
     <p class="noprint"><button class="sec inl" onclick="CM.st.date='${cmShift(date, -1)}';renderChamu('journal')">＜ 前日 / Dia anterior</button>
     <button class="sec inl" onclick="CM.st.date='${cmToday()}';renderChamu('journal')">今日 / Hoje</button>
     <button class="sec inl" onclick="CM.st.date='${cmShift(date, 1)}';renderChamu('journal')">翌日 / Próximo dia ＞</button>
@@ -805,6 +889,13 @@ async function cmJournal() {
       <div id="cm_extra_btns">${roster.extra.map(u => `<button type="button" class="sec inl" id="cm_add_${u.id}" onclick="cmAddExtra('${u.id}')">${cmEsc(u.name)}</button>`).join('')}</div></details>
     <button type="button" data-cm-save onclick="cmSaveJournal()">保存して記録票に転記</button><p class="note">↑ Salvar e passar para o registro de serviços</p>`);
   roster.shown.forEach(u => cmWireUser(u.id));
+  const focus = CM.st.focusUser;
+  CM.st.focusUser = '';
+  if (focus) {
+    if (!roster.shown.some(u => String(u.id) === String(focus))) cmAddExtra(focus);
+    const el = document.getElementById('jr_' + focus);
+    if (el) { el.classList.add('cm-focus'); el.scrollIntoView({ block: 'center' }); }
+  }
 }
 function cmJournalCard(u, line, dfl, dow) {
   const l = line || {};
@@ -1066,6 +1157,115 @@ async function cmApplySync(date, prepared, defaults) {
   });
   for (const id of plan.del) await cmRest('chamu_service_records?id=eq.' + id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   return plan.notes.filter(n => n.indexOf('時刻空欄') < 0);
+}
+
+
+function cmShiftMonth(ym, n) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
+  if (!m) return cmToday().slice(0, 7);
+  const t = new Date(Date.UTC(+m[1], +m[2] - 1 + n, 1));
+  return t.toISOString().slice(0, 7);
+}
+function cmBackLogs() {
+  CM.st.logDate = null;
+  if (location.hash === '#chamu/logs') renderChamu('logs');
+  else location.hash = 'chamu/logs';
+}
+function cmOpenLog(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return;
+  CM.st.logDate = date;
+  if (location.hash === '#chamu/logs') renderChamu('logs');
+  else location.hash = 'chamu/logs';
+}
+function cmOpenJournal(date, userId) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return;
+  CM.st.date = date;
+  CM.st.focusUser = userId || '';
+  CM.st.fromLogs = 1;
+  CM.st.logDate = null;
+  if (location.hash === '#chamu/journal') renderChamu('journal');
+  else location.hash = 'chamu/journal';
+}
+function cmLogPersonTag(p) {
+  if (p.missing) return `<span class="cm-tag cm-miss">${cmEsc(p.name)}　未記録</span>`;
+  if (p.recorded) return `<span class="cm-tag">${cmEsc(p.name)}　${p.present ? '出席' : '欠席'}</span>`;
+  return `<span class="cm-tag">${cmEsc(p.name)}</span>`;
+}
+function cmLogDayActions(d) {
+  if (d.hasJournal) return `<p class="noprint"><button type="button" class="inl" onclick="cmOpenLog('${d.date}')">この日を読む</button> <button type="button" class="sec inl" onclick="cmOpenJournal('${d.date}')">直す</button>${d.missing.map(p => ` <button type="button" class="sec inl" onclick="cmOpenJournal('${d.date}','${cmEsc(p.user_id)}')">${cmEsc(p.name)}さんの記録漏れを書く</button>`).join('')}</p>`;
+  return `<p class="noprint"><button type="button" class="inl" onclick="cmOpenJournal('${d.date}')">この日を書く</button>${d.missing.map(p => ` <button type="button" class="sec inl" onclick="cmOpenJournal('${d.date}','${cmEsc(p.user_id)}')">${cmEsc(p.name)}さんを書く</button>`).join('')}</p>`;
+}
+async function cmLogs() {
+  if (CM.st.logDate) return cmLogOne(CM.st.logDate);
+  const month = CM.st.lmonth || cmToday().slice(0, 7);
+  const last = ChamuLib.lastDay(month);
+  const uid = CM.st.luser || '';
+  let users = [], days = [], recs = [], err = '';
+  try {
+    [users, days, recs] = await Promise.all([
+      cmUsers(true),
+      cmRest(`chamu_journal?journal_date=gte.${month}-01&journal_date=lte.${month}-${last}&select=*,chamu_journal_line(*)&order=journal_date.desc`),
+      cmRest(`chamu_service_records?service_date=gte.${month}-01&service_date=lte.${month}-${last}&select=user_id,service_date`),
+    ]);
+  } catch (e) { err = String((e && e.message) || e); }
+  users = users || []; days = days || []; recs = recs || [];
+  const log = ChamuLib.journalMonthLog(users, month, days, recs, cmToday(), uid);
+  CM.st.lmonth = month;
+  const prev = cmShiftMonth(month, -1), next = cmShiftMonth(month, 1);
+  const warn = err ? `<div class="ng">${cmEsc(err)}</div>` : (log.missingCount ? `<div class="wn">未記録が ${log.missingCount} 件あります。利用曜日、または実績がある日で、日誌の行がまだない人です。日付を選んで書いてください。休所の日は書かなくて構いません。</div>` : `<div class="okb">この月の未記録はありません。</div>`);
+  const body = log.days.map(d => `<div class="cm-log-day${d.missingCount ? ' cm-miss-day' : ''}">
+      <h4>${cmEsc(d.date)}（${cmEsc(d.dow || '—')}）${d.missingCount ? '　<span class="cm-tag cm-miss">未記録 ' + d.missingCount + '人</span>' : (d.hasJournal ? '　<span class="cm-tag">記録あり</span>' : '')}</h4>
+      ${d.hasJournal ? `<p>記入者 ${cmEsc((d.journal && d.journal.staff_name) || '—')}　天気 ${cmEsc((d.journal && d.journal.weather) || '—')}${d.journal && d.journal.menu ? '　献立 ' + cmEsc(String(d.journal.menu).slice(0, 40)) : ''}</p>` : '<p class="note">この日の日誌はまだありません。</p>'}
+      <div class="cm-log-people">${d.people.map(cmLogPersonTag).join('') || '<span class="note">対象者なし</span>'}</div>
+      ${cmLogDayActions(d)}</div>`).join('') || '<div class="card"><p>この月に出す日はありません。</p></div>';
+  cmFrame('logs', `<h3>日誌一覧 / Lista de diários</h3>
+    <p class="note">過去の日誌を読む、直す、記録漏れの日を書けます。書くときは、いまの業務日誌の入力画面が開きます。保存すると実績記録票へ転記されます。<br>Leia, corrija ou preencha dias em falta. Ao escrever, abre-se o mesmo formulário do diário.</p>
+    <div class="row noprint"><div><label class="l">月 / Mês</label><input id="l_m" type="month" value="${cmEsc(month)}" style="width:auto"></div>
+      <div><label class="l">利用者 / Usuário</label>${cmSel('l_u', users.map(u => [u.id, u.name + (u.active ? '' : '（停止）')]), uid, 'すべての利用者')}</div>
+      <div style="align-self:end"><button type="button" class="sec inl" onclick="CM.st.lmonth=cmV('l_m');CM.st.luser=cmV('l_u');CM.st.logDate=null;renderChamu('logs')">表示</button>
+        <button type="button" class="sec inl" onclick="CM.st.lmonth='${prev}';renderChamu('logs')">＜ 前月</button>
+        <button type="button" class="sec inl" onclick="CM.st.lmonth='${cmToday().slice(0, 7)}';renderChamu('logs')">今月</button>
+        <button type="button" class="sec inl" onclick="CM.st.lmonth='${next}';renderChamu('logs')">翌月 ＞</button></div></div>
+    ${warn}
+    ${body}`);
+}
+function cmLogReadFields(day) {
+  if (!day) return '<p>この日の日誌はまだありません。</p>';
+  const portions = ChamuLib.PORTION_FIELDS.map(([k, label]) => {
+    const v = day[k];
+    if (v == null || String(v).trim() === '') return '';
+    return `<div><label class="l">${cmEsc(label)}</label><div>${cmEsc(v)}</div></div>`;
+  }).join('');
+  return `<div class="cm-read"><p>記入者　${cmEsc(day.staff_name || '—')}　天気　${cmEsc(day.weather || '—')}</p>
+    <label class="l">献立 / Cardápio</label><div>${cmEsc(day.menu || '—')}</div>
+    <div class="row">${portions}</div>
+    ${day.note ? `<label class="l">全体申し送り / Recado geral</label><div>${cmEsc(day.note)}</div>` : ''}</div>`;
+}
+function cmLogReadLine(p) {
+  if (p.missing) return `<div class="jr cm-miss-day"><div class="cm-who"><b>${cmEsc(p.name)}</b></div><p><span class="cm-tag cm-miss">未記録</span></p><p class="noprint"><button type="button" class="inl" onclick="cmOpenJournal('${CM.st.logDate}','${cmEsc(p.user_id)}')">この人を書く</button></p></div>`;
+  const l = p.line || {};
+  if (!p.recorded) return `<div class="jr"><div class="cm-who"><b>${cmEsc(p.name)}</b></div><p>まだ記録がありません。</p></div>`;
+  if (!p.present) return `<div class="jr"><div class="cm-who"><b>${cmEsc(p.name)}</b></div><p>欠席</p></div>`;
+  const intake = l.intake ? cmEsc(l.intake) + (l.intake_note ? '（' + cmEsc(l.intake_note) + '）' : '') : '—';
+  return `<div class="jr"><div class="cm-who"><b>${cmEsc(p.name)}</b></div>
+    <p>出席　${cmEsc((l.start_time || '').slice(0, 5) || '—')}–${cmEsc((l.end_time || '').slice(0, 5) || '—')}　送迎 ${cmEsc(l.transport || '—')}　食事 ${cmEsc(l.meal || '—')}　摂食 ${intake}</p>
+    ${l.support_note ? `<label class="l">支援内容・ご様子 / Apoio e estado da pessoa</label><div class="cm-read"><dd>${cmEsc(l.support_note)}</dd></div>` : ''}</div>`;
+}
+async function cmLogOne(date) {
+  const [users, day, recs] = await Promise.all([
+    cmUsers(true),
+    cmRest(`chamu_journal?journal_date=eq.${date}&select=*,chamu_journal_line(*)`).then(a => (a && a[0]) || null),
+    cmRest(`chamu_service_records?service_date=eq.${date}&select=user_id,service_date`),
+  ]);
+  const log = ChamuLib.journalMonthLog(users || [], date.slice(0, 7), day ? [day] : [], recs || [], cmToday(), '');
+  const row = log.days.find(d => d.date === date) || { date, dow: ChamuLib.dowOf(date), journal: day, hasJournal: !!day, people: [], missing: [], missingCount: 0, future: date > cmToday() };
+  const missBtns = row.missing.map(p => ` <button type="button" class="sec inl" onclick="cmOpenJournal('${date}','${cmEsc(p.user_id)}')">${cmEsc(p.name)}さんの記録漏れを書く</button>`).join('');
+  cmFrame('logs', `<p class="noprint"><button type="button" class="back" onclick="cmBackLogs()">← 日誌一覧</button></p>
+    <h3>業務日誌　${cmEsc(date)}（${cmEsc(row.dow || '—')}）</h3>
+    <p class="noprint"><button type="button" class="inl" onclick="cmOpenJournal('${date}')">${row.hasJournal ? 'この日を直す' : 'この日を書く'}</button>${missBtns} <button type="button" class="sec inl" onclick="window.print()">印刷／PDFにする</button></p>
+    ${row.missingCount ? `<div class="wn noprint">未記録が ${row.missingCount} 人います。</div>` : ''}
+    <div class="card">${row.hasJournal ? cmLogReadFields(day) : '<p>この日の日誌はまだありません。下のボタンから書けます。</p>'}</div>
+    ${row.people.map(cmLogReadLine).join('') || '<div class="card"><p>この日の対象者はいません。</p></div>'}`);
 }
 
 async function cmKondate() {
