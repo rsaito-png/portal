@@ -2,6 +2,7 @@
 // 元は Drive の税務カレンダーシート（2026-11-05 移植。以後はこちらが正）。
 // 2026-11-27 拡張（supabase/tax_calendar_remind.sql）：リマインド日（期限の5日前）の朝9時に cron「taxcal-remind」が
 // 会長の「私への依頼」（staff_todo, source_key=taxcal:行id）を1件だけ作る。済と依頼の完了はDBのトリガーで連動。
+// not_needed=true の行は「不要」：薄く・取り消し線、お知らせなし（済とは別）。
 // 受付画面は非公開バケット tax-receipts（行id/ファイル）に置き、receipts 列にパスを持つ。振込・納付・送信はしない。
 const tcE = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TC_KIND = { monthly_tax: ['月次', '#2e6b4f'], annual: ['年次', '#8a4b0f'], other: ['その他', '#666'] };
@@ -24,9 +25,9 @@ async function renderTaxCal(focus) {
   let todos = {}; try { if (tIds.length) (await sb(`staff_todo?id=in.(${tIds.join(',')})&select=id,status`) || []).forEach(t => todos[t.id] = t.status); } catch (e) {}
   let logs = []; try { logs = await sb('tax_calendar_log?select=at,kind,msg&kind=neq.info&order=at.desc&limit=1') || []; } catch (e) {}
   const today = tcToday(), soon = new Date(Date.now() + 9 * 3600e3 + 14 * 864e5).toISOString().slice(0, 10);
-  const list = rows.filter(r => TC_PAST || r.due_date >= today || !r.done || r.id === TC_FOCUS);
-  const next = rows.filter(r => !r.done && r.due_date >= today).slice(0, 1)[0];
-  const over = rows.filter(r => !r.done && r.due_date < today);
+  const list = rows.filter(r => TC_PAST || r.id === TC_FOCUS || (!r.not_needed && (r.due_date >= today || !r.done)) || (r.not_needed && r.due_date >= today));
+  const next = rows.filter(r => !r.done && !r.not_needed && r.due_date >= today).slice(0, 1)[0];
+  const over = rows.filter(r => !r.done && !r.not_needed && r.due_date < today);
   const wd = d => '日月火水木金土'[new Date(d + 'T00:00:00+09:00').getDay()];
   const md = d => `${+d.slice(5, 7)}/${+d.slice(8)}`;
   const days = d => Math.round((new Date(d) - new Date(today)) / 864e5);
@@ -48,6 +49,7 @@ async function renderTaxCal(focus) {
         ${inp('method', id, '方法（郵便局・e-Taxなど）', r && r.method)}
         ${inp('amount', id, '金額（わかったら総務が書く）', r && r.amount_text)}
         ${inp('note', id, 'メモ', r && r.note)}
+        <label><br><input id="tc_nn_${id}" type="checkbox" ${r && r.not_needed ? 'checked' : ''}> 不要（お知らせを出さない）</label>
       </div>
       <p><button onclick="tcSave('${id}')">保存</button>
         <button class="back" onclick="TC_EDIT=null;renderTaxCal()">やめる</button>
@@ -56,19 +58,20 @@ async function renderTaxCal(focus) {
   };
   const row = r => {
     const k = TC_KIND[r.kind] || TC_KIND.other, n = days(r.due_date);
-    const hot = !r.done && r.due_date <= soon, late = !r.done && n < 0;
+    const nn = !!r.not_needed;
+    const hot = !nn && !r.done && r.due_date <= soon, late = !nn && !r.done && n < 0;
     if (TC_EDIT === r.id) return form(r);
     const rc = r.receipts || [];
     const todoSt = r.todo_id ? (TC_TODO_ST[todos[r.todo_id]] || 'あり') : null;
     const focus = r.id === TC_FOCUS;
-    return `<div class="card" id="tc_row_${r.id}" style="margin:6px 0;padding:8px 10px;border-left:6px solid ${late ? '#c00' : hot ? '#e08a00' : k[1]};${focus ? 'outline:3px solid #e08a00;' : ''}${r.done && !focus ? 'opacity:.55' : ''}">
+    return `<div class="card" id="tc_row_${r.id}" style="margin:6px 0;padding:8px 10px;border-left:6px solid ${late ? '#c00' : hot ? '#e08a00' : k[1]};${focus ? 'outline:3px solid #e08a00;' : ''}${nn ? 'opacity:.4;background:#f2f2f2;' : ''}${r.done && !focus && !nn ? 'opacity:.55' : ''}">
       <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="min-width:6.5em">${md(r.due_date)}（${wd(r.due_date)}）</b>
       <span style="font-size:12px;color:#fff;background:${k[1]};padding:1px 6px;border-radius:8px">${k[0]}</span>
-      ${r.done ? '<span style="color:#2e6b4f">✅ 済</span>' : late ? `<b style="color:#c00">期限切れ ${-n}日</b>` : hot ? `<b style="color:#e08a00">あと${n}日</b>` : `<small>あと${n}日</small>`}</div>
-      <div style="margin:4px 0;font-size:16px">${tcE(r.title)}</div>
+      ${nn ? '<span style="font-size:12px;color:#fff;background:#999;padding:1px 6px;border-radius:8px">不要</span><small>お知らせは出しません</small>' : r.done ? '<span style="color:#2e6b4f">✅ 済</span>' : late ? `<b style="color:#c00">期限切れ ${-n}日</b>` : hot ? `<b style="color:#e08a00">あと${n}日</b>` : `<small>あと${n}日</small>`}</div>
+      <div style="margin:4px 0;font-size:16px${nn ? ';text-decoration:line-through' : ''}">${tcE(r.title)}</div>
       <div style="font-size:13px;color:#555">担当：${tcE(r.assignee || '—')}　提出先：${tcE(r.agency || '—')}<br>
         方法：${tcE(r.method || '要確認')}　金額：${r.amount_text ? tcE(r.amount_text) : '<span style="color:#999">未記入（総務が書く）</span>'}<br>
-        お知らせ日：${r.remind_date ? md(r.remind_date) + '（' + wd(r.remind_date) + '）' : '—'}　依頼：${todoSt ? (r.todo_id ? `<a href="#report">${todoSt}</a>` : '') : (r.remind_date ? 'まだ（お知らせ日の朝に作る）' : '作らない')}
+        お知らせ日：${r.remind_date ? md(r.remind_date) + '（' + wd(r.remind_date) + '）' : '—'}　依頼：${todoSt ? (r.todo_id ? `<a href="#report">${todoSt}</a>` : '') : (!nn && r.remind_date ? 'まだ（お知らせ日の朝に作る）' : '作らない')}
         ${r.note ? `<br>メモ：${tcE(r.note)}` : ''}</div>
       ${r.detail || r.source ? `<details style="font-size:12px;color:#555"><summary>くわしく・根拠</summary>${r.detail ? `<p>${tcE(r.detail)}</p>` : ''}${r.source ? `<p>根拠：${tcE(r.source)}</p>` : ''}</details>` : ''}
       <div style="font-size:13px;margin-top:4px">📎 受付画面：${rc.length ? rc.map((p, i) => `<a href="javascript:void 0" onclick="tcOpen('${tcE(p)}')">${i + 1}枚目</a>`).join('　') : '<span style="color:#999">まだ</span>'}
@@ -126,7 +129,7 @@ async function tcSave(id) {
   const body = {
     due_date: due,
     title,
-    remind_date: g('remind') || tcMinus5(due),
+    not_needed: !!(document.getElementById('tc_nn_' + id) || {}).checked,
     kind: document.getElementById('tc_kind_' + id).value || 'other',
     assignee: g('assignee') || null,
     agency: g('agency') || null,
@@ -135,6 +138,7 @@ async function tcSave(id) {
     note: g('note') || null,
     updated_at: new Date().toISOString()
   };
+  body.remind_date = body.not_needed ? null : (g('remind') || tcMinus5(due));
   try {
     if (isNew) await sb('tax_calendar', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
     else await sb('tax_calendar?id=eq.' + id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
