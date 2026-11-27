@@ -6,20 +6,25 @@
 import { CORS, authUser, env, json, serviceUpdate, userRpc } from "../_shared/http.ts";
 import { hostedCheckoutUrl, squareApiBase, SQUARE_VERSION } from "../_shared/square.ts";
 
+// 研修ページの公開先（2026-11-27 齊藤さん決定：研修ページだけ training.psr-seishinkai.org へ。職員ポータルは据え置き）。
+// シークレットが古いままでも新しいアドレスへ戻れるよう、ここに固定で足す。旧オリジンはシークレット側で許可されたまま。
+const TRAINING_ORIGIN = "https://training.psr-seishinkai.org";
+
 function successUrl(req: Request, body: { return_to?: string }) {
   const allow = (env("SCT_ALLOWED_ORIGINS")).split(",").map((s) => s.trim()).filter(Boolean);
+  if (!allow.includes(TRAINING_ORIGIN)) allow.push(TRAINING_ORIGIN);
   const pub = env("SCT_PUBLIC_URL").replace(/\/$/, "");
   const asPage = (base: string) => {
     const page = base.endsWith("/sct.html") ? base : base + "/sct.html";
     return page.startsWith("https://") ? page.split("?")[0] : null;
   };
-  if (pub) return asPage(pub);
+  // 受講者が開いているページ（許可オリジンの / ・/index.html・/sct.html）へ戻すのを優先する
   if (body.return_to) {
-    let u: URL;
-    try { u = new URL(body.return_to); } catch { return null; }
-    if (u.protocol !== "https:" || !allow.includes(u.origin) || !u.pathname.endsWith("/sct.html")) return null;
-    return u.origin + u.pathname;
+    let u: URL | null = null;
+    try { u = new URL(body.return_to); } catch { u = null; }
+    if (u && u.protocol === "https:" && allow.includes(u.origin) && (u.pathname === "/" || u.pathname.endsWith("/index.html") || u.pathname.endsWith("/sct.html"))) return u.origin + u.pathname;
   }
+  if (pub) return asPage(pub);
   const origin = req.headers.get("origin") ?? "";
   if (origin.startsWith("https://") && allow.includes(origin)) return origin + "/sct.html";
   return null;

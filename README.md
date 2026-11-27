@@ -63,7 +63,7 @@
 - 職員・受講記録などの個人データはDBにだけある（このリポジトリには入れない）。テストモード（ht_settings）中も、このページはメール・チャットを送らない
 
 ## ストレスチェック実施者養成研修（`sct_`）
-- 受講者の入口は `sct.html`（アカウント作成・資格・免除証明・開催の予約・Square・修了証）。職員ポータルの運営画面は `#sct`（事務または `sct_admin`）。
+- 受講者の入口は https://training.psr-seishinkai.org/ （本体は別リポジトリ rsaito-png/training。portal の `sct.html` はそこへ転送するだけ。共通部品は `tools/sync_training.sh` で写す）（アカウント作成・資格・免除証明・開催の予約・Square・修了証）。職員ポータルの運営画面は `#sct`（事務または `sct_admin`）。
 - `supabase/sct.sql` … 表・RLS・修了判定。`sct_logic.js` は画面と `node tools/sct_check.js` が共有する規則。詳しい適用手順とシークレットは `docs/sct.md`。
 - ホームページのLP、顔認証、ジョブメドレー、エデン連携はこの範囲に入っていない。
 

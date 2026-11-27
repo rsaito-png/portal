@@ -108,7 +108,7 @@ async function renderSct() {
     SCT.D = sctDemo(); SCT.year = SCT.year || '2026'; return sctDraw();
   }
   const admin = typeof sctIsAdmin === 'function' && await sctIsAdmin();
-  if (!admin) { $('view').innerHTML = SCT.back + '<h3>実施者養成研修</h3><p>事務または sct_admin だけが使えます。権限を付けたあとは入り直してください。受講者の入口は <a href="sct.html">sct.html</a> です。</p>'; return; }
+  if (!admin) { $('view').innerHTML = SCT.back + '<h3>実施者養成研修</h3><p>事務または sct_admin だけが使えます。権限を付けたあとは入り直してください。受講者の入口は <a href="https://training.psr-seishinkai.org/">training.psr-seishinkai.org</a> です。</p>'; return; }
   try { await sctLoad(); if (!SCT.year) SCT.year = Sct.jstYear(new Date()); sctDraw(); }
   catch (e) { $('view').innerHTML = SCT.back + `<h3>実施者養成研修</h3><p>読み込めませんでした。supabase/sct.sql の適用を確認してください。</p><p>${sctEsc(e.message)}</p>`; }
 }
@@ -116,7 +116,7 @@ function sctDraw() {
   const tabs = `<p class="scttabs">${SCT_TABS.map(([k, l]) => `<button class="sctb ${SCT.tab === k ? '' : 'g'}" onclick="SCT.tab='${k}';SCT.form=null;sctDraw()">${l}</button>`).join('')}</p>`;
   const body = { sessions: sctViewSessions, people: sctViewPeople, pay: sctViewPay, ledger: sctViewLedger, meet: sctViewMeet, report: sctViewReport, teachers: sctViewTeachers }[SCT.tab]();
   const preview = SCT.preview ? `<div class="card" id="sctcert">${SctCert.fragment(SCT.preview)}</div>` : '';
-  $('view').innerHTML = `${SCT.back}<h3>ストレスチェック実施者養成（運営）</h3><p><a class="sctman" href="sct-ops.html">運用マニュアル</a></p><p class="sctnote">受講者の入口は <a href="sct.html">sct.html</a>。オンデマンドは不可。ビデオONは運営が目視し、2分を超えてカメラが切れていた回は出席から外します。${typeof DEMO !== 'undefined' && DEMO ? ' 見本データです。' : ''}</p>${tabs}<div id="sctmsg"></div>${preview}${body}`;
+  $('view').innerHTML = `${SCT.back}<h3>ストレスチェック実施者養成（運営）</h3><p><a class="sctman" href="sct-ops.html">運用マニュアル</a></p><p class="sctnote">受講者の入口は <a href="https://training.psr-seishinkai.org/">training.psr-seishinkai.org</a>。オンデマンドは不可。ビデオONは運営が目視し、2分を超えてカメラが切れていた回は出席から外します。${typeof DEMO !== 'undefined' && DEMO ? ' 見本データです。' : ''}</p>${tabs}<div id="sctmsg"></div>${preview}${body}`;
 }
 function sctMsg(t, bad) { const el = document.getElementById('sctmsg'); if (el) el.innerHTML = `<p class="${bad ? 'ng' : 'ok'}" style="background:${bad ? '#fde2e2' : '#dff3e4'};padding:8px;border-radius:8px">${sctEsc(t)}</p>`; }
 function sctViewSessions() {

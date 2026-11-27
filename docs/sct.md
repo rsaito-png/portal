@@ -2,7 +2,7 @@
 
 外部の受講者（歯科医師・看護師・精神保健福祉士・公認心理師）が、日時の決まった Google Meet で録画研修を受け、修了証を得るための機能です。法定研修（`ht_`）とは別の表です。ホームページのLPは作っていません。
 
-受講者の入口は `sct.html`。運営は職員ポータルの `#sct`（総務のタイルからも開けます）。事務担当の日々の手順は、ポータルの [運用マニュアル](../sct-ops.html)（運営画面上部の「運用マニュアル」）です。
+受講者の入口は https://training.psr-seishinkai.org/ （rsaito-png/training。2026-11-27 移転。portal の `sct.html` は転送だけ。`sct_logic.js`・`sct_cert.js` を直したら `tools/sync_training.sh` で写す）。運営は職員ポータルの `#sct`（総務のタイルからも開けます）。事務担当の日々の手順は、ポータルの [運用マニュアル](../sct-ops.html)（運営画面上部の「運用マニュアル」）です。
 
 ## 料金と修了
 
@@ -43,7 +43,7 @@ node tools/sct_check.js
 - すでに Stripe 版の `sct.sql` を流しているとき: `supabase/sct_square.sql` を実行する。更新後の `sct.sql` を最初から流し直しても、列の追加と関数の置き換えまで進みます。
 - 入金済みの `method=stripe` は残します。未入金の `stripe` だけ `square` になります。`stripe_session_id` などの旧列は消しません。手数料の控えは `processor_fee_yen`（空なら旧 `stripe_fee_yen` を写す）です。
 
-2. Authentication で受講者の自己登録を許可する。メール確認を使う場合は、リダイレクトURLに `sct.html` の公開URLを足す。
+2. Authentication で受講者の自己登録を許可する。メール確認を使う場合は、リダイレクトURL（Additional Redirect URLs）に `https://training.psr-seishinkai.org/**` を足す（Site URL は職員ポータルのまま）。
 3. 運営にする人は、既存の `app_metadata.role` が `事務` ならそのままで足ります。別の人はログインし直したあとに有効です。
 
 ```sql
@@ -74,7 +74,7 @@ supabase secrets set \
 | `SQUARE_ENVIRONMENT` | `sandbox` か `production`。トークンと webhook の環境をこれに合わせます。 |
 | `SQUARE_WEBHOOK_SIGNATURE_KEY` | Webhooks → Subscriptions → 作ったエンドポイントの Signature key。 |
 | `SQUARE_WEBHOOK_NOTIFICATION_URL` | その購読に登録した URL と、文字まで同じにします（上の URL。末尾スラッシュやクエリは付けない）。署名は「この URL + 生のボディ」です。 |
-| `SCT_PUBLIC_URL` | `sct.html` があるディレクトリ（末尾スラッシュなし）か、`sct.html` 自身の URL。`https` 必須。Square の支払い後の戻り先になります。 |
+| `SCT_PUBLIC_URL` | `sct.html` があるディレクトリ（末尾スラッシュなし）か、`sct.html` 自身の URL。`https` 必須。Square の支払い後の戻り先になります。受講者が許可オリジンの `/`・`/sct.html` から申し込んだときはそのページへ戻すのを優先し、`https://training.psr-seishinkai.org` はコード側で常に許可。 |
 | `SCT_ALLOWED_ORIGINS` | カンマ区切り。`SCT_PUBLIC_URL` が空のときの戻り先オリジンです。 |
 
 `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` と `SUPABASE_ANON_KEY` は関数の実行環境に入っています。サービスロールキーはブラウザに出しません。以前の `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` は、この研修では使いません。

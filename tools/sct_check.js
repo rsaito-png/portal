@@ -124,11 +124,11 @@ ok(hook.includes('x-square-hmacsha256-signature') && hook.includes('notification
 const crypto = require('crypto');
 const vector = crypto.createHmac('sha256', 'asdf1234').update('https://example.com/webhook{"hello":"world"}').digest('base64');
 ok(vector === '2kRE5qRU2tR+tBGlDwMEw2avJ7QM4ikPYD/PJ3bd9Og=' && squareSrc.includes(vector), 'square published signature vector');
-ok(!/Stripe/.test(fs.readFileSync(path.join(root, 'sct.html'), 'utf8') + fs.readFileSync(path.join(root, 'sct.js'), 'utf8') + fs.readFileSync(path.join(root, 'README.md'), 'utf8')), 'screens and readme do not say Stripe');
+ok(!/Stripe/.test(fs.readFileSync(path.join(root, 'sct.js'), 'utf8') + fs.readFileSync(path.join(root, 'README.md'), 'utf8')), 'screens and readme do not say Stripe');
 ok(fs.readFileSync(path.join(root, 'supabase/functions/_shared/cert.ts'), 'utf8').includes('講師名'), 'edge cert template');
-ok(fs.readFileSync(path.join(root, 'index.html'), 'utf8').includes("id === 'sct'") && fs.readFileSync(path.join(root, 'sct.html'), 'utf8').includes('sct_logic.js'), 'pages wired');
+ok(fs.readFileSync(path.join(root, 'index.html'), 'utf8').includes("id === 'sct'") && fs.readFileSync(path.join(root, 'sct.html'), 'utf8').includes('https://training.psr-seishinkai.org/'), 'pages wired (learner page moved to training repo)');
 const ops = fs.readFileSync(path.join(root, 'sct-ops.html'), 'utf8');
-ok(ops.includes('運用マニュアル') && ops.includes('https://rsaito-png.github.io/portal/sct.html'), 'ops manual and learner url');
+ok(ops.includes('運用マニュアル') && ops.includes('https://training.psr-seishinkai.org/'), 'ops manual and learner url');
 ok(ops.includes('12,800') && ops.includes('10,800') && ops.includes('0円') && ops.includes('西岡愛梨'), 'ops prices and instructor');
 ok(/paid=1/.test(ops) && ops.includes('入金にしません'), 'return url is not payment');
 ok(ops.includes('docs/sct.md') && !/SQUARE_ACCESS_TOKEN|SQUARE_WEBHOOK|sq0atp-|EAAA|MEET_WEBHOOK/.test(ops) && !secret.test(ops), 'ops manual has no secrets');
