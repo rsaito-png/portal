@@ -245,7 +245,7 @@ function kmHtml() {
   }).join(' ') + '</p>' : '';
   var state = KM.persisted ? '<span class="ok">この月は保存済みです。</span>' : '<span class="warn">この月はまだ保存されていません。週パターンを表示しています。</span>';
   return '<div id="km-root"><h3>' + kmEsc(K.reiwa(KM.ym)) + '</h3>'
-    + '<p class="note">' + kmEsc(svc.office) + '　' + kmEsc(svc.label) + '。上段が開始、中段が終了、下段が時間。横に動かすと氏名は残ります。' + (KM.entry === 'chamu' ? ' <a href="#chamu/haichi">曜日の配置表</a>。' : '') + ' <a href="#dakoku">出退勤打刻</a>は別です。</p>'
+    + '<p class="note">' + kmEsc(svc.office) + '　' + kmEsc(svc.label) + '。上段が開始、中段が終了、下段が時間。横に動かすと氏名は残ります。' + (KM.entry === 'chamu' ? ' <a href="#chamu/haichi">曜日の配置表</a>。' : '') + (KM.entry === 'chamu' ? '' : ' <a href="#dakoku">出退勤打刻</a>は別です。') + '</p>'
     + '<details class="noprint"><summary>配置の内容</summary><p class="note">職員の配置はこの月の共通の記録です（レオと茶夢で同じ）。利用者数はサービスごとです。常勤 10:00–18:00（月〜金、齊藤・友香。水も両方）。非常勤は月火木金 安藤11:00–14:00、水 加藤11:00–14:00、文は月〜金14:00–17:00。安藤と文は14:00で引き継ぎ、重なりません。非常勤の職種略称の初期値は「指導」です。勤務時間は休憩を含んでよい。</p></details>'
     + tabs
     + '<div class="km-bar noprint"><button type="button" class="km-b" onclick="kmShiftMonth(-1)">← 前の月</button>'
