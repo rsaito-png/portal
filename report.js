@@ -20,7 +20,7 @@ async function renderReport() {
       <p>または1行でOK：<textarea id="sr_b" rows="3" maxlength="2000" style="width:100%;font-size:16px" placeholder="今日やったこと">${esc(t && !t.no_problem ? t.body || '' : '')}</textarea></p>
       <p>困りごと（あれば）：<textarea id="sr_t" rows="2" maxlength="2000" style="width:100%;font-size:16px">${esc(t?.trouble || '')}</textarea></p>
       <button onclick="srSend(false)" style="font-size:18px;padding:10px 24px">送る</button> <span id="sr_m" class="note"></span></div>
-      <h3>私への依頼</h3>${todos.length ? todos.map(x => `<div class="card"><b>${esc(x.title)}</b>${x.link && /^#[\w/-]*$/.test(x.link) ? ` <a href="${x.link}">→ 開いて直す</a>` : ''}${x.due ? `<small>　期限 ${esc(x.due)}</small>` : ''}
+      <h3>私への依頼</h3>${todos.length ? todos.map(x => `<div class="card"><b>${esc(x.title)}</b>${x.link && /^#[\w/-]*$/.test(x.link) ? ` <a href="${x.link}">${x.link.startsWith('#taxcal') ? '→ 税カレンダーで添付・済' : '→ 開いて直す'}</a>` : ''}${x.due ? `<small>　期限 ${esc(x.due)}</small>` : ''}
         <p><select id="st_${x.id}" onchange="srTodo(${x.id})">${Object.entries(srST).map(([k, v]) => `<option value="${k}"${k === x.status ? ' selected' : ''}>${v}</option>`).join('')}</select>
         <input id="sn_${x.id}" maxlength="1000" placeholder="一言（任意）" value="${esc(x.note || '')}" style="width:60%" onchange="srTodo(${x.id})"> <span id="sm_${x.id}" class="note"></span></p></div>`).join('') : '<p>いまの指示はありません。</p>'}
       <h3>最近の報告</h3>${reps.map(r => `<p>${esc(r.day)}　${r.no_problem ? '問題なし' : esc(r.body || '')}${r.trouble ? '　⚠️' + esc(r.trouble) : ''}</p>`).join('') || '<p>まだありません。</p>'}`;
