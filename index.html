@@ -38,6 +38,13 @@ table.sougei-view th,table.sougei-view td{white-space:nowrap;vertical-align:top}
 .ptabs button{width:auto;margin-right:6px;padding:8px 16px;background:#fff;color:#333;border:1px solid #bbb}.ptabs .on{background:var(--main);color:#fff}
 h4{margin:14px 0 6px;font-size:25px}.kk.over{border-left:6px solid #d33}.kk.soon{border-left:6px solid #e6b800}.kk.ok{opacity:.6}.badge{background:#d33;color:#fff;border-radius:6px;padding:1px 6px;font-size:22px}.kk.soon .badge{background:#e6b800}.kk.ok .badge{background:#888}
 .back{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:8px 14px}
+/* レオホーム（対象職員）：戻る＋見出しの2行の右横に打刻。狭い画面では下へ */
+.leo-head-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,max-content);grid-template-rows:auto auto;column-gap:10px;row-gap:2px;align-items:stretch;margin:0 0 8px;max-width:100%;min-width:0;box-sizing:border-box}
+.leo-head-row>.back{grid-column:1;grid-row:1;justify-self:start;width:auto;margin:0;max-width:100%}
+.leo-head-row>h3{grid-column:1;grid-row:2;margin:4px 0 0;min-width:0;overflow-wrap:anywhere}
+.leo-head-row>.pl-hero-leo{grid-column:2;grid-row:1/-1;margin:0;min-width:0;max-width:220px;align-self:stretch;display:flex}
+.leo-head-row>.pl-hero-leo .pl-punch{flex:1;min-width:0;width:100%;box-sizing:border-box}
+@media (max-width:420px){.leo-head-row{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto}.leo-head-row>.pl-hero-leo{grid-column:1;grid-row:3;max-width:100%}}
 h3{font-size:25px;color:#555;margin:20px 0 8px}
 .tile span{display:block;font-size:44px}.tile small{display:block;color:#888;font-size:22px;margin-top:4px}
 #out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:24px}
@@ -196,7 +203,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
 <link rel="stylesheet" href="shell.css?v=20261128eye">
-<link rel="stylesheet" href="theme-planet.css?v=20261128leogo">
+<link rel="stylesheet" href="theme-planet.css?v=20261128punchside">
 <style>
 /* パスワードの表示／かくす（目のマーク）。テーマの主ボタン色を受けない */
 .pw-wrap{position:relative;width:100%;margin:6px 0}
@@ -339,7 +346,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261128leogo';
+  var BUILD = '20261128punchside';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -460,7 +467,14 @@ function plPunchHtml() {
 }
 function leoHomePunchHtml() {
   if (!isLeoDirectStaff()) return '';
-  return '<div class="pl-hero pl-hero-leo">' + plPunchHtml() + '</div>';
+  return '<div class="pl-hero pl-hero-leo"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span></a></div>';
+}
+function officeHeadHtml(o) {
+  const back = '<button class="back" onclick="location.hash=portalTopHash()">← 事業所えらびへ</button>';
+  const title = `<h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>`;
+  const punch = (o && o.id === 'leo') ? leoHomePunchHtml() : '';
+  if (!punch) return back + title;
+  return `<div class="leo-head-row">${back}${title}${punch}</div>`;
 }
 function leoHomeBody(o) {
   const vis = visTiles(o), col = o.color;
@@ -496,7 +510,7 @@ function leoHomeBody(o) {
   const todoRow = todoT.length ? `<div class="grid leo3">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
   // あなたへのお知らせは依頼があるときだけ表示（homeTodo）。総合トップの先頭（連先生の並び）はそのまま。レオホームではカレンダーの直後・毎日やるの直前へ（ゆか先生 2026-11-28）
   const notice = `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">あなたへのお知らせ</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>`;
-  return `${leoHomePunchHtml()}${todoRow}<div id="leo_home_cal"></div>${notice}<h3 class="nx">毎日やる</h3><div class="grid leo3">
+  return `${todoRow}<div id="leo_home_cal"></div>${notice}<h3 class="nx">毎日やる</h3><div class="grid leo3">
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}
@@ -604,9 +618,7 @@ async function render() {
   const o = C.offices.find(x => x.id === id);
   if (o && typeof canOpenOffice === 'function' && !canOpenOffice(o)) { location.hash = ''; return; }
   if (o) {
-    $('view').innerHTML = `<button class="back" onclick="location.hash=portalTopHash()">← 事業所えらびへ</button>
-      <h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>
-      ${officeBody(o)}`;
+    $('view').innerHTML = `${officeHeadHtml(o)}${officeBody(o)}`;
     if (o.id === 'suishodama' && typeof siMonthly === 'function') { $('view').insertAdjacentHTML('beforeend', '<div id="sui_month"></div>'); siMonthly(); }
     if (typeof HY_OFFICES !== 'undefined' && HY_OFFICES[o.id]) hiyariUnread(o.id).then(n => { const a = document.querySelector(`a[href="#${o.id}/hiyari"]`); if (a && n) a.insertAdjacentHTML('afterbegin', `<span class="badge">未読 ${n}</span>`); });
     if (typeof chairMsgShow === 'function') chairMsgShow();
