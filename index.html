@@ -45,18 +45,21 @@ table.sougei-view th,table.sougei-view td{white-space:nowrap;vertical-align:top}
 .ptabs button{width:auto;margin-right:6px;padding:8px 16px;background:#fff;color:#333;border:1px solid #bbb}.ptabs .on{background:var(--main);color:#fff}
 h4{margin:14px 0 6px;font-size:25px}.kk.over{border-left:6px solid #d33}.kk.soon{border-left:6px solid #e6b800}.kk.ok{opacity:.6}.badge{background:#d33;color:#fff;border-radius:6px;padding:1px 6px;font-size:22px}.kk.soon .badge{background:#e6b800}.kk.ok .badge{background:#888}
 .back{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:8px 14px}
-/* レオホーム（対象職員）：戻る＋見出しの右に打刻。お知らせは小さいボタン（狭い幅では打刻の下・同じ右列）。一覧はボタンを押して見出しの下に開く */
-.leo-head-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px 10px;margin:0 0 8px;max-width:100%;min-width:0;box-sizing:border-box}
-.leo-head-left{flex:1 1 12em;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+/* レオホーム（対象職員）：戻る＋見出しの右に打刻。お知らせは打刻の右横の2行ボタン（同じ高さ）。480px未満では縦に積む。一覧はボタンを押して見出しの下に開く */
+.leo-head-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:stretch;gap:6px 8px;margin:0 0 8px;max-width:100%;min-width:0;box-sizing:border-box}
+.leo-head-left{flex:1 1 0;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
 .leo-head-left>.back{width:auto;margin:0;max-width:100%;align-self:start}
 .leo-head-left>h3{margin:4px 0 0;min-width:0;overflow-wrap:anywhere}
-.leo-head-tools{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;min-width:0;flex:0 1 auto;max-width:220px}
-.leo-head-tools .pl-hero-leo{margin:0;min-width:0;max-width:220px;flex:0 0 auto;display:flex;align-self:stretch}
+.leo-head-row.has-todo .leo-head-left>h3{font-size:22px}
+.leo-head-tools{display:flex;flex-direction:row;align-items:stretch;justify-content:flex-end;gap:6px;min-width:0;flex:0 0 auto;max-width:none}
+.leo-head-tools .pl-hero-leo{margin:0;min-width:0;max-width:13em;flex:0 1 auto;display:flex;align-self:stretch}
+.leo-head-row.has-todo .leo-head-tools .pl-hero-leo{max-width:9.8em}
 .leo-head-tools .pl-hero-leo .pl-punch{flex:1;min-width:0;width:100%;box-sizing:border-box}
-.leo-todo-slot{flex:0 0 auto;min-width:0;width:100%}
-.leo-todo-btn{width:100%;margin:0;padding:7px 8px;font-size:13px;font-weight:700;line-height:1.25;border-radius:14px;border:2px solid #e9b949;background:#fffdfa;color:#21302a;box-shadow:0 0 0 1px rgba(233,185,73,.35);display:flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.leo-todo-btn .leo-todo-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.leo-todo-n{display:inline-flex;align-items:center;justify-content:center;min-width:1.3em;height:1.3em;padding:0 5px;border-radius:999px;background:#e9b949;color:#21302a;font-size:12px;font-weight:700;flex:none}
+.leo-todo-slot{flex:0 0 auto;min-width:0;width:auto;align-self:stretch;display:flex}
+.leo-todo-btn{margin:0;padding:6px 18px 6px 8px;font-size:12px;font-weight:700;line-height:1.25;border-radius:14px;border:2px solid #e9b949;background:#fffdfa;color:#21302a;box-shadow:0 0 0 1px rgba(233,185,73,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;box-sizing:border-box;cursor:pointer;text-align:center;white-space:normal;min-width:0;width:auto;max-width:none;height:auto;align-self:stretch;position:relative}
+.leo-todo-btn .leo-todo-label{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;text-align:center;white-space:nowrap;line-height:1.25}
+.leo-todo-btn .leo-todo-l1,.leo-todo-btn .leo-todo-l2{display:block}
+.leo-todo-n{display:inline-flex;align-items:center;justify-content:center;min-width:1.2em;height:1.2em;padding:0 4px;border-radius:999px;background:#e9b949;color:#21302a;font-size:10px;font-weight:700;flex:none;position:absolute;top:4px;right:4px}
 .leo-todo-btn[aria-expanded="true"],.leo-todo-btn.on{background:#fff6d6}
 .leo-head-todo-panel{flex:1 1 100%;width:100%;margin:0;padding:10px 12px;box-sizing:border-box;max-height:16em;overflow:auto;-webkit-overflow-scrolling:touch;order:3}
 .leo-head-todo-panel .ht-h{font-size:16px;margin:0 0 6px}
@@ -64,8 +67,8 @@ h4{margin:14px 0 6px;font-size:25px}.kk.over{border-left:6px solid #d33}.kk.soon
 .leo-head-todo-panel .ui-list-row{min-height:0;padding:6px 0;gap:6px}
 .leo-head-todo-panel .ht-t b{font-size:14px;line-height:1.3}
 .leo-head-todo-panel .ht-t small{font-size:12px}
-@media (min-width:900px){.leo-head-tools{flex-direction:row;align-items:stretch;max-width:none;gap:8px}.leo-todo-slot{width:auto;align-self:stretch;display:flex}.leo-todo-btn{height:100%;width:auto;min-width:9.5em;padding:8px 12px;white-space:normal}}
-@media (max-width:420px){.leo-head-left,.leo-head-tools{flex-basis:100%}.leo-head-tools{max-width:100%}.leo-head-tools .pl-hero-leo{max-width:100%}}
+@media (min-width:900px){.leo-head-tools{gap:8px}.leo-head-tools .pl-hero-leo,.leo-head-row.has-todo .leo-head-tools .pl-hero-leo{max-width:14em}.leo-head-row.has-todo .leo-head-left>h3{font-size:25px}.leo-todo-btn{max-width:none;min-width:6.5em;padding:8px 10px;font-size:13px}.leo-todo-n{font-size:12px;min-width:1.3em;height:1.3em}}
+@media (max-width:479px){.leo-head-row{flex-wrap:wrap}.leo-head-left,.leo-head-tools{flex-basis:100%}.leo-head-tools{max-width:100%;flex-direction:column;align-items:stretch}.leo-head-tools .pl-hero-leo,.leo-head-row.has-todo .leo-head-tools .pl-hero-leo{max-width:100%}.leo-todo-slot{width:100%}.leo-todo-btn{max-width:none;width:100%;font-size:13px;padding:7px 8px}.leo-head-row.has-todo .leo-head-left>h3{font-size:25px}}
 h3{font-size:25px;color:#555;margin:20px 0 8px}
 .tile span{display:block;font-size:44px}.tile small{display:block;color:#888;font-size:22px;margin-top:4px}
 #out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:24px}
@@ -224,7 +227,7 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
 <link rel="stylesheet" href="shell.css?v=20261128todobtn">
-<link rel="stylesheet" href="theme-planet.css?v=20261128todobtn">
+<link rel="stylesheet" href="theme-planet.css?v=20261128todoright">
 <style>
 /* パスワードの表示／かくす（目のマーク）。テーマの主ボタン色を受けない */
 .pw-wrap{position:relative;width:100%;margin:6px 0}
@@ -367,7 +370,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261128todobtn';
+  var BUILD = '20261128todoright';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -491,7 +494,7 @@ function leoHomePunchHtml() {
   return '<div class="pl-hero pl-hero-leo"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span></a></div>';
 }
 function leoHomeNoticeBtnHtml() {
-  return '<div class="leo-todo-slot" hidden><button type="button" class="leo-todo-btn" id="leo_todo_btn" aria-expanded="false" aria-controls="home_todo" onclick="leoTodoToggle()"><span class="leo-todo-label">📣 あなたへのお知らせ</span><span class="leo-todo-n" id="leo_todo_n" hidden></span></button></div>';
+  return '<div class="leo-todo-slot" hidden><button type="button" class="leo-todo-btn" id="leo_todo_btn" aria-expanded="false" aria-controls="home_todo" onclick="leoTodoToggle()"><span class="leo-todo-label"><span class="leo-todo-l1">📣 あなたへの</span><span class="leo-todo-l2">お知らせ</span></span><span class="leo-todo-n" id="leo_todo_n" hidden></span></button></div>';
 }
 function leoHomeNoticePanelHtml() {
   return '<section id="home_todo" class="ui-card home-todo leo-head-todo-panel" hidden><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>';

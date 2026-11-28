@@ -108,12 +108,14 @@ html.th-planet body.ui-app .pl-punch .pl-clock{font-family:var(--pl-disp);font-s
 html.th-planet body.ui-app .pl-punch .pl-go{display:block;text-align:center;background:var(--pl-g);color:#fff;border-radius:20px;padding:14px 10px;font-size:1.3em;font-weight:700;margin-top:8px;box-shadow:0 6px 14px -10px rgba(36,92,64,.9)}
 html.th-planet body.ui-app .pl-punch small{color:var(--pl-sub);font-size:.85em}
 /* レオホームの打刻（対象職員のみ）。戻る＋見出しの右横。総合トップと同じ色で小さく */
-html.th-planet body.ui-app .leo-head-tools .pl-hero-leo{display:flex;margin:0;max-width:220px}
+html.th-planet body.ui-app .leo-head-tools .pl-hero-leo{display:flex;margin:0;max-width:13em}
 html.th-planet body.ui-app .leo-head-tools .pl-hero-leo a.pl-punch{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ph clock" "go go";align-items:center;align-content:center;gap:2px 8px;padding:8px 10px;box-sizing:border-box;width:100%;max-width:100%;min-width:0;border-radius:20px}
 html.th-planet body.ui-app .leo-head-row .pl-ph{grid-area:ph;font-size:.95em;line-height:1.2;min-width:0;overflow-wrap:anywhere}
 html.th-planet body.ui-app .leo-head-row .pl-clock{grid-area:clock;font-size:1.35em;line-height:1;white-space:nowrap}
 html.th-planet body.ui-app .leo-head-row .pl-go{grid-area:go;margin-top:2px;padding:7px 8px;font-size:.95em;border-radius:14px;box-shadow:0 4px 10px -8px rgba(36,92,64,.9)}
-@media (max-width:420px){html.th-planet body.ui-app .leo-head-tools .pl-hero-leo{max-width:100%}}
+@media (max-width:899px){html.th-planet body.ui-app .leo-head-row.has-todo .pl-clock{display:none}html.th-planet body.ui-app .leo-head-row.has-todo .leo-head-tools .pl-hero-leo{max-width:9.8em}html.th-planet body.ui-app .leo-head-row.has-todo .leo-head-tools .pl-hero-leo a.pl-punch{grid-template-columns:minmax(0,1fr);grid-template-areas:"ph" "go";padding:6px 8px;gap:2px;border-radius:16px}html.th-planet body.ui-app .leo-head-row.has-todo .pl-ph{font-size:12px;white-space:nowrap}html.th-planet body.ui-app .leo-head-row.has-todo .pl-go{margin-top:1px;padding:6px 6px;font-size:12px;border-radius:12px}}
+@media (max-width:479px){html.th-planet body.ui-app .leo-head-tools .pl-hero-leo,html.th-planet body.ui-app .leo-head-row.has-todo .leo-head-tools .pl-hero-leo{max-width:100%}html.th-planet body.ui-app .leo-head-row.has-todo .leo-head-tools .pl-hero-leo a.pl-punch{padding:8px 10px;border-radius:20px}html.th-planet body.ui-app .leo-head-row.has-todo .pl-ph{font-size:.95em}html.th-planet body.ui-app .leo-head-row.has-todo .pl-go{padding:7px 8px;font-size:.95em;border-radius:14px}}
+@media (min-width:900px){html.th-planet body.ui-app .leo-head-tools .pl-hero-leo,html.th-planet body.ui-app .leo-head-row.has-todo .leo-head-tools .pl-hero-leo{max-width:14em}}
 /* レオホーム：お知らせは小さい金枠ボタン。一覧は見出しの下のパネル */
 html.th-planet body.ui-app main button.leo-todo-btn{background:var(--pl-card)!important;color:var(--pl-ink)!important;border:2px solid var(--pl-gold)!important;box-shadow:0 0 0 1px rgba(233,185,73,.35),var(--shadow)!important;border-radius:16px!important;font-family:var(--pl-font)!important;font-weight:700}
 html.th-planet body.ui-app main button.leo-todo-btn:hover{background:#fff6d6!important}

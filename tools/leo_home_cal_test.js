@@ -443,8 +443,8 @@ assert.ok(nakaField.includes('中村友香担当'), '中村本人（現場職責
   const todoAt = yuka.head.indexOf('id="home_todo"');
   const toolsEnd = yuka.head.indexOf('<section id="home_todo"');
   const tools = toolsEnd > 0 ? yuka.head.slice(yuka.head.indexOf('class="leo-head-tools"'), toolsEnd) : '';
-  assert.ok(btnAt > punchAt && tools.includes('leo-todo-btn') && tools.includes('leo-todo-slot') && !tools.includes('<section'), 'お知らせは打刻の右（同じ右列）の小さいボタン');
-  assert.ok(yuka.head.includes('📣 あなたへのお知らせ') && yuka.head.includes('leo-todo-n'), 'ボタン題名と件数バッジ');
+  assert.ok(btnAt > punchAt && tools.includes('leo-todo-btn') && tools.includes('leo-todo-slot') && !tools.includes('<section'), 'お知らせは打刻の右横の小さいボタン');
+  assert.ok(yuka.head.includes('📣 あなたへの') && yuka.head.includes('>お知らせ<') && yuka.head.includes('leo-todo-l1') && yuka.head.includes('leo-todo-n'), 'ボタン題名（2行）と件数バッジ');
   assert.ok(yuka.head.includes('leo-head-todo-panel') && todoAt > btnAt, '一覧はボタンを押すと開くパネル');
   assert.ok(yuka.head.includes('class="leo-todo-slot" hidden') && yuka.head.includes('leo-head-todo-panel" hidden'), '依頼がないときはボタンも一覧も隠す');
   assert.ok(homeSrc.includes('function leoTodoToggle'), 'ボタンで一覧を開く');
@@ -651,6 +651,6 @@ delete sandbox.JP_HOLIDAYS;
   assert.strictEqual(r.ok, false, '氏名なしは対象外');
   assert.ok(html.includes("const LEO_DIRECT_STAFF = ['中村友香']"), '対象は1か所の定数');
   assert.ok(html.includes('onclick="location.hash=portalTopHash()"'), '事業所えらびへは portalTopHash');
-  assert.ok(html.includes("var BUILD = '20261128todobtn'"), 'BUILD を上げる');
+  assert.ok(html.includes("var BUILD = '20261128todoright'"), 'BUILD を上げる');
 }
 console.log('leo_home_cal_test ok');
