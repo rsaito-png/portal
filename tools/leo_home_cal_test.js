@@ -418,6 +418,18 @@ assert.ok(nakaField.includes('中村友香担当'), '中村本人（現場職責
   assert.ok(!nsec.includes('今日の日誌') && !nsec.includes('href="#leo/nikki"'), '中村本人の担当欄から今日の日誌を外す');
   assert.ok(nakaField.slice(0, nakaField.indexOf('中村友香担当')).includes('href="#leo/nikki"'), '中村本人も毎日やるの日誌は残す');
 }
+{
+  const punchAt = nakaField.indexOf('class="pl-punch"');
+  const calAt = nakaField.indexOf('id="leo_home_cal"');
+  assert.ok(punchAt >= 0 && punchAt < calAt, '中村本人のレオホーム先頭に出退勤打刻');
+  assert.ok(nakaField.includes('href="#dakoku"') && nakaField.includes('出退勤打刻') && nakaField.includes('出勤・退勤する'), '打刻は総合トップと同じ部品');
+  assert.ok(nakaField.includes('class="pl-hero pl-hero-leo"') && nakaField.includes('id="pl_clock"'), 'レオホーム用の小さい打刻枠');
+  assert.ok(!nakaField.includes('daily_sky') && !nakaField.includes('お仕事占い'), 'レオホームの打刻に占いは置かない');
+  const other = renderLeoHome('職員', '児発管');
+  assert.ok(!other.includes('class="pl-punch"') && !other.includes('href="#dakoku"'), '他の職員のレオホームに打刻を置かない');
+  const fieldPunch = renderLeoHome('職員', '現場支援員');
+  assert.ok(!fieldPunch.includes('class="pl-punch"'), '現場職員のレオホームに打刻を置かない');
+}
 assert.ok(!nakaField.includes('事務担当'), '中村本人でも事務担当は出さない');
 const kanri = renderLeoHome('職員', '児発管');
 assert.ok(kanri.includes('中村友香担当'), '児発管に中村友香担当');
@@ -559,4 +571,54 @@ assert.ok(jan.includes('class="sub off">年末年始のお休み'), '1/1は祝�
 assert.ok(!jan.includes('>祝日<'), '休所がある日は祝日ラベルを重ねない');
 delete sandbox.JP_HOLIDAYS;
 
+// レオ直行・レオホーム打刻の切替（LEO_DIRECT_STAFF を空にすると全員オフ）
+{
+  const loc = { hash: '', pathname: '/portal/', search: '' };
+  const hist = { replaced: [] };
+  const run = (name, hash) => {
+    const sbx = {
+      MY_FULL_NAME: String(name || '').replace(/[\s　]/g, ''),
+      location: { ...loc, hash },
+      history: { replaceState(_s, _t, url) { hist.replaced.push(url); sbx.location.hash = '#' + String(url).split('#')[1]; } },
+    };
+    hist.replaced = [];
+    vm.runInNewContext(homeSrc + `
+      this.ok = isLeoDirectStaff();
+      this.top = portalTopHash();
+      this.redirected = maybeOpenLeoHome();
+      this.hash = location.hash;
+      this.urls = history.replaced ? null : null;
+    `, sbx);
+    // history.replaced is not visible inside unless we attach it; read from hist
+    return { ok: sbx.ok, top: sbx.top, redirected: sbx.redirected, hash: sbx.hash, urls: hist.replaced };
+  };
+  let r = run('中村友香', '');
+  assert.strictEqual(r.ok, true, '中村友香は対象');
+  assert.strictEqual(r.top, 'top', '対象の事業所えらびは #top');
+  assert.strictEqual(r.redirected, true, '空ハッシュはレオへ直行');
+  assert.strictEqual(r.hash, '#leo');
+  assert.deepStrictEqual(r.urls, ['/portal/#leo']);
+  r = run('中村　友香', '');
+  assert.strictEqual(r.ok, true, '全角スペースの氏名も対象（正規化）');
+  r = run('中村友香', '#leo/plan');
+  assert.strictEqual(r.redirected, false, '深いリンクは上書きしない');
+  assert.strictEqual(r.hash, '#leo/plan');
+  assert.deepStrictEqual(r.urls, []);
+  r = run('中村友香', '#top');
+  assert.strictEqual(r.redirected, false, '#top（事業所えらび）はそのまま');
+  r = run('中村友香', '#dakoku');
+  assert.strictEqual(r.redirected, false, '打刻画面は上書きしない');
+  r = run('中村文', '');
+  assert.strictEqual(r.ok, false, '中村文は対象外');
+  assert.strictEqual(r.top, '', '対象外の戻り先は空ハッシュ');
+  assert.strictEqual(r.redirected, false);
+  assert.strictEqual(r.hash, '');
+  r = run('齊藤連', '');
+  assert.strictEqual(r.ok, false, '連先生は対象外');
+  r = run('', '');
+  assert.strictEqual(r.ok, false, '氏名なしは対象外');
+  assert.ok(html.includes("const LEO_DIRECT_STAFF = ['中村友香']"), '対象は1か所の定数');
+  assert.ok(html.includes('onclick="location.hash=portalTopHash()"'), '事業所えらびへは portalTopHash');
+  assert.ok(html.includes("var BUILD = '20261128leogo'"), 'BUILD を上げる');
+}
 console.log('leo_home_cal_test ok');
