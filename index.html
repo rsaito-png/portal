@@ -16,6 +16,13 @@ button{background:var(--main);color:#fff;border:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 /* レオのホームのボタンは横4個・字は小さめ（スマホだけ3個。ゆか先生指定 2026-11-19） */
 .grid.leo3{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.grid.leo3 .tile{overflow-wrap:anywhere}.grid.leo3 .tile.big{padding:18px 6px;font-size:16px}.grid.leo3 .tile span{font-size:34px}@media (min-width:900px){.grid.leo3{gap:16px}.grid.leo3 .tile.big{padding:26px 10px;font-size:24px}.grid.leo3 .tile span{font-size:52px}}@media (max-width:480px){.grid.leo3{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.grid.leo3 .tile.big{padding:16px 4px;font-size:14px}.grid.leo3 .tile span{font-size:30px}}
+/* 対象職員のレオホーム：520〜640pxでタイルを横6個。字は2行まで折返し */
+.grid.leo3.leo6{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.grid.leo3.leo6 .tile.big{padding:10px 3px;font-size:12px;line-height:1.25}
+.grid.leo3.leo6 .tile span{font-size:24px}
+.grid.leo3.leo6 .tile small{font-size:10px;margin-top:2px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
+@media (min-width:900px){.grid.leo3.leo6{gap:10px}.grid.leo3.leo6 .tile.big{padding:16px 6px;font-size:16px}.grid.leo3.leo6 .tile span{font-size:36px}.grid.leo3.leo6 .tile small{font-size:12px}}
+@media (max-width:479px){.grid.leo3.leo6{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.grid.leo3.leo6 .tile.big{padding:14px 4px;font-size:13px}.grid.leo3.leo6 .tile span{font-size:28px}}
 .tile{background:#fff;border-radius:12px;padding:22px 10px;text-align:center;text-decoration:none;color:#222;box-shadow:0 1px 3px #0002;font-size:18px}
 .office{border-left:6px solid var(--c);text-align:left;padding:18px 14px}
 .office small{display:inline;margin-left:6px}
@@ -38,25 +45,27 @@ table.sougei-view th,table.sougei-view td{white-space:nowrap;vertical-align:top}
 .ptabs button{width:auto;margin-right:6px;padding:8px 16px;background:#fff;color:#333;border:1px solid #bbb}.ptabs .on{background:var(--main);color:#fff}
 h4{margin:14px 0 6px;font-size:25px}.kk.over{border-left:6px solid #d33}.kk.soon{border-left:6px solid #e6b800}.kk.ok{opacity:.6}.badge{background:#d33;color:#fff;border-radius:6px;padding:1px 6px;font-size:22px}.kk.soon .badge{background:#e6b800}.kk.ok .badge{background:#888}
 .back{background:#fff;color:#333;border:1px solid #bbb;width:auto;padding:8px 14px}
-/* レオホーム（対象職員）：戻る＋見出しの右に打刻。お知らせがあるときは打刻の右。足りなければその行ごと下へ */
-.leo-head-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:stretch;gap:8px 10px;margin:0 0 8px;max-width:100%;min-width:0;box-sizing:border-box}
-.leo-head-left{flex:1 1 12.5em;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+/* レオホーム（対象職員）：戻る＋見出しの右に打刻。お知らせは小さいボタン（狭い幅では打刻の下・同じ右列）。一覧はボタンを押して見出しの下に開く */
+.leo-head-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px 10px;margin:0 0 8px;max-width:100%;min-width:0;box-sizing:border-box}
+.leo-head-left{flex:1 1 12em;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
 .leo-head-left>.back{width:auto;margin:0;max-width:100%;align-self:start}
 .leo-head-left>h3{margin:4px 0 0;min-width:0;overflow-wrap:anywhere}
-.leo-head-tools{display:flex;flex-wrap:wrap;align-items:stretch;justify-content:flex-end;gap:8px;min-width:0;flex:0 1 auto}
-.leo-head-row.has-todo .leo-head-tools{flex:1 1 18em;justify-content:flex-start}
-.leo-head-row.has-todo .leo-head-tools .pl-hero-leo{align-self:start}
+.leo-head-tools{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;min-width:0;flex:0 1 auto;max-width:220px}
 .leo-head-tools .pl-hero-leo{margin:0;min-width:0;max-width:220px;flex:0 0 auto;display:flex;align-self:stretch}
 .leo-head-tools .pl-hero-leo .pl-punch{flex:1;min-width:0;width:100%;box-sizing:border-box}
-.leo-head-tools .home-todo{flex:1 1 12em;min-width:0;max-width:100%;margin:0;padding:8px 10px;box-sizing:border-box;max-height:11.5em;overflow:auto;-webkit-overflow-scrolling:touch}
-.leo-head-tools .home-todo .ht-h{font-size:15px;margin:0 0 4px;line-height:1.25}
-.leo-head-tools .home-todo .ht-sub{font-size:12px;margin:0 0 4px}
-.leo-head-tools .home-todo .ui-list-row{min-height:0;padding:5px 0;gap:6px;border-radius:0}
-.leo-head-tools .home-todo .ht-t b{font-size:13px;line-height:1.3}
-.leo-head-tools .home-todo .ht-t small{font-size:11px}
-.leo-head-tools .home-todo p.ht-sub:last-child{display:none}
-@media (max-width:720px){.leo-head-row.has-todo .leo-head-left,.leo-head-row.has-todo .leo-head-tools{flex-basis:100%}.leo-head-row.has-todo .leo-head-tools{flex-wrap:nowrap}}
-@media (max-width:420px){.leo-head-left,.leo-head-tools{flex-basis:100%}.leo-head-tools .pl-hero-leo{max-width:100%}.leo-head-row.has-todo .leo-head-tools{flex-wrap:wrap}}
+.leo-todo-slot{flex:0 0 auto;min-width:0;width:100%}
+.leo-todo-btn{width:100%;margin:0;padding:7px 8px;font-size:13px;font-weight:700;line-height:1.25;border-radius:14px;border:2px solid #e9b949;background:#fffdfa;color:#21302a;box-shadow:0 0 0 1px rgba(233,185,73,.35);display:flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leo-todo-btn .leo-todo-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.leo-todo-n{display:inline-flex;align-items:center;justify-content:center;min-width:1.3em;height:1.3em;padding:0 5px;border-radius:999px;background:#e9b949;color:#21302a;font-size:12px;font-weight:700;flex:none}
+.leo-todo-btn[aria-expanded="true"],.leo-todo-btn.on{background:#fff6d6}
+.leo-head-todo-panel{flex:1 1 100%;width:100%;margin:0;padding:10px 12px;box-sizing:border-box;max-height:16em;overflow:auto;-webkit-overflow-scrolling:touch;order:3}
+.leo-head-todo-panel .ht-h{font-size:16px;margin:0 0 6px}
+.leo-head-todo-panel .ht-sub{font-size:12px;margin:0 0 4px}
+.leo-head-todo-panel .ui-list-row{min-height:0;padding:6px 0;gap:6px}
+.leo-head-todo-panel .ht-t b{font-size:14px;line-height:1.3}
+.leo-head-todo-panel .ht-t small{font-size:12px}
+@media (min-width:900px){.leo-head-tools{flex-direction:row;align-items:stretch;max-width:none;gap:8px}.leo-todo-slot{width:auto;align-self:stretch;display:flex}.leo-todo-btn{height:100%;width:auto;min-width:9.5em;padding:8px 12px;white-space:normal}}
+@media (max-width:420px){.leo-head-left,.leo-head-tools{flex-basis:100%}.leo-head-tools{max-width:100%}.leo-head-tools .pl-hero-leo{max-width:100%}}
 h3{font-size:25px;color:#555;margin:20px 0 8px}
 .tile span{display:block;font-size:44px}.tile small{display:block;color:#888;font-size:22px;margin-top:4px}
 #out{background:none;border:1px solid #fff;width:auto;padding:6px 10px;font-size:24px}
@@ -214,8 +223,8 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
-<link rel="stylesheet" href="shell.css?v=20261128eye">
-<link rel="stylesheet" href="theme-planet.css?v=20261128todohead">
+<link rel="stylesheet" href="shell.css?v=20261128todobtn">
+<link rel="stylesheet" href="theme-planet.css?v=20261128todobtn">
 <style>
 /* パスワードの表示／かくす（目のマーク）。テーマの主ボタン色を受けない */
 .pw-wrap{position:relative;width:100%;margin:6px 0}
@@ -314,7 +323,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <script src="kin_contract.js?v=20261117docs"></script>
 <script src="kin_print.js?v=202610162340"></script>
 <script src="kin_jisseki.js?v=202610162340"></script>
-<script src="report.js?v=20261128todohead"></script>
+<script src="report.js?v=20261128todobtn"></script>
 <script src="ht.js?v=20261117comm"></script>
 <script src="sct_logic.js?v=20261026sq"></script>
 <script src="sct_cert.js?v=20261026"></script>
@@ -358,7 +367,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261128todohead';
+  var BUILD = '20261128todobtn';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -481,18 +490,31 @@ function leoHomePunchHtml() {
   if (!isLeoDirectStaff()) return '';
   return '<div class="pl-hero pl-hero-leo"><a class="pl-punch" href="#dakoku"><span class="pl-ph">⏰ 出退勤打刻</span><b class="pl-clock" id="pl_clock"></b><span class="pl-go">出勤・退勤する</span></a></div>';
 }
-function leoHomeNoticeHtml() {
-  return '<section id="home_todo" class="ui-card home-todo leo-head-todo" hidden><h2 class="ht-h">あなたへのお知らせ</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>';
+function leoHomeNoticeBtnHtml() {
+  return '<div class="leo-todo-slot" hidden><button type="button" class="leo-todo-btn" id="leo_todo_btn" aria-expanded="false" aria-controls="home_todo" onclick="leoTodoToggle()"><span class="leo-todo-label">📣 あなたへのお知らせ</span><span class="leo-todo-n" id="leo_todo_n" hidden></span></button></div>';
+}
+function leoHomeNoticePanelHtml() {
+  return '<section id="home_todo" class="ui-card home-todo leo-head-todo-panel" hidden><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>';
+}
+function leoTodoToggle(ev) {
+  if (ev) ev.preventDefault();
+  const panel = document.getElementById('home_todo'), btn = document.getElementById('leo_todo_btn');
+  if (!panel || !btn) return;
+  const open = panel.hidden;
+  panel.hidden = !open;
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.classList.toggle('on', open);
 }
 function officeHeadHtml(o) {
   const back = '<button class="back" onclick="location.hash=portalTopHash()">← 事業所えらびへ</button>';
   const title = `<h3 style="color:${o.color}">${o.name}${o.kind ? '（' + o.kind + '）' : ''}</h3>`;
   const punch = (o && o.id === 'leo') ? leoHomePunchHtml() : '';
   if (!punch) return back + title;
-  return `<div class="leo-head-row"><div class="leo-head-left">${back}${title}</div><div class="leo-head-tools">${punch}${leoHomeNoticeHtml()}</div></div>`;
+  return `<div class="leo-head-row"><div class="leo-head-left">${back}${title}</div><div class="leo-head-tools">${punch}${leoHomeNoticeBtnHtml()}</div>${leoHomeNoticePanelHtml()}</div>`;
 }
 function leoHomeBody(o) {
   const vis = visTiles(o), col = o.color;
+  const leoGrid = 'grid leo3' + (isLeoDirectStaff() ? ' leo6' : '');
   const mine = ((o.mine || {})[myDuty()] || []).flatMap(n => vis.filter(t => t[1] === n)).slice(0, 3);
   const big = (href, icon, label, id, on) => `<a class="tile big" href="${href}" ${on ? `onclick="${on}"` : ''} style="border-top:4px solid ${col}"><span>${icon}</span>${label}<small id="${id || ''}"></small></a>`;
   const gbtn = x => `<a class="tile big" href="#${o.id}/g${x.k}" style="border-top:4px solid ${col}"><span>${x.icon}</span>${x.label}</a>`; // 下の補足（計画・請求・利用者情報など）は出さない（ゆか先生指定 2026-11-19）
@@ -500,16 +522,16 @@ function leoHomeBody(o) {
   const g = groupList(o).filter(x => x.label !== '現場' && (x.label !== '事務・計画' || (typeof canManage === 'function' && canManage()) || (typeof IS_CHAIR !== 'undefined' && IS_CHAIR))).map(gbtn).join('');
   const tileBig = t => `<a class="tile big" ${t[2] ? `href="${t[2]}"` : ''} style="border-top:4px solid ${col}${t[2] ? '' : ';opacity:.5'}"><span>${t[0]}</span>${leoBr(shortName(o, t[1]))}${t[2] ? '' : '<small>準備中</small>'}</a>`;
   const rtv = (o.routine || []).flatMap(n => vis.filter(t => t[1] === n));
-  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="grid leo3">${rtv.map(tileBig).join('')}</div>` : '';
+  const rt = rtv.length ? `<h3 class="nx">管理系ルーティン</h3><div class="${leoGrid}">${rtv.map(tileBig).join('')}</div>` : '';
   const who = (o.who || []).map(([title, names]) => {
     if (typeof whoVisible === 'function' && !whoVisible(title)) return '';
     const tiles = (names || []).flatMap(n => vis.filter(t => t[1] === n));
-    return tiles.length ? `<h3 class="nx">${title}</h3><div class="grid leo3">${tiles.map(tileBig).join('')}</div>` : '';
+    return tiles.length ? `<h3 class="nx">${title}</h3><div class="${leoGrid}">${tiles.map(tileBig).join('')}</div>` : '';
   }).join('');
   const dutyName = myDuty() === '事務' ? '情報' : myDuty() + 'の仕事';
   // 事務・計画のフォルダは「事務」の段でシフトの横に置く（ゆか先生指定 2026-11-13）
   const dutyInner = `${mine.map(t => `<a class="tile big" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}</a>`).join('')}`;
-  const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="grid leo3">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="grid leo3">${dutyInner}</div>`);
+  const duty = !dutyInner ? '' : (dutyName === '児発管の仕事' ? `<div class="${leoGrid}">${dutyInner}</div>` : `<h3 class="nx">${dutyName}</h3><div class="${leoGrid}">${dutyInner}</div>`);
   // 毎日やるの報告は職員が書く LINE報告を書く（#leo/line）。日誌は #leo/nikki に1つ（#leo/diary は直リンクのまま）。LINEの下書きは直リンクのみ。モニタリングシートは事務・計画（個別支援計画の隣）。
   // 不具合・修正の依頼はトップの受付に統一（#uketsuke は残す）。
   const sougeiNames = ['送迎'];
@@ -519,14 +541,14 @@ function leoHomeBody(o) {
   // 実態のシフト（#leo/shift）。職員はみな見られる。直すのは管理者（画面の中で切り替え）。勤務実績表とは別
   const shiftT = vis.filter(t => t[1] === 'シフト');
   const jimu = shiftT.map(tileBig).join('') + g;
-  const shiftRow = jimu ? `<h3 class="nx">事務</h3><div class="grid leo3">${jimu}</div>` : '';
+  const shiftRow = jimu ? `<h3 class="nx">事務</h3><div class="${leoGrid}">${jimu}</div>` : '';
   // 今日やること（児発管）はここ1か所だけ（担当者名の欄には重ねない）
   const todoT = o.todoTop ? vis.filter(t => t[1] === o.todoTop) : [];
-  const todoRow = todoT.length ? `<div class="grid leo3">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
+  const todoRow = todoT.length ? `<div class="${leoGrid}">${todoT.map(t => `<a class="tile big main" href="${t[2]}" style="border-top:4px solid ${col}"><span>${t[0]}</span>${shortName(o, t[1])}<small>${t[3]}</small></a>`).join('')}</div>` : '';
   // あなたへのお知らせは依頼があるときだけ表示（homeTodo）。総合トップの先頭（連先生の並び）はそのまま。
-  // 対象職員（LEO_DIRECT_STAFF）は見出し横の打刻の右（officeHeadHtml）。ほかの職員のレオホームはこれまでどおりカレンダーの直後・毎日やるの直前。
+  // 対象職員（LEO_DIRECT_STAFF）は見出し横の打刻の右に、お知らせの小さいボタン（officeHeadHtml。押すと一覧が開く）。ほかの職員のレオホームはこれまでどおりカレンダーの直後・毎日やるの直前。
   const notice = isLeoDirectStaff() ? '' : `<section id="home_todo" class="ui-card home-todo" hidden><h2 class="ht-h">あなたへのお知らせ</h2><div id="home_todo_body"><p class="ht-sub">読み込み中…</p></div></section>`;
-  return `${todoRow}<div id="leo_home_cal"></div>${notice}<h3 class="nx">毎日やる</h3><div class="grid leo3">
+  return `${todoRow}<div id="leo_home_cal"></div>${notice}<h3 class="nx">毎日やる</h3><div class="${leoGrid}">
     ${big('#leo/kids', '🧒', '今日の利用児童', 'hs_kids', "PERIOD='today'")}
     ${big('#leo/hiyari', '⚠️', 'ヒヤリハット', '', '')}
     ${big('#leo/line', '💬', 'LINE報告を書く', '', '')}

@@ -86,8 +86,24 @@ async function myTodoBox() {
 // 依頼が0件の人（多くの現場職員）には枠ごと出さない。依頼が1件でもあれば出す（職員への指示はポータルの依頼で出すため）
 async function homeTodo() {
   const el = document.getElementById('home_todo_body'); if (!el) return;
-  const show = on => { const s = document.getElementById('home_todo'), j = document.getElementById('ht_jump'); if (s) { s.hidden = !on; const row = s.closest && s.closest('.leo-head-row'); if (row) row.classList.toggle('has-todo', !!on); } if (j) j.hidden = !on; };
+  const btn = document.getElementById('leo_todo_btn');
+  const slot = document.querySelector('.leo-todo-slot');
+  const isLeoHead = !!(btn && slot);
+  const show = on => {
+    const s = document.getElementById('home_todo'), j = document.getElementById('ht_jump');
+    if (isLeoHead) {
+      slot.hidden = !on;
+      const row = slot.closest && slot.closest('.leo-head-row');
+      if (row) row.classList.toggle('has-todo', !!on);
+      if (!on) { if (s) s.hidden = true; btn.setAttribute('aria-expanded', 'false'); btn.classList.remove('on'); }
+    } else {
+      if (s) s.hidden = !on;
+    }
+    if (j) j.hidden = !on;
+  };
+  const setCount = n => { const b = document.getElementById('leo_todo_n'); if (!b) return; if (n > 0) { b.textContent = n; b.hidden = false; } else { b.textContent = ''; b.hidden = true; } };
   show(false);
+  setCount(0);
   if (DEMO || typeof sb !== 'function') return;
   try {
     const t = await sb(`staff_todo?assignee=eq.${srMe()}&status=neq.done&order=due.asc.nullslast,created_at&select=id,title,link,due,status,office`);
@@ -95,6 +111,7 @@ async function homeTodo() {
     const nNew = t.filter(x => x.status === 'open').length;
     if (!t.length) { el.innerHTML = ''; return; }
     show(true);
+    setCount(t.length);
     el.innerHTML = `<p class="ht-sub">${t.length}件${nNew ? `（うち新しい依頼 ${nNew}件）` : ''}</p>` + t.map(x => {
       const ok = x.link && /^#[\w/-]*$/.test(x.link), od = x.due && x.due <= today;
       const meta = [x.office ? esc(x.office) : '', x.due ? `<span class="${od ? 'ht-over' : ''}">期限 ${esc(x.due.slice(5).split('-').map(Number).join('/'))}${x.due < today ? '（過ぎています）' : x.due === today ? '（今日）' : ''}</span>` : '', x.status === 'doing' ? 'やっている' : '未着手'].filter(Boolean).join('・');

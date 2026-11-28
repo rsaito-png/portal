@@ -438,11 +438,19 @@ assert.ok(nakaField.includes('中村友香担当'), '中村本人（現場職責
   assert.ok(!yuka.body.includes('class="pl-punch"') && !yuka.body.includes('href="#dakoku"'), '本文側の全幅カードは置かない');
   const page = yuka.head + yuka.body;
   assert.ok(page.indexOf('事業所えらびへ') < page.indexOf('class="pl-punch"') && page.indexOf('class="pl-punch"') < page.indexOf('id="leo_home_cal"'), '打刻は見出しのあと、カレンダーの前');
-  const todoAt = yuka.head.indexOf('id="home_todo"');
   const punchAt = yuka.head.indexOf('class="pl-punch"');
-  assert.ok(todoAt > punchAt && yuka.head.includes('class="leo-head-tools"') && yuka.head.includes('leo-head-todo'), 'お知らせは打刻の右（同じツール行）');
-  assert.ok(yuka.head.includes('あなたへのお知らせ') && yuka.head.includes('hidden'), 'お知らせは依頼があるときだけ出す');
+  const btnAt = yuka.head.indexOf('id="leo_todo_btn"');
+  const todoAt = yuka.head.indexOf('id="home_todo"');
+  const toolsEnd = yuka.head.indexOf('<section id="home_todo"');
+  const tools = toolsEnd > 0 ? yuka.head.slice(yuka.head.indexOf('class="leo-head-tools"'), toolsEnd) : '';
+  assert.ok(btnAt > punchAt && tools.includes('leo-todo-btn') && tools.includes('leo-todo-slot') && !tools.includes('<section'), 'お知らせは打刻の右（同じ右列）の小さいボタン');
+  assert.ok(yuka.head.includes('📣 あなたへのお知らせ') && yuka.head.includes('leo-todo-n'), 'ボタン題名と件数バッジ');
+  assert.ok(yuka.head.includes('leo-head-todo-panel') && todoAt > btnAt, '一覧はボタンを押すと開くパネル');
+  assert.ok(yuka.head.includes('class="leo-todo-slot" hidden') && yuka.head.includes('leo-head-todo-panel" hidden'), '依頼がないときはボタンも一覧も隠す');
+  assert.ok(homeSrc.includes('function leoTodoToggle'), 'ボタンで一覧を開く');
   assert.ok(!yuka.body.includes('id="home_todo"') && !yuka.body.includes('あなたへのお知らせ'), '対象職員の本文（カレンダーの下）にはお知らせを置かない');
+  assert.ok(yuka.body.includes('class="grid leo3 leo6"'), '対象職員のタイルは横6個（leo6）');
+  assert.ok(!yuka.body.match(/class="grid leo3"/), '対象職員に4個用の枠を残さない');
   const other = headOf('職員', '児発管');
   assert.ok(!other.head.includes('class="pl-punch"') && !other.head.includes('leo-head-row'), '他の職員の見出し横に打刻を置かない');
   assert.ok(!other.body.includes('class="pl-punch"'), '他の職員の本文にも打刻を置かない');
@@ -451,6 +459,8 @@ assert.ok(nakaField.includes('中村友香担当'), '中村本人（現場職責
   const fieldPunch = headOf('職員', '現場支援員');
   assert.ok(!fieldPunch.head.includes('class="pl-punch"') && !fieldPunch.body.includes('class="pl-punch"'), '現場職員に打刻を置かない');
   assert.ok(fieldPunch.body.includes('id="home_todo"'), '現場職員のお知らせは本文の位置のまま');
+  assert.ok(fieldPunch.body.includes('class="grid leo3"') && !fieldPunch.body.includes('leo6'), '他の職員のタイルは今までどおり横4個');
+  assert.ok(other.body.includes('class="grid leo3"') && !other.body.includes('leo6'), '児発管（本人以外）のタイルは横4個');
 }
 assert.ok(!nakaField.includes('事務担当'), '中村本人でも事務担当は出さない');
 const kanri = renderLeoHome('職員', '児発管');
@@ -641,6 +651,6 @@ delete sandbox.JP_HOLIDAYS;
   assert.strictEqual(r.ok, false, '氏名なしは対象外');
   assert.ok(html.includes("const LEO_DIRECT_STAFF = ['中村友香']"), '対象は1か所の定数');
   assert.ok(html.includes('onclick="location.hash=portalTopHash()"'), '事業所えらびへは portalTopHash');
-  assert.ok(html.includes("var BUILD = '20261128todohead'"), 'BUILD を上げる');
+  assert.ok(html.includes("var BUILD = '20261128todobtn'"), 'BUILD を上げる');
 }
 console.log('leo_home_cal_test ok');

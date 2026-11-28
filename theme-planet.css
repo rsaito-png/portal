@@ -64,9 +64,9 @@ html.th-planet body.ui-app ::placeholder{color:#7b857f;opacity:1}
 
 /* ボタン：主ボタンは緑・大きく丸く */
 html.th-planet body.ui-app button,html.th-planet body.ui-app .btn,html.th-planet body.ui-app a.btn{border-radius:16px!important;font-weight:700}
-html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.pw-toggle):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):not(.calv button),
+html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.pw-toggle):not(.sub):not(.sec):not(.g):not(.inl):not(.leo-todo-btn):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):not(.calv button),
 html.th-planet body.ui-app #login button:not(.btn-ghost):not(.pw-toggle),html.th-planet body.ui-app #forgot button:not(.btn-ghost):not(.pw-toggle),html.th-planet body.ui-app #setpw button:not(.pw-toggle){background:var(--pl-g)!important;color:#fff!important;border:2px solid var(--pl-g)!important;box-shadow:0 6px 14px -10px rgba(36,92,64,.9)!important;background-image:none!important;min-height:48px}
-html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.pw-toggle):not(.sub):not(.sec):not(.g):not(.inl):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):not(.calv button):hover{background:var(--pl-g2)!important}
+html.th-planet body.ui-app main button:not(.nk-kid):not(.nk-fold):not(.nc-chip):not(.back):not(.btn-ghost):not(.pw-toggle):not(.sub):not(.sec):not(.g):not(.inl):not(.leo-todo-btn):not(.sgm button):not(.sg-page button):not(.sg-top button):not(.sg-add button):not(.calv button):hover{background:var(--pl-g2)!important}
 html.th-planet body.ui-app main button:disabled{opacity:.55}
 html.th-planet body.ui-app .back,html.th-planet body.ui-app .btn-ghost,html.th-planet body.ui-app button.sub,html.th-planet body.ui-app button.sec,html.th-planet body.ui-app button.g,html.th-planet body.ui-app button.inl,html.th-planet body.ui-app a.btn.sub{background:#fff!important;color:var(--pl-g2)!important;border:2px solid var(--pl-g)!important;border-radius:16px!important;box-shadow:none!important;min-height:44px}
 html.th-planet body.ui-app .ptabs button{background:#fff!important;color:var(--pl-ink)!important;border:1.5px solid var(--pl-line)!important;border-radius:999px!important;box-shadow:none!important}
@@ -114,11 +114,15 @@ html.th-planet body.ui-app .leo-head-row .pl-ph{grid-area:ph;font-size:.95em;lin
 html.th-planet body.ui-app .leo-head-row .pl-clock{grid-area:clock;font-size:1.35em;line-height:1;white-space:nowrap}
 html.th-planet body.ui-app .leo-head-row .pl-go{grid-area:go;margin-top:2px;padding:7px 8px;font-size:.95em;border-radius:14px;box-shadow:0 4px 10px -8px rgba(36,92,64,.9)}
 @media (max-width:420px){html.th-planet body.ui-app .leo-head-tools .pl-hero-leo{max-width:100%}}
-/* レオホーム見出し横のお知らせ（打刻の右）。小さく、長いときは枠内スクロール */
-html.th-planet body.ui-app .leo-head-tools .home-todo{padding:8px 10px!important;border-radius:20px!important}
-html.th-planet body.ui-app .leo-head-tools .home-todo .ht-h{font-size:15px!important;margin:0 0 4px}
-html.th-planet body.ui-app .leo-head-tools .home-todo .ui-list-row{min-height:0;padding:5px 0;border-bottom:1px dashed var(--pl-line)}
-@media (min-width:900px){html.th-planet body.ui-app .leo-head-tools .home-todo .ht-h{font-size:18px!important}}
+/* レオホーム：お知らせは小さい金枠ボタン。一覧は見出しの下のパネル */
+html.th-planet body.ui-app main button.leo-todo-btn{background:var(--pl-card)!important;color:var(--pl-ink)!important;border:2px solid var(--pl-gold)!important;box-shadow:0 0 0 1px rgba(233,185,73,.35),var(--shadow)!important;border-radius:16px!important;font-family:var(--pl-font)!important;font-weight:700}
+html.th-planet body.ui-app main button.leo-todo-btn:hover{background:#fff6d6!important}
+html.th-planet body.ui-app main button.leo-todo-btn[aria-expanded="true"],html.th-planet body.ui-app main button.leo-todo-btn.on{background:#fff6d6!important}
+html.th-planet body.ui-app .leo-todo-n{background:var(--pl-gold)!important;color:#21302a!important}
+html.th-planet body.ui-app .leo-head-todo-panel{padding:10px 12px!important;border-radius:20px!important}
+html.th-planet body.ui-app .leo-head-todo-panel .ht-h{font-size:16px!important;margin:0 0 6px}
+html.th-planet body.ui-app .leo-head-todo-panel .ui-list-row{min-height:0;padding:6px 0;border-bottom:1px dashed var(--pl-line)}
+@media (min-width:900px){html.th-planet body.ui-app .leo-head-todo-panel .ht-h{font-size:20px!important}}
 html.th-planet body.ui-app .daily-sky{position:relative;overflow:hidden;margin:0!important;color:#fff!important;background:url(img/planet/ring.svg) right -26px top -18px/170px auto no-repeat,radial-gradient(120% 140% at 85% 0%,var(--pl-night2),var(--pl-night) 60%,#1f2a52)!important;border:0!important;border-radius:28px!important;padding:20px 22px!important;box-shadow:0 14px 28px -18px rgba(31,42,82,.8)!important;line-height:1.75;font-size:1em!important}
 html.th-planet body.ui-app .daily-sky .ds-h{font-family:var(--pl-disp);font-weight:700;font-size:1.25em!important;opacity:1!important;color:#fff!important;margin:0 0 6px}
 html.th-planet body.ui-app .daily-sky .ds-h::before{content:"🔮 "}
