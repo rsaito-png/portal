@@ -86,7 +86,7 @@ async function myTodoBox() {
 // 依頼が0件の人（多くの現場職員）には枠ごと出さない。依頼が1件でもあれば出す（職員への指示はポータルの依頼で出すため）
 async function homeTodo() {
   const el = document.getElementById('home_todo_body'); if (!el) return;
-  const show = on => { const s = document.getElementById('home_todo'), j = document.getElementById('ht_jump'); if (s) s.hidden = !on; if (j) j.hidden = !on; };
+  const show = on => { const s = document.getElementById('home_todo'), j = document.getElementById('ht_jump'); if (s) { s.hidden = !on; const row = s.closest && s.closest('.leo-head-row'); if (row) row.classList.toggle('has-todo', !!on); } if (j) j.hidden = !on; };
   show(false);
   if (DEMO || typeof sb !== 'function') return;
   try {

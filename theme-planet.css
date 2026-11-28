@@ -26,8 +26,8 @@ html.th-planet body.ui-app header a{color:var(--pl-ink)}
 
 /* 見出し */
 html.th-planet body.ui-app h1,html.th-planet body.ui-app h2,html.th-planet body.ui-app h3,html.th-planet body.ui-app h4{font-family:var(--pl-disp)!important;color:var(--pl-ink);text-shadow:none!important;letter-spacing:.02em}
-html.th-planet body.ui-app #view > h3,html.th-planet body.ui-app #view > h4,html.th-planet body.ui-app .leo-head-row > h3,html.th-planet body.ui-app h3.nx{color:var(--pl-ink)!important;border:0!important;width:auto;display:flex;align-items:center;gap:.4em}
-html.th-planet body.ui-app #view > h3::before,html.th-planet body.ui-app .leo-head-row > h3::before,html.th-planet body.ui-app h3.nx::before{content:"";flex:none;width:.7em;height:.7em;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f3d3a6,#d79d5f);box-shadow:0 0 0 .12em rgba(217,178,124,.35)}
+html.th-planet body.ui-app #view > h3,html.th-planet body.ui-app #view > h4,html.th-planet body.ui-app .leo-head-left > h3,html.th-planet body.ui-app h3.nx{color:var(--pl-ink)!important;border:0!important;width:auto;display:flex;align-items:center;gap:.4em}
+html.th-planet body.ui-app #view > h3::before,html.th-planet body.ui-app .leo-head-left > h3::before,html.th-planet body.ui-app h3.nx::before{content:"";flex:none;width:.7em;height:.7em;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f3d3a6,#d79d5f);box-shadow:0 0 0 .12em rgba(217,178,124,.35)}
 html.th-planet body.ui-app h3 small{font-family:var(--pl-font);font-weight:400;color:var(--pl-sub)}
 
 /* ログイン中の表示・説明 */
@@ -108,12 +108,17 @@ html.th-planet body.ui-app .pl-punch .pl-clock{font-family:var(--pl-disp);font-s
 html.th-planet body.ui-app .pl-punch .pl-go{display:block;text-align:center;background:var(--pl-g);color:#fff;border-radius:20px;padding:14px 10px;font-size:1.3em;font-weight:700;margin-top:8px;box-shadow:0 6px 14px -10px rgba(36,92,64,.9)}
 html.th-planet body.ui-app .pl-punch small{color:var(--pl-sub);font-size:.85em}
 /* レオホームの打刻（対象職員のみ）。戻る＋見出しの右横。総合トップと同じ色で小さく */
-html.th-planet body.ui-app .leo-head-row>.pl-hero-leo{display:flex;margin:0;max-width:220px}
-html.th-planet body.ui-app .leo-head-row>.pl-hero-leo a.pl-punch{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ph clock" "go go";align-items:center;align-content:center;gap:2px 8px;padding:8px 10px;box-sizing:border-box;width:100%;max-width:100%;min-width:0;border-radius:20px}
+html.th-planet body.ui-app .leo-head-tools .pl-hero-leo{display:flex;margin:0;max-width:220px}
+html.th-planet body.ui-app .leo-head-tools .pl-hero-leo a.pl-punch{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ph clock" "go go";align-items:center;align-content:center;gap:2px 8px;padding:8px 10px;box-sizing:border-box;width:100%;max-width:100%;min-width:0;border-radius:20px}
 html.th-planet body.ui-app .leo-head-row .pl-ph{grid-area:ph;font-size:.95em;line-height:1.2;min-width:0;overflow-wrap:anywhere}
 html.th-planet body.ui-app .leo-head-row .pl-clock{grid-area:clock;font-size:1.35em;line-height:1;white-space:nowrap}
 html.th-planet body.ui-app .leo-head-row .pl-go{grid-area:go;margin-top:2px;padding:7px 8px;font-size:.95em;border-radius:14px;box-shadow:0 4px 10px -8px rgba(36,92,64,.9)}
-@media (max-width:420px){html.th-planet body.ui-app .leo-head-row>.pl-hero-leo{max-width:100%}}
+@media (max-width:420px){html.th-planet body.ui-app .leo-head-tools .pl-hero-leo{max-width:100%}}
+/* レオホーム見出し横のお知らせ（打刻の右）。小さく、長いときは枠内スクロール */
+html.th-planet body.ui-app .leo-head-tools .home-todo{padding:8px 10px!important;border-radius:20px!important}
+html.th-planet body.ui-app .leo-head-tools .home-todo .ht-h{font-size:15px!important;margin:0 0 4px}
+html.th-planet body.ui-app .leo-head-tools .home-todo .ui-list-row{min-height:0;padding:5px 0;border-bottom:1px dashed var(--pl-line)}
+@media (min-width:900px){html.th-planet body.ui-app .leo-head-tools .home-todo .ht-h{font-size:18px!important}}
 html.th-planet body.ui-app .daily-sky{position:relative;overflow:hidden;margin:0!important;color:#fff!important;background:url(img/planet/ring.svg) right -26px top -18px/170px auto no-repeat,radial-gradient(120% 140% at 85% 0%,var(--pl-night2),var(--pl-night) 60%,#1f2a52)!important;border:0!important;border-radius:28px!important;padding:20px 22px!important;box-shadow:0 14px 28px -18px rgba(31,42,82,.8)!important;line-height:1.75;font-size:1em!important}
 html.th-planet body.ui-app .daily-sky .ds-h{font-family:var(--pl-disp);font-weight:700;font-size:1.25em!important;opacity:1!important;color:#fff!important;margin:0 0 6px}
 html.th-planet body.ui-app .daily-sky .ds-h::before{content:"🔮 "}
@@ -223,4 +228,4 @@ html.th-planet body.ui-app .tile.office .st{display:inline-block;margin-left:6px
   html.th-planet body.ui-app .pl-paused .tile.office .tx{font-size:26px}
   html.th-planet body.ui-app .pl-paused .tile.office .tx small{font-size:20px}
 }
-html.th-planet body.ui-app #view > h3 small,html.th-planet body.ui-app .leo-head-row > h3 small{font-family:var(--pl-font);font-weight:500;font-size:.55em;color:var(--pl-sub);margin-left:6px}
+html.th-planet body.ui-app #view > h3 small,html.th-planet body.ui-app .leo-head-left > h3 small{font-family:var(--pl-font);font-weight:500;font-size:.55em;color:var(--pl-sub);margin-left:6px}

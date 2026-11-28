@@ -438,11 +438,19 @@ assert.ok(nakaField.includes('中村友香担当'), '中村本人（現場職責
   assert.ok(!yuka.body.includes('class="pl-punch"') && !yuka.body.includes('href="#dakoku"'), '本文側の全幅カードは置かない');
   const page = yuka.head + yuka.body;
   assert.ok(page.indexOf('事業所えらびへ') < page.indexOf('class="pl-punch"') && page.indexOf('class="pl-punch"') < page.indexOf('id="leo_home_cal"'), '打刻は見出しのあと、カレンダーの前');
+  const todoAt = yuka.head.indexOf('id="home_todo"');
+  const punchAt = yuka.head.indexOf('class="pl-punch"');
+  assert.ok(todoAt > punchAt && yuka.head.includes('class="leo-head-tools"') && yuka.head.includes('leo-head-todo'), 'お知らせは打刻の右（同じツール行）');
+  assert.ok(yuka.head.includes('あなたへのお知らせ') && yuka.head.includes('hidden'), 'お知らせは依頼があるときだけ出す');
+  assert.ok(!yuka.body.includes('id="home_todo"') && !yuka.body.includes('あなたへのお知らせ'), '対象職員の本文（カレンダーの下）にはお知らせを置かない');
   const other = headOf('職員', '児発管');
   assert.ok(!other.head.includes('class="pl-punch"') && !other.head.includes('leo-head-row'), '他の職員の見出し横に打刻を置かない');
   assert.ok(!other.body.includes('class="pl-punch"'), '他の職員の本文にも打刻を置かない');
+  const oCal = other.body.indexOf('id="leo_home_cal"'), oTodo = other.body.indexOf('id="home_todo"'), oDaily = other.body.indexOf('毎日やる');
+  assert.ok(oCal >= 0 && oTodo > oCal && oDaily > oTodo, '他の職員のお知らせはカレンダーのあと、毎日やるの前');
   const fieldPunch = headOf('職員', '現場支援員');
   assert.ok(!fieldPunch.head.includes('class="pl-punch"') && !fieldPunch.body.includes('class="pl-punch"'), '現場職員に打刻を置かない');
+  assert.ok(fieldPunch.body.includes('id="home_todo"'), '現場職員のお知らせは本文の位置のまま');
 }
 assert.ok(!nakaField.includes('事務担当'), '中村本人でも事務担当は出さない');
 const kanri = renderLeoHome('職員', '児発管');
@@ -633,6 +641,6 @@ delete sandbox.JP_HOLIDAYS;
   assert.strictEqual(r.ok, false, '氏名なしは対象外');
   assert.ok(html.includes("const LEO_DIRECT_STAFF = ['中村友香']"), '対象は1か所の定数');
   assert.ok(html.includes('onclick="location.hash=portalTopHash()"'), '事業所えらびへは portalTopHash');
-  assert.ok(html.includes("var BUILD = '20261128punchside'"), 'BUILD を上げる');
+  assert.ok(html.includes("var BUILD = '20261128todohead'"), 'BUILD を上げる');
 }
 console.log('leo_home_cal_test ok');
