@@ -30,13 +30,21 @@ details{border-bottom:1px solid #eee;padding:4px 0}summary{cursor:pointer;paddin
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
-<link rel="stylesheet" href="theme-retro.css?v=20261030px">
+<link rel="stylesheet" href="theme-retro.css?v=20261128eye">
+<style>
+.pw-wrap{position:relative;width:100%;margin:3px 0}
+.pw-wrap input{margin:0;padding-right:48px;width:100%;box-sizing:border-box;display:block}
+#login button.pw-toggle,button.pw-toggle{position:absolute;right:2px;top:0;bottom:0;width:44px!important;min-width:44px!important;max-width:44px!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;border:0!important;border-radius:8px!important;background:transparent!important;background-image:none!important;color:#555!important;box-shadow:none!important;text-shadow:none!important;cursor:pointer;display:flex!important;align-items:center;justify-content:center;line-height:0;z-index:1}
+button.pw-toggle:hover{background:transparent!important;color:#222!important;box-shadow:none!important}
+button.pw-toggle:focus-visible{outline:2px solid #888;outline-offset:0}
+button.pw-toggle svg{width:22px;height:22px;display:block;pointer-events:none}
+</style>
 </head><body>
 <header><span>📒 会計（簡易）</span><span><a href="index.html">← ポータルへ</a></span></header>
 <main>
 <div id="login" class="card" hidden><p>法人管理者のメールアドレスでログインしてください。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
-<input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
+<div class="pw-wrap"><input id="pw" type="password" placeholder="パスワード" autocomplete="current-password"><button type="button" class="pw-toggle" aria-label="パスワードを表示" aria-pressed="false"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
 <button onclick="accLogin()">ログイン</button><div id="msg" style="color:#c00"></div></div>
 <div id="app" hidden><nav id="nav"></nav><div id="view"></div></div>
 <div id="deny" class="card" hidden>この画面は法人管理者だけが使えます。<br><a href="index.html">ポータルへ戻る</a></div>
@@ -53,6 +61,25 @@ details{border-bottom:1px solid #eee;padding:4px 0}summary{cursor:pointer;paddin
 <script src="ledger.js?v=202610181"></script>
 <script src="csvfmt.js?v=202610201"></script>
 <script src="acc.js?v=202610211600"></script>
-<script src="pc-scale.js?v=20261112keep"></script>
+<script src="pc-scale.js?v=20261128eye"></script>
 <script src="to-top.js?v=20261105top"></script>
+<script>
+(function(){
+  var input=document.getElementById('pw'); if(!input) return;
+  var btn=input.parentElement&&input.parentElement.querySelector('.pw-toggle'); if(!btn) return;
+  var eye='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var eyeOff='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.3 21.3 0 0 1 5.06-6.94"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  btn.addEventListener('click', function(e){
+    e.preventDefault();
+    var show=input.type==='password';
+    var start=input.selectionStart, end=input.selectionEnd;
+    input.type=show?'text':'password';
+    try{if(start!=null)input.setSelectionRange(start,end);}catch(err){}
+    btn.setAttribute('aria-label', show?'パスワードをかくす':'パスワードを表示');
+    btn.setAttribute('aria-pressed', show?'true':'false');
+    btn.innerHTML=show?eyeOff:eye;
+    input.focus();
+  });
+})();
+</script>
 </body></html>

@@ -124,12 +124,12 @@ h3.nx{font-size:18px;color:#333;margin:18px 0 10px}.nxl{display:grid;grid-templa
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link id="th_retro" rel="stylesheet" href="theme-retro.css?v=20261103pc">
+<link id="th_retro" rel="stylesheet" href="theme-retro.css?v=20261128eye">
 <script>/* テーマ切替：既定=惑星の空(planet・2026-11-10 会長承認)。?theme=yamen（官吏）/ ?theme=retro（ドット絵）はそのページを開いたときだけ。覚えない */
 (function(){var t='planet';try{var q=new URLSearchParams(location.search).get('theme');if(q==='retro'||q==='yamen')t=q;localStorage.removeItem('portalTheme');}catch(e){}
 document.documentElement.classList.add('th-'+t);var l=document.getElementById('th_retro');if(l&&t!=='retro')l.disabled=true;})();</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@700&family=Zen+Maru+Gothic:wght@500;700&display=swap">
-<link rel="stylesheet" href="theme-yamen.css?v=20261109chip">
+<link rel="stylesheet" href="theme-yamen.css?v=20261128eye">
 <style>
 /* 今日の日誌：児童名のボタン。入力欄は隠すだけで残す（保存は全員分） */
 .nk-kids{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
@@ -195,9 +195,17 @@ html.th-yamen body.portal button.nk-fold{background:transparent;color:inherit;bo
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="tokens.css?v=20261104all">
-<link rel="stylesheet" href="shell.css?v=20261110chip2">
-<link rel="stylesheet" href="theme-planet.css?v=20261113cal">
+<link rel="stylesheet" href="shell.css?v=20261128eye">
+<link rel="stylesheet" href="theme-planet.css?v=20261128eye">
 <style>
+/* パスワードの表示／かくす（目のマーク）。テーマの主ボタン色を受けない */
+.pw-wrap{position:relative;width:100%;margin:6px 0}
+.pw-wrap input{margin:0;padding-right:48px;width:100%;box-sizing:border-box;display:block}
+html body.ui-app #login button.pw-toggle,html body.ui-app #setpw button.pw-toggle,html.th-planet body.ui-app #login button.pw-toggle,html.th-planet body.ui-app #setpw button.pw-toggle,html.th-yamen body.portal #login button.pw-toggle,html.th-yamen body.portal #setpw button.pw-toggle,html body #login button.pw-toggle,html body #setpw button.pw-toggle,button.pw-toggle{position:absolute;right:2px;top:0;bottom:0;width:44px!important;min-width:44px!important;max-width:44px!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;border:0!important;border-radius:8px!important;background:transparent!important;background-image:none!important;color:#555!important;box-shadow:none!important;text-shadow:none!important;font-weight:400!important;cursor:pointer;display:flex!important;align-items:center;justify-content:center;line-height:0;z-index:1}
+html body.ui-app #login button.pw-toggle:hover,html body.ui-app #setpw button.pw-toggle:hover,html.th-planet body.ui-app #login button.pw-toggle:hover,html.th-planet body.ui-app #setpw button.pw-toggle:hover,html.th-yamen body.portal #login button.pw-toggle:hover,html.th-yamen body.portal #setpw button.pw-toggle:hover,button.pw-toggle:hover{background:transparent!important;color:#222!important;box-shadow:none!important}
+button.pw-toggle:focus-visible{outline:2px solid #888;outline-offset:0}
+button.pw-toggle svg{width:22px;height:22px;display:block;pointer-events:none}
+@media (min-width:900px){.pw-wrap{margin:10px 0}.pw-wrap input{padding-right:72px}html body.ui-app #login button.pw-toggle,html body.ui-app #setpw button.pw-toggle,html.th-planet body.ui-app #login button.pw-toggle,html.th-planet body.ui-app #setpw button.pw-toggle,html.th-yamen body.portal #login button.pw-toggle,html.th-yamen body.portal #setpw button.pw-toggle,button.pw-toggle{width:56px!important;min-width:56px!important;max-width:56px!important;right:6px}button.pw-toggle svg{width:32px;height:32px}}
 /* 児童別表示：Googleシートの児童別表示に寄せた印刷様式。ポータルの拡大よりこちらを優先 */
 html body.ui-app .jd{max-width:100%;overflow-x:clip;color:#1c2833;font-size:15px}
 html body.ui-app .jd-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:0 0 8px}
@@ -250,7 +258,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <main>
 <div id="login" class="card"><p>メールアドレスとパスワードでログインしてください。</p>
 <input id="em" type="email" placeholder="メールアドレス" autocomplete="username">
-<input id="pw" type="password" placeholder="パスワード" autocomplete="current-password">
+<div class="pw-wrap"><input id="pw" type="password" placeholder="パスワード" autocomplete="current-password"><button type="button" class="pw-toggle" aria-label="パスワードを表示" aria-pressed="false"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
 <button onclick="login()">ログイン</button>
 <button class="btn-ghost" onclick="$('login').hidden=true;$('forgot').hidden=false">はじめての方／パスワードを忘れた方</button>
 <button class="btn-ghost" onclick="location.search='?demo=1'">見本を見る</button><div id="msg"></div></div>
@@ -259,7 +267,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 <button onclick="sendReset()">メールを送る</button>
 <button class="btn-ghost" onclick="$('forgot').hidden=true;$('login').hidden=false">もどる</button><div id="fmsg"></div></div>
 <div id="setpw" class="card" hidden><p>新しいパスワードを決めてください（8文字以上）。</p>
-<input id="npw" type="password" placeholder="新しいパスワード" autocomplete="new-password">
+<div class="pw-wrap"><input id="npw" type="password" placeholder="新しいパスワード" autocomplete="new-password"><button type="button" class="pw-toggle" aria-label="パスワードを表示" aria-pressed="false"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
 <button onclick="setPassword()">パスワードを決める</button><div id="pmsg"></div></div>
 <div id="home" hidden><p id="hi"></p><div id="view"></div>
 <p id="help"></p></div>
@@ -331,7 +339,7 @@ html body.ui-app .jd table.jd-days tr.jd-abs td.jd-hot{color:#c0392b;font-weight
 
 // 古いキャッシュの index/JS を捨てて再読込（打刻は Supabase のみ）
 (function () {
-  var BUILD = '20261126kazukithu';
+  var BUILD = '20261128eye';
   try {
     var prev = localStorage.getItem('portalBuild');
     if (prev && prev !== BUILD) {
@@ -812,8 +820,29 @@ async function setPassword() {
 }
 if (AUTH_HASH.get('access_token') && ['recovery', 'invite'].includes(AUTH_HASH.get('type'))) { $('login').hidden = true; $('setpw').hidden = false; }
 
+
+const PW_EYE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const PW_EYE_OFF = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.3 21.3 0 0 1 5.06-6.94"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+function attachPwToggle(id) {
+  const input = $(id); if (!input) return;
+  const btn = input.parentElement && input.parentElement.querySelector('.pw-toggle'); if (!btn) return;
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    const show = input.type === 'password';
+    const start = input.selectionStart, end = input.selectionEnd;
+    input.type = show ? 'text' : 'password';
+    try { if (start != null) input.setSelectionRange(start, end); } catch (err) {}
+    btn.setAttribute('aria-label', show ? 'パスワードをかくす' : 'パスワードを表示');
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    btn.innerHTML = show ? PW_EYE_OFF : PW_EYE;
+    input.focus();
+  });
+}
+attachPwToggle('pw');
+attachPwToggle('npw');
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+$('npw').addEventListener('keydown', e => { if (e.key === 'Enter') setPassword(); });
 show();
-</script><script src="pc-scale.js?v=20261113cal"></script>
+</script><script src="pc-scale.js?v=20261128eye"></script>
 <script src="to-top.js?v=20261105top"></script>
 </body></html>

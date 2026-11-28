@@ -18,6 +18,7 @@
       // 児童別表示と型表などの入力表（.sheet-scroll）、児童の利用・送迎予定（.calv）は拡大しない。型表は全画面でも右端まで1画面に収める（2026-11-13）。児童別表示は印刷様式の大きさのまま。送迎予定は棒と名前列の文字が切れないようにする（2026-11-13）。
       if(e.closest&&e.closest('.jd,.sheet-scroll,.calv')){if(e.dataset)e.dataset.pcs='1';return;}
       var t=e.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='SVG'||t==='svg'||t==='CANVAS'||t==='BR')return;
+      if(e.classList&&e.classList.contains('pw-toggle')){if(e.dataset)e.dataset.pcs='1';return;}
       var cs=getComputedStyle(e),fs=parseFloat(cs.fontSize);
       if(fs&&fs<30){var n=Math.max(30,Math.round(fs*2.2));if(n>48)n=48;put(e,'font-size',n+'px');}
       var mw=cs.maxWidth;if(mw&&/px$/.test(mw)){var w=parseFloat(mw);if(w>=400&&w<1100)put(e,'max-width','1200px');}

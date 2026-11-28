@@ -93,7 +93,7 @@ html.th-yamen body.portal .badge, html.th-yamen body.portal .tile .badge {
 }
 
 /* ボタン：朱漆＋金 */
-html.th-yamen body.portal button, html.th-yamen body.portal .btn, html.th-yamen body.portal a.btn {
+html.th-yamen body.portal button:not(.pw-toggle), html.th-yamen body.portal .btn, html.th-yamen body.portal a.btn {
   background: linear-gradient(180deg, var(--ym-red-2), var(--ym-red));
   color: var(--ym-ivory); border: 1px solid var(--ym-gold); border-radius: 3px;
   box-shadow: 0 3px 0 #2a0505;
