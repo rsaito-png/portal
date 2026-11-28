@@ -2425,7 +2425,7 @@ LEO_VIEWS.plan = async function () {
       </details></div>` };
   }).sort((a, b) => (a.st >= 7) - (b.st >= 7) || b.over - a.over || (a.d?.start || 0) - (b.d?.start || 0));
   const live = cards.filter(c => !c.gone), leftCards = cards.filter(c => c.gone);
-  return `<h3>個別支援計画</h3>${demoNote()}<p class="note">各カードの赤い行と下のボタンだけ進めれば大丈夫です。細かい情報は「くわしく見る」にあります。保護者へのリンクはコピーして、公式LINEの1対1トークで送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。退所日を過ぎた児童は下に分けています（記録は残しています）。</p>
+  return `<h3>個別支援計画</h3>${demoNote()}<p class="note">各カードの赤い行と下のボタンだけ進めれば大丈夫です。細かい情報は「くわしく見る」にあります。保護者への案内文（リンクつき）をコピーして、公式LINEの1対1トークに貼って送ってください（ポータルからは送りません）。本文の下書きはボットが作ります。退所日を過ぎた児童は下に分けています（記録は残しています）。</p>
     ${live.filter(c => c.urgent).map(c => c.html).join('') || '<p class="note">いま急ぎの子はいません。</p>'}${live.some(c => !c.urgent) ? `<details style="margin-top:10px" ${live.some(c => !c.urgent && PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">いま急ぎではない子（${live.filter(c => !c.urgent).length}人）</summary>${live.filter(c => !c.urgent).map(c => c.html).join('')}</details>` : ''}${leftCards.length ? `<details style="margin-top:10px" ${leftCards.some(c => PLAN_OPEN === c.key) ? 'open' : ''}><summary style="cursor:pointer;font-weight:bold">退所した児童（${leftCards.length}人・記録は残しています）</summary>${leftCards.map(c => c.html).join('')}</details>` : ''}${cards.length ? '' : '<p>管理表の行がありません。</p>'}${mg ? trackEditList(rows) : ''}<div id="plan_editor"></div>`;
 };
 // 管理表の行を直す（児発管・管理者・事務）。ポータルの表だけを直す。Googleの管理表へは書き戻さない
@@ -2576,6 +2576,43 @@ async function planPrint(id) {
     docs.filter(Boolean).map((t, i) => `<div class="${i ? 'pb' : ''}">${markupHtml(t)}</div>`).join('') + '<script>setTimeout(()=>print(),300)<\/script>'); w.document.close();
 }
 // リンクのコピー：結果をボタンのすぐ下に必ず表示（成功＝緑、失敗＝URL欄を出して手でコピー）
+// 個別支援計画の保護者向け案内（来月の利用予定と同じく、文章＋リンクをまとめてコピーする）
+/* plan-line:start */
+const PLAN_LINE_SIGN = '中村　友香';
+function planLineDue(fromYmd) {
+  const base = fromYmd || (typeof today === 'function' ? today() : new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }));
+  const p = String(base).split('-').map(Number);
+  const dt = new Date(Date.UTC(p[0], (p[1] || 1) - 1, (p[2] || 1) + 7));
+  return `${dt.getUTCMonth() + 1}月${dt.getUTCDate()}日（${'日月火水木金土'[dt.getUTCDay()]}）`;
+}
+function planLineMsg(kind, url, doc) {
+  const u = String(url || '').trim(), sign = PLAN_LINE_SIGN;
+  if (kind === 'mon') return `こんにちは。
+いつもレオをご利用いただき、ありがとうございます。
+個別支援計画の更新時期となりました。
+つきましては以下のアンケートへのご回答をお願いいたします。
+お手数ですが、${planLineDue()}までにご回答いただけますと幸いです。
+${u}
+引き続き、お子様の成長のために取り組んでまいります。
+よろしくお願いいたします。
+${sign}`;
+  if (kind === 'doui' && doc === '原案') return `こんにちは。
+ご回答ありがとうございました。
+原案の段階で「もっとこうしてほしい！」というご意見があれば、本計画に反映させていただきます。
+ご確認いただき、この内容でよろしければ以下のフォームより確認連絡をお願いいたします。
+${u}
+ご意見があればこのLINEでお知らせください。
+原案は薄めに作ってありまして、本案はもう少し内容を深めます。（それぞれ１〜２行増えるようなイメージです。）
+よろしくお願いいたします。
+${sign}`;
+  if (kind === 'doui' && (doc === '本案' || !doc)) return `こんにちは。
+個別支援計画の本案をお送りさせていただきます。
+ご確認よろしくお願いいたします。
+${u}
+${sign}`;
+  return u;
+}
+/* plan-line:end */
 async function copyUrl(url) {
   try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(url); return true; } } catch (e) { }
   try { const ta = document.createElement('textarea'); ta.value = url; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; }
@@ -2589,18 +2626,39 @@ function copyNote(b, html, child) {
 function copyResult(b, url, ok, child, extra) {
   const e = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   if (b) { if (!b.dataset.orig) b.dataset.orig = b.textContent; b.textContent = ok ? 'コピーしました ✔' : b.dataset.orig; clearTimeout(b._t); if (ok) b._t = setTimeout(() => { b.textContent = b.dataset.orig; }, 5000); }
-  copyNote(b, ok ? `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">コピーしました。公式LINEの1対1トークに貼って送ってください。</p><p class="note">${extra || ''}</p>`
-    : `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">自動でコピーできませんでした。下のリンクを長押し（または選択）してコピーし、公式LINEの1対1トークに貼って送ってください。</p><input readonly value="${e(url)}" onfocus="this.select()" onclick="this.select()" style="width:100%;font-size:14px"><p class="note">${extra || ''}</p>`, child);
+  const multi = /\n/.test(String(url || ''));
+  const preview = multi
+    ? `<textarea readonly rows="10" onclick="this.select()" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.6;margin:6px 0">${e(url)}</textarea>`
+    : (ok ? '' : `<input readonly value="${e(url)}" onfocus="this.select()" onclick="this.select()" style="width:100%;font-size:14px">`);
+  const okHead = 'コピーしました。公式LINEの1対1トークに貼って送ってください。';
+  const ngHead = multi
+    ? '自動でコピーできませんでした。下の文を長押し（または選択）してコピーし、公式LINEの1対1トークに貼って送ってください。'
+    : '自動でコピーできませんでした。下のリンクを長押し（または選択）してコピーし、公式LINEの1対1トークに貼って送ってください。';
+  copyNote(b, ok ? `<p style="background:#e6f6e6;color:#1a6b1a;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">${okHead}</p>${preview}<p class="note">${extra || ''}</p>`
+    : `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">${ngHead}</p>${preview}<p class="note">${extra || ''}</p>`, child);
 }
 function copyError(b, msg, child) { copyNote(b, `<p style="background:#fde8e8;color:#b00;padding:10px;border-radius:6px;font-weight:bold;margin:6px 0">失敗しました：${String(msg).replace(/[<&]/g, '')}</p>`, child); }
+function planHogoUrl(kind, tok) {
+  return `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&t=${tok}`;
+}
+function planDemoUrl(kind, doc) {
+  return `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&demo=1${doc ? '&doc=' + encodeURIComponent(doc) : ''}`;
+}
 async function planLink(kind, child, term, planId, doc) {
-  if (DEMO) { pmsg(child || '児童B', `<p class="note">見本：${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&demo=1${doc ? '&doc=' + encodeURIComponent(doc) : ''}</p>`); return; }
-  const B = copyBtnEl(); if (B) B.disabled = true;
+  const B = copyBtnEl();
+  if (DEMO) {
+    const text = planLineMsg(kind, planDemoUrl(kind, doc), doc);
+    const ok = await copyUrl(text);
+    copyResult(B, text, ok, child || '児童B', '見本の案内文（リンクつき）です。本番ではご家庭ごとの専用リンクになります。ほかの家庭には送らないでください。');
+    return;
+  }
+  if (B) B.disabled = true;
   try { const tok = await sb('rpc/leo_make_token_link', { method: 'POST', body: JSON.stringify({ p_kind: kind, p_child: child, p_term: term, p_plan: planId || null, p_doc: doc }) });
-    const url = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&t=${tok}`;
-    const ok = await copyUrl(url);
+    const url = planHogoUrl(kind, tok);
+    const text = planLineMsg(kind, url, doc);
+    const ok = await copyUrl(text);
     await planLogSend(kind, child, term, planId, doc, tok, null);
-    copyResult(B, url, ok, child, 'ほかの家庭には送らないでください。' + (kind === 'doui' ? 'リンクは30日で期限が切れ、同意が1回入ると使えなくなります。あとで本文を直したときは、リンクをもう一度作ってください。' : '')); }
+    copyResult(B, text, ok, child, '案内の文（リンクつき）をコピーしました。ほかの家庭には送らないでください。' + (kind === 'doui' ? 'リンクは30日で期限が切れ、同意が1回入ると使えなくなります。あとで本文を直したときは、リンクをもう一度作ってください。' : '')); }
   catch (e) { copyError(B, e.message, child); }
   finally { if (B) B.disabled = false; }
 }
@@ -2611,16 +2669,22 @@ async function planLogSend(kind, child, term, planId, doc, tok, url, via) {
 // 再送：前と同じリンクをコピーし、送った記録を足す（ポータルからは送らない）
 async function planResend(kind, child, term, planId, doc) {
   const B = copyBtnEl();
-  if (DEMO) { copyNote(B, '<p class="note">見本：リンクをコピーして、送った記録を1件足します。</p>', child); return; }
+  if (DEMO) {
+    const text = planLineMsg(kind, planDemoUrl(kind, doc), doc);
+    const ok = await copyUrl(text);
+    copyResult(B, text, ok, child, '見本の案内文（リンクつき）です。送った記録は見本では残しません。');
+    return;
+  }
   try {
   const D0 = await planData(), N = s => String(s || '').replace(/\s/g, '');
   const prev = (D0.sends || []).filter(x => x.kind === kind && N(x.child) === N(child) && (kind === 'mon' ? x.term === term : x.plan_id === planId && x.doc === doc)).pop();
   let tok = kind === 'mon' ? (D0.links.find(l => N(l.child) === N(child) && l.term === term) || {}).token : (D0.clinks.filter(l => l.plan_id === planId && l.doc === doc && !l.used_at && new Date(l.expires_at) > new Date()).pop() || {}).token;
-  let url = tok ? `${location.origin}${location.pathname.replace(/[^/]*$/, '')}hogosha.html?k=${kind}&t=${tok}` : prev && prev.url;
+  let url = tok ? planHogoUrl(kind, tok) : prev && prev.url;
   if (!url) { await planLink(kind, kind === 'mon' ? child : '', kind === 'mon' ? term : '', planId, doc); return; }
-  const ok = await copyUrl(url);
+  const text = planLineMsg(kind, url, doc);
+  const ok = await copyUrl(text);
   await planLogSend(kind, child, term, planId, doc, tok || null, tok ? null : url, tok ? 'ポータル（再送）' : 'Google（再送）');
-  copyResult(B, url, ok, child, (tok ? '' : 'これはGoogleフォームのリンクです（全員共通）。') + '送った記録を1件足しました。');
+  copyResult(B, text, ok, child, (tok ? '' : 'これはGoogleフォームのリンクです（全員共通）。') + '案内の文（リンクつき）をコピーしました。送った記録を1件足しました。');
   } catch (e) { copyError(B, e.message, child); }
 }
 // ④ 職員モニタリング：今の計画期間の活動記録（日誌Q列＋ポータルの下書き由来）を日付順にまとめる。ボットが文章に整える

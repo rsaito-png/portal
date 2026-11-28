@@ -53,10 +53,10 @@ function skTermOf(sel, plans, monLinks) {
 }
 function skLineMsg(kind, url, doc) {
   const u = String(url || '').trim();
+  if ((kind === 'mon' || kind === 'doui') && typeof planLineMsg === 'function') return planLineMsg(kind, u, doc);
   if (kind === 'assess') return `レオです。\n\nご利用前のアセスメントのご案内です。下のリンクを開いて、ご入力をお願いいたします。\n\n${u}`;
-  if (kind === 'mon') return `レオです。\n\n個別支援計画のための保護者アンケートです。下のリンクを開いて、ご回答をお願いいたします。\n\n${u}`;
   if (kind === 'doc') return `レオです。\n\n利用契約書と重要事項説明書の署名用リンクです。下のリンクを開いて、ご確認とご署名をお願いいたします。\n\n${u}`;
-  if (kind === 'doui') return `レオです。\n\n個別支援計画（${doc || '本案'}）の同意のお願いです。下のリンクを開いて、ご確認と同意をお願いいたします。\n\n${u}`;
+  if (kind === 'mon' || kind === 'doui') return u;
   return `レオです。\n\n下のリンクを開いてください。\n\n${u}`;
 }
 function skLastLineSend(sends, kind, child, pred) {
@@ -69,7 +69,7 @@ function skLineBox(id, kind, child, term, token, url, lastSend, doc) {
   const docArg = doc || '';
   return `<div class="sk-linebox" style="margin:10px 0;padding:10px;border:1px solid #cde;border-radius:8px;background:#f7fbf8">
     <p class="note">保護者への案内です。コピーして、公式LINEの1対1トークに貼って送ってください。ポータルからは送りません。</p>
-    <textarea id="${esc(id)}" readonly rows="7" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.6">${esc(skLineMsg(kind, url, doc))}</textarea>
+    <textarea id="${esc(id)}" data-kind="${esc(kind)}" data-doc="${esc(docArg)}" data-url="${esc(url)}" readonly rows="12" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.6">${esc(skLineMsg(kind, url, doc))}</textarea>
     <p style="margin:8px 0">
       <button type="button" onclick="skCopyMsg('${esc(id)}')">コピー</button>
       <button type="button" onclick="skMarkSent('${esc(id)}','${esc(kind)}','${skArg(child)}','${skArg(term || '')}','${skArg(token || '')}','${skArg(url)}','${skArg(docArg)}')">LINEで送った</button>
@@ -93,7 +93,11 @@ window.skOpen = function (name) {
 };
 window.skCopyMsg = async function (id) {
   const el = typeof document !== 'undefined' && document.getElementById(id);
-  const text = el ? el.value : '';
+  let text = el ? el.value : '';
+  if (el && typeof planLineMsg === 'function' && (el.dataset.kind === 'mon' || el.dataset.kind === 'doui')) {
+    text = planLineMsg(el.dataset.kind, el.dataset.url || '', el.dataset.doc || '');
+    el.value = text;
+  }
   const note = typeof document !== 'undefined' && document.getElementById(id + '_msg');
   const ok = typeof copyUrl === 'function' ? await copyUrl(text) : false;
   if (!ok && el) { try { el.focus(); el.select(); } catch (e) {} }

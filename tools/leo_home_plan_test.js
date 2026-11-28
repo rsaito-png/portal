@@ -282,7 +282,7 @@ const docs = { genan: '原案', honan: '本案', assessment: 'アセス', kaigi:
   assert.ok(!homeFn.includes("sheetRows('keikaku')"));
   assert.ok(!homeFn.includes('#leo/keikaku'));
   assert.ok(homeFn.includes('planHomeTodos'));
-  assert.ok(read('index.html').includes('leo.js?v=20261124kakunin'));
+  assert.ok(read('index.html').includes('leo.js?v=20261128planline'));
   const { leoYmShift, leoKakuninHomeItems, leoTodoItem } = sandbox.__leo;
   assert.strictEqual(leoYmShift('2026-11', -1), '2026-10');
   assert.strictEqual(leoYmShift('2026-01', -1), '2025-12');
