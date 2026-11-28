@@ -401,6 +401,11 @@ function renderLeoHome(role, duty, name) {
   });
   assert.ok(!daily.includes('#leo/monitoring') && !daily.includes('モニタリングシート'), role + '/' + duty + ' の毎日やるにモニタリングは置かない');
   assert.ok(body.includes('送迎') && body.includes('href="#leo/sougei"'), role + '/' + duty + ' に送迎を直置き');
+  const calAt = body.indexOf('id="leo_home_cal"');
+  const noticeAt = body.indexOf('id="home_todo"');
+  const dailyAt = body.indexOf('毎日やる');
+  assert.ok(calAt >= 0 && noticeAt > calAt && dailyAt > noticeAt, role + '/' + duty + ' のお知らせはカレンダーのあと、毎日やるの前');
+  assert.ok(body.includes('あなたへのお知らせ') && body.includes('class="ui-card home-todo" hidden'), role + '/' + duty + ' のお知らせは依頼があるときだけ');
 });
 const field = renderLeoHome('職員', '現場支援員');
 assert.ok(!field.includes('中村友香担当') && !field.includes('事務担当') && !field.includes('がする'), '現場職員に担当欄を出さない');
